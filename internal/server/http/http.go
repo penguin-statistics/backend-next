@@ -48,13 +48,5 @@ func CreateServer(config *config.Config) *fiber.App {
 		app.Use(pprof.New())
 	}
 
-	app.Get("/", func(c *fiber.Ctx) error {
-		return c.SendString("Hello, World!")
-	})
-
-	app.Get("/_teapot", func(c *fiber.Ctx) error {
-		return c.SendStatus(418)
-	})
-
 	return app
 }

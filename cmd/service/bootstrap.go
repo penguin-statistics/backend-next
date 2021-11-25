@@ -3,6 +3,9 @@ package service
 import (
 	"context"
 	"penguin-stats-v4/internal/config"
+	"penguin-stats-v4/internal/controllers"
+	"penguin-stats-v4/internal/infra"
+	"penguin-stats-v4/internal/server"
 	httpserver "penguin-stats-v4/internal/server/http"
 
 	"go.uber.org/fx"
@@ -12,6 +15,10 @@ func Bootstrap() {
 	app := fx.New(
 		fx.Provide(config.Parse),
 		fx.Provide(httpserver.CreateServer),
+		fx.Provide(infra.ProvidePostgres),
+		fx.Provide(server.CreateVersioningEndpoints),
+		fx.Invoke(controllers.RegisterIndexController),
+		fx.Invoke(controllers.RegisterItemController),
 		fx.Invoke(run),
 	)
 
