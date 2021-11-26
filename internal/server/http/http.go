@@ -19,7 +19,7 @@ import (
 func CreateServer(config *config.Config) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:      "Penguin Stats Backend v4",
-		ServerHeader: "Penguin/1.0",
+		ServerHeader: "Penguin/0.1",
 		// NOTICE: This will also affect WebSocket. Be aware if this fiber instance service is re-used.
 		ReadTimeout:  time.Second * 20,
 		WriteTimeout: time.Second * 20,

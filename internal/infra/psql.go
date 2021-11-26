@@ -1,8 +1,10 @@
 package infra
 
 import (
+	"context"
 	"database/sql"
 	"penguin-stats-v4/internal/config"
+	"time"
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
@@ -18,6 +20,12 @@ func ProvidePostgres(config *config.Config) (*bun.DB, error) {
 	// Create a Bun db on top of it.
 	db := bun.NewDB(pgdb, pgdialect.New())
 	db.AddQueryHook(bundebug.NewQueryHook())
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	if err := db.PingContext(ctx); err != nil {
+		return nil, err
+	}
 
 	return db, nil
 }
