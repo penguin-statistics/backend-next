@@ -15,4 +15,5 @@ type PDropReport struct {
 	CreatedAt string `json:"createdAt"`
 	Deleted   bool   `json:"deleted"`
 	Server    string `json:"server"`
+	AccountID int64  `json:"accountId"`
 }

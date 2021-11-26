@@ -8,14 +8,14 @@ import (
 )
 
 type PDropInfo struct {
-	bun.BaseModel `bun:"drop_infos"`
+	bun.BaseModel `bun:"drop_infos,alias:di"`
 
 	ID            int64           `json:"id"`
 	Server        string          `json:"server"`
 	StageID       int64           `json:"stageId"`
 	ItemID        null.Int        `json:"itemId"`
-	DropType      int64           `json:"dropType"`
-	TimeRangeID   string          `json:"timeRangeId"`
+	DropType      string          `json:"dropType"`
+	TimeRangeID   int64           `json:"timeRangeId"`
 	Bounds        json.RawMessage `json:"bounds"`
-	Accumulatable bool            `json:"accumulatable"`
+	Accumulable   bool            `json:"accumulable"`
 }
