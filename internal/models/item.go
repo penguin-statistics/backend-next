@@ -16,7 +16,7 @@ type PItem struct {
 	Existence json.RawMessage `json:"existence"`
 	SortID    int             `json:"sortId"`
 	Rarity    int             `json:"rarity"`
-	Group     null.String     `json:"group"`
-	Sprite    null.String     `json:"sprite"`
-	Keywords  json.RawMessage `json:"keywords"`
+	Group     *null.String    `json:"group,omitempty"`
+	Sprite    *null.String    `json:"sprite,omitempty"`
+	Keywords  json.RawMessage `json:"keywords,omitempty"`
 }

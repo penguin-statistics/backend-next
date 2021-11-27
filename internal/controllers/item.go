@@ -1,22 +1,28 @@
 package controllers
 
 import (
+	"database/sql"
+	"net/http"
 	"penguin-stats-v4/internal/models"
+	"penguin-stats-v4/internal/pkg/errors"
 	"penguin-stats-v4/internal/server"
 	"penguin-stats-v4/internal/utils"
 	"strings"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
 	"github.com/uptrace/bun"
 )
 
 type ItemController struct {
-	db *bun.DB
+	db    *bun.DB
+	redis *redis.Client
 }
 
-func RegisterItemController(v3 *server.V3, db *bun.DB) {
+func RegisterItemController(v3 *server.V3, db *bun.DB, redis *redis.Client) {
 	c := &ItemController{
-		db: db,
+		db:    db,
+		redis: redis,
 	}
 
 	v3.Get("/items/:itemId", buildSanitizer(utils.NonNullString, utils.IsInt), c.GetItemById)
@@ -28,7 +34,7 @@ func buildSanitizer(sanitizer ...func(string) bool) func(ctx *fiber.Ctx) error {
 
 		for _, sanitizer := range sanitizer {
 			if !sanitizer(itemId) {
-				return utils.RespondBadRequest(ctx, "invalid or missing itemId")
+				return fiber.NewError(http.StatusBadRequest, "invalid or missing itemId")
 			}
 		}
 
@@ -44,6 +50,10 @@ func (c *ItemController) GetItemById(ctx *fiber.Ctx) error {
 		Model(&item).
 		Where("id = ?", itemId).
 		Scan(ctx.Context())
+
+	if err == sql.ErrNoRows {
+		return errors.ErrNotFound
+	}
 
 	if err != nil {
 		return err

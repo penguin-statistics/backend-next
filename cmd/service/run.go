@@ -1,4 +1,4 @@
-package service
+package main
 
 import (
 	"fmt"
@@ -6,14 +6,8 @@ import (
 
 	// "github.com/davecgh/go-spew/spew"
 	"github.com/gofiber/fiber/v2"
-	"github.com/uptrace/bun"
 )
 
-func run(app *fiber.App, config *config.Config, db *bun.DB) error {
-	err := db.Ping()
-	if err != nil {
-		return fmt.Errorf("failed to ping database: %w", err)
-	}
-
+func run(app *fiber.App, config *config.Config) error {
 	return app.Listen(fmt.Sprintf(":%d", config.Port))
 }

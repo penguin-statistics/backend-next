@@ -2,14 +2,14 @@ package shims
 
 import (
 	"encoding/json"
-	"github.com/ahmetb/go-linq/v3"
-	"github.com/tidwall/gjson"
-	"penguin-stats-v4/internal/models/helpers"
 	"penguin-stats-v4/internal/models/shims"
 	"penguin-stats-v4/internal/server"
 	"penguin-stats-v4/internal/utils"
 	"strconv"
 	"strings"
+
+	"github.com/ahmetb/go-linq/v3"
+	"github.com/tidwall/gjson"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/uptrace/bun"
@@ -33,7 +33,7 @@ func applyShim(item *shims.PItem) {
 	item.Name = nameI18n.Map()["zh"].String()
 
 	var coordSegments []int
-	if item.Sprite.Valid {
+	if item.Sprite != nil && item.Sprite.Valid {
 		segments := strings.SplitN(item.Sprite.String, ":", 2)
 
 		linq.From(segments).Select(func(i interface{}) interface{} {
@@ -46,7 +46,9 @@ func applyShim(item *shims.PItem) {
 			return i.(int) != -1
 		}).ToSlice(&coordSegments)
 	}
-	item.SpriteCoords = helpers.NewIntSlice(coordSegments, coordSegments != nil)
+	if coordSegments != nil {
+		item.SpriteCoords = &coordSegments
+	}
 
 	keywords := gjson.ParseBytes(item.Keywords)
 

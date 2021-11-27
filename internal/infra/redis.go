@@ -12,7 +12,7 @@ func ProvideRedis() (*redis.Client, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "",
-		DB:       0,
+		DB:       1, // avoid potential collision with Penguin v1 Backend
 	})
 
 	// check redis connection

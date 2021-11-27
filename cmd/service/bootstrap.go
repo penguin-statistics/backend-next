@@ -1,29 +1,18 @@
-package service
+package main
 
 import (
 	"context"
-	"penguin-stats-v4/internal/config"
-	"penguin-stats-v4/internal/controllers"
-	"penguin-stats-v4/internal/controllers/shims"
-	"penguin-stats-v4/internal/infra"
-	"penguin-stats-v4/internal/server"
-	httpserver "penguin-stats-v4/internal/server/http"
+	"penguin-stats-v4/internal/appentry"
 
 	"go.uber.org/fx"
 )
 
-func Bootstrap() {
-	app := fx.New(
-		fx.Provide(config.Parse),
-		fx.Provide(httpserver.CreateServer),
-		fx.Provide(infra.ProvidePostgres),
-		fx.Provide(infra.ProvideRedis),
-		fx.Provide(server.CreateVersioningEndpoints),
-		fx.Invoke(shims.RegisterItemController),
-		fx.Invoke(controllers.RegisterIndexController),
-		fx.Invoke(controllers.RegisterItemController),
-		fx.Invoke(run),
-	)
+func main() {
+	opts := []fx.Option{}
+	opts = append(opts, appentry.ProvideOptions()...)
+	opts = append(opts, fx.Invoke(run))
+
+	app := fx.New(opts...)
 
 	ctx := context.Background()
 	err := app.Start(ctx)

@@ -14,8 +14,8 @@ type PZone struct {
 	ZoneID     int64           `json:"zoneId"`
 	Index      int64           `json:"index"`
 	Category   string          `json:"category"`
-	Type       null.String     `json:"type"`
+	Type       *null.String    `json:"type,omitempty"`
 	Name       json.RawMessage `json:"name"`
 	Existence  json.RawMessage `json:"existence"`
-	Background null.String     `json:"background"`
+	Background *null.String    `json:"background,omitempty"`
 }
