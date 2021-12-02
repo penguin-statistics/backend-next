@@ -1,18 +1,18 @@
 package appentry
 
 import (
-	"penguin-stats-v4/internal/config"
-	"penguin-stats-v4/internal/controllers"
-	"penguin-stats-v4/internal/controllers/shims"
-	"penguin-stats-v4/internal/infra"
-	"penguin-stats-v4/internal/server"
-	httpserver "penguin-stats-v4/internal/server/http"
+	"github.com/penguin-statistics/backend-next/internal/config"
+	"github.com/penguin-statistics/backend-next/internal/controllers"
+	"github.com/penguin-statistics/backend-next/internal/controllers/shims"
+	"github.com/penguin-statistics/backend-next/internal/infra"
+	"github.com/penguin-statistics/backend-next/internal/server"
+	httpserver "github.com/penguin-statistics/backend-next/internal/server/http"
 
 	"go.uber.org/fx"
 )
 
-func ProvideOptions() []fx.Option {
-	return []fx.Option{
+func ProvideOptions(includeSwagger bool) []fx.Option {
+	opts := []fx.Option{
 		fx.Provide(config.Parse),
 		fx.Provide(httpserver.CreateServer),
 		fx.Provide(infra.ProvidePostgres),
@@ -22,4 +22,10 @@ func ProvideOptions() []fx.Option {
 		fx.Invoke(controllers.RegisterIndexController),
 		fx.Invoke(controllers.RegisterItemController),
 	}
+
+	if includeSwagger {
+		opts = append(opts, fx.Invoke(controllers.RegisterSwaggerController))
+	}
+
+	return opts
 }

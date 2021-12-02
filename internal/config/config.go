@@ -12,7 +12,7 @@ type Config struct {
 }
 
 func Parse() *Config {
-	portStr := os.Getenv("PENGUIN_V4_PORT")
+	portStr := os.Getenv("PENGUIN_V3_PORT")
 	if portStr == "" {
 		portStr = "9010"
 	}
@@ -22,7 +22,7 @@ func Parse() *Config {
 		panic(err)
 	}
 
-	devMode := os.Getenv("PENGUIN_V4_DEV") == "true"
+	devMode := os.Getenv("PENGUIN_3_DEV") == "true"
 
 	return &Config{
 		Port:    port,

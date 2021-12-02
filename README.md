@@ -2,11 +2,11 @@
      alt="Penguin Statistics - Logo"
      width="96px" />
      
-# Penguin Statistics - V4 Backend
+# Penguin Statistics - V3 Backend
 [![License](https://img.shields.io/github/license/penguin-statistics/backend-next)](https://github.com/penguin-statistics/backend-next/blob/dev/LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/penguin-statistics/backend-next)](https://github.com/penguin-statistics/backend-next/commits/dev)
 
-The re-designed [Penguin Statistics](https://penguin-stats.io/?utm_source=github) v4 Backend, built with Go.
+The re-designed [Penguin Statistics](https://penguin-stats.io/?utm_source=github) v3 Backend, built with Go.
 
 ## Architecture
 This Go project mainly uses:

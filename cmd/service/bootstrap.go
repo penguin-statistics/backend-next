@@ -1,15 +1,16 @@
-package main
+package service
 
 import (
 	"context"
-	"penguin-stats-v4/internal/appentry"
+
+	"github.com/penguin-statistics/backend-next/internal/appentry"
 
 	"go.uber.org/fx"
 )
 
-func main() {
+func Bootstrap() {
 	opts := []fx.Option{}
-	opts = append(opts, appentry.ProvideOptions()...)
+	opts = append(opts, appentry.ProvideOptions(true)...)
 	opts = append(opts, fx.Invoke(run))
 
 	app := fx.New(opts...)

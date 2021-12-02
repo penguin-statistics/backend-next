@@ -4,8 +4,9 @@ import (
 	"os"
 	"time"
 
-	"penguin-stats-v4/internal/config"
-	"penguin-stats-v4/internal/pkg/errors"
+	"github.com/opentracing/opentracing-go"
+	"github.com/penguin-statistics/backend-next/internal/config"
+	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -15,11 +16,14 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/gofiber/helmet/v2"
+
+	fibertracing "github.com/aschenmaker/fiber-opentracing"
+	"github.com/aschenmaker/fiber-opentracing/fjaeger"
 )
 
 func CreateServer(config *config.Config) *fiber.App {
 	app := fiber.New(fiber.Config{
-		AppName:      "Penguin Stats Backend v4",
+		AppName:      "Penguin Stats Backend v3",
 		ServerHeader: "Penguin/0.1",
 		// NOTICE: This will also affect WebSocket. Be aware if this fiber instance service is re-used
 		//         for long connection services.
@@ -31,7 +35,7 @@ func CreateServer(config *config.Config) *fiber.App {
 		ErrorHandler: func(ctx *fiber.Ctx, err error) error {
 			// Use custom error handler to return JSON error responses
 			if e, ok := err.(*errors.PenguinError); ok {
-				// Override status code if errors.PenguinError type
+				// Provide error code if errors.PenguinError type
 				return ctx.Status(e.StatusCode).JSON(fiber.Map{
 					"code":    e.ErrorCode,
 					"message": e.Message,
@@ -48,7 +52,8 @@ func CreateServer(config *config.Config) *fiber.App {
 			}
 
 			return ctx.Status(code).JSON(fiber.Map{
-				"error": err.Error(),
+				"code":    "INTERNAL_ERROR",
+				"message": err.Error(),
 			})
 		},
 	})
@@ -65,11 +70,20 @@ func CreateServer(config *config.Config) *fiber.App {
 		EnableStackTrace: true,
 	}))
 	app.Use(helmet.New(helmet.Config{
-		HSTSMaxAge:            31356000,
-		HSTSPreloadEnabled:    true,
-		ReferrerPolicy:        "strict-origin-when-cross-origin",
-		ContentSecurityPolicy: "default-src 'none'; script-src 'none'; worker-src 'none'; frame-ancestors 'none'; sandbox",
-		PermissionPolicy:      "interest-cohort=()",
+		HSTSMaxAge:         31356000,
+		HSTSPreloadEnabled: true,
+		ReferrerPolicy:     "strict-origin-when-cross-origin",
+		// ContentSecurityPolicy: "default-src 'none'; script-src 'none'; worker-src 'none'; frame-ancestors 'none'; sandbox",
+		PermissionPolicy: "interest-cohort=()",
+	}))
+
+	fjaeger.New(fjaeger.Config{})
+
+	app.Use(fibertracing.New(fibertracing.Config{
+		Tracer: opentracing.GlobalTracer(),
+		OperationName: func(ctx *fiber.Ctx) string {
+			return "TEST:  HTTP " + ctx.Method() + " URL: " + ctx.Path()
+		},
 	}))
 
 	if config.DevMode {

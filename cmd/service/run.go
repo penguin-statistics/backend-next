@@ -1,8 +1,9 @@
-package main
+package service
 
 import (
 	"fmt"
-	"penguin-stats-v4/internal/config"
+
+	"github.com/penguin-statistics/backend-next/internal/config"
 
 	// "github.com/davecgh/go-spew/spew"
 	"github.com/gofiber/fiber/v2"

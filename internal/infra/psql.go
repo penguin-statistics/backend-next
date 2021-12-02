@@ -3,8 +3,9 @@ package infra
 import (
 	"context"
 	"database/sql"
-	"penguin-stats-v4/internal/config"
 	"time"
+
+	"github.com/penguin-statistics/backend-next/internal/config"
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"

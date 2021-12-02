@@ -35,7 +35,4 @@ var (
 
 	// ErrInvalidRequest is returned when a request is invalid.
 	ErrInvalidRequest = New(fiber.StatusBadRequest, CodeInvalidRequest, "invalid request")
-
-	// ErrInternal is returned when an internal error occurs.
-	ErrInternal = New(fiber.StatusInternalServerError, "INTERNAL_ERROR", "internal error")
 )

@@ -2,11 +2,12 @@ package shims
 
 import (
 	"encoding/json"
-	"penguin-stats-v4/internal/models/shims"
-	"penguin-stats-v4/internal/server"
-	"penguin-stats-v4/internal/utils"
 	"strconv"
 	"strings"
+
+	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	"github.com/penguin-statistics/backend-next/internal/server"
+	"github.com/penguin-statistics/backend-next/internal/utils"
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/tidwall/gjson"
@@ -47,7 +48,7 @@ func applyShim(item *shims.PItem) {
 		}).ToSlice(&coordSegments)
 	}
 	if coordSegments != nil {
-		item.SpriteCoords = &coordSegments
+		item.SpriteCoord = &coordSegments
 	}
 
 	keywords := gjson.ParseBytes(item.Keywords)

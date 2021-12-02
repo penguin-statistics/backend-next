@@ -3,11 +3,12 @@ package controllers
 import (
 	"database/sql"
 	"net/http"
-	"penguin-stats-v4/internal/models"
-	"penguin-stats-v4/internal/pkg/errors"
-	"penguin-stats-v4/internal/server"
-	"penguin-stats-v4/internal/utils"
 	"strings"
+
+	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/server"
+	"github.com/penguin-statistics/backend-next/internal/utils"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
@@ -42,6 +43,16 @@ func buildSanitizer(sanitizer ...func(string) bool) func(ctx *fiber.Ctx) error {
 	}
 }
 
+// GetItemById godoc
+// @Summary      Gets an Item using numerical ID
+// @Description  Gets an Item using the item's numerical ID
+// @Tags         Item
+// @Produce      json
+// @Param        itemId  path      int  true  "Numerical Item ID"
+// @Success      200     {object}  models.PItem{name=models.I18nString,existence=models.Existence,keywords=models.Keywords}
+// @Failure      400     {object}  errors.PenguinError "Invalid or missing itemId. Notice that this shall be the **numerical ID** of the item, instead of the previously used string form **arkItemId** of the item."
+// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Router       /v3/items/{itemId} [GET]
 func (c *ItemController) GetItemById(ctx *fiber.Ctx) error {
 	itemId := ctx.Params("itemId")
 

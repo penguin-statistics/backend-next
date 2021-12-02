@@ -30,13 +30,13 @@ func TestV2Items(t *testing.T) {
 		j.ForEach(func(key, value gjson.Result) bool {
 			assert.Equal(t, gjson.String, value.Get("itemId").Type, "expect itemId is a string")
 
-			coords := value.Get("spriteCoords")
-			if coords.IsArray() {
-				arr := coords.Array()
-				assert.Equal(t, len(arr), 2, "expect spriteCoords is an array of length 2")
+			coord := value.Get("spriteCoord")
+			if coord.IsArray() {
+				arr := coord.Array()
+				assert.Equal(t, len(arr), 2, "expect spriteCoord is an array of length 2")
 
 				for _, v := range arr {
-					assert.Equal(t, gjson.Number, v.Type, "expect spriteCoords is an array of numbers")
+					assert.Equal(t, gjson.Number, v.Type, "expect spriteCoord is an array of numbers")
 				}
 			}
 

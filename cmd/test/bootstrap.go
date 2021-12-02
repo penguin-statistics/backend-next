@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"penguin-stats-v4/internal/appentry"
+
+	"github.com/penguin-statistics/backend-next/internal/appentry"
 
 	"go.uber.org/fx"
 )
@@ -10,7 +11,7 @@ import (
 func populate(targets ...interface{}) {
 	// for testing, logger is too annoying. therefore we use a NopLogger here
 	opts := []fx.Option{fx.NopLogger}
-	opts = append(opts, appentry.ProvideOptions()...)
+	opts = append(opts, appentry.ProvideOptions(false)...)
 	opts = append(opts, fx.Populate(targets...))
 
 	app := fx.New(
