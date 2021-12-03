@@ -1,12 +1,18 @@
 package httpserver
 
 import (
+	"fmt"
 	"os"
 	"time"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/penguin-statistics/backend-next/internal/config"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/sdk/resource"
+	tracesdk "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -17,8 +23,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/gofiber/helmet/v2"
 
-	fibertracing "github.com/aschenmaker/fiber-opentracing"
-	"github.com/aschenmaker/fiber-opentracing/fjaeger"
+	"github.com/penguin-statistics/fiberotel"
 )
 
 func CreateServer(config *config.Config) *fiber.App {
@@ -77,17 +82,49 @@ func CreateServer(config *config.Config) *fiber.App {
 		PermissionPolicy: "interest-cohort=()",
 	}))
 
-	fjaeger.New(fjaeger.Config{})
-
-	app.Use(fibertracing.New(fibertracing.Config{
-		Tracer: opentracing.GlobalTracer(),
-		OperationName: func(ctx *fiber.Ctx) string {
-			return "TEST:  HTTP " + ctx.Method() + " URL: " + ctx.Path()
-		},
-	}))
-
 	if config.DevMode {
+		fmt.Println("Running in DEV mode")
+
 		app.Use(pprof.New())
+
+		exporter, err := jaeger.New(jaeger.WithCollectorEndpoint())
+		if err != nil {
+			panic(err)
+		}
+		tracerProvider := tracesdk.NewTracerProvider(
+			tracesdk.WithSyncer(exporter),
+			tracesdk.WithResource(resource.NewWithAttributes(
+				semconv.SchemaURL,
+				semconv.ServiceNameKey.String("backendv3"),
+				attribute.String("environment", "dev"),
+			)),
+		)
+		otel.SetTracerProvider(tracerProvider)
+
+		app.Use(fiberotel.New(fiberotel.Config{
+			Tracer:   tracerProvider.Tracer("backendv3"),
+			SpanName: "HTTP {{ .Method }} {{ .Path }}",
+		}))
+
+		// fjaeger.New(fjaeger.Config{
+		// 	ServiceName: "backendv3",
+		// })
+
+		// app.Use(fibertracing.New(fibertracing.Config{
+		// 	Tracer: opentracing.GlobalTracer(),
+		// 	OperationName: func(ctx *fiber.Ctx) string {
+		// 		return ctx.Method() + " " + ctx.Path()
+		// 	},
+		// 	Modify: func(ctx *fiber.Ctx, span opentracing.Span) {
+		// 		span.SetTag("http.method", ctx.Method()) // GET, POST
+		// 		span.SetTag("http.remote_address", ctx.IP())
+		// 		span.SetTag("http.path", ctx.Path())
+		// 		span.SetTag("http.host", ctx.Hostname())
+		// 		span.SetTag("http.url", ctx.OriginalURL())
+
+		// 		ctx.SetUserContext(opentracing.ContextWithSpan(ctx.Context(), span))
+		// 	},
+		// }))
 	}
 
 	return app

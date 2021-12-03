@@ -3,22 +3,30 @@ definitions:
   errors.PenguinError:
     properties:
       errorCode:
+        example: INVALID_REQUEST
         type: string
       message:
+        example: 'invalid request: request parameters are invalid'
         type: string
       statusCode:
+        example: 400
         type: integer
     type: object
   models.Existence:
     properties:
       CN:
         $ref: '#/definitions/models.ServerExistence'
+        description: 'CN: 国服 Mainland China Server (maintained by Hypergryph Network
+          Technology Co., Ltd.)'
       JP:
         $ref: '#/definitions/models.ServerExistence'
+        description: 'JP: 日服 Japan Server (maintained by Yostar Inc,.)'
       KR:
         $ref: '#/definitions/models.ServerExistence'
+        description: 'KR: 韩服 Korea Server (maintained by Yostar Limited)'
       US:
         $ref: '#/definitions/models.ServerExistence'
+        description: 'US: 美服/国际服 Global Server (maintained by Yostar Limited)'
     required:
     - CN
     - JP
@@ -28,23 +36,31 @@ definitions:
   models.I18nOptionalString:
     properties:
       en:
+        description: 'EN: English (en)'
         type: string
       ja:
+        description: 'JP: 日本語 (ja)'
         type: string
       ko:
+        description: 'KR: 한국어 (ko)'
         type: string
       zh:
+        description: 'ZH: 中文 (zh-CN)'
         type: string
     type: object
   models.I18nString:
     properties:
       en:
+        description: 'EN: English (en)'
         type: string
       ja:
+        description: 'JP: 日本語 (ja)'
         type: string
       ko:
+        description: 'KR: 한국어 (ko)'
         type: string
       zh:
+        description: 'ZH: 中文 (zh-CN)'
         type: string
     required:
     - en
@@ -56,8 +72,10 @@ definitions:
     properties:
       alias:
         $ref: '#/definitions/models.I18nOptionalString'
+        description: Alias of the item,
       pron:
         $ref: '#/definitions/models.I18nOptionalString'
+        description: Pronounciation hints of the item
     required:
     - alias
     - pron
@@ -122,9 +140,37 @@ info:
   title: Penguin Statistics API
   version: 3.0.0-alpha.1
 paths:
+  /v3/items:
+    get:
+      description: Get all Items
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              allOf:
+              - $ref: '#/definitions/models.PItem'
+              - properties:
+                  existence:
+                    $ref: '#/definitions/models.Existence'
+                  keywords:
+                    $ref: '#/definitions/models.Keywords'
+                  name:
+                    $ref: '#/definitions/models.I18nString'
+                type: object
+            type: array
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get all Items
+      tags:
+      - Item
   /v3/items/{itemId}:
     get:
-      description: Gets an Item using the item's numerical ID
+      description: Get an Item using the item's numerical ID
       parameters:
       - description: Numerical Item ID
         in: path
@@ -157,7 +203,7 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/errors.PenguinError'
-      summary: Gets an Item using numerical ID
+      summary: Get an Item with numerical ID
       tags:
       - Item
 swagger: "2.0"

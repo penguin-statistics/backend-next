@@ -7,9 +7,9 @@ import (
 )
 
 type PenguinError struct {
-	StatusCode int
-	ErrorCode  string
-	Message    string
+	StatusCode int    `example:"400"`
+	ErrorCode  string `example:"INVALID_REQUEST"`
+	Message    string `example:"invalid request: request parameters are invalid"`
 }
 
 func New(statusCode int, errorCode string, message string) *PenguinError {

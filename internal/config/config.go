@@ -22,7 +22,7 @@ func Parse() *Config {
 		panic(err)
 	}
 
-	devMode := os.Getenv("PENGUIN_3_DEV") == "true"
+	devMode := os.Getenv("PENGUIN_V3_DEV") == "true"
 
 	return &Config{
 		Port:    port,

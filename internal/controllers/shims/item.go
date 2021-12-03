@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 
@@ -13,16 +14,15 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/uptrace/bun"
 )
 
 type ItemController struct {
-	db *bun.DB
+	repo *repos.ItemRepo
 }
 
-func RegisterItemController(v2 *server.V2, db *bun.DB) {
+func RegisterItemController(v2 *server.V2, repo *repos.ItemRepo) {
 	c := &ItemController{
-		db: db,
+		repo: repo,
 	}
 
 	v2.Get("/items", c.GetItems)
@@ -58,9 +58,7 @@ func applyShim(item *shims.PItem) {
 }
 
 func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
-	var items []*shims.PItem
-
-	err := c.db.NewSelect().Model(&items).Scan(ctx.Context())
+	items, err := c.repo.GetShimItems(ctx.Context())
 	if err != nil {
 		return err
 	}
@@ -75,17 +73,12 @@ func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
 func (c *ItemController) GetItemByArkId(ctx *fiber.Ctx) error {
 	itemId := ctx.Params("itemId")
 
-	var item shims.PItem
-	err := c.db.NewSelect().
-		Model(&item).
-		Where("ark_item_id = ?", itemId).
-		Scan(ctx.Context())
-
+	item, err := c.repo.GetShimItemById(ctx.Context(), itemId)
 	if err != nil {
 		return err
 	}
 
-	applyShim(&item)
+	applyShim(item)
 
 	return ctx.JSON(item)
 }

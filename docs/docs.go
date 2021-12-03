@@ -31,16 +31,63 @@ var doc = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/v3/items/{itemId}": {
+        "/v3/items": {
             "get": {
-                "description": "Gets an Item using the item's numerical ID",
+                "description": "Get all Items",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Item"
                 ],
-                "summary": "Gets an Item using numerical ID",
+                "summary": "Get all Items",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/definitions/models.PItem"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "existence": {
+                                                "$ref": "#/definitions/models.Existence"
+                                            },
+                                            "keywords": {
+                                                "$ref": "#/definitions/models.Keywords"
+                                            },
+                                            "name": {
+                                                "$ref": "#/definitions/models.I18nString"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v3/items/{itemId}": {
+            "get": {
+                "description": "Get an Item using the item's numerical ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Item"
+                ],
+                "summary": "Get an Item with numerical ID",
                 "parameters": [
                     {
                         "type": "integer",
@@ -96,13 +143,16 @@ var doc = `{
             "type": "object",
             "properties": {
                 "errorCode": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "INVALID_REQUEST"
                 },
                 "message": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "invalid request: request parameters are invalid"
                 },
                 "statusCode": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 400
                 }
             }
         },
@@ -116,15 +166,19 @@ var doc = `{
             ],
             "properties": {
                 "CN": {
+                    "description": "CN: 国服 Mainland China Server (maintained by Hypergryph Network Technology Co., Ltd.)",
                     "$ref": "#/definitions/models.ServerExistence"
                 },
                 "JP": {
+                    "description": "JP: 日服 Japan Server (maintained by Yostar Inc,.)",
                     "$ref": "#/definitions/models.ServerExistence"
                 },
                 "KR": {
+                    "description": "KR: 韩服 Korea Server (maintained by Yostar Limited)",
                     "$ref": "#/definitions/models.ServerExistence"
                 },
                 "US": {
+                    "description": "US: 美服/国际服 Global Server (maintained by Yostar Limited)",
                     "$ref": "#/definitions/models.ServerExistence"
                 }
             }
@@ -133,15 +187,19 @@ var doc = `{
             "type": "object",
             "properties": {
                 "en": {
+                    "description": "EN: English (en)",
                     "type": "string"
                 },
                 "ja": {
+                    "description": "JP: 日本語 (ja)",
                     "type": "string"
                 },
                 "ko": {
+                    "description": "KR: 한국어 (ko)",
                     "type": "string"
                 },
                 "zh": {
+                    "description": "ZH: 中文 (zh-CN)",
                     "type": "string"
                 }
             }
@@ -156,15 +214,19 @@ var doc = `{
             ],
             "properties": {
                 "en": {
+                    "description": "EN: English (en)",
                     "type": "string"
                 },
                 "ja": {
+                    "description": "JP: 日本語 (ja)",
                     "type": "string"
                 },
                 "ko": {
+                    "description": "KR: 한국어 (ko)",
                     "type": "string"
                 },
                 "zh": {
+                    "description": "ZH: 中文 (zh-CN)",
                     "type": "string"
                 }
             }
@@ -177,9 +239,11 @@ var doc = `{
             ],
             "properties": {
                 "alias": {
+                    "description": "Alias of the item,",
                     "$ref": "#/definitions/models.I18nOptionalString"
                 },
                 "pron": {
+                    "description": "Pronounciation hints of the item",
                     "$ref": "#/definitions/models.I18nOptionalString"
                 }
             }

@@ -1,31 +1,29 @@
 package controllers
 
 import (
-	"database/sql"
 	"net/http"
 	"strings"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
-	"github.com/uptrace/bun"
 )
 
 type ItemController struct {
-	db    *bun.DB
+	repo  *repos.ItemRepo
 	redis *redis.Client
 }
 
-func RegisterItemController(v3 *server.V3, db *bun.DB, redis *redis.Client) {
+func RegisterItemController(v3 *server.V3, repo *repos.ItemRepo, redis *redis.Client) {
 	c := &ItemController{
-		db:    db,
+		repo:  repo,
 		redis: redis,
 	}
 
+	v3.Get("/items", c.GetItems)
 	v3.Get("/items/:itemId", buildSanitizer(utils.NonNullString, utils.IsInt), c.GetItemById)
 }
 
@@ -43,9 +41,26 @@ func buildSanitizer(sanitizer ...func(string) bool) func(ctx *fiber.Ctx) error {
 	}
 }
 
+// GetItems godoc
+// @Summary      Get all Items
+// @Description  Get all Items
+// @Tags         Item
+// @Produce      json
+// @Success      200     {array}  models.PItem{name=models.I18nString,existence=models.Existence,keywords=models.Keywords}
+// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Router       /v3/items [GET]
+func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
+	items, err := c.repo.GetItems(ctx.Context())
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(items)
+}
+
 // GetItemById godoc
-// @Summary      Gets an Item using numerical ID
-// @Description  Gets an Item using the item's numerical ID
+// @Summary      Get an Item with numerical ID
+// @Description  Get an Item using the item's numerical ID
 // @Tags         Item
 // @Produce      json
 // @Param        itemId  path      int  true  "Numerical Item ID"
@@ -56,16 +71,7 @@ func buildSanitizer(sanitizer ...func(string) bool) func(ctx *fiber.Ctx) error {
 func (c *ItemController) GetItemById(ctx *fiber.Ctx) error {
 	itemId := ctx.Params("itemId")
 
-	var item models.PItem
-	err := c.db.NewSelect().
-		Model(&item).
-		Where("id = ?", itemId).
-		Scan(ctx.Context())
-
-	if err == sql.ErrNoRows {
-		return errors.ErrNotFound
-	}
-
+	item, err := c.repo.GetItemById(ctx.Context(), itemId)
 	if err != nil {
 		return err
 	}

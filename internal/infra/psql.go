@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
 	"github.com/uptrace/bun/extra/bundebug"
+	"github.com/uptrace/bun/extra/bunotel"
 )
 
 func ProvidePostgres(config *config.Config) (*bun.DB, error) {
@@ -21,6 +22,7 @@ func ProvidePostgres(config *config.Config) (*bun.DB, error) {
 	// Create a Bun db on top of it.
 	db := bun.NewDB(pgdb, pgdialect.New())
 	db.AddQueryHook(bundebug.NewQueryHook())
+	db.AddQueryHook(bunotel.NewQueryHook(bunotel.WithDBName("penguin_structured")))
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
