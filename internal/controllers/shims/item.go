@@ -9,6 +9,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/utils"
+	"github.com/penguin-statistics/fiberotel"
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/tidwall/gjson"
@@ -58,14 +59,16 @@ func applyShim(item *shims.PItem) {
 }
 
 func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
-	items, err := c.repo.GetShimItems(ctx.Context())
+	items, err := c.repo.GetShimItems(fiberotel.FromCtx(ctx))
 	if err != nil {
 		return err
 	}
 
+	_, span := fiberotel.StartTracerFromCtx(ctx, "applyShims")
 	for _, i := range items {
 		applyShim(i)
 	}
+	span.End()
 
 	return ctx.JSON(items)
 }

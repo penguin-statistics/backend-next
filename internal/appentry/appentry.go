@@ -19,10 +19,12 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(infra.ProvidePostgres),
 		fx.Provide(infra.ProvideRedis),
 		fx.Provide(repos.NewItemRepo),
+		fx.Provide(repos.NewStageRepo),
 		fx.Provide(server.CreateVersioningEndpoints),
 		fx.Invoke(shims.RegisterItemController),
 		fx.Invoke(controllers.RegisterIndexController),
 		fx.Invoke(controllers.RegisterItemController),
+		fx.Invoke(controllers.RegisterStageController),
 	}
 
 	if includeSwagger {

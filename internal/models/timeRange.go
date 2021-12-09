@@ -10,8 +10,8 @@ type PTimeRange struct {
 
 	ID        int64        `json:"id"`
 	Name      *null.String `json:"name,omitempty"`
-	StartTime null.Time    `json:"start_time"`
-	EndTime   null.Time    `json:"end_time"`
+	StartTime null.Time    `json:"startTime"`
+	EndTime   null.Time    `json:"endTime"`
 	Comment   *null.String `json:"-" bun:"-"`
 	Server    string       `json:"server"`
 }

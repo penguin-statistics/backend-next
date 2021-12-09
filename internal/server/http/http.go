@@ -15,6 +15,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -22,6 +23,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/gofiber/helmet/v2"
+	"github.com/gofiber/websocket/v2"
 
 	"github.com/penguin-statistics/fiberotel"
 )
@@ -64,12 +66,13 @@ func CreateServer(config *config.Config) *fiber.App {
 	})
 
 	app.Use(favicon.New())
-	app.Use(requestid.New())
-	app.Use(logger.New(logger.Config{
-		Format:     "${pid} ${ip} ${locals:requestid} ${status} ${latency} - ${method} ${path}\n",
-		TimeFormat: time.RFC3339,
-		Output:     os.Stdout,
-	}))
+	app.Use(requestid.New(
+		requestid.Config{
+			Generator: func(ctx *fiber.Ctx) string {
+				return ctx.Get(requestid.Header)
+			},
+		},
+	))
 	app.Use(cors.New())
 	app.Use(recover.New(recover.Config{
 		EnableStackTrace: true,
@@ -81,11 +84,26 @@ func CreateServer(config *config.Config) *fiber.App {
 		// ContentSecurityPolicy: "default-src 'none'; script-src 'none'; worker-src 'none'; frame-ancestors 'none'; sandbox",
 		PermissionPolicy: "interest-cohort=()",
 	}))
+	app.Use(compress.New(compress.Config{
+		Level: compress.LevelBestSpeed,
+	}))
+	app.Use("/api/v3/live", func(c *fiber.Ctx) error {
+		if websocket.IsWebSocketUpgrade(c) {
+			return c.Next()
+		}
+		return fiber.ErrUpgradeRequired
+	})
 
 	if config.DevMode {
 		fmt.Println("Running in DEV mode")
 
 		app.Use(pprof.New())
+
+		app.Use(logger.New(logger.Config{
+			Format:     "${pid} ${ip} ${locals:requestid} ${status} ${latency} - ${method} ${path}\n",
+			TimeFormat: time.RFC3339,
+			Output:     os.Stdout,
+		}))
 
 		exporter, err := jaeger.New(jaeger.WithCollectorEndpoint())
 		if err != nil {

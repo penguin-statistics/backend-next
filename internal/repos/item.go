@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 	"github.com/uptrace/bun"
@@ -36,6 +37,11 @@ func (c *ItemRepo) GetItems(ctx context.Context) ([]*models.PItem, error) {
 }
 
 func (c *ItemRepo) GetItemById(ctx context.Context, itemId string) (*models.PItem, error) {
+	val, ok := cache.ItemFromId.Load(itemId)
+	if ok {
+		return val.(*models.PItem), nil
+	}
+
 	var item models.PItem
 	err := c.db.NewSelect().
 		Model(&item).

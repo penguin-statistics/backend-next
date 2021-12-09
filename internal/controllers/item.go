@@ -1,15 +1,23 @@
 package controllers
 
 import (
+	"compress/gzip"
+	"encoding/hex"
+	"log"
+	"math/rand"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/penguin-statistics/backend-next/internal/models/protos"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/utils"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/websocket/v2"
 )
 
 type ItemController struct {
@@ -25,6 +33,79 @@ func RegisterItemController(v3 *server.V3, repo *repos.ItemRepo, redis *redis.Cl
 
 	v3.Get("/items", c.GetItems)
 	v3.Get("/items/:itemId", buildSanitizer(utils.NonNullString, utils.IsInt), c.GetItemById)
+
+	v3.Get("/live", websocket.New(func(c *websocket.Conn) {
+		defer c.Close()
+
+		_, b, err := c.ReadMessage()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		log.Println(hex.EncodeToString(b))
+
+		elements := []*protos.MatrixUpdateMessage_Segment_Element{}
+		for i := 0; i < 5; i++ {
+			elements = append(elements, &protos.MatrixUpdateMessage_Segment_Element{
+				Id: &protos.MatrixUpdateMessage_Segment_Element_StageId{
+					StageId: rand.Int31(),
+				},
+				Amount: rand.Int31(),
+			})
+		}
+
+		segments := []*protos.MatrixUpdateMessage_Segment{}
+		for i := 0; i < 40; i++ {
+			segments = append(segments, &protos.MatrixUpdateMessage_Segment{
+				Bucket: &protos.MatrixUpdateMessage_Segment_ItemId{
+					ItemId: rand.Int31(),
+				},
+				Elements: elements,
+			})
+		}
+
+		msg := protos.MatrixUpdateMessage{
+			Header: &protos.Header{
+				Type: protos.MessageType_MATRIX_ABSOLUTE_UPDATE_MESSAGE,
+			},
+			Segments: segments,
+		}
+
+		res, err := proto.Marshal(&msg)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		writer, err := c.NextWriter(websocket.BinaryMessage)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		gw := gzip.NewWriter(writer)
+
+		_, err = gw.Write(res)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		gw.Close()
+		writer.Close()
+
+		time.Sleep(time.Millisecond * 100)
+
+		err = c.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Now().Add(time.Second*5))
+		if err != nil {
+			log.Println(err)
+			return
+		}
+	}, websocket.Config{
+		Subprotocols:      []string{"penguin-matrix"},
+		EnableCompression: true,
+	}))
 }
 
 func buildSanitizer(sanitizer ...func(string) bool) func(ctx *fiber.Ctx) error {
