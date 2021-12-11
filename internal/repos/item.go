@@ -36,8 +36,8 @@ func (c *ItemRepo) GetItems(ctx context.Context) ([]*models.PItem, error) {
 	return items, nil
 }
 
-func (c *ItemRepo) GetItemById(ctx context.Context, itemId string) (*models.PItem, error) {
-	val, ok := cache.ItemFromId.Load(itemId)
+func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*models.PItem, error) {
+	val, ok := cache.ItemFromId.Load(arkItemId)
 	if ok {
 		return val.(*models.PItem), nil
 	}
@@ -45,7 +45,7 @@ func (c *ItemRepo) GetItemById(ctx context.Context, itemId string) (*models.PIte
 	var item models.PItem
 	err := c.db.NewSelect().
 		Model(&item).
-		Where("id = ?", itemId).
+		Where("ark_item_id = ?", arkItemId).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
@@ -77,7 +77,7 @@ func (c *ItemRepo) GetShimItems(ctx context.Context) ([]*shims.PItem, error) {
 	return items, nil
 }
 
-func (c *ItemRepo) GetShimItemById(ctx context.Context, itemId string) (*shims.PItem, error) {
+func (c *ItemRepo) GetShimItemByArkId(ctx context.Context, itemId string) (*shims.PItem, error) {
 	var item shims.PItem
 	err := c.db.NewSelect().
 		Model(&item).

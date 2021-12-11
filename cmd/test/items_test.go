@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/penguin-statistics/backend-next/cmd/test/comparator"
 	"github.com/stretchr/testify/assert"
-	"github.com/tidwall/gjson"
 )
 
 func TestV2Items(t *testing.T) {
@@ -25,22 +25,10 @@ func TestV2Items(t *testing.T) {
 		b, err := ioutil.ReadAll(resp.Body)
 		assert.NoError(t, err, "expect no error while reading body")
 
-		j := gjson.ParseBytes(b)
+		comparator, err := comparator.NewComparatorFromFilePath("../../test/testdata/v2_items.json")
+		assert.NoError(t, err, "expect no error while creating comparator")
 
-		j.ForEach(func(key, value gjson.Result) bool {
-			assert.Equal(t, gjson.String, value.Get("itemId").Type, "expect itemId is a string")
-
-			coord := value.Get("spriteCoord")
-			if coord.IsArray() {
-				arr := coord.Array()
-				assert.Equal(t, len(arr), 2, "expect spriteCoord is an array of length 2")
-
-				for _, v := range arr {
-					assert.Equal(t, gjson.Number, v.Type, "expect spriteCoord is an array of numbers")
-				}
-			}
-
-			return true
-		})
+		comp := comparator.Compare(b, []string{"alias", "pron", "groupID", "addTimePoint", "spriteCoord"})
+		assert.NoError(t, comp, "expect response structure to match test data")
 	})
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/bwmarrin/snowflake"
 	"github.com/penguin-statistics/backend-next/internal/config"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 	"go.opentelemetry.io/otel"
@@ -28,7 +29,7 @@ import (
 	"github.com/penguin-statistics/fiberotel"
 )
 
-func CreateServer(config *config.Config) *fiber.App {
+func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:      "Penguin Stats Backend v3",
 		ServerHeader: "Penguin/0.1",
@@ -66,14 +67,15 @@ func CreateServer(config *config.Config) *fiber.App {
 	})
 
 	app.Use(favicon.New())
+	app.Use(cors.New())
 	app.Use(requestid.New(
 		requestid.Config{
-			Generator: func(ctx *fiber.Ctx) string {
-				return ctx.Get(requestid.Header)
+			Header: "X-Penguin-Request-ID",
+			Generator: func() string {
+				return flake.Generate().Base58()
 			},
 		},
 	))
-	app.Use(cors.New())
 	app.Use(recover.New(recover.Config{
 		EnableStackTrace: true,
 	}))

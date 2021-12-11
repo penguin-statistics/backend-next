@@ -10,8 +10,8 @@ import (
 type PStage struct {
 	bun.BaseModel `bun:"stages"`
 
-	ID           int64           `json:"id"`
-	ArkStageID   string          `json:"arkStageId"`
+	ID           int64           `json:"penguinStageId"`
+	ArkStageID   string          `json:"stageId"`
 	ZoneID       int64           `json:"zoneId"`
 	Code         json.RawMessage `json:"code"`
 	Sanity       null.Int        `json:"sanity"`

@@ -75,4 +75,11 @@ require (
 	mellium.im/sasl v0.2.1 // indirect
 )
 
-require github.com/savsgio/gotils v0.0.0-20210921075833-21a6215cb0e4 // indirect
+require (
+	github.com/bwmarrin/snowflake v0.3.0 // indirect
+	github.com/mr-tron/base58 v1.2.0 // indirect
+	github.com/nats-io/nats.go v1.13.0 // indirect
+	github.com/nats-io/nkeys v0.3.0 // indirect
+	github.com/nats-io/nuid v1.0.1 // indirect
+	github.com/savsgio/gotils v0.0.0-20210921075833-21a6215cb0e4 // indirect
+)
