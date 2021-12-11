@@ -4,10 +4,11 @@ go 1.17
 
 require (
 	github.com/ahmetb/go-linq/v3 v3.2.0
-	github.com/fasthttp/websocket v1.4.3-rc.10
+	github.com/bwmarrin/snowflake v0.3.0
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/gofiber/fiber/v2 v2.23.0
 	github.com/gofiber/helmet/v2 v2.2.4
+	github.com/nats-io/nats.go v1.13.1-0.20211122170419-d7c1d78a50fc
 	github.com/penguin-statistics/fiber-swagger/v3 v3.0.2
 	github.com/penguin-statistics/fiberotel v0.8.2
 	github.com/stretchr/testify v1.7.0
@@ -76,9 +77,8 @@ require (
 )
 
 require (
-	github.com/bwmarrin/snowflake v0.3.0 // indirect
-	github.com/mr-tron/base58 v1.2.0 // indirect
-	github.com/nats-io/nats.go v1.13.0 // indirect
+	github.com/fasthttp/websocket v1.4.3-rc.10 // indirect
+	github.com/nats-io/nats-server/v2 v2.6.6 // indirect
 	github.com/nats-io/nkeys v0.3.0 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/savsgio/gotils v0.0.0-20210921075833-21a6215cb0e4 // indirect
