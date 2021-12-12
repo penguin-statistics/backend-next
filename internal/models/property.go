@@ -4,10 +4,10 @@ import (
 	"github.com/uptrace/bun"
 )
 
-type PProperty struct {
+type Property struct {
 	bun.BaseModel `bun:"properties"`
 
-	ID    int64  `json:"id"`
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	PropertyID int64  `bun:",pk" json:"id"`
+	Key        string `json:"key"`
+	Value      string `json:"value"`
 }

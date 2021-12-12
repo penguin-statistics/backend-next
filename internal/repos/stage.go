@@ -3,8 +3,11 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"log"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
+	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 	"github.com/uptrace/bun"
 )
@@ -17,73 +20,78 @@ func NewStageRepo(db *bun.DB) *StageRepo {
 	return &StageRepo{db: db}
 }
 
-func (c *StageRepo) GetStages(ctx context.Context) ([]*models.PStage, error) {
-	var stages []*models.PStage
+func (c *StageRepo) GetStages(ctx context.Context) ([]*models.Stage, error) {
+	var stages []*models.Stage
 	err := c.db.NewSelect().
 		Model(&stages).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
 		return nil, errors.ErrNotFound
-	}
-
-	if err != nil {
+	} else if err != nil {
 		return nil, err
 	}
 
 	return stages, nil
 }
 
-func (c *StageRepo) GetStageById(ctx context.Context, itemId string) (*models.PStage, error) {
-	var stage models.PStage
+func (c *StageRepo) GetStageByArkId(ctx context.Context, stageArkId string) (*models.Stage, error) {
+	val, ok := cache.StageFromArkId.Get(stageArkId)
+	if ok {
+		return val.(*models.Stage), nil
+	}
+
+	var stage models.Stage
 	err := c.db.NewSelect().
 		Model(&stage).
-		Where("id = ?", itemId).
+		Where("ark_stage_id = ?", stageArkId).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
 		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
 	}
 
-	if err != nil {
+	cache.StageFromArkId.SetDefault(stageArkId, &stage)
+	return &stage, nil
+}
+
+func (c *StageRepo) GetShimStages(ctx context.Context) ([]*shims.Stage, error) {
+	var stages []*shims.Stage
+
+	err := c.db.NewSelect().
+		Model(&stages).
+		Relation("Zone", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Column("ark_zone_id")
+		}).
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return stages, nil
+}
+
+func (c *StageRepo) GetShimStageByArkId(ctx context.Context, stageId string) (*shims.Stage, error) {
+	var stage shims.Stage
+	err := c.db.NewSelect().
+		Model(&stage).
+		Relation("Zone", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Column("ark_zone_id")
+		}).
+		Where("ark_stage_id = ?", stageId).
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 
 	return &stage, nil
 }
-
-// func (c *StageRepo) GetShimItems(ctx context.Context) ([]*shims.PStage, error) {
-// 	var items []*shims.PItem
-
-// 	err := c.db.NewSelect().
-// 		Model(&items).
-// 		Scan(ctx)
-
-// 	if err == sql.ErrNoRows {
-// 		return nil, errors.ErrNotFound
-// 	}
-
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return items, nil
-// }
-
-// func (c *StageRepo) GetShimItemById(ctx context.Context, itemId string) (*shims.PItem, error) {
-// 	var item shims.PItem
-// 	err := c.db.NewSelect().
-// 		Model(&item).
-// 		Where("ark_item_id = ?", itemId).
-// 		Scan(ctx)
-
-// 	if err == sql.ErrNoRows {
-// 		return nil, errors.ErrNotFound
-// 	}
-
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &item, nil
-// }

@@ -23,12 +23,10 @@ func RegisterStageController(v3 *server.V3, repo *repos.StageRepo, redis *redis.
 	v3.Get("/stages/:stageId", c.GetStageById)
 }
 
-// GetStages godoc
-// @Summary      Get all stages
-// @Description  Get all stages
+// @Summary      Get all Stages
 // @Tags         Stage
 // @Produce      json
-// @Success      200     {array}  models.PStage{existence=models.Existence,code=models.I18nString}
+// @Success      200     {array}  models.Stage{existence=models.Existence,code=models.I18nString}
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/stages [GET]
 func (c *StageController) GetStages(ctx *fiber.Ctx) error {
@@ -40,20 +38,18 @@ func (c *StageController) GetStages(ctx *fiber.Ctx) error {
 	return ctx.JSON(stages)
 }
 
-// GetStageById godoc
-// @Summary      Get an Stage with numerical ID
-// @Description  Get an Stage using the stage's numerical ID
+// @Summary      Get an Stage with ID
 // @Tags         Stage
 // @Produce      json
-// @Param        stageId  path      int  true  "Numerical Stage ID"
-// @Success      200     {object}  models.PStage{existence=models.Existence,code=models.I18nString}
-// @Failure      400     {object}  errors.PenguinError "Invalid or missing stageId. Notice that this shall be the **numerical ID** of the stage, instead of the previously used string form **arkStageId** of the stage."
+// @Param        stageId  path      int  true  "Stage ID"
+// @Success      200     {object}  models.Stage{existence=models.Existence,code=models.I18nString}
+// @Failure      400     {object}  errors.PenguinError "Invalid or missing stageId. Notice that this shall be the **string ID** of the stage, instead of the internally used numerical ID of the stage."
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/stages/{stageId} [GET]
 func (c *StageController) GetStageById(ctx *fiber.Ctx) error {
 	stageId := ctx.Params("stageId")
 
-	stage, err := c.repo.GetStageById(ctx.Context(), stageId)
+	stage, err := c.repo.GetStageByArkId(ctx.Context(), stageId)
 	if err != nil {
 		return err
 	}

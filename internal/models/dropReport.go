@@ -4,10 +4,10 @@ import (
 	"github.com/uptrace/bun"
 )
 
-type PDropReport struct {
+type DropReport struct {
 	bun.BaseModel `bun:"drop_reports"`
 
-	ID        int64  `json:"id"`
+	ReportID  int64  `bun:",pk" json:"id"`
 	StageID   int64  `json:"stageId"`
 	PatternID int64  `json:"patternId"`
 	Times     int64  `json:"times"`

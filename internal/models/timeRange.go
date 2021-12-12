@@ -5,13 +5,13 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-type PTimeRange struct {
+type TimeRange struct {
 	bun.BaseModel `bun:"time_ranges,alias:tr"`
 
-	ID        int64        `json:"id"`
-	Name      *null.String `json:"name,omitempty"`
+	RangeID   int64        `bun:",pk" json:"id"`
+	Name      *null.String `json:"name,omitempty" swaggertype:"string"`
 	StartTime null.Time    `json:"startTime"`
 	EndTime   null.Time    `json:"endTime"`
-	Comment   *null.String `json:"-" bun:"-"`
+	Comment   *null.String `json:"-" bun:"-" swaggertype:"string"`
 	Server    string       `json:"server"`
 }

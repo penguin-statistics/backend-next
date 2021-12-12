@@ -7,10 +7,10 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-type PNotice struct {
+type Notice struct {
 	bun.BaseModel `bun:"notices"`
 
-	ID         int64           `json:"id"`
+	NoticeID   int64           `bun:",pk" json:"id"`
 	Conditions json.RawMessage `json:"conditions"`
 	Severity   null.Int        `json:"severity"`
 	Content    string          `json:"content"`

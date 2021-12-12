@@ -31,9 +31,308 @@ var doc = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/v2/items": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Item"
+                ],
+                "summary": "Get all Items",
+                "deprecated": true,
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/definitions/shims.Item"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "existence": {
+                                                "$ref": "#/definitions/models.Existence"
+                                            },
+                                            "name_i18n": {
+                                                "$ref": "#/definitions/models.I18nString"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/items/{itemId}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Item"
+                ],
+                "summary": "Get an Item with ID",
+                "deprecated": true,
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Item ID",
+                        "name": "itemId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/shims.Item"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "existence": {
+                                            "$ref": "#/definitions/models.Existence"
+                                        },
+                                        "name_i18n": {
+                                            "$ref": "#/definitions/models.I18nString"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item.",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/stages": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Stage"
+                ],
+                "summary": "Get all Stages",
+                "deprecated": true,
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/definitions/shims.Stage"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "code_i18n": {
+                                                "$ref": "#/definitions/models.I18nString"
+                                            },
+                                            "existence": {
+                                                "$ref": "#/definitions/models.Existence"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/stages/{stageId}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Stage"
+                ],
+                "summary": "Get an Stage with ID",
+                "deprecated": true,
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Stage ID",
+                        "name": "stageId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/shims.Stage"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "code_i18n": {
+                                            "$ref": "#/definitions/models.I18nString"
+                                        },
+                                        "existence": {
+                                            "$ref": "#/definitions/models.Existence"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or missing stageId. Notice that this shall be the **string ID** of the stage, instead of the internally used numerical ID of the stage.",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/zones": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Zone"
+                ],
+                "summary": "Get all Zones",
+                "deprecated": true,
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/definitions/shims.Zone"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "existence": {
+                                                "$ref": "#/definitions/models.Existence"
+                                            },
+                                            "zoneName_i18n": {
+                                                "$ref": "#/definitions/models.I18nString"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v2/zones/{zoneId}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Zone"
+                ],
+                "summary": "Get a Zone with ID",
+                "deprecated": true,
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Zone ID",
+                        "name": "zoneId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/shims.Zone"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "existence": {
+                                            "$ref": "#/definitions/models.Existence"
+                                        },
+                                        "zoneName_i18n": {
+                                            "$ref": "#/definitions/models.I18nString"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or missing zoneId. Notice that this shall be the **string ID** of the zone, instead of the v3 API internally used numerical ID of the zone.",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
         "/v3/items": {
             "get": {
-                "description": "Get all Items",
                 "produces": [
                     "application/json"
                 ],
@@ -49,7 +348,7 @@ var doc = `{
                             "items": {
                                 "allOf": [
                                     {
-                                        "$ref": "#/definitions/models.PItem"
+                                        "$ref": "#/definitions/models.Item"
                                     },
                                     {
                                         "type": "object",
@@ -80,18 +379,17 @@ var doc = `{
         },
         "/v3/items/{itemId}": {
             "get": {
-                "description": "Get an Item using the item's numerical ID",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Item"
                 ],
-                "summary": "Get an Item with numerical ID",
+                "summary": "Get an Item with ID",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "Numerical Item ID",
+                        "type": "string",
+                        "description": "Item ID",
                         "name": "itemId",
                         "in": "path",
                         "required": true
@@ -103,7 +401,7 @@ var doc = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/models.PItem"
+                                    "$ref": "#/definitions/models.Item"
                                 },
                                 {
                                     "type": "object",
@@ -123,7 +421,203 @@ var doc = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid or missing itemId. Notice that this shall be the **numerical ID** of the item, instead of the previously used string form **arkItemId** of the item.",
+                        "description": "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item.",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v3/stages": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Stage"
+                ],
+                "summary": "Get all Stages",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/definitions/models.Stage"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "code": {
+                                                "$ref": "#/definitions/models.I18nString"
+                                            },
+                                            "existence": {
+                                                "$ref": "#/definitions/models.Existence"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v3/stages/{stageId}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Stage"
+                ],
+                "summary": "Get an Stage with ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Stage ID",
+                        "name": "stageId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.Stage"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "$ref": "#/definitions/models.I18nString"
+                                        },
+                                        "existence": {
+                                            "$ref": "#/definitions/models.Existence"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or missing stageId. Notice that this shall be the **string ID** of the stage, instead of the internally used numerical ID of the stage.",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v3/zones": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Zone"
+                ],
+                "summary": "Get all Zones",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/definitions/models.Zone"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "existence": {
+                                                "$ref": "#/definitions/models.Existence"
+                                            },
+                                            "name": {
+                                                "$ref": "#/definitions/models.I18nString"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/v3/zones/{zoneId}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Zone"
+                ],
+                "summary": "Get a Zone with ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Zone ID",
+                        "name": "zoneId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.Zone"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "existence": {
+                                            "$ref": "#/definitions/models.Existence"
+                                        },
+                                        "name": {
+                                            "$ref": "#/definitions/models.I18nString"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or missing zoneId. Notice that this shall be the **string ID** of the zone, instead of the internally used numerical ID of the zone.",
                         "schema": {
                             "$ref": "#/definitions/errors.PenguinError"
                         }
@@ -231,30 +725,9 @@ var doc = `{
                 }
             }
         },
-        "models.Keywords": {
-            "type": "object",
-            "required": [
-                "alias",
-                "pron"
-            ],
-            "properties": {
-                "alias": {
-                    "description": "Alias of the item,",
-                    "$ref": "#/definitions/models.I18nOptionalString"
-                },
-                "pron": {
-                    "description": "Pronounciation hints of the item",
-                    "$ref": "#/definitions/models.I18nOptionalString"
-                }
-            }
-        },
-        "models.PItem": {
+        "models.Item": {
             "type": "object",
             "properties": {
-                "arkItemId": {
-                    "description": "ArkItemID is the previously used, string form ID of the item.",
-                    "type": "string"
-                },
                 "existence": {
                     "description": "Existence is a map with server code as key and the existence of the item in that server as value.",
                     "type": "object"
@@ -263,9 +736,9 @@ var doc = `{
                     "description": "Group is an identifier of what the item actually is. For example, both orirock and orirock cube would have the same group, ` + "`" + `orirock` + "`" + `.",
                     "type": "string"
                 },
-                "id": {
-                    "description": "ID is the numerical ID of the item.",
-                    "type": "integer"
+                "itemId": {
+                    "description": "ArkItemID (itemId) is the previously used, string form ID of the item; in JSON-representation ` + "`" + `itemId` + "`" + ` is used as key.",
+                    "type": "string"
                 },
                 "keywords": {
                     "description": "Keywords is an arbitrary JSON object containing the keywords of the item, for optimizing the results of the frontend built-in search engine.",
@@ -274,6 +747,10 @@ var doc = `{
                 "name": {
                     "description": "Name is a map with language code as key and the name of the item in that language as value.",
                     "type": "object"
+                },
+                "penguinItemId": {
+                    "description": "ItemID (penguinItemId) is the numerical ID of the item.",
+                    "type": "integer"
                 },
                 "rarity": {
                     "type": "integer"
@@ -285,6 +762,19 @@ var doc = `{
                 "sprite": {
                     "description": "Sprite describes the location of the item's sprite on the sprite image, in a form of Y:X.",
                     "type": "string"
+                }
+            }
+        },
+        "models.Keywords": {
+            "type": "object",
+            "properties": {
+                "alias": {
+                    "description": "Alias of the item,",
+                    "$ref": "#/definitions/models.I18nOptionalString"
+                },
+                "pron": {
+                    "description": "Pronounciation hints of the item",
+                    "$ref": "#/definitions/models.I18nOptionalString"
                 }
             }
         },
@@ -302,6 +792,214 @@ var doc = `{
                 },
                 "startTime": {
                     "type": "integer"
+                }
+            }
+        },
+        "models.Stage": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "Code is a map with language code as key and the code of the stage in that language as value.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "existence": {
+                    "description": "Existence is a map with server code as key and the existence of the item in that server as value.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "minClearTime": {
+                    "description": "MinClearTime is the minimum time (in milliseconds as a duration) it takes to clear the stage, referencing from prts.wiki",
+                    "type": "number"
+                },
+                "penguinStageId": {
+                    "description": "StageID (penguinStageId) is the numerical ID of the stage.",
+                    "type": "integer"
+                },
+                "sanity": {
+                    "description": "Sanity is the sanity requirement for a full clear of the stage.",
+                    "type": "number"
+                },
+                "stageId": {
+                    "description": "ArkStageID (stageId) is the previously used, string form ID of the stage; in JSON-representation ` + "`" + `stageId` + "`" + ` is used as key.",
+                    "type": "string"
+                },
+                "zoneId": {
+                    "description": "ZoneID is the numerical ID of the zone the stage is in.",
+                    "type": "integer"
+                }
+            }
+        },
+        "models.Zone": {
+            "type": "object",
+            "properties": {
+                "background": {
+                    "description": "Background is the path of the background image of the zone, relative to the CDN endpoint.",
+                    "type": "string"
+                },
+                "category": {
+                    "description": "Category of the zone.",
+                    "type": "string",
+                    "example": "MAINLINE"
+                },
+                "existence": {
+                    "description": "Existence is a map with server code as key and the existence of the item in that server as value.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "Name is a map with language code as key and the name of the item in that language as value.",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "penguinZoneId": {
+                    "description": "ZoneID is the numerical ID of the zone.",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "Type of the zone, e.g. \"AWAKENING_HOUR\" or \"VISION_SHATTER\". Optional and only occurres when ` + "`" + `category` + "`" + ` is \"MAINLINE\".",
+                    "type": "string",
+                    "example": "AWAKENING_HOUR"
+                },
+                "zoneId": {
+                    "type": "string"
+                }
+            }
+        },
+        "shims.Item": {
+            "type": "object",
+            "properties": {
+                "alias": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "existence": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "groupID": {
+                    "type": "string"
+                },
+                "itemId": {
+                    "type": "string"
+                },
+                "itemType": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "name_i18n": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "pron": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "rarity": {
+                    "type": "integer"
+                },
+                "sortId": {
+                    "type": "integer"
+                },
+                "spriteCoord": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "shims.Stage": {
+            "type": "object",
+            "properties": {
+                "apCost": {
+                    "type": "number"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "code_i18n": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "existence": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "minClearTime": {
+                    "type": "number"
+                },
+                "stageId": {
+                    "type": "string"
+                },
+                "zoneId": {
+                    "type": "string"
+                }
+            }
+        },
+        "shims.Zone": {
+            "type": "object",
+            "properties": {
+                "background": {
+                    "type": "string"
+                },
+                "existence": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "subType": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "zoneId": {
+                    "type": "string"
+                },
+                "zoneIndex": {
+                    "type": "integer"
+                },
+                "zoneName": {
+                    "type": "string"
+                },
+                "zoneName_i18n": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         }

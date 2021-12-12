@@ -41,12 +41,10 @@ func buildSanitizer(sanitizer ...func(string) bool) func(ctx *fiber.Ctx) error {
 	}
 }
 
-// GetItems godoc
 // @Summary      Get all Items
-// @Description  Get all Items
 // @Tags         Item
 // @Produce      json
-// @Success      200     {array}  models.PItem{name=models.I18nString,existence=models.Existence,keywords=models.Keywords}
+// @Success      200     {array}  models.Item{name=models.I18nString,existence=models.Existence,keywords=models.Keywords}
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/items [GET]
 func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
@@ -58,13 +56,11 @@ func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
 	return ctx.JSON(items)
 }
 
-// GetItemById godoc
 // @Summary      Get an Item with ID
-// @Description  Get an Item using the item's ID
 // @Tags         Item
 // @Produce      json
 // @Param        itemId  path      string  true  "Item ID"
-// @Success      200     {object}  models.PItem{name=models.I18nString,existence=models.Existence,keywords=models.Keywords}
+// @Success      200     {object}  models.Item{name=models.I18nString,existence=models.Existence,keywords=models.Keywords}
 // @Failure      400     {object}  errors.PenguinError "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item."
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/items/{itemId} [GET]

@@ -23,12 +23,16 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(infra.ProvideRedis),
 		fx.Provide(repos.NewItemRepo),
 		fx.Provide(repos.NewStageRepo),
+		fx.Provide(repos.NewZoneRepo),
 		fx.Provide(server.CreateVersioningEndpoints),
 		fx.Invoke(shims.RegisterItemController),
+		fx.Invoke(shims.RegisterStageController),
+		fx.Invoke(shims.RegisterZoneController),
 		fx.Invoke(controllers.RegisterLiveController),
 		fx.Invoke(controllers.RegisterIndexController),
 		fx.Invoke(controllers.RegisterItemController),
 		fx.Invoke(controllers.RegisterStageController),
+		fx.Invoke(controllers.RegisterZoneController),
 	}
 
 	if includeSwagger {

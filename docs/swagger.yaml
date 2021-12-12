@@ -68,23 +68,8 @@ definitions:
     - ko
     - zh
     type: object
-  models.Keywords:
+  models.Item:
     properties:
-      alias:
-        $ref: '#/definitions/models.I18nOptionalString'
-        description: Alias of the item,
-      pron:
-        $ref: '#/definitions/models.I18nOptionalString'
-        description: Pronounciation hints of the item
-    required:
-    - alias
-    - pron
-    type: object
-  models.PItem:
-    properties:
-      arkItemId:
-        description: ArkItemID is the previously used, string form ID of the item.
-        type: string
       existence:
         description: Existence is a map with server code as key and the existence
           of the item in that server as value.
@@ -93,9 +78,10 @@ definitions:
         description: Group is an identifier of what the item actually is. For example,
           both orirock and orirock cube would have the same group, `orirock`.
         type: string
-      id:
-        description: ID is the numerical ID of the item.
-        type: integer
+      itemId:
+        description: ArkItemID (itemId) is the previously used, string form ID of
+          the item; in JSON-representation `itemId` is used as key.
+        type: string
       keywords:
         description: Keywords is an arbitrary JSON object containing the keywords
           of the item, for optimizing the results of the frontend built-in search
@@ -105,6 +91,9 @@ definitions:
         description: Name is a map with language code as key and the name of the item
           in that language as value.
         type: object
+      penguinItemId:
+        description: ItemID (penguinItemId) is the numerical ID of the item.
+        type: integer
       rarity:
         type: integer
       sortId:
@@ -114,6 +103,15 @@ definitions:
         description: Sprite describes the location of the item's sprite on the sprite
           image, in a form of Y:X.
         type: string
+    type: object
+  models.Keywords:
+    properties:
+      alias:
+        $ref: '#/definitions/models.I18nOptionalString'
+        description: Alias of the item,
+      pron:
+        $ref: '#/definitions/models.I18nOptionalString'
+        description: Pronounciation hints of the item
     type: object
   models.ServerExistence:
     properties:
@@ -125,6 +123,156 @@ definitions:
         type: integer
     required:
     - exist
+    type: object
+  models.Stage:
+    properties:
+      code:
+        description: Code is a map with language code as key and the code of the stage
+          in that language as value.
+        items:
+          type: integer
+        type: array
+      existence:
+        description: Existence is a map with server code as key and the existence
+          of the item in that server as value.
+        items:
+          type: integer
+        type: array
+      minClearTime:
+        description: MinClearTime is the minimum time (in milliseconds as a duration)
+          it takes to clear the stage, referencing from prts.wiki
+        type: number
+      penguinStageId:
+        description: StageID (penguinStageId) is the numerical ID of the stage.
+        type: integer
+      sanity:
+        description: Sanity is the sanity requirement for a full clear of the stage.
+        type: number
+      stageId:
+        description: ArkStageID (stageId) is the previously used, string form ID of
+          the stage; in JSON-representation `stageId` is used as key.
+        type: string
+      zoneId:
+        description: ZoneID is the numerical ID of the zone the stage is in.
+        type: integer
+    type: object
+  models.Zone:
+    properties:
+      background:
+        description: Background is the path of the background image of the zone, relative
+          to the CDN endpoint.
+        type: string
+      category:
+        description: Category of the zone.
+        example: MAINLINE
+        type: string
+      existence:
+        description: Existence is a map with server code as key and the existence
+          of the item in that server as value.
+        items:
+          type: integer
+        type: array
+      index:
+        type: integer
+      name:
+        description: Name is a map with language code as key and the name of the item
+          in that language as value.
+        items:
+          type: integer
+        type: array
+      penguinZoneId:
+        description: ZoneID is the numerical ID of the zone.
+        type: integer
+      type:
+        description: Type of the zone, e.g. "AWAKENING_HOUR" or "VISION_SHATTER".
+          Optional and only occurres when `category` is "MAINLINE".
+        example: AWAKENING_HOUR
+        type: string
+      zoneId:
+        type: string
+    type: object
+  shims.Item:
+    properties:
+      alias:
+        items:
+          type: string
+        type: array
+      existence:
+        items:
+          type: integer
+        type: array
+      groupID:
+        type: string
+      itemId:
+        type: string
+      itemType:
+        type: string
+      name:
+        type: string
+      name_i18n:
+        items:
+          type: integer
+        type: array
+      pron:
+        items:
+          type: string
+        type: array
+      rarity:
+        type: integer
+      sortId:
+        type: integer
+      spriteCoord:
+        items:
+          type: integer
+        type: array
+    type: object
+  shims.Stage:
+    properties:
+      apCost:
+        type: number
+      code:
+        type: string
+      code_i18n:
+        items:
+          type: integer
+        type: array
+      existence:
+        items:
+          type: integer
+        type: array
+      minClearTime:
+        type: number
+      stageId:
+        type: string
+      zoneId:
+        type: string
+    type: object
+  shims.Zone:
+    properties:
+      background:
+        type: string
+      existence:
+        items:
+          type: integer
+        type: array
+      stages:
+        items:
+          type: string
+        type: array
+      subType:
+        type: string
+      type:
+        type: string
+      zoneId:
+        type: string
+      zoneIndex:
+        type: integer
+      zoneName:
+        type: string
+      zoneName_i18n:
+        items:
+          type: integer
+        type: array
     type: object
 host: localhost:9010
 info:
@@ -140,9 +288,9 @@ info:
   title: Penguin Statistics API
   version: 3.0.0-alpha.1
 paths:
-  /v3/items:
+  /v2/items:
     get:
-      description: Get all Items
+      deprecated: true
       produces:
       - application/json
       responses:
@@ -151,7 +299,191 @@ paths:
           schema:
             items:
               allOf:
-              - $ref: '#/definitions/models.PItem'
+              - $ref: '#/definitions/shims.Item'
+              - properties:
+                  existence:
+                    $ref: '#/definitions/models.Existence'
+                  name_i18n:
+                    $ref: '#/definitions/models.I18nString'
+                type: object
+            type: array
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get all Items
+      tags:
+      - Item
+  /v2/items/{itemId}:
+    get:
+      deprecated: true
+      parameters:
+      - description: Item ID
+        in: path
+        name: itemId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/shims.Item'
+            - properties:
+                existence:
+                  $ref: '#/definitions/models.Existence'
+                name_i18n:
+                  $ref: '#/definitions/models.I18nString'
+              type: object
+        "400":
+          description: Invalid or missing itemId. Notice that this shall be the **string
+            ID** of the item, instead of the internally used numerical ID of the item.
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get an Item with ID
+      tags:
+      - Item
+  /v2/stages:
+    get:
+      deprecated: true
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              allOf:
+              - $ref: '#/definitions/shims.Stage'
+              - properties:
+                  code_i18n:
+                    $ref: '#/definitions/models.I18nString'
+                  existence:
+                    $ref: '#/definitions/models.Existence'
+                type: object
+            type: array
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get all Stages
+      tags:
+      - Stage
+  /v2/stages/{stageId}:
+    get:
+      deprecated: true
+      parameters:
+      - description: Stage ID
+        in: path
+        name: stageId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/shims.Stage'
+            - properties:
+                code_i18n:
+                  $ref: '#/definitions/models.I18nString'
+                existence:
+                  $ref: '#/definitions/models.Existence'
+              type: object
+        "400":
+          description: Invalid or missing stageId. Notice that this shall be the **string
+            ID** of the stage, instead of the internally used numerical ID of the
+            stage.
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get an Stage with ID
+      tags:
+      - Stage
+  /v2/zones:
+    get:
+      deprecated: true
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              allOf:
+              - $ref: '#/definitions/shims.Zone'
+              - properties:
+                  existence:
+                    $ref: '#/definitions/models.Existence'
+                  zoneName_i18n:
+                    $ref: '#/definitions/models.I18nString'
+                type: object
+            type: array
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get all Zones
+      tags:
+      - Zone
+  /v2/zones/{zoneId}:
+    get:
+      deprecated: true
+      parameters:
+      - description: Zone ID
+        in: path
+        name: zoneId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/shims.Zone'
+            - properties:
+                existence:
+                  $ref: '#/definitions/models.Existence'
+                zoneName_i18n:
+                  $ref: '#/definitions/models.I18nString'
+              type: object
+        "400":
+          description: Invalid or missing zoneId. Notice that this shall be the **string
+            ID** of the zone, instead of the v3 API internally used numerical ID of
+            the zone.
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get a Zone with ID
+      tags:
+      - Zone
+  /v3/items:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              allOf:
+              - $ref: '#/definitions/models.Item'
               - properties:
                   existence:
                     $ref: '#/definitions/models.Existence'
@@ -170,13 +502,12 @@ paths:
       - Item
   /v3/items/{itemId}:
     get:
-      description: Get an Item using the item's numerical ID
       parameters:
-      - description: Numerical Item ID
+      - description: Item ID
         in: path
         name: itemId
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -184,7 +515,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/models.PItem'
+            - $ref: '#/definitions/models.Item'
             - properties:
                 existence:
                   $ref: '#/definitions/models.Existence'
@@ -194,16 +525,134 @@ paths:
                   $ref: '#/definitions/models.I18nString'
               type: object
         "400":
-          description: Invalid or missing itemId. Notice that this shall be the **numerical
-            ID** of the item, instead of the previously used string form **arkItemId**
-            of the item.
+          description: Invalid or missing itemId. Notice that this shall be the **string
+            ID** of the item, instead of the internally used numerical ID of the item.
           schema:
             $ref: '#/definitions/errors.PenguinError'
         "500":
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/errors.PenguinError'
-      summary: Get an Item with numerical ID
+      summary: Get an Item with ID
       tags:
       - Item
+  /v3/stages:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              allOf:
+              - $ref: '#/definitions/models.Stage'
+              - properties:
+                  code:
+                    $ref: '#/definitions/models.I18nString'
+                  existence:
+                    $ref: '#/definitions/models.Existence'
+                type: object
+            type: array
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get all Stages
+      tags:
+      - Stage
+  /v3/stages/{stageId}:
+    get:
+      parameters:
+      - description: Stage ID
+        in: path
+        name: stageId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.Stage'
+            - properties:
+                code:
+                  $ref: '#/definitions/models.I18nString'
+                existence:
+                  $ref: '#/definitions/models.Existence'
+              type: object
+        "400":
+          description: Invalid or missing stageId. Notice that this shall be the **string
+            ID** of the stage, instead of the internally used numerical ID of the
+            stage.
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get an Stage with ID
+      tags:
+      - Stage
+  /v3/zones:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              allOf:
+              - $ref: '#/definitions/models.Zone'
+              - properties:
+                  existence:
+                    $ref: '#/definitions/models.Existence'
+                  name:
+                    $ref: '#/definitions/models.I18nString'
+                type: object
+            type: array
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get all Zones
+      tags:
+      - Zone
+  /v3/zones/{zoneId}:
+    get:
+      parameters:
+      - description: Zone ID
+        in: path
+        name: zoneId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.Zone'
+            - properties:
+                existence:
+                  $ref: '#/definitions/models.Existence'
+                name:
+                  $ref: '#/definitions/models.I18nString'
+              type: object
+        "400":
+          description: Invalid or missing zoneId. Notice that this shall be the **string
+            ID** of the zone, instead of the internally used numerical ID of the zone.
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get a Zone with ID
+      tags:
+      - Zone
 swagger: "2.0"

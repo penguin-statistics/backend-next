@@ -7,10 +7,10 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-type PItem struct {
+type Item struct {
 	bun.BaseModel `bun:"items"`
 
-	ID          int64           `json:"-"`
+	ItemID      int64           `bun:",pk" json:"-"`
 	ArkItemID   string          `json:"itemId"`
 	Name        string          `bun:"-" json:"name"`
 	NameI18n    json.RawMessage `bun:"name" json:"name_i18n"`
@@ -18,10 +18,10 @@ type PItem struct {
 	ItemType    string          `bun:"-" json:"itemType"`
 	SortID      int             `json:"sortId"`
 	Rarity      int             `json:"rarity"`
-	Group       *null.String    `json:"groupID,omitempty"`
-	Sprite      *null.String    `json:"-"`
+	Group       *null.String    `json:"groupID,omitempty" swaggertype:"string"`
+	Sprite      *null.String    `json:"-" swaggertype:"string"`
 	SpriteCoord *[]int          `bun:"-" json:"spriteCoord,omitempty"`
 	Keywords    json.RawMessage `json:"-"`
-	AliasMap    json.RawMessage `bun:"-" json:"alias,omitempty"`
-	PronMap     json.RawMessage `bun:"-" json:"pron,omitempty"`
+	AliasMap    json.RawMessage `bun:"-" json:"alias,omitempty" swaggertype:"array,string"`
+	PronMap     json.RawMessage `bun:"-" json:"pron,omitempty" swaggertype:"array,string"`
 }

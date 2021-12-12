@@ -4,9 +4,9 @@ import (
 	"github.com/uptrace/bun"
 )
 
-type PDropPattern struct {
+type DropPattern struct {
 	bun.BaseModel `bun:"drop_patterns"`
 
-	ID   int64  `json:"id"`
-	Hash string `json:"hash"`
+	PatternID int64  `bun:",pk" json:"id"`
+	Hash      string `json:"hash"`
 }

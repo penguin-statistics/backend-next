@@ -8,12 +8,12 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-type PActivity struct {
+type Activity struct {
 	bun.BaseModel `bun:"activities"`
 
-	ID        int64           `json:"id"`
-	StartTime *time.Time      `json:"startTime"`
-	EndTime   null.Time       `json:"endTime"`
-	Name      string          `json:"name"`
-	Existence json.RawMessage `json:"existence"`
+	ActivityID int64           `bun:",pk" json:"id"`
+	StartTime  *time.Time      `json:"startTime"`
+	EndTime    null.Time       `json:"endTime"`
+	Name       string          `json:"name"`
+	Existence  json.RawMessage `json:"existence"`
 }

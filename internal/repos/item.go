@@ -19,30 +19,28 @@ func NewItemRepo(db *bun.DB) *ItemRepo {
 	return &ItemRepo{db: db}
 }
 
-func (c *ItemRepo) GetItems(ctx context.Context) ([]*models.PItem, error) {
-	var items []*models.PItem
+func (c *ItemRepo) GetItems(ctx context.Context) ([]*models.Item, error) {
+	var items []*models.Item
 	err := c.db.NewSelect().
 		Model(&items).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
 		return nil, errors.ErrNotFound
-	}
-
-	if err != nil {
+	} else if err != nil {
 		return nil, err
 	}
 
 	return items, nil
 }
 
-func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*models.PItem, error) {
-	val, ok := cache.ItemFromId.Load(arkItemId)
+func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*models.Item, error) {
+	val, ok := cache.ItemFromArkId.Get(arkItemId)
 	if ok {
-		return val.(*models.PItem), nil
+		return val.(*models.Item), nil
 	}
 
-	var item models.PItem
+	var item models.Item
 	err := c.db.NewSelect().
 		Model(&item).
 		Where("ark_item_id = ?", arkItemId).
@@ -50,17 +48,16 @@ func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*model
 
 	if err == sql.ErrNoRows {
 		return nil, errors.ErrNotFound
-	}
-
-	if err != nil {
+	} else if err != nil {
 		return nil, err
 	}
 
+	cache.ItemFromArkId.SetDefault(arkItemId, &item)
 	return &item, nil
 }
 
-func (c *ItemRepo) GetShimItems(ctx context.Context) ([]*shims.PItem, error) {
-	var items []*shims.PItem
+func (c *ItemRepo) GetShimItems(ctx context.Context) ([]*shims.Item, error) {
+	var items []*shims.Item
 
 	err := c.db.NewSelect().
 		Model(&items).
@@ -68,17 +65,15 @@ func (c *ItemRepo) GetShimItems(ctx context.Context) ([]*shims.PItem, error) {
 
 	if err == sql.ErrNoRows {
 		return nil, errors.ErrNotFound
-	}
-
-	if err != nil {
+	} else if err != nil {
 		return nil, err
 	}
 
 	return items, nil
 }
 
-func (c *ItemRepo) GetShimItemByArkId(ctx context.Context, itemId string) (*shims.PItem, error) {
-	var item shims.PItem
+func (c *ItemRepo) GetShimItemByArkId(ctx context.Context, itemId string) (*shims.Item, error) {
+	var item shims.Item
 	err := c.db.NewSelect().
 		Model(&item).
 		Where("ark_item_id = ?", itemId).
@@ -86,9 +81,7 @@ func (c *ItemRepo) GetShimItemByArkId(ctx context.Context, itemId string) (*shim
 
 	if err == sql.ErrNoRows {
 		return nil, errors.ErrNotFound
-	}
-
-	if err != nil {
+	} else if err != nil {
 		return nil, err
 	}
 

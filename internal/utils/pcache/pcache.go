@@ -1,13 +1,11 @@
 package pcache
 
-import "sync"
+import (
+	"time"
 
-type Cache struct {
-	*sync.Map
-}
+	"github.com/patrickmn/go-cache"
+)
 
-func New() *Cache {
-	return &Cache{
-		&sync.Map{},
-	}
+func New() *cache.Cache {
+	return cache.New(cache.NoExpiration, time.Hour)
 }

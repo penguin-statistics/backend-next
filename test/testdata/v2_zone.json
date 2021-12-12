@@ -1,0 +1,41 @@
+{
+    "zoneId": "main_0",
+    "zoneIndex": 0,
+    "type": "MAINLINE",
+    "subType": "AWAKENING_HOUR",
+    "zoneName": "序章",
+    "existence": {
+        "US": {
+            "exist": true
+        },
+        "JP": {
+            "exist": true
+        },
+        "CN": {
+            "exist": true
+        },
+        "KR": {
+            "exist": true
+        }
+    },
+    "stages": [
+        "main_00-01",
+        "main_00-02",
+        "main_00-03",
+        "main_00-04",
+        "main_00-05",
+        "main_00-06",
+        "main_00-07",
+        "main_00-08",
+        "main_00-09",
+        "main_00-10",
+        "main_00-11"
+    ],
+    "background": "/backgrounds/zones/main_0.jpg",
+    "zoneName_i18n": {
+        "ko": "프롤로그",
+        "ja": "序章",
+        "en": "Prologue",
+        "zh": "序章"
+    }
+}

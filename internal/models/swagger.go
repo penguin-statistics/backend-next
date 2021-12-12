@@ -43,7 +43,7 @@ type Existence struct {
 
 type Keywords struct {
 	// Alias of the item,
-	Alias I18nOptionalString `json:"alias" validate:"required"`
+	Alias I18nOptionalString `json:"alias"`
 	// Pronounciation hints of the item
-	Pron I18nOptionalString `json:"pron" validate:"required"`
+	Pron I18nOptionalString `json:"pron"`
 }

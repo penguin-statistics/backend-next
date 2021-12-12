@@ -29,7 +29,7 @@ func RegisterItemController(v2 *server.V2, repo *repos.ItemRepo) {
 	v2.Get("/items/:itemId", c.GetItemByArkId)
 }
 
-func applyShim(item *shims.PItem) {
+func (c *ItemController) applyShim(item *shims.Item) {
 	nameI18n := gjson.ParseBytes(item.NameI18n)
 	item.Name = nameI18n.Map()["zh"].String()
 
@@ -57,6 +57,13 @@ func applyShim(item *shims.PItem) {
 	item.PronMap = json.RawMessage(utils.Must(json.Marshal(keywords.Map()["pron"].Value().(map[string]interface{}))).([]byte))
 }
 
+// @Summary      Get all Items
+// @Tags         Item
+// @Produce      json
+// @Success      200     {array}  shims.Item{name_i18n=models.I18nString,existence=models.Existence}
+// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Router       /v2/items [GET]
+// @Deprecated
 func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
 	items, err := c.repo.GetShimItems(ctx.Context())
 	if err != nil {
@@ -64,12 +71,21 @@ func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
 	}
 
 	for _, i := range items {
-		applyShim(i)
+		c.applyShim(i)
 	}
 
 	return ctx.JSON(items)
 }
 
+// @Summary      Get an Item with ID
+// @Tags         Item
+// @Produce      json
+// @Param        itemId  path      string  true  "Item ID"
+// @Success      200     {object}  shims.Item{name_i18n=models.I18nString,existence=models.Existence}
+// @Failure      400     {object}  errors.PenguinError "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item."
+// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Router       /v2/items/{itemId} [GET]
+// @Deprecated
 func (c *ItemController) GetItemByArkId(ctx *fiber.Ctx) error {
 	itemId := ctx.Params("itemId")
 
@@ -78,7 +94,7 @@ func (c *ItemController) GetItemByArkId(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	applyShim(item)
+	c.applyShim(item)
 
 	return ctx.JSON(item)
 }

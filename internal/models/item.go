@@ -7,12 +7,12 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-type PItem struct {
+type Item struct {
 	bun.BaseModel `bun:"items" swaggerignore:"true"`
 
-	// ID is the numerical ID of the item.
-	ID int64 `json:"penguinItemId"`
-	// ArkItemID is the previously used, string form ID of the item; in JSON-representation `itemId` is used as key.
+	// ItemID (penguinItemId) is the numerical ID of the item.
+	ItemID int64 `bun:",pk" json:"penguinItemId"`
+	// ArkItemID (itemId) is the previously used, string form ID of the item; in JSON-representation `itemId` is used as key.
 	ArkItemID string `json:"itemId"`
 	// Name is a map with language code as key and the name of the item in that language as value.
 	Name json.RawMessage `json:"name" swaggertype:"object"`
