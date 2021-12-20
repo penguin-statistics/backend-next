@@ -3,7 +3,8 @@ package repos
 import (
 	"context"
 	"database/sql"
-	"log"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
@@ -57,13 +58,23 @@ func (c *StageRepo) GetStageByArkId(ctx context.Context, stageArkId string) (*mo
 	return &stage, nil
 }
 
-func (c *StageRepo) GetShimStages(ctx context.Context) ([]*shims.Stage, error) {
+func (c *StageRepo) GetShimStages(ctx context.Context, server string) ([]*shims.Stage, error) {
 	var stages []*shims.Stage
 
 	err := c.db.NewSelect().
 		Model(&stages).
 		Relation("Zone", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.Column("ark_zone_id")
+		}).
+		Relation("DropInfos", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.
+				Relation("Item", func(sq *bun.SelectQuery) *bun.SelectQuery {
+					return sq.Column("ark_item_id")
+				}).
+				Relation("Stage", func(sq *bun.SelectQuery) *bun.SelectQuery {
+					return sq.Column("ark_stage_id")
+				}).
+				Where("server = ?", server)
 		}).
 		Scan(ctx)
 
@@ -76,12 +87,22 @@ func (c *StageRepo) GetShimStages(ctx context.Context) ([]*shims.Stage, error) {
 	return stages, nil
 }
 
-func (c *StageRepo) GetShimStageByArkId(ctx context.Context, stageId string) (*shims.Stage, error) {
+func (c *StageRepo) GetShimStageByArkId(ctx context.Context, stageId string, server string) (*shims.Stage, error) {
 	var stage shims.Stage
 	err := c.db.NewSelect().
 		Model(&stage).
 		Relation("Zone", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.Column("ark_zone_id")
+		}).
+		Relation("DropInfos", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.
+				Relation("Item", func(sq *bun.SelectQuery) *bun.SelectQuery {
+					return sq.Column("ark_item_id")
+				}).
+				Relation("Stage", func(sq *bun.SelectQuery) *bun.SelectQuery {
+					return sq.Column("ark_stage_id")
+				}).
+				Where("server = ?", server)
 		}).
 		Where("ark_stage_id = ?", stageId).
 		Scan(ctx)
@@ -89,7 +110,10 @@ func (c *StageRepo) GetShimStageByArkId(ctx context.Context, stageId string) (*s
 	if err == sql.ErrNoRows {
 		return nil, errors.ErrNotFound
 	} else if err != nil {
-		log.Println(err)
+		log.Error().
+			Str("stageId", stageId).
+			Err(err).
+			Msg("failed to get shim stage")
 		return nil, err
 	}
 

@@ -5,15 +5,17 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/penguin-statistics/backend-next/internal/config"
 )
 
-func ProvideRedis() (*redis.Client, error) {
+func ProvideRedis(config *config.Config) (*redis.Client, error) {
+	u, err := redis.ParseURL(config.RedisURL)
+	if err != nil {
+		return nil, err
+	}
+
 	// Open a Redis Client
-	client := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "",
-		DB:       1, // avoid potential collision with Penguin v1 Backend
-	})
+	client := redis.NewClient(u)
 
 	// check redis connection
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)

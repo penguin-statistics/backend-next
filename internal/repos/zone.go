@@ -3,7 +3,6 @@ package repos
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
@@ -94,7 +93,6 @@ func (c *ZoneRepo) GetShimZoneByArkId(ctx context.Context, zoneId string) (*shim
 	if err == sql.ErrNoRows {
 		return nil, errors.ErrNotFound
 	} else if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 

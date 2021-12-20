@@ -12,7 +12,7 @@ import (
 // @contact.url    https://github.com/AlvISsReimu
 // @license.name   MIT License
 // @license.url    https://opensource.org/licenses/MIT
-// @host           localhost:9010
+// @host           https://penguin-stats.io
 // @BasePath       /api
 func main() {
 	service.Bootstrap()

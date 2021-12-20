@@ -15,8 +15,7 @@ import (
 
 func ProvidePostgres(config *config.Config) (*bun.DB, error) {
 	// Open a PostgreSQL database.
-	dsn := "postgres://root:root@localhost:5432/penguin_structured?sslmode=disable"
-	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
+	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(config.PostgresDSN)))
 
 	// Create a Bun db on top of it.
 	db := bun.NewDB(pgdb, pgdialect.New())
@@ -25,6 +24,7 @@ func ProvidePostgres(config *config.Config) (*bun.DB, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
+
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
 	}

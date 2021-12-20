@@ -1,8 +1,6 @@
 package service
 
 import (
-	"context"
-
 	"github.com/penguin-statistics/backend-next/internal/appentry"
 
 	"go.uber.org/fx"
@@ -15,9 +13,5 @@ func Bootstrap() {
 
 	app := fx.New(opts...)
 
-	ctx := context.Background()
-	err := app.Start(ctx)
-	if err != nil {
-		panic(err)
-	}
+	app.Run() // blocks
 }

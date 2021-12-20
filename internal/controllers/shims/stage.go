@@ -30,6 +30,15 @@ func (c *StageController) applyShim(stage *shims.Stage) {
 	if stage.Zone != nil {
 		stage.ArkZoneID = stage.Zone.ArkZoneID
 	}
+
+	for _, i := range stage.DropInfos {
+		if i.Item != nil {
+			i.ArkItemID = i.Item.ArkItemID
+		}
+		if i.Stage != nil {
+			i.ArkStageID = i.Stage.ArkStageID
+		}
+	}
 }
 
 // @Summary      Get all Stages
@@ -37,10 +46,12 @@ func (c *StageController) applyShim(stage *shims.Stage) {
 // @Produce      json
 // @Success      200     {array}  shims.Stage{existence=models.Existence,code_i18n=models.I18nString}
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
-// @Router       /v2/stages [GET]
+// @Router       /PenguinStats/v2/stages [GET]
 // @Deprecated
 func (c *StageController) GetStages(ctx *fiber.Ctx) error {
-	items, err := c.repo.GetShimStages(ctx.Context())
+	server := ctx.Query("server", "CN")
+
+	items, err := c.repo.GetShimStages(ctx.Context(), server)
 	if err != nil {
 		return err
 	}
@@ -59,12 +70,13 @@ func (c *StageController) GetStages(ctx *fiber.Ctx) error {
 // @Success      200     {object}  shims.Stage{existence=models.Existence,code_i18n=models.I18nString}
 // @Failure      400     {object}  errors.PenguinError "Invalid or missing stageId. Notice that this shall be the **string ID** of the stage, instead of the internally used numerical ID of the stage."
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
-// @Router       /v2/stages/{stageId} [GET]
+// @Router       /PenguinStats/v2/stages/{stageId} [GET]
 // @Deprecated
 func (c *StageController) GetStageByArkId(ctx *fiber.Ctx) error {
 	stageId := ctx.Params("stageId")
+	server := ctx.Query("server", "CN")
 
-	item, err := c.repo.GetShimStageByArkId(ctx.Context(), stageId)
+	item, err := c.repo.GetShimStageByArkId(ctx.Context(), stageId, server)
 	if err != nil {
 		return err
 	}

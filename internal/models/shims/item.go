@@ -15,7 +15,7 @@ type Item struct {
 	Name        string          `bun:"-" json:"name"`
 	NameI18n    json.RawMessage `bun:"name" json:"name_i18n"`
 	Existence   json.RawMessage `json:"existence"`
-	ItemType    string          `bun:"-" json:"itemType"`
+	ItemType    string          `bun:"column:type" json:"itemType"`
 	SortID      int             `json:"sortId"`
 	Rarity      int             `json:"rarity"`
 	Group       *null.String    `json:"groupID,omitempty" swaggertype:"string"`

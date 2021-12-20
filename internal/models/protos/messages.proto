@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+option go_package = "github.com/penguin-statistics/backend-next/internal/protos";
+
 message Ping {
     Header header = 1;
     int32 sequence = 2;
@@ -76,5 +78,4 @@ message MatrixUpdateSubscribeResp {
     int32 sequence = 2;
 }
 
-option go_package = "github.com/penguin-statistics/backend-next/internal/protos";
 

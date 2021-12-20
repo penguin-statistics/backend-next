@@ -22,4 +22,6 @@ type Stage struct {
 	MinClearTime null.Int        `json:"minClearTime" swaggertype:"number"`
 
 	Zone *models.Zone `bun:"rel:belongs-to,join:zone_id=zone_id" json:"-"`
+
+	DropInfos []*DropInfo `bun:"rel:has-many,join:stage_id=stage_id" json:"dropInfos"`
 }
