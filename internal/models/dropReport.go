@@ -5,7 +5,7 @@ import (
 )
 
 type DropReport struct {
-	bun.BaseModel `bun:"drop_reports"`
+	bun.BaseModel `bun:"drop_reports,alias:dr"`
 
 	ReportID  int64  `bun:",pk" json:"id"`
 	StageID   int64  `json:"stageId"`
