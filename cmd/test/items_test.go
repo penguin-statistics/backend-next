@@ -15,7 +15,7 @@ func TestV2Items(t *testing.T) {
 	populate(&app)
 
 	t.Run("GetsShimFormatItems", func(t *testing.T) {
-		resp, err := app.Test(httptest.NewRequest("GET", "/api/v2/items", nil))
+		resp, err := app.Test(httptest.NewRequest("GET", "/PenguinStats/api/v2/items", nil))
 		if err != nil {
 			t.Error(err)
 		}

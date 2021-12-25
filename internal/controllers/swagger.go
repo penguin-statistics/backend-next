@@ -7,9 +7,6 @@ import (
 	_ "github.com/penguin-statistics/backend-next/docs"
 )
 
-type SwaggerController struct {
-}
-
 func RegisterSwaggerController(app *fiber.App) {
 	app.Get("/swagger/*", swagger.Handler) // default
 

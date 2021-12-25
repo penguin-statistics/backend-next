@@ -15,7 +15,7 @@ func TestV2Zones(t *testing.T) {
 	populate(&app)
 
 	t.Run("GetsShimFormatZones", func(t *testing.T) {
-		resp, err := app.Test(httptest.NewRequest("GET", "/api/v2/zones", nil))
+		resp, err := app.Test(httptest.NewRequest("GET", "/PenguinStats/api/v2/zones", nil))
 		if err != nil {
 			t.Error(err)
 		}

@@ -4,16 +4,24 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"runtime"
+	"runtime/debug"
 	"strings"
 	"time"
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/davecgh/go-spew/spew"
 	ut "github.com/go-playground/universal-translator"
-	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
-	"github.com/penguin-statistics/backend-next/internal/utils/i18n"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/compress"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/favicon"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/pprof"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
+	"github.com/gofiber/helmet/v2"
+	"github.com/gofiber/websocket/v2"
+	"github.com/penguin-statistics/fiberotel"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
 	"go.opentelemetry.io/otel"
@@ -24,17 +32,9 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"golang.org/x/text/language"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/compress"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/favicon"
-	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/gofiber/fiber/v2/middleware/requestid"
-	"github.com/gofiber/helmet/v2"
-	"github.com/gofiber/websocket/v2"
-
-	"github.com/penguin-statistics/fiberotel"
+	"github.com/penguin-statistics/backend-next/internal/config"
+	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/utils/i18n"
 )
 
 func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
@@ -119,9 +119,7 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 	app.Use(recover.New(recover.Config{
 		EnableStackTrace: true,
 		StackTraceHandler: func(c *fiber.Ctx, e interface{}) {
-			buf := []byte{}
-			runtime.Stack(buf, false)
-			_, _ = os.Stderr.WriteString(fmt.Sprintf("panic: %v\n%s\n", e, buf))
+			os.Stderr.WriteString(fmt.Sprintf("panic: %v\n%s\n", e, string(debug.Stack())))
 		},
 	}))
 	app.Use(helmet.New(helmet.Config{
@@ -165,7 +163,7 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 	if config.DevMode {
 		fmt.Println("Running in DEV mode")
 
-		// app.Use(pprof.New())
+		app.Use(pprof.New())
 
 		app.Use(logger.New(logger.Config{
 			Format:     "${pid} ${ip} ${locals:requestid} ${status} ${latency} - ${method} ${path}\n",

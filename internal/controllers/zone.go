@@ -1,24 +1,22 @@
 package controllers
 
 import (
-	"github.com/penguin-statistics/backend-next/internal/repos"
-	"github.com/penguin-statistics/backend-next/internal/server"
-
 	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
+	"go.uber.org/fx"
+
+	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/server"
 )
 
 type ZoneController struct {
-	repo  *repos.ZoneRepo
-	redis *redis.Client
+	fx.In
+
+	Repo  *repos.ZoneRepo
+	Redis *redis.Client
 }
 
-func RegisterZoneController(v3 *server.V3, repo *repos.ZoneRepo, redis *redis.Client) {
-	c := &ZoneController{
-		repo:  repo,
-		redis: redis,
-	}
-
+func RegisterZoneController(v3 *server.V3, c ZoneController) {
 	v3.Get("/zones", c.GetZones)
 	v3.Get("/zones/:zoneId", c.GetZoneById)
 }
@@ -30,7 +28,7 @@ func RegisterZoneController(v3 *server.V3, repo *repos.ZoneRepo, redis *redis.Cl
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/zones [GET]
 func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
-	zones, err := c.repo.GetZones(ctx.Context())
+	zones, err := c.Repo.GetZones(ctx.Context())
 	if err != nil {
 		return err
 	}
@@ -49,7 +47,7 @@ func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
 func (c *ZoneController) GetZoneById(ctx *fiber.Ctx) error {
 	zoneId := ctx.Params("zoneId")
 
-	zone, err := c.repo.GetZoneByArkId(ctx.Context(), zoneId)
+	zone, err := c.Repo.GetZoneByArkId(ctx.Context(), zoneId)
 	if err != nil {
 		return err
 	}

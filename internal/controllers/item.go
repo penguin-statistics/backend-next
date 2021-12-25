@@ -4,25 +4,23 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-redis/redis/v8"
+	"github.com/gofiber/fiber/v2"
+	"go.uber.org/fx"
+
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/utils"
-
-	"github.com/go-redis/redis/v8"
-	"github.com/gofiber/fiber/v2"
 )
 
 type ItemController struct {
-	repo  *repos.ItemRepo
-	redis *redis.Client
+	fx.In
+
+	Repo  *repos.ItemRepo
+	Redis *redis.Client
 }
 
-func RegisterItemController(v3 *server.V3, repo *repos.ItemRepo, redis *redis.Client) {
-	c := &ItemController{
-		repo:  repo,
-		redis: redis,
-	}
-
+func RegisterItemController(v3 *server.V3, c ItemController) {
 	v3.Get("/items", c.GetItems)
 	v3.Get("/items/:itemId", buildSanitizer(utils.NonNullString, utils.IsInt), c.GetItemById)
 }
@@ -48,7 +46,7 @@ func buildSanitizer(sanitizer ...func(string) bool) func(ctx *fiber.Ctx) error {
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/items [GET]
 func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
-	items, err := c.repo.GetItems(ctx.Context())
+	items, err := c.Repo.GetItems(ctx.Context())
 	if err != nil {
 		return err
 	}
@@ -67,7 +65,7 @@ func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
 func (c *ItemController) GetItemById(ctx *fiber.Ctx) error {
 	itemId := ctx.Params("itemId")
 
-	item, err := c.repo.GetItemByArkId(ctx.Context(), itemId)
+	item, err := c.Repo.GetItemByArkId(ctx.Context(), itemId)
 	if err != nil {
 		return err
 	}

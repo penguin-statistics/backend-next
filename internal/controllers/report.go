@@ -1,63 +1,28 @@
 package controllers
 
 import (
-	"fmt"
 	"strings"
 
-	errors2 "github.com/pkg/errors"
-
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
+	"go.uber.org/fx"
+
 	"github.com/penguin-statistics/backend-next/internal/models/dto"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
-	"github.com/rs/zerolog/log"
 )
 
 type ReportController struct {
-	crypto *utils.Crypto
+	fx.In
+
+	Crypto *utils.Crypto
 }
 
-func RegisterReportController(v2 *server.V2, v3 *server.V3, crypto *utils.Crypto) {
-	c := &ReportController{
-		crypto: crypto,
-	}
-
+func RegisterReportController(v2 *server.V2, v3 *server.V3, c ReportController) {
 	v2.Post("/report", c.SingularReport)
 	v2.Post("/report/recognition", c.RecognitionReport)
-	v2.Post("/intentionallypanic", func(ctx *fiber.Ctx) error {
-		e := outer()
-
-		fmt.Printf("#%+v#", e)
-
-		log.Error().
-			Stack().
-			Err(e).
-			Msg("trig")
-
-		return e
-	})
-}
-
-func inner() error {
-	return errors2.New("seems we have an error here")
-}
-
-func middle() error {
-	err := inner()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func outer() error {
-	err := middle()
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // @Summary      Submit an Item Drop Report
@@ -100,7 +65,7 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 	privateKey := segments[0]
 	body := segments[1]
 
-	decrypted, err := c.crypto.Decrypt(privateKey, body)
+	decrypted, err := c.Crypto.Decrypt(privateKey, body)
 	if err != nil {
 		log.Warn().
 			Err(err).

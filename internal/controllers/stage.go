@@ -1,24 +1,22 @@
 package controllers
 
 import (
-	"github.com/penguin-statistics/backend-next/internal/repos"
-	"github.com/penguin-statistics/backend-next/internal/server"
-
 	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
+	"go.uber.org/fx"
+
+	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/server"
 )
 
 type StageController struct {
-	repo  *repos.StageRepo
-	redis *redis.Client
+	fx.In
+
+	Repo  *repos.StageRepo
+	Redis *redis.Client
 }
 
-func RegisterStageController(v3 *server.V3, repo *repos.StageRepo, redis *redis.Client) {
-	c := &StageController{
-		repo:  repo,
-		redis: redis,
-	}
-
+func RegisterStageController(v3 *server.V3, c StageController) {
 	v3.Get("/stages", c.GetStages)
 	v3.Get("/stages/:stageId", c.GetStageById)
 }
@@ -30,7 +28,7 @@ func RegisterStageController(v3 *server.V3, repo *repos.StageRepo, redis *redis.
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/stages [GET]
 func (c *StageController) GetStages(ctx *fiber.Ctx) error {
-	stages, err := c.repo.GetStages(ctx.Context())
+	stages, err := c.Repo.GetStages(ctx.Context())
 	if err != nil {
 		return err
 	}
@@ -49,7 +47,7 @@ func (c *StageController) GetStages(ctx *fiber.Ctx) error {
 func (c *StageController) GetStageById(ctx *fiber.Ctx) error {
 	stageId := ctx.Params("stageId")
 
-	stage, err := c.repo.GetStageByArkId(ctx.Context(), stageId)
+	stage, err := c.Repo.GetStageByArkId(ctx.Context(), stageId)
 	if err != nil {
 		return err
 	}
