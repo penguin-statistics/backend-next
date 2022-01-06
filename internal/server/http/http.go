@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/bwmarrin/snowflake"
-	"github.com/davecgh/go-spew/spew"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
@@ -23,7 +22,6 @@ import (
 	"github.com/gofiber/websocket/v2"
 	"github.com/penguin-statistics/fiberotel"
 	"github.com/rs/zerolog/log"
-	"github.com/rs/zerolog/pkgerrors"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
@@ -81,9 +79,6 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 				// Overwrite status code if fiber.Error type & provided code
 				code = e.Code
 			}
-
-			s := pkgerrors.MarshalStack(err)
-			spew.Dump(s, err)
 
 			log.Error().
 				Stack().
@@ -144,7 +139,7 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 			return c.Next()
 		}
 
-		tags, _, err := language.ParseAcceptLanguage(c.Get("Accept-Language"))
+		tags, _, err := language.ParseAcceptLanguage(c.Get(fiber.HeaderAcceptLanguage))
 		if err != nil {
 			return set(i18n.UT.GetFallback())
 		}

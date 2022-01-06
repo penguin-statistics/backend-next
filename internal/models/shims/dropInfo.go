@@ -9,10 +9,10 @@ import (
 type DropInfo struct {
 	bun.BaseModel `bun:"drop_infos"`
 
-	DropID     int64           `bun:",pk" json:"dropId"`
+	DropID     int             `bun:",pk" json:"dropId"`
 	Server     string          `json:"-"`
-	StageID    int64           `json:"-"`
-	ItemID     int64           `json:"-"`
+	StageID    int             `json:"-"`
+	ItemID     int             `json:"-"`
 	ArkStageID string          `bun:"-" json:"stageId"`
 	ArkItemID  string          `bun:"-" json:"itemId"`
 	DropType   string          `json:"dropType"`

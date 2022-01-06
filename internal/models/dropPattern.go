@@ -7,6 +7,6 @@ import (
 type DropPattern struct {
 	bun.BaseModel `bun:"drop_patterns,alias:dp"`
 
-	PatternID int64  `bun:",pk" json:"id"`
+	PatternID int    `bun:",pk" json:"id"`
 	Hash      string `json:"hash"`
 }

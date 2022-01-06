@@ -3,15 +3,15 @@ package rekuest
 import (
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
-	"github.com/gofiber/fiber/v2"
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
-	"github.com/penguin-statistics/backend-next/internal/utils/i18n"
-
 	en_translations "github.com/go-playground/validator/v10/translations/en"
 	ja_translations "github.com/go-playground/validator/v10/translations/ja"
 	zh_translations "github.com/go-playground/validator/v10/translations/zh"
 	zh_tw_translations "github.com/go-playground/validator/v10/translations/zh_tw"
+	"github.com/gofiber/fiber/v2"
+
+	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 	"github.com/penguin-statistics/backend-next/internal/utils"
+	"github.com/penguin-statistics/backend-next/internal/utils/i18n"
 )
 
 var Validate = utils.NewValidator()
@@ -112,7 +112,7 @@ func validateStruct(ctx *fiber.Ctx, s interface{}) []*ErrorResponse {
 // always be a pointer.
 func ValidBody(ctx *fiber.Ctx, dest interface{}) error {
 	if err := ctx.BodyParser(dest); err != nil {
-		return err
+		return errors.ErrInvalidRequest.WithMessage("invalid request: %s", err)
 	}
 
 	if err := validateStruct(ctx, dest); err != nil {

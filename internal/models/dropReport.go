@@ -7,13 +7,13 @@ import (
 type DropReport struct {
 	bun.BaseModel `bun:"drop_reports,alias:dr"`
 
-	ReportID  int64  `bun:",pk" json:"id"`
-	StageID   int64  `json:"stageId"`
-	PatternID int64  `json:"patternId"`
-	Times     int64  `json:"times"`
+	ReportID  int    `bun:",pk" json:"id"`
+	StageID   int    `json:"stageId"`
+	PatternID int    `json:"patternId"`
+	Times     int    `json:"times"`
 	IP        string `json:"ip"`
 	CreatedAt string `json:"createdAt"`
 	Deleted   bool   `json:"deleted"`
 	Server    string `json:"server"`
-	AccountID int64  `json:"accountId"`
+	AccountID int    `json:"accountId"`
 }

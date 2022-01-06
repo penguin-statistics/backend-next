@@ -10,7 +10,7 @@ import (
 type Item struct {
 	bun.BaseModel `bun:"items"`
 
-	ItemID      int64           `bun:",pk" json:"-"`
+	ItemID      int             `bun:",pk" json:"-"`
 	ArkItemID   string          `json:"itemId"`
 	Name        string          `bun:"-" json:"name"`
 	NameI18n    json.RawMessage `bun:"name" json:"name_i18n"`

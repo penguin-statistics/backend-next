@@ -7,8 +7,8 @@ import (
 type DropPatternElement struct {
 	bun.BaseModel `bun:"drop_pattern_elements,alias:dpe"`
 
-	ElementID     int64 `bun:",pk" json:"id"`
-	DropPatternID int64 `json:"dropPatternId"`
-	ItemID        int64 `json:"itemId"`
-	Quantity      int64 `json:"quantity"`
+	ElementID     int `bun:",pk" json:"id"`
+	DropPatternID int `json:"dropPatternId"`
+	ItemID        int `json:"itemId"`
+	Quantity      int `json:"quantity"`
 }

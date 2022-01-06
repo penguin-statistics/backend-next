@@ -46,6 +46,6 @@ type Existence struct {
 type Keywords struct {
 	// Alias of the item,
 	Alias I18nOptionalString `json:"alias"`
-	// Pronunciation hints of the item
+	// Pronounciation hints of the item
 	Pron I18nOptionalString `json:"pron"`
 }

@@ -7,6 +7,8 @@
 [![Last Commit](https://img.shields.io/github/last-commit/penguin-statistics/backend-next)](https://github.com/penguin-statistics/backend-next/commits/dev)
 [![GitHub Actions Build Status](https://github.com/penguin-statistics/backend-next/actions/workflows/go.yml/badge.svg)](https://github.com/penguin-statistics/backend-next/actions/workflows/go.yml)
 
+![Alt](https://repobeats.axiom.co/api/embed/ae259f962b4d5fc542de420d31a237986d282765.svg "Repobeats analytics image")
+
 The re-designed [Penguin Statistics](https://penguin-stats.io/?utm_source=github) v3 Backend, built with Go.
 
 ## Architecture
@@ -18,7 +20,7 @@ This Go project mainly uses:
 This project mainly follows a RESTful API design.
 
 ## Maintainers
-This frontend project has mainly being maintained by the following contributors (in alphabetical order):
+This project has mainly being maintained by the following contributors (in alphabetical order):
 - [AlvISsReimu](https://github.com/AlvISsReimu)
 - [GalvinGao](https://github.com/GalvinGao)
 

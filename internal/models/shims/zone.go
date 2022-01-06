@@ -11,9 +11,9 @@ import (
 type Zone struct {
 	bun.BaseModel `bun:"zones"`
 
-	ZoneID       int64           `bun:",pk" json:"-"`
+	ZoneID       int             `bun:",pk" json:"-"`
 	ArkZoneID    string          `json:"zoneId"`
-	Index        int64           `json:"zoneIndex"`
+	Index        int             `json:"zoneIndex"`
 	Category     string          `json:"type"`
 	Type         *null.String    `json:"subType" swaggertype:"string"`
 	ZoneName     string          `bun:"-" json:"zoneName"`

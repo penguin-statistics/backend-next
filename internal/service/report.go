@@ -1,19 +1,22 @@
 package service
 
 import (
-	"go.uber.org/fx"
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/penguin-statistics/backend-next/internal/models/dto"
+	"github.com/penguin-statistics/backend-next/internal/repos"
 )
 
 type ReportService struct {
-	fx.In
+	itemRepo *repos.ItemRepo
 }
 
-func NewReportService() *ReportService {
-	return &ReportService{}
+func NewReportService(itemRepo *repos.ItemRepo) *ReportService {
+	return &ReportService{
+		itemRepo: itemRepo,
+	}
 }
 
 func (s *ReportService) SubmitSingularReport(report *dto.BatchReportRequest) {
-
+	spew.Dump(report)
 }

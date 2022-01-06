@@ -3,6 +3,8 @@ package appentry
 import (
 	"time"
 
+	"go.uber.org/fx"
+
 	"github.com/penguin-statistics/backend-next/internal/config"
 	"github.com/penguin-statistics/backend-next/internal/controllers"
 	"github.com/penguin-statistics/backend-next/internal/controllers/shims"
@@ -11,9 +13,8 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	httpserver "github.com/penguin-statistics/backend-next/internal/server/http"
+	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils"
-
-	"go.uber.org/fx"
 )
 
 func ProvideOptions(includeSwagger bool) []fx.Option {
@@ -28,6 +29,8 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(repos.NewItemRepo),
 		fx.Provide(repos.NewStageRepo),
 		fx.Provide(repos.NewZoneRepo),
+		fx.Provide(repos.NewDropPatternRepo),
+		fx.Provide(service.NewReportService),
 		fx.Provide(server.CreateVersioningEndpoints),
 		fx.Provide(utils.NewCrypto),
 		fx.Invoke(shims.RegisterItemController),

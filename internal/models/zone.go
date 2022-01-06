@@ -11,9 +11,9 @@ type Zone struct {
 	bun.BaseModel `bun:"zones"`
 
 	// ZoneID is the numerical ID of the zone.
-	ZoneID    int64  `bun:",pk" json:"penguinZoneId"`
+	ZoneID    int    `bun:",pk" json:"penguinZoneId"`
 	ArkZoneID string `json:"zoneId"`
-	Index     int64  `json:"index"`
+	Index     int    `json:"index"`
 	// Category of the zone.
 	Category string `json:"category" example:"MAINLINE"`
 	// Type of the zone, e.g. "AWAKENING_HOUR" or "VISION_SHATTER". Optional and only occurres when `category` is "MAINLINE".

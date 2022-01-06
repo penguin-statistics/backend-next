@@ -11,7 +11,7 @@ import (
 type Activity struct {
 	bun.BaseModel `bun:"activities"`
 
-	ActivityID int64           `bun:",pk" json:"id"`
+	ActivityID int             `bun:",pk" json:"id"`
 	StartTime  *time.Time      `json:"startTime"`
 	EndTime    null.Time       `json:"endTime"`
 	Name       string          `json:"name"`

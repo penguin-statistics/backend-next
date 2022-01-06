@@ -25,7 +25,7 @@ type Extras map[string]interface{}
 type PenguinError struct {
 	StatusCode int    `example:"400"`
 	ErrorCode  string `example:"INVALID_REQUEST"`
-	Message    string `example:"invalid request: request parameters are invalid"`
+	Message    string `example:"invalid request: some or all request parameters are invalid"`
 	Extras     *Extras
 }
 
@@ -35,6 +35,16 @@ func New(statusCode int, errorCode string, message string) *PenguinError {
 		ErrorCode:  errorCode,
 		Message:    message,
 	}
+}
+
+func (e *PenguinError) WithMessage(format string, parts ...interface{}) *PenguinError {
+	e.Message = fmt.Sprintf(format, parts...)
+	return e
+}
+
+func (e *PenguinError) WithExtras(extras Extras) *PenguinError {
+	e.Extras = &extras
+	return e
 }
 
 func NewInvalidViolations(violations interface{}) *PenguinError {
