@@ -4,11 +4,12 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/uptrace/bun"
+
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
-	"github.com/uptrace/bun"
 )
 
 type ItemRepo struct {
@@ -35,13 +36,13 @@ func (c *ItemRepo) GetItems(ctx context.Context) ([]*models.Item, error) {
 }
 
 func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*models.Item, error) {
-	val, ok := cache.ItemFromArkId.Get(arkItemId)
-	if ok {
-		return val.(*models.Item), nil
+	var item models.Item
+	err := cache.ItemFromArkId.Get(arkItemId, &item)
+	if err == nil {
+		return &item, nil
 	}
 
-	var item models.Item
-	err := c.db.NewSelect().
+	err = c.db.NewSelect().
 		Model(&item).
 		Where("ark_item_id = ?", arkItemId).
 		Scan(ctx)
@@ -52,7 +53,7 @@ func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*model
 		return nil, err
 	}
 
-	cache.ItemFromArkId.SetDefault(arkItemId, &item)
+	go cache.ItemFromArkId.Set(arkItemId, &item)
 	return &item, nil
 }
 
