@@ -2,11 +2,11 @@ package cache
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/goccy/go-json"
 )
 
 var (
@@ -20,7 +20,10 @@ type Cache interface {
 }
 
 func New(client *redis.Client, prefix string) Cache {
-	return &redisCache{client: client, prefix: prefix}
+	return &redisCache{
+		client: client,
+		prefix: prefix,
+	}
 }
 
 type redisCache struct {

@@ -1,13 +1,12 @@
 package shims
 
 import (
+	"github.com/gofiber/fiber/v2"
+	"github.com/tidwall/gjson"
+
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
-
-	"github.com/tidwall/gjson"
-
-	"github.com/gofiber/fiber/v2"
 )
 
 type StageController struct {

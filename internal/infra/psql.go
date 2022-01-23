@@ -20,7 +20,7 @@ func ProvidePostgres(config *config.Config) (*bun.DB, error) {
 
 	// Create a Bun db on top of it.
 	db := bun.NewDB(pgdb, pgdialect.New())
-	db.AddQueryHook(bundebug.NewQueryHook())
+	db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithEnabled(true), bundebug.WithVerbose(true)))
 	db.AddQueryHook(bunotel.NewQueryHook(bunotel.WithDBName("penguin_structured")))
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)

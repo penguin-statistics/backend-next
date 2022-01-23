@@ -29,7 +29,9 @@ require (
 require (
 	github.com/go-logr/logr v1.2.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/goccy/go-json v0.9.4 // indirect
 	github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.7 // indirect
+	github.com/valyala/fastjson v1.6.3 // indirect
 	go.opentelemetry.io/otel/internal/metric v0.26.0 // indirect
 	go.opentelemetry.io/otel/metric v0.26.0 // indirect
 )

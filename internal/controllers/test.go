@@ -59,7 +59,7 @@ func (c *TestController) calcDropMatrixForTimeRanges(
 	var dropInfosByTimeRangeID []linq.Group
 	linq.From(dropInfos).
 		GroupByT(
-			func(dropInfo models.DropInfo) int { return dropInfo.TimeRangeID },
+			func(dropInfo models.DropInfo) int { return dropInfo.RangeID },
 			func(dropInfo models.DropInfo) models.DropInfo { return dropInfo }).
 		ToSlice(&dropInfosByTimeRangeID)
 

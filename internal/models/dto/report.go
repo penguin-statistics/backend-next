@@ -1,16 +1,16 @@
 package dto
 
 type Drop struct {
-	DropType string `json:"dropType" validate:"required,oneof=REGULAR SPECIAL EXTRA NORMAL_DROP SPECIAL_DROP EXTRA_DROP"`
+	DropType string `json:"dropType" validate:"required,oneof=REGULAR_DROP NORMAL_DROP SPECIAL_DROP EXTRA_DROP"`
 	ItemID   string `json:"itemId" validate:"required"`
-	Quantity int    `json:"quantity" validate:"required,max:1000"`
+	Quantity int    `json:"quantity" validate:"required,lte=1000"`
 }
 
 type SingularReportRequest struct {
 	FragmentServer
 	FragmentReportCommon
 
-	Drops []Drop `json:"drops" validate:"max:64"`
+	Drops []Drop `json:"drops" validate:"lte=100,dive"`
 }
 
 type BatchReportRequest struct {

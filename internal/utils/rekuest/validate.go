@@ -100,7 +100,10 @@ func validateStruct(ctx *fiber.Ctx, s interface{}) []*ErrorResponse {
 	tr := TranslatorFromCtx(ctx)
 	err := Validate.Struct(s)
 	if err != nil {
-		errs := err.(validator.ValidationErrors)
+		errs, ok := err.(validator.ValidationErrors)
+		if !ok {
+			panic(err)
+		}
 		return translate(tr, errs)
 	}
 	return nil
@@ -115,6 +118,14 @@ func ValidBody(ctx *fiber.Ctx, dest interface{}) error {
 		return errors.ErrInvalidRequest.WithMessage("invalid request: %s", err)
 	}
 
+	if err := validateStruct(ctx, dest); err != nil {
+		return errors.NewInvalidViolations(err)
+	}
+
+	return nil
+}
+
+func ValidStruct(ctx *fiber.Ctx, dest interface{}) error {
 	if err := validateStruct(ctx, dest); err != nil {
 		return errors.NewInvalidViolations(err)
 	}

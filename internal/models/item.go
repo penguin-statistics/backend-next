@@ -8,7 +8,7 @@ import (
 )
 
 type Item struct {
-	bun.BaseModel `bun:"items" swaggerignore:"true"`
+	bun.BaseModel `bun:"items,alias:it" swaggerignore:"true"`
 
 	// ItemID (penguinItemId) is the numerical ID of the item.
 	ItemID int `bun:",pk" json:"penguinItemId"`

@@ -31,6 +31,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(repos.NewItemRepo),
 		fx.Provide(repos.NewStageRepo),
 		fx.Provide(repos.NewZoneRepo),
+		fx.Provide(repos.NewDropInfoRepo),
 		fx.Provide(repos.NewDropPatternRepo),
 		fx.Provide(service.NewReportService),
 		fx.Provide(server.CreateVersioningEndpoints),

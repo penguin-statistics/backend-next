@@ -2,14 +2,13 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
 	"go.uber.org/fx"
-
 	// "github.com/davecgh/go-spew/spew"
 	"github.com/gofiber/fiber/v2"
+
+	"github.com/penguin-statistics/backend-next/internal/config"
 )
 
 func run(app *fiber.App, config *config.Config, lc fx.Lifecycle) {
@@ -18,7 +17,7 @@ func run(app *fiber.App, config *config.Config, lc fx.Lifecycle) {
 			errChan := make(chan error)
 
 			go func() {
-				errChan <- app.Listen(fmt.Sprintf(":%d", config.Port))
+				errChan <- app.Listen(config.Address)
 			}()
 
 			// wait for at maximum 100ms for errChan to return anything, else just assume succeeded and return

@@ -8,8 +8,8 @@ import (
 )
 
 type Config struct {
-	// Port is the TCP port the program would listen on. By default the program listens on all interfaces.
-	Port int
+	// Address is the listen address would listen on.
+	Address string
 
 	// DevMode to indicate development mode. When true, the program would spin up utilities for debugging and
 	// provide a more contextual message when encountered a panic. See internal/server/http/http.go for the
