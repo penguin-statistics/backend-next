@@ -6,10 +6,10 @@ require (
 	github.com/ahmetb/go-linq/v3 v3.2.0
 	github.com/bwmarrin/snowflake v0.3.0
 	github.com/go-redis/redis/v8 v8.11.4
+	github.com/goccy/go-json v0.9.4
 	github.com/gofiber/fiber/v2 v2.23.0
 	github.com/gofiber/helmet/v2 v2.2.4
 	github.com/nats-io/nats.go v1.13.1-0.20211122170419-d7c1d78a50fc
-	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/penguin-statistics/fiber-swagger/v3 v3.0.2
 	github.com/penguin-statistics/fiberotel v0.8.2
 	github.com/stretchr/testify v1.7.0
@@ -29,9 +29,7 @@ require (
 require (
 	github.com/go-logr/logr v1.2.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/goccy/go-json v0.9.4 // indirect
 	github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.7 // indirect
-	github.com/valyala/fastjson v1.6.3 // indirect
 	go.opentelemetry.io/otel/internal/metric v0.26.0 // indirect
 	go.opentelemetry.io/otel/metric v0.26.0 // indirect
 )
