@@ -8,7 +8,7 @@ import (
 )
 
 type Zone struct {
-	bun.BaseModel `bun:"zones"`
+	bun.BaseModel `bun:"zones,alias:zo"`
 
 	// ZoneID is the numerical ID of the zone.
 	ZoneID    int    `bun:",pk" json:"penguinZoneId"`

@@ -8,7 +8,7 @@ import (
 )
 
 type Stage struct {
-	bun.BaseModel `bun:"stages"`
+	bun.BaseModel `bun:"stages,alias:st"`
 
 	// StageID (penguinStageId) is the numerical ID of the stage.
 	StageID int `bun:",pk" json:"penguinStageId"`

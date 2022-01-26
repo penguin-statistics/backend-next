@@ -1,12 +1,33 @@
 package cache
 
-import "github.com/penguin-statistics/backend-next/internal/utils/pcache"
+import (
+	"sync"
 
-var ItemFromId = pcache.New()
-var ItemFromArkId = pcache.New()
+	"github.com/go-redis/redis/v8"
 
-var StageFromId = pcache.New()
-var StageFromArkId = pcache.New()
+	"github.com/penguin-statistics/backend-next/internal/utils/cache"
+)
 
-var ZoneFromId = pcache.New()
-var ZoneFromArkId = pcache.New()
+var ItemFromId cache.Cache
+var ItemFromArkId cache.Cache
+
+var StageFromId cache.Cache
+var StageFromArkId cache.Cache
+
+var ZoneFromId cache.Cache
+var ZoneFromArkId cache.Cache
+
+var once sync.Once
+
+func Populate(client *redis.Client) {
+	once.Do(func() {
+		ItemFromId = cache.New(client, "item#id")
+		ItemFromArkId = cache.New(client, "item#arkId")
+
+		StageFromId = cache.New(client, "stage#id")
+		StageFromArkId = cache.New(client, "stage#arkId")
+
+		ZoneFromId = cache.New(client, "zone#id")
+		ZoneFromArkId = cache.New(client, "zone#arkId")
+	})
+}

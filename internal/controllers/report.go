@@ -10,6 +10,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/dto"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 	"github.com/penguin-statistics/backend-next/internal/server"
+	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
 )
@@ -17,7 +18,8 @@ import (
 type ReportController struct {
 	fx.In
 
-	Crypto *utils.Crypto
+	Crypto        *utils.Crypto
+	ReportService *service.ReportService
 }
 
 func RegisterReportController(v2 *server.V2, v3 *server.V3, c ReportController) {
@@ -39,7 +41,7 @@ func (c *ReportController) SingularReport(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	return ctx.JSON(report)
+	return c.ReportService.VerifySingularReport(ctx, &report)
 }
 
 // @Summary      Bulk Submit with Frontend Recognition

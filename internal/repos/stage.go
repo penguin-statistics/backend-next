@@ -5,12 +5,12 @@ import (
 	"database/sql"
 
 	"github.com/rs/zerolog/log"
+	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
-	"github.com/uptrace/bun"
 )
 
 type StageRepo struct {
@@ -37,13 +37,13 @@ func (c *StageRepo) GetStages(ctx context.Context) ([]*models.Stage, error) {
 }
 
 func (c *StageRepo) GetStageByArkId(ctx context.Context, stageArkId string) (*models.Stage, error) {
-	val, ok := cache.StageFromArkId.Get(stageArkId)
-	if ok {
-		return val.(*models.Stage), nil
+	var stage models.Stage
+	err := cache.StageFromArkId.Get(stageArkId, &stage)
+	if err == nil {
+		return &stage, nil
 	}
 
-	var stage models.Stage
-	err := c.db.NewSelect().
+	err = c.db.NewSelect().
 		Model(&stage).
 		Where("ark_stage_id = ?", stageArkId).
 		Scan(ctx)
@@ -54,7 +54,7 @@ func (c *StageRepo) GetStageByArkId(ctx context.Context, stageArkId string) (*mo
 		return nil, err
 	}
 
-	cache.StageFromArkId.SetDefault(stageArkId, &stage)
+	go cache.StageFromArkId.Set(stageArkId, &stage)
 	return &stage, nil
 }
 

@@ -4,11 +4,12 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/uptrace/bun"
+
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
-	"github.com/uptrace/bun"
 )
 
 type ZoneRepo struct {
@@ -35,13 +36,13 @@ func (c *ZoneRepo) GetZones(ctx context.Context) ([]*models.Zone, error) {
 }
 
 func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*models.Zone, error) {
-	val, ok := cache.ZoneFromArkId.Get(arkZoneId)
-	if ok {
-		return val.(*models.Zone), nil
+	var zone models.Zone
+	err := cache.ZoneFromArkId.Get(arkZoneId, &zone)
+	if err == nil {
+		return &zone, nil
 	}
 
-	var zone models.Zone
-	err := c.db.NewSelect().
+	err = c.db.NewSelect().
 		Model(&zone).
 		Where("ark_zone_id = ?", arkZoneId).
 		Scan(ctx)
@@ -52,7 +53,7 @@ func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model
 		return nil, err
 	}
 
-	cache.ZoneFromArkId.SetDefault(arkZoneId, &zone)
+	go cache.ZoneFromArkId.Set(arkZoneId, &zone)
 	return &zone, nil
 }
 

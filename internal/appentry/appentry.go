@@ -9,6 +9,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/controllers"
 	"github.com/penguin-statistics/backend-next/internal/controllers/shims"
 	"github.com/penguin-statistics/backend-next/internal/infra"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/flake"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
@@ -26,9 +27,11 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(infra.ProvideNats),
 		fx.Provide(infra.ProvidePostgres),
 		fx.Provide(infra.ProvideRedis),
+		fx.Invoke(cache.Populate),
 		fx.Provide(repos.NewItemRepo),
 		fx.Provide(repos.NewStageRepo),
 		fx.Provide(repos.NewZoneRepo),
+		fx.Provide(repos.NewDropInfoRepo),
 		fx.Provide(repos.NewDropPatternRepo),
 		fx.Provide(service.NewReportService),
 		fx.Provide(server.CreateVersioningEndpoints),

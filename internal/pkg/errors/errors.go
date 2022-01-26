@@ -37,14 +37,14 @@ func New(statusCode int, errorCode string, message string) *PenguinError {
 	}
 }
 
-func (e *PenguinError) WithMessage(format string, parts ...interface{}) *PenguinError {
+func (e PenguinError) WithMessage(format string, parts ...interface{}) *PenguinError {
 	e.Message = fmt.Sprintf(format, parts...)
-	return e
+	return &e
 }
 
-func (e *PenguinError) WithExtras(extras Extras) *PenguinError {
+func (e PenguinError) WithExtras(extras Extras) *PenguinError {
 	e.Extras = &extras
-	return e
+	return &e
 }
 
 func NewInvalidViolations(violations interface{}) *PenguinError {
