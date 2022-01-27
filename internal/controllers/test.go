@@ -15,6 +15,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
 )
 
@@ -22,6 +23,8 @@ type TestController struct {
 	fx.In
 
 	DB *bun.DB
+	DropMatrixElementRepo *repos.DropMatrixElementRepo
+	DropInfoRepo *repos.DropInfoRepo
 }
 
 func RegisterTestController(v3 *server.V3, c TestController) {
@@ -31,21 +34,82 @@ func RegisterTestController(v3 *server.V3, c TestController) {
 func (c *TestController) Test(ctx *fiber.Ctx) error {
 	queryServer := "CN"
 
-	var stageIds []int
+	c.RefreshGlobalDropMatrix(ctx, queryServer)
 
-	timeRangeIDs := []int{1, 2, 3, 4, 15, 43, 86, 87, 129, 175, 180, 121}
-	var itemIDs []int
-
-	var results []map[string]interface{}
-	if err := c.calcDropMatrixForTimeRanges(ctx, queryServer, timeRangeIDs, stageIds, itemIDs, &results); err != nil {
-		return err
-	}
-
+	results := []map[string]int{}
 	return ctx.JSON(&results)
 }
 
+func (c *TestController) RefreshGlobalDropMatrix(ctx *fiber.Ctx, server string) error {
+	toSave := make([]models.DropMatrixElement, 0)
+	// iterate over all time ranges
+	for i := 1; i <= 220; i++ {
+		timeRangeIDs := []int{i}
+		var results []map[string]int
+		// get drop matrix calc results
+		if err := c.calcDropMatrixForTimeRanges(ctx, server, timeRangeIDs, make([]int, 0), make([]int, 0), &results); err != nil {
+			return err
+		}
+
+		stageTimesMap := map[int]int{} // save stage times for later use
+
+		// grouping results by stage id
+		var groupedResults []linq.Group
+		linq.From(results).
+			GroupByT(
+				func (el map[string] int) int { return el["stageID"] }, 
+				func (el map[string] int) map[string] int { return el }).ToSlice(&groupedResults)
+		for _, el := range groupedResults {
+			stageID := el.Key.(int)
+
+			// get all item ids which are dropped in this stage and in this time range
+			dropItemIDs, err := c.DropInfoRepo.GetItemDropSetByStageIDAndRangeID(ctx.UserContext(), server, stageID, i)
+			if err != nil {
+				return err
+			}
+			// use a fake hashset to save item ids
+			dropSet := map[int]struct{}{}
+			for _, itemID := range dropItemIDs {
+				dropSet[itemID] = struct{}{}
+			}
+
+			for _, el2 := range el.Group {
+				itemID := el2.(map[string] int)["itemID"]
+				quantity := el2.(map[string] int)["quantity"]
+				times := el2.(map[string] int)["times"]
+				dropMatrixElement := models.DropMatrixElement{
+					StageID: stageID,
+					ItemID: itemID,
+					RangeID: i,
+					Quantity: quantity,
+					Times: times,
+					Server: server,
+				}
+				toSave = append(toSave, dropMatrixElement)
+				delete(dropSet, itemID) // remove existing item ids from drop set
+				stageTimesMap[stageID] = times // record stage times into a map
+			}
+			// add those items which do not show up in the matrix (quantity is 0)
+			for itemID := range dropSet {
+				dropMatrixElementWithZeroQuantity := models.DropMatrixElement{
+					StageID: stageID,
+					ItemID: itemID,
+					RangeID: i,
+					Quantity: 0,
+					Times: stageTimesMap[stageID],
+					Server: server,
+				}	
+				toSave = append(toSave, dropMatrixElementWithZeroQuantity)
+			}
+		}
+	}
+	c.DropMatrixElementRepo.DeleteByServer(ctx.UserContext(), server)
+	c.DropMatrixElementRepo.BatchSaveElements(ctx.UserContext(), toSave)
+	return nil
+}
+
 func (c *TestController) calcDropMatrixForTimeRanges(
-	ctx *fiber.Ctx, queryServer string, timeRangeIDs []int, stageIDFilter []int, itemIDFilter []int, results *[]map[string]interface{}) error {
+	ctx *fiber.Ctx, queryServer string, timeRangeIDs []int, stageIDFilter []int, itemIDFilter []int, results *[]map[string]int) error {
 	timeRangesMap := make(map[int]models.TimeRange)
 	if err := c.getTimeRangesMap(ctx, queryServer, &timeRangesMap); err != nil {
 		return err
@@ -59,7 +123,7 @@ func (c *TestController) calcDropMatrixForTimeRanges(
 	var dropInfosByTimeRangeID []linq.Group
 	linq.From(dropInfos).
 		GroupByT(
-			func(dropInfo models.DropInfo) int { return dropInfo.RangeID },
+			func(dropInfo models.DropInfo) int { return dropInfo.TimeRangeID },
 			func(dropInfo models.DropInfo) models.DropInfo { return dropInfo }).
 		ToSlice(&dropInfosByTimeRangeID)
 
@@ -103,7 +167,10 @@ func (c *TestController) calcDropMatrixForTimeRanges(
 
 		span3.End()
 
-		*results = timesResults
+		var combinedResults []map[string]int
+		combineQuantityAndTimesResults(&quantityResults, &timesResults, &combinedResults)
+
+		*results = combinedResults
 
 		spanouter.End()
 	}
@@ -225,4 +292,45 @@ func (c *TestController) calcTotalTimes(ctx context.Context, server string, time
 		return err
 	}
 	return nil
+}
+
+func combineQuantityAndTimesResults(quantityResults *[]map[string]interface{}, timesResults *[]map[string]interface{}, combinedResults *[]map[string]int) {
+	var firstGroupResults []linq.Group
+	*combinedResults = make([]map[string]int, 0)
+	linq.From(*quantityResults).
+		GroupByT(
+			func(result map[string]interface{}) interface{} { return result["stage_id"] },
+			func(result map[string]interface{}) map[string]interface{} { return result }).
+		ToSlice(&firstGroupResults)
+	quantityResultsMap := make(map[int]map[int]int)
+	for _, firstGroupElements := range firstGroupResults {
+		stageID := int(firstGroupElements.Key.(int64))
+		resultsMap := make(map[int]int, 0)
+		linq.From(firstGroupElements.Group).
+			ToMapByT(&resultsMap,
+				func(el interface{}) int { return int(el.(map[string]interface{})["item_id"].(int64)) },
+				func(el interface{}) int { return int(el.(map[string]interface{})["total_quantity"].(int64)) })
+		quantityResultsMap[stageID] = resultsMap
+	}
+
+	var secondGroupResults []linq.Group
+	linq.From(*timesResults).
+		GroupByT(
+			func(result map[string]interface{}) interface{} { return result["stage_id"] },
+			func(result map[string]interface{}) map[string]interface{} { return result }).
+		ToSlice(&secondGroupResults)
+	for _, secondGroupResults := range secondGroupResults {
+		stageID := int(secondGroupResults.Key.(int64))	
+		quantityResultsMapForOneStage := quantityResultsMap[stageID]
+		for _, el := range secondGroupResults.Group {
+			times := int(el.(map[string]interface{})["total_times"].(int64))
+			for itemID, quantity := range quantityResultsMapForOneStage {
+				*combinedResults = append(*combinedResults, map[string] int {
+					"stageID": stageID,
+					"itemID": itemID,
+					"times": times,
+					"quantity": quantity})
+			}
+		}
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/ahmetb/go-linq/v3"
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
@@ -35,7 +36,7 @@ func (s *DropInfoRepo) GetDropInfo(ctx context.Context, id int) (*models.DropInf
 	return &dropInfo, nil
 }
 
-func (s *DropInfoRepo) GetCurrentTimeRangeDropInfo(ctx context.Context, server, arkStageId string, tuples [][]string) ([]*models.DropInfo, error) {
+func (s *DropInfoRepo) GetCurrentTimeRangeDropInfo(ctx context.Context, server string, arkStageId string, tuples [][]string) ([]*models.DropInfo, error) {
 	var dropInfo []*models.DropInfo
 	err := pquery.New(
 		s.DB.NewSelect().
@@ -57,4 +58,35 @@ func (s *DropInfoRepo) GetCurrentTimeRangeDropInfo(ctx context.Context, server, 
 	}
 
 	return dropInfo, nil
+}
+
+func (s *DropInfoRepo) GetItemDropSetByStageIDAndRangeID(ctx context.Context, server string, stageID int, rangeID int) ([]int, error) {
+	var results []interface{}
+	err := pquery.New(
+		s.DB.NewSelect().
+			Column("di.item_id").
+			Model((*models.DropInfo)(nil)).
+			Where("di.server = ?", server).
+			Where("di.stage_id = ?", stageID).
+			Where("di.item_id IS NOT NULL").
+			Where("di.time_range_id = ?", rangeID),
+	).Q.Scan(ctx, &results)
+	
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	linq.From(results).
+		SelectT(func (el interface{}) int { return int(el.(int64)) }).
+		Distinct().
+		SortT(func(a int, b int) bool { return a < b }).
+		ToSlice(&results)
+
+	itemIDs := make([]int, len(results))
+    for i := range results {
+        itemIDs[i] = results[i].(int)
+    }
+	return itemIDs, nil
 }

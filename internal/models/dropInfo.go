@@ -15,7 +15,7 @@ type DropInfo struct {
 	StageID     int             `json:"stageId"`
 	ItemID      null.Int        `json:"itemId"`
 	DropType    string          `json:"dropType"`
-	RangeID     int             `json:"timeRangeId"`
+	TimeRangeID     int             `json:"timeRangeId"`
 	Bounds      json.RawMessage `json:"bounds"`
 	Accumulable bool            `json:"accumulable"`
 }

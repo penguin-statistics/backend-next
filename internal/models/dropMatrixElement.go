@@ -13,4 +13,5 @@ type DropMatrixElement struct {
 	RangeID   int `json:"timeRangeId"`
 	Quantity  int `json:"quantity"`
 	Times     int `json:"times"`
+	Server string `json:"server"`
 }
