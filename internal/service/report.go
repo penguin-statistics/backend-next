@@ -29,7 +29,7 @@ func (s *ReportService) VerifySingularReport(ctx *fiber.Ctx, report *dto.Singula
 			mappedDropType, have := konst.DropTypeMap[drop.DropType]
 			if !have {
 				err = errors.ErrInvalidRequest.WithMessage("invalid drop type: expected one of %v, but got `%s`", konst.DropTypeMapKeys, drop.DropType)
-				return nil
+				return []string{}
 			}
 			return []string{
 				drop.ItemID,
@@ -41,20 +41,28 @@ func (s *ReportService) VerifySingularReport(ctx *fiber.Ctx, report *dto.Singula
 		return err
 	}
 
-	expectDropInfos, err := s.DropInfoRepo.GetCurrentTimeRangeDropInfo(ctx.Context(), report.Server, report.StageID, tuples)
+	itemDropInfos, typeDropInfos, err := s.DropInfoRepo.GetForCurrentTimeRangeWithDropTypes(ctx.Context(), &repos.DropInfoQuery{
+		Server:     report.Server,
+		ArkStageId: report.StageID,
+		DropTuples: tuples,
+	})
 	if err != nil {
 		return err
 	}
 
-	if len(expectDropInfos) != len(report.Drops) {
-		return errors.ErrInvalidRequest.WithMessage("invalid drop info count: expected %d, but got %d", len(report.Drops), len(expectDropInfos))
+	if len(itemDropInfos) != len(report.Drops) {
+		return errors.ErrInvalidRequest.
+			WithMessage("invalid drop info count: expected %d, but got %d", len(report.Drops), len(itemDropInfos))
 	}
 
 	// for _, drop := range report.Drops {
 	// 	drop.ItemID
 	// }
 
-	return ctx.JSON(expectDropInfos)
+	return ctx.JSON(fiber.Map{
+		"item_drop_infos": itemDropInfos,
+		"type_drop_infos": typeDropInfos,
+	})
 }
 
 func (s *ReportService) SubmitSingularReport(report *dto.BatchReportRequest) {

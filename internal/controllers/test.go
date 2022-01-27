@@ -22,9 +22,9 @@ import (
 type TestController struct {
 	fx.In
 
-	DB *bun.DB
+	DB                    *bun.DB
 	DropMatrixElementRepo *repos.DropMatrixElementRepo
-	DropInfoRepo *repos.DropInfoRepo
+	DropInfoRepo          *repos.DropInfoRepo
 }
 
 func RegisterTestController(v3 *server.V3, c TestController) {
@@ -57,8 +57,8 @@ func (c *TestController) RefreshGlobalDropMatrix(ctx *fiber.Ctx, server string) 
 		var groupedResults []linq.Group
 		linq.From(results).
 			GroupByT(
-				func (el map[string] int) int { return el["stageID"] }, 
-				func (el map[string] int) map[string] int { return el }).ToSlice(&groupedResults)
+				func(el map[string]int) int { return el["stageID"] },
+				func(el map[string]int) map[string]int { return el }).ToSlice(&groupedResults)
 		for _, el := range groupedResults {
 			stageID := el.Key.(int)
 
@@ -74,31 +74,31 @@ func (c *TestController) RefreshGlobalDropMatrix(ctx *fiber.Ctx, server string) 
 			}
 
 			for _, el2 := range el.Group {
-				itemID := el2.(map[string] int)["itemID"]
-				quantity := el2.(map[string] int)["quantity"]
-				times := el2.(map[string] int)["times"]
+				itemID := el2.(map[string]int)["itemID"]
+				quantity := el2.(map[string]int)["quantity"]
+				times := el2.(map[string]int)["times"]
 				dropMatrixElement := models.DropMatrixElement{
-					StageID: stageID,
-					ItemID: itemID,
-					RangeID: i,
+					StageID:  stageID,
+					ItemID:   itemID,
+					RangeID:  i,
 					Quantity: quantity,
-					Times: times,
-					Server: server,
+					Times:    times,
+					Server:   server,
 				}
 				toSave = append(toSave, dropMatrixElement)
-				delete(dropSet, itemID) // remove existing item ids from drop set
+				delete(dropSet, itemID)        // remove existing item ids from drop set
 				stageTimesMap[stageID] = times // record stage times into a map
 			}
 			// add those items which do not show up in the matrix (quantity is 0)
 			for itemID := range dropSet {
 				dropMatrixElementWithZeroQuantity := models.DropMatrixElement{
-					StageID: stageID,
-					ItemID: itemID,
-					RangeID: i,
+					StageID:  stageID,
+					ItemID:   itemID,
+					RangeID:  i,
 					Quantity: 0,
-					Times: stageTimesMap[stageID],
-					Server: server,
-				}	
+					Times:    stageTimesMap[stageID],
+					Server:   server,
+				}
 				toSave = append(toSave, dropMatrixElementWithZeroQuantity)
 			}
 		}
@@ -123,7 +123,7 @@ func (c *TestController) calcDropMatrixForTimeRanges(
 	var dropInfosByTimeRangeID []linq.Group
 	linq.From(dropInfos).
 		GroupByT(
-			func(dropInfo models.DropInfo) int { return dropInfo.TimeRangeID },
+			func(dropInfo models.DropInfo) int { return dropInfo.RangeID },
 			func(dropInfo models.DropInfo) models.DropInfo { return dropInfo }).
 		ToSlice(&dropInfosByTimeRangeID)
 
@@ -320,15 +320,15 @@ func combineQuantityAndTimesResults(quantityResults *[]map[string]interface{}, t
 			func(result map[string]interface{}) map[string]interface{} { return result }).
 		ToSlice(&secondGroupResults)
 	for _, secondGroupResults := range secondGroupResults {
-		stageID := int(secondGroupResults.Key.(int64))	
+		stageID := int(secondGroupResults.Key.(int64))
 		quantityResultsMapForOneStage := quantityResultsMap[stageID]
 		for _, el := range secondGroupResults.Group {
 			times := int(el.(map[string]interface{})["total_times"].(int64))
 			for itemID, quantity := range quantityResultsMapForOneStage {
-				*combinedResults = append(*combinedResults, map[string] int {
-					"stageID": stageID,
-					"itemID": itemID,
-					"times": times,
+				*combinedResults = append(*combinedResults, map[string]int{
+					"stageID":  stageID,
+					"itemID":   itemID,
+					"times":    times,
 					"quantity": quantity})
 			}
 		}

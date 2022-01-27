@@ -1,5 +1,11 @@
 package konst
 
+const (
+	DropTypeRegular = "REGULAR"
+	DropTypeSpecial = "SPECIAL"
+	DropTypeExtra   = "EXTRA"
+)
+
 // DropTypeMap maps an API drop type to a database drop type.
 // The map must not be modified.
 var DropTypeMap = map[string]string{

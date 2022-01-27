@@ -5,15 +5,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ahmetb/go-linq/v3"
+	"github.com/gofiber/fiber/v2"
+	"github.com/tidwall/gjson"
+
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/utils"
-
-	"github.com/ahmetb/go-linq/v3"
-	"github.com/tidwall/gjson"
-
-	"github.com/gofiber/fiber/v2"
 )
 
 type ItemController struct {
@@ -53,8 +52,8 @@ func (c *ItemController) applyShim(item *shims.Item) {
 
 	keywords := gjson.ParseBytes(item.Keywords)
 
-	item.AliasMap = json.RawMessage(utils.Must(json.Marshal(keywords.Map()["alias"].Value().(map[string]interface{}))).([]byte))
-	item.PronMap = json.RawMessage(utils.Must(json.Marshal(keywords.Map()["pron"].Value().(map[string]interface{}))).([]byte))
+	item.AliasMap = json.RawMessage(utils.Must(json.Marshal(keywords.Get("alias").Value().(map[string]interface{}))).([]byte))
+	item.PronMap = json.RawMessage(utils.Must(json.Marshal(keywords.Get("pron").Value().(map[string]interface{}))).([]byte))
 }
 
 // @Summary      Get all Items

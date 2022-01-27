@@ -37,7 +37,8 @@ import (
 
 func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 	app := fiber.New(fiber.Config{
-		AppName:      "Penguin Stats Backend v3",
+		AppName: "Penguin Stats Backend v3",
+		// TODO: use managed version value
 		ServerHeader: "Penguin/0.1",
 		// NOTICE: This will also affect WebSocket. Be aware if this fiber instance service is re-used
 		//         for long connection services.
@@ -111,12 +112,6 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 			},
 		},
 	))
-	app.Use(recover.New(recover.Config{
-		EnableStackTrace: true,
-		StackTraceHandler: func(c *fiber.Ctx, e interface{}) {
-			os.Stderr.WriteString(fmt.Sprintf("panic: %v\n%s\n", e, string(debug.Stack())))
-		},
-	}))
 	app.Use(helmet.New(helmet.Config{
 		HSTSMaxAge:         31356000,
 		HSTSPreloadEnabled: true,
@@ -166,6 +161,13 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 			Output:     os.Stdout,
 		}))
 
+		app.Use(recover.New(recover.Config{
+			EnableStackTrace: true,
+			StackTraceHandler: func(c *fiber.Ctx, e interface{}) {
+				os.Stderr.WriteString(fmt.Sprintf("panic: %v\n%s\n", e, string(debug.Stack())))
+			},
+		}))
+
 		exporter, err := jaeger.New(jaeger.WithCollectorEndpoint())
 		if err != nil {
 			panic(err)
@@ -204,6 +206,8 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 		// 		ctx.SetUserContext(opentracing.ContextWithSpan(ctx.Context(), span))
 		// 	},
 		// }))
+	} else {
+		app.Use(recover.New())
 	}
 
 	return app
