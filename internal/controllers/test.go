@@ -221,10 +221,8 @@ func (c *TestController) getDropInfos(ctx *fiber.Ctx, server string, rangeIds []
 
 func (c *TestController) calcTotalQuantity(ctx context.Context, server string, timeRange models.TimeRange, dropInfosByStageId []linq.Group, accountId null.Int, quantityResults *[]map[string]interface{}) error {
 	var b strings.Builder
-	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Time.Format(time.RFC3339))
-	if timeRange.EndTime.Valid {
-		fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Time.Format(time.RFC3339))
-	}
+	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Format(time.RFC3339))
+	fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Format(time.RFC3339))
 	b.WriteString(" AND (")
 	for idx, el := range dropInfosByStageId {
 		stageId := el.Key.(int)
@@ -273,10 +271,8 @@ func (c *TestController) calcTotalQuantity(ctx context.Context, server string, t
 
 func (c *TestController) calcTotalTimes(ctx context.Context, server string, timeRange models.TimeRange, dropInfosByStageId []linq.Group, accountId null.Int, timesResults *[]map[string]interface{}) error {
 	var b strings.Builder
-	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Time.Format(time.RFC3339))
-	if timeRange.EndTime.Valid {
-		fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Time.Format(time.RFC3339))
-	}
+	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Format(time.RFC3339))
+	fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Format(time.RFC3339))
 	b.WriteString(" AND dr.stage_id")
 	var stageIds []int
 	linq.From(dropInfosByStageId).
