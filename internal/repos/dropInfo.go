@@ -81,16 +81,16 @@ func (s *DropInfoRepo) GetForCurrentTimeRange(ctx context.Context, query *DropIn
 	return dropInfo, nil
 }
 
-func (s *DropInfoRepo) GetItemDropSetByStageIDAndRangeID(ctx context.Context, server string, stageID int, rangeID int) ([]int, error) {
+func (s *DropInfoRepo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server string, stageId int, rangeId int) ([]int, error) {
 	var results []interface{}
 	err := pquery.New(
 		s.DB.NewSelect().
 			Column("di.item_id").
 			Model((*models.DropInfo)(nil)).
 			Where("di.server = ?", server).
-			Where("di.stage_id = ?", stageID).
+			Where("di.stage_id = ?", stageId).
 			Where("di.item_id IS NOT NULL").
-			Where("di.range_id = ?", rangeID),
+			Where("di.range_id = ?", rangeId),
 	).Q.Scan(ctx, &results)
 
 	if err == sql.ErrNoRows {
@@ -105,11 +105,11 @@ func (s *DropInfoRepo) GetItemDropSetByStageIDAndRangeID(ctx context.Context, se
 		SortT(func(a int, b int) bool { return a < b }).
 		ToSlice(&results)
 
-	itemIDs := make([]int, len(results))
+	itemIds := make([]int, len(results))
 	for i := range results {
-		itemIDs[i] = results[i].(int)
+		itemIds[i] = results[i].(int)
 	}
-	return itemIDs, nil
+	return itemIds, nil
 }
 
 func (s *DropInfoRepo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) ([]*models.DropInfo, []*models.DropInfo, error) {

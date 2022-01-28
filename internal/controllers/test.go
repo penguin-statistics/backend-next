@@ -63,10 +63,10 @@ func (c *TestController) RefreshGlobalDropMatrix(ctx *fiber.Ctx, server string) 
 			fmt.Println("<   :", i)
 			startTime := time.Now()
 
-			timeRangeIDs := []int{i}
+			rangeIds := []int{i}
 			var results []map[string]int
 			// get drop matrix calc results
-			if err := c.calcDropMatrixForTimeRanges(ctx, server, timeRangeIDs, nil, nil, &results); err != nil {
+			if err := c.calcDropMatrixForTimeRanges(ctx, server, rangeIds, nil, nil, &results); err != nil {
 				return
 			}
 
@@ -76,48 +76,48 @@ func (c *TestController) RefreshGlobalDropMatrix(ctx *fiber.Ctx, server string) 
 			var groupedResults []linq.Group
 			linq.From(results).
 				GroupByT(
-					func(el map[string]int) int { return el["stageID"] },
+					func(el map[string]int) int { return el["stageId"] },
 					func(el map[string]int) map[string]int { return el }).ToSlice(&groupedResults)
 
 			currentBatch := make([]models.DropMatrixElement, len(groupedResults))
 			for _, el := range groupedResults {
-				stageID := el.Key.(int)
+				stageId := el.Key.(int)
 
 				// get all item ids which are dropped in this stage and in this time range
-				dropItemIDs, _ := c.DropInfoRepo.GetItemDropSetByStageIDAndRangeID(ctx.Context(), server, stageID, i)
+				dropItemIds, _ := c.DropInfoRepo.GetItemDropSetByStageIdAndRangeId(ctx.Context(), server, stageId, i)
 				// if err != nil {
 				// 	return err
 				// }
 				// use a fake hashset to save item ids
-				dropSet := make(map[int]struct{}, len(dropItemIDs))
-				for _, itemID := range dropItemIDs {
-					dropSet[itemID] = struct{}{}
+				dropSet := make(map[int]struct{}, len(dropItemIds))
+				for _, itemId := range dropItemIds {
+					dropSet[itemId] = struct{}{}
 				}
 
 				for _, el2 := range el.Group {
-					itemID := el2.(map[string]int)["itemID"]
+					itemId := el2.(map[string]int)["itemId"]
 					quantity := el2.(map[string]int)["quantity"]
 					times := el2.(map[string]int)["times"]
 					dropMatrixElement := models.DropMatrixElement{
-						StageID:  stageID,
-						ItemID:   itemID,
+						StageID:  stageId,
+						ItemID:   itemId,
 						RangeID:  i,
 						Quantity: quantity,
 						Times:    times,
 						Server:   server,
 					}
 					currentBatch = append(currentBatch, dropMatrixElement)
-					delete(dropSet, itemID)        // remove existing item ids from drop set
-					stageTimesMap[stageID] = times // record stage times into a map
+					delete(dropSet, itemId)        // remove existing item ids from drop set
+					stageTimesMap[stageId] = times // record stage times into a map
 				}
 				// add those items which do not show up in the matrix (quantity is 0)
-				for itemID := range dropSet {
+				for itemId := range dropSet {
 					dropMatrixElementWithZeroQuantity := models.DropMatrixElement{
-						StageID:  stageID,
-						ItemID:   itemID,
+						StageID:  stageId,
+						ItemID:   itemId,
 						RangeID:  i,
 						Quantity: 0,
-						Times:    stageTimesMap[stageID],
+						Times:    stageTimesMap[stageId],
 						Server:   server,
 					}
 					currentBatch = append(currentBatch, dropMatrixElementWithZeroQuantity)
@@ -141,42 +141,42 @@ func (c *TestController) RefreshGlobalDropMatrix(ctx *fiber.Ctx, server string) 
 }
 
 func (c *TestController) calcDropMatrixForTimeRanges(
-	ctx *fiber.Ctx, queryServer string, timeRangeIDs []int, stageIDFilter []int, itemIDFilter []int, results *[]map[string]int) error {
+	ctx *fiber.Ctx, queryServer string, rangeIds []int, stageIdFilter []int, itemIdFilter []int, results *[]map[string]int) error {
 	timeRangesMap := make(map[int]models.TimeRange)
 	if err := c.getTimeRangesMap(ctx, queryServer, &timeRangesMap); err != nil {
 		return err
 	}
 
 	var dropInfos []models.DropInfo
-	if err := c.getDropInfos(ctx, queryServer, timeRangeIDs, stageIDFilter, itemIDFilter, &dropInfos); err != nil {
+	if err := c.getDropInfos(ctx, queryServer, rangeIds, stageIdFilter, itemIdFilter, &dropInfos); err != nil {
 		return err
 	}
 
-	var dropInfosByTimeRangeID []linq.Group
+	var dropInfosByRangeId []linq.Group
 	linq.From(dropInfos).
 		GroupByT(
 			func(dropInfo models.DropInfo) int { return dropInfo.RangeID },
 			func(dropInfo models.DropInfo) models.DropInfo { return dropInfo }).
-		ToSlice(&dropInfosByTimeRangeID)
+		ToSlice(&dropInfosByRangeId)
 
-	for _, el := range dropInfosByTimeRangeID {
-		timeRangeID := el.Key.(int)
+	for _, el := range dropInfosByRangeId {
+		rangeId := el.Key.(int)
 
-		timeRange := timeRangesMap[timeRangeID]
+		timeRange := timeRangesMap[rangeId]
 		// fmt.Printf("timeRange = %s\n", timeRange.Name.String)
 
-		var dropInfosByStageID []linq.Group
+		var dropInfosByStageId []linq.Group
 		linq.From(dropInfos).GroupByT(
 			func(dropInfo models.DropInfo) int { return dropInfo.StageID },
 			func(dropInfo models.DropInfo) models.DropInfo { return dropInfo }).
-			ToSlice(&dropInfosByStageID)
+			ToSlice(&dropInfosByStageId)
 
 		quantityResults := []map[string]interface{}{}
-		if err := c.calcTotalQuantity(ctx.Context(), queryServer, timeRange, dropInfosByStageID, &quantityResults); err != nil {
+		if err := c.calcTotalQuantity(ctx.Context(), queryServer, timeRange, dropInfosByStageId, &quantityResults); err != nil {
 			return err
 		}
 		timesResults := []map[string]interface{}{}
-		if err := c.calcTotalTimes(ctx.Context(), queryServer, timeRange, dropInfosByStageID, &timesResults); err != nil {
+		if err := c.calcTotalTimes(ctx.Context(), queryServer, timeRange, dropInfosByStageId, &timesResults); err != nil {
 			return err
 		}
 
@@ -204,18 +204,18 @@ func (c *TestController) getTimeRangesMap(ctx *fiber.Ctx, server string, results
 	return nil
 }
 
-func (c *TestController) getDropInfos(ctx *fiber.Ctx, server string, timeRangeIDs []int, stageIDFilter []int, itemIDFilter []int, results *[]models.DropInfo) error {
+func (c *TestController) getDropInfos(ctx *fiber.Ctx, server string, rangeIds []int, stageIdFilter []int, itemIdFilter []int, results *[]models.DropInfo) error {
 	var whereBuilder strings.Builder
 	fmt.Fprintf(&whereBuilder, "di.server = ? AND di.range_id IN (?) AND di.drop_type != ? AND di.item_id IS NOT NULL")
 
-	if stageIDFilter != nil && len(stageIDFilter) > 0 {
+	if stageIdFilter != nil && len(stageIdFilter) > 0 {
 		fmt.Fprintf(&whereBuilder, " AND di.stage_id IN (?)")
 	}
-	if itemIDFilter != nil && len(itemIDFilter) > 0 {
+	if itemIdFilter != nil && len(itemIdFilter) > 0 {
 		fmt.Fprintf(&whereBuilder, " AND di.item_id IN (?)")
 	}
 	if err := c.DB.NewSelect().TableExpr("drop_infos as di").Column("di.stage_id", "di.item_id", "di.range_id", "di.accumulable").
-		Where(whereBuilder.String(), server, bun.In(timeRangeIDs), "RECOGNITION_ONLY", bun.In(stageIDFilter), bun.In(itemIDFilter)).
+		Where(whereBuilder.String(), server, bun.In(rangeIds), "RECOGNITION_ONLY", bun.In(stageIdFilter), bun.In(itemIdFilter)).
 		Join("JOIN time_ranges AS tr ON tr.range_id = di.range_id").
 		Scan(ctx.Context(), results); err != nil {
 		return err
@@ -223,33 +223,33 @@ func (c *TestController) getDropInfos(ctx *fiber.Ctx, server string, timeRangeID
 	return nil
 }
 
-func (c *TestController) calcTotalQuantity(ctx context.Context, server string, timeRange models.TimeRange, dropInfosByStageID []linq.Group, quantityResults *[]map[string]interface{}) error {
+func (c *TestController) calcTotalQuantity(ctx context.Context, server string, timeRange models.TimeRange, dropInfosByStageId []linq.Group, quantityResults *[]map[string]interface{}) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Time.Format(time.RFC3339))
 	if timeRange.EndTime.Valid {
 		fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Time.Format(time.RFC3339))
 	}
 	b.WriteString(" AND (")
-	for idx, el := range dropInfosByStageID {
-		stageID := el.Key.(int)
-		var itemIDs []int
+	for idx, el := range dropInfosByStageId {
+		stageId := el.Key.(int)
+		var itemIds []int
 		linq.From(el.Group).
 			SelectT(func(dropInfo models.DropInfo) int {
 				return int(dropInfo.ItemID.Int64)
 			}).
-			ToSlice(&itemIDs)
+			ToSlice(&itemIds)
 
-		fmt.Fprintf(&b, "dr.stage_id = %d AND dpe.item_id", stageID)
-		if len(itemIDs) == 1 {
-			fmt.Fprintf(&b, " = %d", itemIDs[0])
+		fmt.Fprintf(&b, "dr.stage_id = %d AND dpe.item_id", stageId)
+		if len(itemIds) == 1 {
+			fmt.Fprintf(&b, " = %d", itemIds[0])
 		} else {
-			var itemIDsStr []string
-			for _, itemID := range itemIDs {
-				itemIDsStr = append(itemIDsStr, strconv.FormatInt(int64(itemID), 10))
+			var itemIdsStr []string
+			for _, itemId := range itemIds {
+				itemIdsStr = append(itemIdsStr, strconv.FormatInt(int64(itemId), 10))
 			}
-			fmt.Fprintf(&b, " IN (%s)", strings.Join(itemIDsStr, ","))
+			fmt.Fprintf(&b, " IN (%s)", strings.Join(itemIdsStr, ","))
 		}
-		if idx != len(dropInfosByStageID)-1 {
+		if idx != len(dropInfosByStageId)-1 {
 			b.WriteString(" OR ")
 		}
 	}
@@ -269,27 +269,27 @@ func (c *TestController) calcTotalQuantity(ctx context.Context, server string, t
 	return nil
 }
 
-func (c *TestController) calcTotalTimes(ctx context.Context, server string, timeRange models.TimeRange, dropInfosByStageID []linq.Group, timesResults *[]map[string]interface{}) error {
+func (c *TestController) calcTotalTimes(ctx context.Context, server string, timeRange models.TimeRange, dropInfosByStageId []linq.Group, timesResults *[]map[string]interface{}) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Time.Format(time.RFC3339))
 	if timeRange.EndTime.Valid {
 		fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Time.Format(time.RFC3339))
 	}
 	b.WriteString(" AND dr.stage_id")
-	var stageIDs []int
-	linq.From(dropInfosByStageID).
+	var stageIds []int
+	linq.From(dropInfosByStageId).
 		SelectT(func(group linq.Group) int { return group.Key.(int) }).
 		Distinct().
 		SortT(func(a int, b int) bool { return a < b }).
-		ToSlice(&stageIDs)
-	if len(stageIDs) == 1 {
-		fmt.Fprintf(&b, "= %d", stageIDs[0])
+		ToSlice(&stageIds)
+	if len(stageIds) == 1 {
+		fmt.Fprintf(&b, "= %d", stageIds[0])
 	} else {
-		var stageIDsStr []string
-		for _, stageID := range stageIDs {
-			stageIDsStr = append(stageIDsStr, strconv.FormatInt(int64(stageID), 10))
+		var stageIdsStr []string
+		for _, stageId := range stageIds {
+			stageIdsStr = append(stageIdsStr, strconv.FormatInt(int64(stageId), 10))
 		}
-		fmt.Fprintf(&b, " IN (%s)", strings.Join(stageIDsStr, ","))
+		fmt.Fprintf(&b, " IN (%s)", strings.Join(stageIdsStr, ","))
 	}
 
 	*timesResults = make([]map[string]interface{}, 0)
@@ -315,13 +315,13 @@ func combineQuantityAndTimesResults(quantityResults *[]map[string]interface{}, t
 		ToSlice(&firstGroupResults)
 	quantityResultsMap := make(map[int]map[int]int)
 	for _, firstGroupElements := range firstGroupResults {
-		stageID := int(firstGroupElements.Key.(int64))
+		stageId := int(firstGroupElements.Key.(int64))
 		resultsMap := make(map[int]int, 0)
 		linq.From(firstGroupElements.Group).
 			ToMapByT(&resultsMap,
 				func(el interface{}) int { return int(el.(map[string]interface{})["item_id"].(int64)) },
 				func(el interface{}) int { return int(el.(map[string]interface{})["total_quantity"].(int64)) })
-		quantityResultsMap[stageID] = resultsMap
+		quantityResultsMap[stageId] = resultsMap
 	}
 
 	var secondGroupResults []linq.Group
@@ -331,14 +331,14 @@ func combineQuantityAndTimesResults(quantityResults *[]map[string]interface{}, t
 			func(result map[string]interface{}) map[string]interface{} { return result }).
 		ToSlice(&secondGroupResults)
 	for _, secondGroupResults := range secondGroupResults {
-		stageID := int(secondGroupResults.Key.(int64))
-		quantityResultsMapForOneStage := quantityResultsMap[stageID]
+		stageId := int(secondGroupResults.Key.(int64))
+		quantityResultsMapForOneStage := quantityResultsMap[stageId]
 		for _, el := range secondGroupResults.Group {
 			times := int(el.(map[string]interface{})["total_times"].(int64))
-			for itemID, quantity := range quantityResultsMapForOneStage {
+			for itemId, quantity := range quantityResultsMapForOneStage {
 				*combinedResults = append(*combinedResults, map[string]int{
-					"stageID":  stageID,
-					"itemID":   itemID,
+					"stageId":  stageId,
+					"itemId":   itemId,
 					"times":    times,
 					"quantity": quantity})
 			}
