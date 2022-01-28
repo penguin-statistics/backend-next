@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 	"go.uber.org/fx"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/repos"
@@ -64,7 +65,7 @@ func (c *TestController) RefreshGlobalDropMatrix(ctx *fiber.Ctx, server string) 
 			rangeIds := []int{i}
 			var results []map[string]int
 			// get drop matrix calc results
-			if err := c.calcDropMatrixForTimeRanges(ctx, server, rangeIds, nil, nil, &results); err != nil {
+			if err := c.calcDropMatrixForTimeRanges(ctx, server, rangeIds, nil, nil, null.Int{}, &results); err != nil {
 				return
 			}
 
@@ -132,12 +133,11 @@ func (c *TestController) RefreshGlobalDropMatrix(ctx *fiber.Ctx, server string) 
 	wg.Wait()
 
 	log.Debug().Msgf("toSave length: %v", len(toSave))
-
 	return c.DropMatrixElementRepo.BatchSaveElements(ctx.UserContext(), toSave, server)
 }
 
 func (c *TestController) calcDropMatrixForTimeRanges(
-	ctx *fiber.Ctx, queryServer string, rangeIds []int, stageIdFilter []int, itemIdFilter []int, results *[]map[string]int) error {
+	ctx *fiber.Ctx, queryServer string, rangeIds []int, stageIdFilter []int, itemIdFilter []int, accountId null.Int, results *[]map[string]int) error {
 	timeRangesMap := make(map[int]models.TimeRange)
 	if err := c.getTimeRangesMap(ctx, queryServer, &timeRangesMap); err != nil {
 		return err
@@ -168,11 +168,11 @@ func (c *TestController) calcDropMatrixForTimeRanges(
 			ToSlice(&dropInfosByStageId)
 
 		quantityResults := []map[string]interface{}{}
-		if err := c.calcTotalQuantity(ctx.Context(), queryServer, timeRange, dropInfosByStageId, &quantityResults); err != nil {
+		if err := c.calcTotalQuantity(ctx.Context(), queryServer, timeRange, dropInfosByStageId, accountId, &quantityResults); err != nil {
 			return err
 		}
 		timesResults := []map[string]interface{}{}
-		if err := c.calcTotalTimes(ctx.Context(), queryServer, timeRange, dropInfosByStageId, &timesResults); err != nil {
+		if err := c.calcTotalTimes(ctx.Context(), queryServer, timeRange, dropInfosByStageId, accountId, &timesResults); err != nil {
 			return err
 		}
 
@@ -219,7 +219,7 @@ func (c *TestController) getDropInfos(ctx *fiber.Ctx, server string, rangeIds []
 	return nil
 }
 
-func (c *TestController) calcTotalQuantity(ctx context.Context, server string, timeRange models.TimeRange, dropInfosByStageId []linq.Group, quantityResults *[]map[string]interface{}) error {
+func (c *TestController) calcTotalQuantity(ctx context.Context, server string, timeRange models.TimeRange, dropInfosByStageId []linq.Group, accountId null.Int, quantityResults *[]map[string]interface{}) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Time.Format(time.RFC3339))
 	if timeRange.EndTime.Valid {
@@ -252,12 +252,18 @@ func (c *TestController) calcTotalQuantity(ctx context.Context, server string, t
 	b.WriteString(")")
 
 	*quantityResults = make([]map[string]interface{}, 0)
-	if err := c.DB.NewSelect().
+	query := c.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
 		Column("dr.stage_id", "dpe.item_id").
 		ColumnExpr("SUM(dpe.quantity) AS total_quantity").
 		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id").
-		Where("deleted = false AND dr.server = ? AND "+b.String(), server).
+		Where("dr.deleted = false AND dr.server = ? AND "+b.String(), server)
+	if accountId.Valid {
+		query.Where("dr.account_id = ?", accountId.Int64)
+	} else {
+		query.Where("dr.reliable = true")
+	}
+	if err := query.
 		Group("dr.stage_id", "dpe.item_id").
 		Scan(ctx, quantityResults); err != nil {
 		return err
@@ -265,7 +271,7 @@ func (c *TestController) calcTotalQuantity(ctx context.Context, server string, t
 	return nil
 }
 
-func (c *TestController) calcTotalTimes(ctx context.Context, server string, timeRange models.TimeRange, dropInfosByStageId []linq.Group, timesResults *[]map[string]interface{}) error {
+func (c *TestController) calcTotalTimes(ctx context.Context, server string, timeRange models.TimeRange, dropInfosByStageId []linq.Group, accountId null.Int, timesResults *[]map[string]interface{}) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Time.Format(time.RFC3339))
 	if timeRange.EndTime.Valid {
@@ -289,11 +295,17 @@ func (c *TestController) calcTotalTimes(ctx context.Context, server string, time
 	}
 
 	*timesResults = make([]map[string]interface{}, 0)
-	if err := c.DB.NewSelect().
+	query := c.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
 		Column("dr.stage_id").
 		ColumnExpr("COUNT(*) AS total_times").
-		Where("deleted = false AND dr.server = ? AND "+b.String(), server).
+		Where("dr.deleted = false AND dr.server = ? AND "+b.String(), server)
+	if accountId.Valid {
+		query.Where("dr.account_id = ?", accountId.Int64)
+	} else {
+		query.Where("dr.reliable = true")
+	}
+	if err := query.
 		Group("dr.stage_id").
 		Scan(ctx, timesResults); err != nil {
 		return err

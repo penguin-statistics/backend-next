@@ -13,6 +13,7 @@ type DropReport struct {
 	Times     int    `json:"times"`
 	IP        string `json:"ip"`
 	CreatedAt string `json:"createdAt"`
+	Reliable  bool   `json:"reliable"`
 	Deleted   bool   `json:"deleted"`
 	Server    string `json:"server"`
 	AccountID int    `json:"accountId"`
