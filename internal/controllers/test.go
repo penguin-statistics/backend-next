@@ -34,9 +34,7 @@ func RegisterTestController(v3 *server.V3, c TestController) {
 func (c *TestController) Test(ctx *fiber.Ctx) error {
 	queryServer := ctx.Params("server")
 
-	c.RefreshGlobalDropMatrix(ctx, queryServer)
-
-	return ctx.SendStatus(fiber.StatusNoContent)
+	return c.RefreshGlobalDropMatrix(ctx, queryServer)
 }
 
 func (c *TestController) RefreshGlobalDropMatrix(ctx *fiber.Ctx, server string) error {
@@ -135,8 +133,7 @@ func (c *TestController) RefreshGlobalDropMatrix(ctx *fiber.Ctx, server string) 
 
 	log.Debug().Msgf("toSave length: %v", len(toSave))
 
-	c.DropMatrixElementRepo.BatchSaveElements(ctx.UserContext(), toSave, server)
-	return nil
+	return c.DropMatrixElementRepo.BatchSaveElements(ctx.UserContext(), toSave, server)
 }
 
 func (c *TestController) calcDropMatrixForTimeRanges(

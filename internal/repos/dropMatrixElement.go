@@ -18,11 +18,11 @@ func NewDropMatrixElementRepo(db *bun.DB) *DropMatrixElementRepo {
 
 func (s *DropMatrixElementRepo) BatchSaveElements(ctx context.Context, elements []models.DropMatrixElement, server string) error {
 	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := tx.NewInsert().Model(&elements).Exec(ctx)
+		_, err := tx.NewDelete().Model((*models.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
 		if err != nil {
 			return err
 		}
-		_, err = tx.NewDelete().Model((*models.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
+		_, err = tx.NewInsert().Model(&elements).Exec(ctx)
 		return err
 	})
 	if err != nil {
