@@ -30,6 +30,8 @@ type Config struct {
 	// https://bun.uptrace.dev/postgres/#pgdriver for more details on how to construct a PostgreSQL DSN.
 	PostgresDSN string `required:"true" split_words:"true"`
 
+	BunDebugVerbose bool `split_words:"true"`
+
 	// NatsURL is the URL of the NATS server. See https://pkg.go.dev/github.com/nats-io/nats.go#Connect
 	// for more information on how to construct a NATS URL.
 	NatsURL string `required:"true" split_words:"true" default:"nats://127.0.0.1:4222"`
