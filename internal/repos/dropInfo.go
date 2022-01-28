@@ -90,7 +90,7 @@ func (s *DropInfoRepo) GetItemDropSetByStageIDAndRangeID(ctx context.Context, se
 			Where("di.server = ?", server).
 			Where("di.stage_id = ?", stageID).
 			Where("di.item_id IS NOT NULL").
-			Where("di.time_range_id = ?", rangeID),
+			Where("di.range_id = ?", rangeID),
 	).Q.Scan(ctx, &results)
 
 	if err == sql.ErrNoRows {

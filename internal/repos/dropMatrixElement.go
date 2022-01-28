@@ -17,7 +17,7 @@ func NewDropMatrixElementRepo(db *bun.DB) *DropMatrixElementRepo {
 }
 
 func (s *DropMatrixElementRepo) BatchSaveElements(ctx context.Context, elements []models.DropMatrixElement) {
-	s.db.NewInsert().Model(&elements).Exec(ctx)
+	s.db.NewInsert().Model(elements).Exec(ctx)
 }
 
 func (s *DropMatrixElementRepo) DeleteByServer(ctx context.Context, server string) {

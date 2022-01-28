@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/gofiber/fiber/v2"
-	"github.com/penguin-statistics/fiberotel"
+	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
-	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
@@ -28,82 +28,114 @@ type TestController struct {
 }
 
 func RegisterTestController(v3 *server.V3, c TestController) {
-	v3.Get("/test", c.Test)
+	v3.Get("/test/:server", c.Test)
 }
 
 func (c *TestController) Test(ctx *fiber.Ctx) error {
-	queryServer := "CN"
+	queryServer := ctx.Params("server")
 
 	c.RefreshGlobalDropMatrix(ctx, queryServer)
 
-	results := []map[string]int{}
-	return ctx.JSON(&results)
+	return ctx.SendStatus(fiber.StatusNoContent)
 }
 
 func (c *TestController) RefreshGlobalDropMatrix(ctx *fiber.Ctx, server string) error {
-	toSave := make([]models.DropMatrixElement, 0)
+	toSave := make([]models.DropMatrixElement, 40000)
+	ch := make(chan []models.DropMatrixElement, 15)
+	var wg sync.WaitGroup
+
+	go func() {
+		for {
+			m := <-ch
+			toSave = append(toSave, m...)
+			wg.Done()
+		}
+	}()
+
+	usedTimeMap := sync.Map{}
+
+	limiter := make(chan struct{}, 7)
+	wg.Add(220)
 	// iterate over all time ranges
 	for i := 1; i <= 220; i++ {
-		timeRangeIDs := []int{i}
-		var results []map[string]int
-		// get drop matrix calc results
-		if err := c.calcDropMatrixForTimeRanges(ctx, server, timeRangeIDs, make([]int, 0), make([]int, 0), &results); err != nil {
-			return err
-		}
+		limiter <- struct{}{}
+		go func(i int) {
+			fmt.Println("<   :", i)
+			startTime := time.Now()
 
-		stageTimesMap := map[int]int{} // save stage times for later use
-
-		// grouping results by stage id
-		var groupedResults []linq.Group
-		linq.From(results).
-			GroupByT(
-				func(el map[string]int) int { return el["stageID"] },
-				func(el map[string]int) map[string]int { return el }).ToSlice(&groupedResults)
-		for _, el := range groupedResults {
-			stageID := el.Key.(int)
-
-			// get all item ids which are dropped in this stage and in this time range
-			dropItemIDs, err := c.DropInfoRepo.GetItemDropSetByStageIDAndRangeID(ctx.UserContext(), server, stageID, i)
-			if err != nil {
-				return err
-			}
-			// use a fake hashset to save item ids
-			dropSet := map[int]struct{}{}
-			for _, itemID := range dropItemIDs {
-				dropSet[itemID] = struct{}{}
+			timeRangeIDs := []int{i}
+			var results []map[string]int
+			// get drop matrix calc results
+			if err := c.calcDropMatrixForTimeRanges(ctx, server, timeRangeIDs, nil, nil, &results); err != nil {
+				return
 			}
 
-			for _, el2 := range el.Group {
-				itemID := el2.(map[string]int)["itemID"]
-				quantity := el2.(map[string]int)["quantity"]
-				times := el2.(map[string]int)["times"]
-				dropMatrixElement := models.DropMatrixElement{
-					StageID:  stageID,
-					ItemID:   itemID,
-					RangeID:  i,
-					Quantity: quantity,
-					Times:    times,
-					Server:   server,
+			stageTimesMap := map[int]int{} // save stage times for later use
+
+			// grouping results by stage id
+			var groupedResults []linq.Group
+			linq.From(results).
+				GroupByT(
+					func(el map[string]int) int { return el["stageID"] },
+					func(el map[string]int) map[string]int { return el }).ToSlice(&groupedResults)
+
+			currentBatch := make([]models.DropMatrixElement, len(groupedResults))
+			for _, el := range groupedResults {
+				stageID := el.Key.(int)
+
+				// get all item ids which are dropped in this stage and in this time range
+				dropItemIDs, _ := c.DropInfoRepo.GetItemDropSetByStageIDAndRangeID(ctx.Context(), server, stageID, i)
+				// if err != nil {
+				// 	return err
+				// }
+				// use a fake hashset to save item ids
+				dropSet := make(map[int]struct{}, len(dropItemIDs))
+				for _, itemID := range dropItemIDs {
+					dropSet[itemID] = struct{}{}
 				}
-				toSave = append(toSave, dropMatrixElement)
-				delete(dropSet, itemID)        // remove existing item ids from drop set
-				stageTimesMap[stageID] = times // record stage times into a map
-			}
-			// add those items which do not show up in the matrix (quantity is 0)
-			for itemID := range dropSet {
-				dropMatrixElementWithZeroQuantity := models.DropMatrixElement{
-					StageID:  stageID,
-					ItemID:   itemID,
-					RangeID:  i,
-					Quantity: 0,
-					Times:    stageTimesMap[stageID],
-					Server:   server,
+
+				for _, el2 := range el.Group {
+					itemID := el2.(map[string]int)["itemID"]
+					quantity := el2.(map[string]int)["quantity"]
+					times := el2.(map[string]int)["times"]
+					dropMatrixElement := models.DropMatrixElement{
+						StageID:  stageID,
+						ItemID:   itemID,
+						RangeID:  i,
+						Quantity: quantity,
+						Times:    times,
+						Server:   server,
+					}
+					currentBatch = append(currentBatch, dropMatrixElement)
+					delete(dropSet, itemID)        // remove existing item ids from drop set
+					stageTimesMap[stageID] = times // record stage times into a map
 				}
-				toSave = append(toSave, dropMatrixElementWithZeroQuantity)
+				// add those items which do not show up in the matrix (quantity is 0)
+				for itemID := range dropSet {
+					dropMatrixElementWithZeroQuantity := models.DropMatrixElement{
+						StageID:  stageID,
+						ItemID:   itemID,
+						RangeID:  i,
+						Quantity: 0,
+						Times:    stageTimesMap[stageID],
+						Server:   server,
+					}
+					currentBatch = append(currentBatch, dropMatrixElementWithZeroQuantity)
+				}
 			}
-		}
+			ch <- currentBatch
+			<-limiter
+
+			usedTimeMap.Store(i, int(time.Since(startTime).Microseconds()))
+			fmt.Println("   > :", i, "@", time.Since(startTime))
+		}(i)
 	}
-	c.DropMatrixElementRepo.DeleteByServer(ctx.UserContext(), server)
+
+	wg.Wait()
+
+	log.Debug().Msgf("toSave length: %v", len(toSave))
+
+	c.DropMatrixElementRepo.DeleteByServer(ctx.Context(), server)
 	c.DropMatrixElementRepo.BatchSaveElements(ctx.UserContext(), toSave)
 	return nil
 }
@@ -127,19 +159,11 @@ func (c *TestController) calcDropMatrixForTimeRanges(
 			func(dropInfo models.DropInfo) models.DropInfo { return dropInfo }).
 		ToSlice(&dropInfosByTimeRangeID)
 
-	ctxI1, span := fiberotel.StartTracerFromCtx(ctx, "calcDropMatrixForTimeRanges")
-	defer span.End()
-
 	for _, el := range dropInfosByTimeRangeID {
 		timeRangeID := el.Key.(int)
 
-		ctxI2, spanouter := fiberotel.Tracer.Start(ctxI1, "calcDropMatrixForTimeRanges.loop")
-		spanouter.SetAttributes(attribute.Int("timeRangeID", timeRangeID))
-
 		timeRange := timeRangesMap[timeRangeID]
-		fmt.Printf("timeRange = %s\n", timeRange.Name.String)
-
-		_, span1 := fiberotel.Tracer.Start(ctxI2, "calcDropMatrixForTimeRanges.loop.getDropInfosByTimeRangeID")
+		// fmt.Printf("timeRange = %s\n", timeRange.Name.String)
 
 		var dropInfosByStageID []linq.Group
 		linq.From(dropInfos).GroupByT(
@@ -147,32 +171,19 @@ func (c *TestController) calcDropMatrixForTimeRanges(
 			func(dropInfo models.DropInfo) models.DropInfo { return dropInfo }).
 			ToSlice(&dropInfosByStageID)
 
-		span1.End()
-
-		ctxI3, span2 := fiberotel.Tracer.Start(ctxI2, "calcDropMatrixForTimeRanges.loop.getQuantityResults")
-
 		quantityResults := []map[string]interface{}{}
-		if err := c.calcTotalQuantity(ctxI3, queryServer, timeRange, dropInfosByStageID, &quantityResults); err != nil {
+		if err := c.calcTotalQuantity(ctx.Context(), queryServer, timeRange, dropInfosByStageID, &quantityResults); err != nil {
 			return err
 		}
-
-		span2.End()
-
-		_, span3 := fiberotel.Tracer.Start(ctxI2, "calcDropMatrixForTimeRanges.loop.getTimesResults")
-
 		timesResults := []map[string]interface{}{}
-		if err := c.calcTotalTimes(ctx.UserContext(), queryServer, timeRange, dropInfosByStageID, &timesResults); err != nil {
+		if err := c.calcTotalTimes(ctx.Context(), queryServer, timeRange, dropInfosByStageID, &timesResults); err != nil {
 			return err
 		}
-
-		span3.End()
 
 		var combinedResults []map[string]int
 		combineQuantityAndTimesResults(&quantityResults, &timesResults, &combinedResults)
 
 		*results = combinedResults
-
-		spanouter.End()
 	}
 	return nil
 }
@@ -195,17 +206,17 @@ func (c *TestController) getTimeRangesMap(ctx *fiber.Ctx, server string, results
 
 func (c *TestController) getDropInfos(ctx *fiber.Ctx, server string, timeRangeIDs []int, stageIDFilter []int, itemIDFilter []int, results *[]models.DropInfo) error {
 	var whereBuilder strings.Builder
-	fmt.Fprintf(&whereBuilder, "di.server = ? AND di.time_range_id IN (?) AND di.drop_type != ? AND di.item_id IS NOT NULL")
+	fmt.Fprintf(&whereBuilder, "di.server = ? AND di.range_id IN (?) AND di.drop_type != ? AND di.item_id IS NOT NULL")
 
-	if len(stageIDFilter) > 0 {
+	if stageIDFilter != nil && len(stageIDFilter) > 0 {
 		fmt.Fprintf(&whereBuilder, " AND di.stage_id IN (?)")
 	}
-	if len(itemIDFilter) > 0 {
+	if itemIDFilter != nil && len(itemIDFilter) > 0 {
 		fmt.Fprintf(&whereBuilder, " AND di.item_id IN (?)")
 	}
-	if err := c.DB.NewSelect().TableExpr("drop_infos as di").Column("di.stage_id", "di.item_id", "di.time_range_id", "di.accumulable").
+	if err := c.DB.NewSelect().TableExpr("drop_infos as di").Column("di.stage_id", "di.item_id", "di.range_id", "di.accumulable").
 		Where(whereBuilder.String(), server, bun.In(timeRangeIDs), "RECOGNITION_ONLY", bun.In(stageIDFilter), bun.In(itemIDFilter)).
-		Join("JOIN time_ranges AS tr ON tr.range_id = di.time_range_id").
+		Join("JOIN time_ranges AS tr ON tr.range_id = di.range_id").
 		Scan(ctx.Context(), results); err != nil {
 		return err
 	}
