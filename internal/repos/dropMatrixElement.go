@@ -16,10 +16,22 @@ func NewDropMatrixElementRepo(db *bun.DB) *DropMatrixElementRepo {
 	return &DropMatrixElementRepo{db: db}
 }
 
-func (s *DropMatrixElementRepo) BatchSaveElements(ctx context.Context, elements []models.DropMatrixElement) {
-	s.db.NewInsert().Model(elements).Exec(ctx)
+func (s *DropMatrixElementRepo) BatchSaveElements(ctx context.Context, elements []models.DropMatrixElement, server string) error {
+	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		_, err := tx.NewInsert().Model(&elements).Exec(ctx)
+		if err != nil {
+			return err
+		}
+		_, err = tx.NewDelete().Model((*models.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-func (s *DropMatrixElementRepo) DeleteByServer(ctx context.Context, server string) {
-	s.db.NewDelete().Model((*models.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
+func (s *DropMatrixElementRepo) DeleteByServer(ctx context.Context, server string) error {
+	_, err := s.db.NewDelete().Model((*models.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
+	return err
 }

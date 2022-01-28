@@ -40,7 +40,7 @@ func (c *TestController) Test(ctx *fiber.Ctx) error {
 }
 
 func (c *TestController) RefreshGlobalDropMatrix(ctx *fiber.Ctx, server string) error {
-	toSave := make([]models.DropMatrixElement, 40000)
+	toSave := []models.DropMatrixElement{}
 	ch := make(chan []models.DropMatrixElement, 15)
 	var wg sync.WaitGroup
 
@@ -79,7 +79,7 @@ func (c *TestController) RefreshGlobalDropMatrix(ctx *fiber.Ctx, server string) 
 					func(el map[string]int) int { return el["stageId"] },
 					func(el map[string]int) map[string]int { return el }).ToSlice(&groupedResults)
 
-			currentBatch := make([]models.DropMatrixElement, len(groupedResults))
+			currentBatch := []models.DropMatrixElement{}
 			for _, el := range groupedResults {
 				stageId := el.Key.(int)
 
@@ -135,8 +135,7 @@ func (c *TestController) RefreshGlobalDropMatrix(ctx *fiber.Ctx, server string) 
 
 	log.Debug().Msgf("toSave length: %v", len(toSave))
 
-	c.DropMatrixElementRepo.DeleteByServer(ctx.Context(), server)
-	c.DropMatrixElementRepo.BatchSaveElements(ctx.UserContext(), toSave)
+	c.DropMatrixElementRepo.BatchSaveElements(ctx.UserContext(), toSave, server)
 	return nil
 }
 
@@ -340,7 +339,8 @@ func combineQuantityAndTimesResults(quantityResults *[]map[string]interface{}, t
 					"stageId":  stageId,
 					"itemId":   itemId,
 					"times":    times,
-					"quantity": quantity})
+					"quantity": quantity,
+				})
 			}
 		}
 	}
