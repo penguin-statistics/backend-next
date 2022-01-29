@@ -1,6 +1,8 @@
 package service
 
 import (
+	"strings"
+
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gofiber/fiber/v2"
@@ -9,19 +11,22 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/konst"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/utils/report"
 )
 
 type ReportService struct {
-	DropInfoRepo *repos.DropInfoRepo
+	DropInfoRepo   *repos.DropInfoRepo
+	ReportVerifier *report.ReportVerifier
 }
 
-func NewReportService(dropInfoRepo *repos.DropInfoRepo) *ReportService {
+func NewReportService(dropInfoRepo *repos.DropInfoRepo, reportVerifier *report.ReportVerifier) *ReportService {
 	return &ReportService{
-		DropInfoRepo: dropInfoRepo,
+		DropInfoRepo:   dropInfoRepo,
+		ReportVerifier: reportVerifier,
 	}
 }
 
-func (s *ReportService) VerifySingularReport(ctx *fiber.Ctx, report *dto.SingularReportRequest) error {
+func (s *ReportService) VerifySingularReport(ctx *fiber.Ctx, report *dto.SingleReportRequest) error {
 	tuples := make([][]string, 0, len(report.Drops))
 	var err error
 	linq.From(report.Drops).
@@ -41,28 +46,18 @@ func (s *ReportService) VerifySingularReport(ctx *fiber.Ctx, report *dto.Singula
 		return err
 	}
 
-	itemDropInfos, typeDropInfos, err := s.DropInfoRepo.GetForCurrentTimeRangeWithDropTypes(ctx.Context(), &repos.DropInfoQuery{
-		Server:     report.Server,
-		ArkStageId: report.StageID,
-		DropTuples: tuples,
-	})
-	if err != nil {
+	// get PenguinID from HTTP header in form of Authorization: PenguinID ########
+	penguinID := strings.TrimSpace(strings.TrimPrefix(ctx.Get("Authorization"), "PenguinID"))
+
+	if err = s.ReportVerifier.Verify(ctx.Context(), &dto.SingleReport{
+		Report:    report,
+		PenguinID: penguinID,
+		UserIP:    ctx.IP(),
+	}); err != nil {
 		return err
 	}
 
-	if len(itemDropInfos) != len(report.Drops) {
-		return errors.ErrInvalidRequest.
-			WithMessage("invalid drop info count: expected %d, but got %d", len(report.Drops), len(itemDropInfos))
-	}
-
-	// for _, drop := range report.Drops {
-	// 	drop.ItemID
-	// }
-
-	return ctx.JSON(fiber.Map{
-		"item_drop_infos": itemDropInfos,
-		"type_drop_infos": typeDropInfos,
-	})
+	return ctx.SendStatus(fiber.StatusAccepted)
 }
 
 func (s *ReportService) SubmitSingularReport(report *dto.BatchReportRequest) {

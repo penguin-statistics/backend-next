@@ -39,6 +39,7 @@ func (s *DropInfoRepo) GetDropInfo(ctx context.Context, id int) (*models.DropInf
 type DropInfoQuery struct {
 	Server     string
 	ArkStageId string
+	// DropTuples is in form of [](drop_item_id, drop_item_type)
 	DropTuples [][]string
 
 	withDropTypes *[]string

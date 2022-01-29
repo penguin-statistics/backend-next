@@ -36,7 +36,7 @@ func RegisterReportController(v2 *server.V2, v3 *server.V3, c ReportController) 
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/v2/report [POST]
 func (c *ReportController) SingularReport(ctx *fiber.Ctx) error {
-	var report dto.SingularReportRequest
+	var report dto.SingleReportRequest
 	if err := rekuest.ValidBody(ctx, &report); err != nil {
 		return err
 	}

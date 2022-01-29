@@ -6,19 +6,11 @@ type Drop struct {
 	Quantity int    `json:"quantity" validate:"required,lte=1000"`
 }
 
-type SingularReportRequest struct {
+type SingleReportRequest struct {
 	FragmentServer
 	FragmentReportCommon
 
 	Drops []Drop `json:"drops" validate:"lte=100,dive"`
-}
-
-type BatchReportRequest struct {
-	FragmentServer
-	FragmentReportCommon
-
-	BatchDrops []BatchReportDrop `json:"batchDrops"`
-	Timestamp  int               `json:"timestamp"`
 }
 
 type BatchReportDrop struct {
@@ -32,4 +24,19 @@ type ReportRequestMetadata struct {
 	Md5          string `json:"md5"`
 	FileName     string `json:"fileName"`
 	LastModified int    `json:"lastModified"`
+}
+
+type BatchReportRequest struct {
+	FragmentServer
+	FragmentReportCommon
+
+	BatchDrops []BatchReportDrop `json:"batchDrops"`
+	Timestamp  int               `json:"timestamp"`
+}
+
+type SingleReport struct {
+	Report *SingleReportRequest `json:"report"`
+
+	PenguinID string `json:"userId"`
+	UserIP    string `json:"userIp"`
 }

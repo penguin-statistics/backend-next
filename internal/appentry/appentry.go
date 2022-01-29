@@ -16,6 +16,7 @@ import (
 	httpserver "github.com/penguin-statistics/backend-next/internal/server/http"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils"
+	"github.com/penguin-statistics/backend-next/internal/utils/report"
 )
 
 func ProvideOptions(includeSwagger bool) []fx.Option {
@@ -28,6 +29,10 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(infra.ProvidePostgres),
 		fx.Provide(infra.ProvideRedis),
 		fx.Invoke(cache.Populate),
+		fx.Provide(report.NewUserVerifier),
+		fx.Provide(report.NewDropVerifier),
+		fx.Provide(report.NewReportVerifier),
+		fx.Provide(repos.NewAccountRepo),
 		fx.Provide(repos.NewItemRepo),
 		fx.Provide(repos.NewStageRepo),
 		fx.Provide(repos.NewZoneRepo),
