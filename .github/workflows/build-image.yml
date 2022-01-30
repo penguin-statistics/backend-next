@@ -1,0 +1,26 @@
+name: Build Docker Image
+
+on:
+  push:
+    branches: [ main , dev ]
+  release:
+    types: [ published ]
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Build and Publish to Registry
+      uses: elgohr/Publish-Docker-Github-Action@3.04
+      with:
+        name: penguin-statistics/backend-next
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        registry: ghcr.io
+        tag: '${{ github.sha }}'
+      
