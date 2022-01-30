@@ -7,8 +7,8 @@ import (
 	"github.com/ahmetb/go-linq/v3"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/dto"
 	"github.com/penguin-statistics/backend-next/internal/models/konst"
+	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
 
@@ -22,12 +22,12 @@ func NewDropVerifier(dropInfoRepo *repos.DropInfoRepo) *DropVerifier {
 	}
 }
 
-func (d *DropVerifier) Verify(ctx context.Context, report *dto.SingleReport) error {
-	drops := report.Report.Drops
+func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, reportCtx *types.ReportContext) error {
+	drops := report.Drops
 	tuples := make([][]string, 0, len(drops))
 	var err error
 	linq.From(drops).
-		SelectT(func(drop dto.Drop) []string {
+		SelectT(func(drop types.Drop) []string {
 			mappedDropType, have := konst.DropTypeMap[drop.DropType]
 			if !have {
 				err = fmt.Errorf("invalid drop type: expected one of %v, but got `%s`", konst.DropTypeMapKeys, drop.DropType)
@@ -44,8 +44,8 @@ func (d *DropVerifier) Verify(ctx context.Context, report *dto.SingleReport) err
 	}
 
 	itemDropInfos, typeDropInfos, err := d.DropInfoRepo.GetForCurrentTimeRangeWithDropTypes(ctx, &repos.DropInfoQuery{
-		Server:     report.Report.Server,
-		ArkStageId: report.Report.StageID,
+		Server:     reportCtx.Server,
+		ArkStageId: report.StageID,
 		DropTuples: tuples,
 	})
 	if err != nil {
@@ -67,10 +67,10 @@ func (d *DropVerifier) Verify(ctx context.Context, report *dto.SingleReport) err
 	return nil
 }
 
-func (d *DropVerifier) verifyDropType(ctx context.Context, report *dto.SingleReport, dropInfos []*models.DropInfo) error {
+func (d *DropVerifier) verifyDropType(ctx context.Context, report *types.SingleReport, dropInfos []*models.DropInfo) error {
 	dropTypeAmountMap := make(map[string]int)
-	linq.From(report.Report.Drops).
-		SelectT(func(drop dto.Drop) string {
+	linq.From(report.Drops).
+		SelectT(func(drop types.Drop) string {
 			// only pick dropType
 			return drop.DropType
 		}).
@@ -105,9 +105,9 @@ func (d *DropVerifier) verifyDropType(ctx context.Context, report *dto.SingleRep
 	return nil
 }
 
-func (d *DropVerifier) verifyDropItem(ctx context.Context, report *dto.SingleReport, dropInfos []*models.DropInfo) error {
+func (d *DropVerifier) verifyDropItem(ctx context.Context, report *types.SingleReport, dropInfos []*models.DropInfo) error {
 	for _, dropInfo := range dropInfos {
-		for _, drop := range report.Report.Drops {
+		for _, drop := range report.Drops {
 			count := drop.Quantity
 			if dropInfo.Bounds.Lower > count {
 				return fmt.Errorf("drop item `%s`: expected at least %d, but got %d", drop.ItemID, dropInfo.Bounds.Lower, count)

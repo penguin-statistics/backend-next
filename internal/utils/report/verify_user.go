@@ -3,7 +3,7 @@ package report
 import (
 	"context"
 
-	"github.com/penguin-statistics/backend-next/internal/models/dto"
+	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
 
@@ -17,8 +17,8 @@ func NewUserVerifier(accountRepo *repos.AccountRepo) *UserVerifier {
 	}
 }
 
-func (u *UserVerifier) Verify(ctx context.Context, report *dto.SingleReport) error {
-	id := report.PenguinID
+func (u *UserVerifier) Verify(ctx context.Context, report *types.SingleReport, reportCtx *types.ReportContext) error {
+	id := reportCtx.PenguinID
 	if id == "" {
 		return nil
 	}

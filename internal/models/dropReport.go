@@ -11,7 +11,6 @@ type DropReport struct {
 	StageID   int    `json:"stageId"`
 	PatternID int    `json:"patternId"`
 	Times     int    `json:"times"`
-	IP        string `json:"ip"`
 	CreatedAt string `json:"createdAt"`
 	Reliable  bool   `json:"reliable"`
 	Deleted   bool   `json:"deleted"`

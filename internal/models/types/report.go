@@ -1,4 +1,4 @@
-package dto
+package types
 
 type Drop struct {
 	DropType string `json:"dropType" validate:"required,oneof=REGULAR_DROP NORMAL_DROP SPECIAL_DROP EXTRA_DROP"`
@@ -7,36 +7,28 @@ type Drop struct {
 }
 
 type SingleReportRequest struct {
-	FragmentServer
+	FragmentStageID
 	FragmentReportCommon
 
-	Drops []Drop `json:"drops" validate:"lte=100,dive"`
+	Drops []Drop `json:"drops" validate:"dive"`
 }
 
 type BatchReportDrop struct {
 	Drops    []Drop                `json:"drops"`
 	StageID  string                `json:"stageId"`
-	Metadata ReportRequestMetadata `json:"metadata"`
+	Metadata ReportRequestMetadata `json:"metadata" validate:"dive"`
 }
 
 type ReportRequestMetadata struct {
-	Fingerprint  string `json:"fingerprint"`
-	Md5          string `json:"md5"`
-	FileName     string `json:"fileName"`
+	Fingerprint  string `json:"fingerprint" validate:"lte=128"`
+	MD5          string `json:"md5" validate:"lte=32"`
+	FileName     string `json:"fileName" validate:"lte=512"`
 	LastModified int    `json:"lastModified"`
 }
 
 type BatchReportRequest struct {
-	FragmentServer
+	FragmentStageID
 	FragmentReportCommon
 
 	BatchDrops []BatchReportDrop `json:"batchDrops"`
-	Timestamp  int               `json:"timestamp"`
-}
-
-type SingleReport struct {
-	Report *SingleReportRequest `json:"report"`
-
-	PenguinID string `json:"userId"`
-	UserIP    string `json:"userIp"`
 }

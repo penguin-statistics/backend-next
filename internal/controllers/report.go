@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/models/dto"
+	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/service"
@@ -36,7 +36,7 @@ func RegisterReportController(v2 *server.V2, v3 *server.V3, c ReportController) 
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/v2/report [POST]
 func (c *ReportController) SingularReport(ctx *fiber.Ctx) error {
-	var report dto.SingleReportRequest
+	var report types.SingleReportRequest
 	if err := rekuest.ValidBody(ctx, &report); err != nil {
 		return err
 	}

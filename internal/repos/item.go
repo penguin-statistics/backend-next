@@ -13,16 +13,16 @@ import (
 )
 
 type ItemRepo struct {
-	db *bun.DB
+	DB *bun.DB
 }
 
 func NewItemRepo(db *bun.DB) *ItemRepo {
-	return &ItemRepo{db: db}
+	return &ItemRepo{DB: db}
 }
 
 func (c *ItemRepo) GetItems(ctx context.Context) ([]*models.Item, error) {
 	var items []*models.Item
-	err := c.db.NewSelect().
+	err := c.DB.NewSelect().
 		Model(&items).
 		Scan(ctx)
 
@@ -42,7 +42,7 @@ func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*model
 		return &item, nil
 	}
 
-	err = c.db.NewSelect().
+	err = c.DB.NewSelect().
 		Model(&item).
 		Where("ark_item_id = ?", arkItemId).
 		Scan(ctx)
@@ -60,7 +60,7 @@ func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*model
 func (c *ItemRepo) GetShimItems(ctx context.Context) ([]*shims.Item, error) {
 	var items []*shims.Item
 
-	err := c.db.NewSelect().
+	err := c.DB.NewSelect().
 		Model(&items).
 		Scan(ctx)
 
@@ -75,7 +75,7 @@ func (c *ItemRepo) GetShimItems(ctx context.Context) ([]*shims.Item, error) {
 
 func (c *ItemRepo) GetShimItemByArkId(ctx context.Context, itemId string) (*shims.Item, error) {
 	var item shims.Item
-	err := c.db.NewSelect().
+	err := c.DB.NewSelect().
 		Model(&item).
 		Where("ark_item_id = ?", itemId).
 		Scan(ctx)

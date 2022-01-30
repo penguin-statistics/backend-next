@@ -3,27 +3,30 @@ package report
 import (
 	"context"
 
-	"github.com/penguin-statistics/backend-next/internal/models/dto"
+	"github.com/penguin-statistics/backend-next/internal/models/types"
 )
 
-type ReportVerifier struct {
-	UserVerifier *UserVerifier
-	DropVerifier *DropVerifier
+type Verifier interface {
+	Verify(ctx context.Context, report *types.SingleReport, reportCtx *types.ReportContext) error
 }
 
-func NewReportVerifier(userVerifier *UserVerifier, dropVerifier *DropVerifier) *ReportVerifier {
+type ReportVerifier []Verifier
+
+func NewReportVerifier(userVerifier *UserVerifier, dropVerifier *DropVerifier, md5Verifier *MD5Verifier) *ReportVerifier {
 	return &ReportVerifier{
-		UserVerifier: userVerifier,
-		DropVerifier: dropVerifier,
+		userVerifier,
+		md5Verifier,
+		dropVerifier,
 	}
 }
 
-func (r *ReportVerifier) Verify(ctx context.Context, report *dto.SingleReport) error {
-	if err := r.UserVerifier.Verify(ctx, report); err != nil {
-		return err
-	}
-	if err := r.DropVerifier.Verify(ctx, report); err != nil {
-		return err
+func (verifier ReportVerifier) Verify(ctx context.Context, reportCtx *types.ReportContext) error {
+	for _, report := range reportCtx.Reports {
+		for _, pipe := range verifier {
+			if err := pipe.Verify(ctx, report, reportCtx); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
