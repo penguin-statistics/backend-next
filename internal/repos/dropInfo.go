@@ -3,6 +3,8 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/uptrace/bun"
@@ -34,6 +36,22 @@ func (s *DropInfoRepo) GetDropInfo(ctx context.Context, id int) (*models.DropInf
 	}
 
 	return &dropInfo, nil
+}
+
+func (s *DropInfoRepo) GetDropInfosByStageId(ctx context.Context, stageId int) ([]*models.DropInfo, error) {
+	var dropInfo []*models.DropInfo
+	err := s.DB.NewSelect().
+		Model(&dropInfo).
+		Where("stage_id = ?", stageId).
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return dropInfo, nil
 }
 
 type DropInfoQuery struct {
@@ -143,4 +161,24 @@ func (s *DropInfoRepo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, 
 	}
 
 	return itemDropInfos, typeDropInfos, nil
+}
+
+func (s *DropInfoRepo) GetDropInfosWithFilters(ctx context.Context, server string, rangeIds []int, stageIdFilter []int, itemIdFilter []int) ([]*models.DropInfo, error) {
+	results := make([]*models.DropInfo, 0)
+	var whereBuilder strings.Builder
+	fmt.Fprintf(&whereBuilder, "di.server = ? AND di.range_id IN (?) AND di.drop_type != ? AND di.item_id IS NOT NULL")
+
+	if stageIdFilter != nil && len(stageIdFilter) > 0 {
+		fmt.Fprintf(&whereBuilder, " AND di.stage_id IN (?)")
+	}
+	if itemIdFilter != nil && len(itemIdFilter) > 0 {
+		fmt.Fprintf(&whereBuilder, " AND di.item_id IN (?)")
+	}
+	if err := s.DB.NewSelect().TableExpr("drop_infos as di").Column("di.stage_id", "di.item_id", "di.range_id", "di.accumulable").
+		Where(whereBuilder.String(), server, bun.In(rangeIds), "RECOGNITION_ONLY", bun.In(stageIdFilter), bun.In(itemIdFilter)).
+		Join("JOIN time_ranges AS tr ON tr.range_id = di.range_id").
+		Scan(ctx, &results); err != nil {
+		return nil, err
+	}
+	return results, nil
 }
