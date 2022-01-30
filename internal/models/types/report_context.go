@@ -4,6 +4,7 @@ type SingleReport struct {
 	FragmentStageID
 
 	Drops []Drop `json:"drops" validate:"dive"`
+	Times int    `json:"times"`
 
 	// Metadata is optional; if not provided, the report will be treated as a single report.
 	Metadata *ReportRequestMetadata `json:"metadata" validate:"dive"`
@@ -14,6 +15,6 @@ type ReportContext struct {
 
 	Reports []*SingleReport `json:"report"`
 
-	PenguinID string `json:"penguinId"`
+	AccountID int    `json:"accountId"`
 	IP        string `json:"ip"`
 }

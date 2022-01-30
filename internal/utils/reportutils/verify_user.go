@@ -1,7 +1,8 @@
-package report
+package reportutils
 
 import (
 	"context"
+	"errors"
 
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/repos"
@@ -18,10 +19,12 @@ func NewUserVerifier(accountRepo *repos.AccountRepo) *UserVerifier {
 }
 
 func (u *UserVerifier) Verify(ctx context.Context, report *types.SingleReport, reportCtx *types.ReportContext) error {
-	id := reportCtx.PenguinID
-	if id == "" {
-		return nil
+	id := reportCtx.AccountID
+	if id == 0 {
+		return errors.New("account id is empty")
 	}
-	_, err := u.AccountRepo.GetAccountByPenguinId(ctx, id)
-	return err
+	if !u.AccountRepo.IsAccountExistWithId(ctx, id) {
+		return errors.New("account not found with given id")
+	}
+	return nil
 }

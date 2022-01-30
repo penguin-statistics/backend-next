@@ -3,30 +3,50 @@ package service
 import (
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/models/convertion"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/repos"
-	"github.com/penguin-statistics/backend-next/internal/utils/report"
+	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
 )
 
 type ReportService struct {
 	DropInfoRepo   *repos.DropInfoRepo
-	ReportVerifier *report.ReportVerifier
+	AccountRepo    *repos.AccountRepo
+	ReportVerifier *reportutils.ReportVerifier
 }
 
-func NewReportService(dropInfoRepo *repos.DropInfoRepo, reportVerifier *report.ReportVerifier) *ReportService {
+func NewReportService(dropInfoRepo *repos.DropInfoRepo, accountRepo *repos.AccountRepo, reportVerifier *reportutils.ReportVerifier) *ReportService {
 	return &ReportService{
 		DropInfoRepo:   dropInfoRepo,
+		AccountRepo:    accountRepo,
 		ReportVerifier: reportVerifier,
 	}
 }
 
-func (s *ReportService) VerifySingularReport(ctx *fiber.Ctx, report *types.SingleReportRequest) error {
+func (s *ReportService) VerifyAndSubmitSingularReport(ctx *fiber.Ctx, report *types.SingleReportRequest) error {
 	// get PenguinID from HTTP header in form of Authorization: PenguinID ########
 	penguinID := strings.TrimSpace(strings.TrimPrefix(ctx.Get("Authorization"), "PenguinID"))
+
+	// if PenguinID is empty, create new PenguinID
+	account, err := s.AccountRepo.GetAccountByPenguinId(ctx.Context(), penguinID)
+	if err != nil {
+		return err
+	}
+	var accountId int
+	if account == nil {
+		createdAccount, err := s.AccountRepo.CreateAccountWithRandomPenguinID(ctx.Context())
+		if err != nil {
+			return err
+		}
+		accountId = createdAccount.AccountID
+	} else {
+		accountId = account.AccountID
+	}
+
+	// merge drops with same (dropType, itemId) pair
+	report.Drops = reportutils.MergeDrops(report.Drops)
 
 	singleReport := convertion.SingleReportRequestToSingleReport(report)
 
@@ -37,7 +57,7 @@ func (s *ReportService) VerifySingularReport(ctx *fiber.Ctx, report *types.Singl
 			Version: report.Version,
 		},
 		Reports:   []*types.SingleReport{singleReport},
-		PenguinID: penguinID,
+		AccountID: accountId,
 		IP:        ctx.IP(),
 	}
 
@@ -46,8 +66,4 @@ func (s *ReportService) VerifySingularReport(ctx *fiber.Ctx, report *types.Singl
 	}
 
 	return ctx.SendStatus(fiber.StatusAccepted)
-}
-
-func (s *ReportService) SubmitSingularReport(report *types.BatchReportRequest) {
-	spew.Dump(report)
 }

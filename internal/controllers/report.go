@@ -41,7 +41,7 @@ func (c *ReportController) SingularReport(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	return c.ReportService.VerifySingularReport(ctx, &report)
+	return c.ReportService.VerifyAndSubmitSingularReport(ctx, &report)
 }
 
 // @Summary      Bulk Submit with Frontend Recognition
