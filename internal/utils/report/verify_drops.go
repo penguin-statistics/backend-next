@@ -87,11 +87,6 @@ func (d *DropVerifier) verifyDropType(ctx context.Context, report *dto.SingleRep
 
 	for _, dropInfo := range dropInfos {
 		for dropType, count := range dropTypeAmountMap {
-			// if current dropType is not satisfying the dropInfo.Bounds counstraints, return error
-			// dropInfo.Bounds consists:
-			// Lower for minimum value allowed,
-			// Upper for maximum value allowed,
-			// Exceptions for values that are explicitly not allowed.
 			if dropInfo.Bounds.Lower > count {
 				return fmt.Errorf("drop type `%s`: expected at least %d, but got %d", dropType, dropInfo.Bounds.Lower, count)
 			} else if dropInfo.Bounds.Upper < count {
