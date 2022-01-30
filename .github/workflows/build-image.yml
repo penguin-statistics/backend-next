@@ -22,4 +22,4 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
         registry: ghcr.io
-        tag: '${{ github.sha }}'
+        tags: '${{ github.sha }}'
