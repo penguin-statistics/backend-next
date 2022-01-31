@@ -16,6 +16,8 @@ type Stage struct {
 	ArkStageID string `json:"stageId"`
 	// ZoneID is the numerical ID of the zone the stage is in.
 	ZoneID int `json:"zoneId"`
+	// ExtraProcessType is the type of extra process that is used in the stage, e.g. "GACHABOX".
+	ExtraProcessType string `json:"extraProcessType"`
 	// Code is a map with language code as key and the code of the stage in that language as value.
 	Code json.RawMessage `json:"code"`
 	// Sanity is the sanity requirement for a full clear of the stage.
@@ -24,4 +26,10 @@ type Stage struct {
 	Existence json.RawMessage `json:"existence"`
 	// MinClearTime is the minimum time (in milliseconds as a duration) it takes to clear the stage, referencing from prts.wiki
 	MinClearTime null.Int `json:"minClearTime" swaggertype:"number"`
+}
+
+type StageExtended struct {
+	Stage
+
+	Zone *Zone `bun:"rel:belongs-to,join:zone_id=zone_id" json:"-"`
 }

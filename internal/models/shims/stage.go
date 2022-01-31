@@ -3,9 +3,10 @@ package shims
 import (
 	"encoding/json"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
+
+	"github.com/penguin-statistics/backend-next/internal/models"
 )
 
 type Stage struct {

@@ -1,24 +1,28 @@
 package service
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/models/convertion"
+	"github.com/penguin-statistics/backend-next/internal/models/konst"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
 )
 
 type ReportService struct {
+	StageRepo      *repos.StageRepo
 	DropInfoRepo   *repos.DropInfoRepo
 	AccountRepo    *repos.AccountRepo
 	ReportVerifier *reportutils.ReportVerifier
 }
 
-func NewReportService(dropInfoRepo *repos.DropInfoRepo, accountRepo *repos.AccountRepo, reportVerifier *reportutils.ReportVerifier) *ReportService {
+func NewReportService(stageRepo *repos.StageRepo, dropInfoRepo *repos.DropInfoRepo, accountRepo *repos.AccountRepo, reportVerifier *reportutils.ReportVerifier) *ReportService {
 	return &ReportService{
+		StageRepo:      stageRepo,
 		DropInfoRepo:   dropInfoRepo,
 		AccountRepo:    accountRepo,
 		ReportVerifier: reportVerifier,
@@ -50,6 +54,18 @@ func (s *ReportService) VerifyAndSubmitSingularReport(ctx *fiber.Ctx, report *ty
 
 	singleReport := convertion.SingleReportRequestToSingleReport(report)
 
+	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
+	category, err := s.StageRepo.GetStageExtraProcessTypeByArkId(ctx.Context(), singleReport.StageID)
+	if err != nil {
+		return err
+	}
+	if category == konst.ExtraProcessTypeGachaBox {
+		fmt.Println(singleReport)
+		reportutils.AggregateGachaBoxDrops(singleReport)
+		fmt.Println(singleReport)
+	}
+
+	// construct ReportContext
 	reportCtx := &types.ReportContext{
 		FragmentReportCommon: types.FragmentReportCommon{
 			Server:  report.Server,

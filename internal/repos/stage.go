@@ -119,3 +119,20 @@ func (c *StageRepo) GetShimStageByArkId(ctx context.Context, stageId string, ser
 
 	return &stage, nil
 }
+
+func (c *StageRepo) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId string) (string, error) {
+	var stage models.Stage
+	err := c.db.NewSelect().
+		Model(&stage).
+		Column("st.extra_process_type").
+		Where("st.ark_stage_id = ?", arkStageId).
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return "", errors.ErrNotFound
+	} else if err != nil {
+		return "", err
+	}
+
+	return stage.ExtraProcessType, nil
+}
