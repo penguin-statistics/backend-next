@@ -2,6 +2,7 @@ package infra
 
 import (
 	"github.com/nats-io/nats.go"
+
 	"github.com/penguin-statistics/backend-next/internal/config"
 )
 
