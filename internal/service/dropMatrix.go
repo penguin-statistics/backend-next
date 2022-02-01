@@ -61,8 +61,8 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 			fmt.Println("<   :", timeRange.RangeID)
 			startTime := time.Now()
 
-			rangeIds := []int{timeRange.RangeID}
-			results, err := s.calcDropMatrixForTimeRanges(ctx, server, rangeIds, nil, nil, &null.Int{})
+			timeRanges := []*models.TimeRange{timeRange}
+			results, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, &null.Int{})
 			if err != nil {
 				return
 			}
@@ -73,8 +73,8 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 			var groupedResults []linq.Group
 			linq.From(results).
 				GroupByT(
-					func(el map[string]int) int { return el["stageId"] },
-					func(el map[string]int) map[string]int { return el }).ToSlice(&groupedResults)
+					func(el map[string]interface{}) int { return el["stageId"].(int) },
+					func(el map[string]interface{}) map[string]interface{} { return el }).ToSlice(&groupedResults)
 
 			currentBatch := []models.DropMatrixElement{}
 			for _, el := range groupedResults {
@@ -90,9 +90,9 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 				}
 
 				for _, el2 := range el.Group {
-					itemId := el2.(map[string]int)["itemId"]
-					quantity := el2.(map[string]int)["quantity"]
-					times := el2.(map[string]int)["times"]
+					itemId := el2.(map[string]interface{})["itemId"].(int)
+					quantity := el2.(map[string]interface{})["quantity"].(int)
+					times := el2.(map[string]interface{})["times"].(int)
 					dropMatrixElement := models.DropMatrixElement{
 						StageID:  stageId,
 						ItemID:   itemId,
@@ -133,48 +133,34 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 }
 
 func (s *DropMatrixService) calcDropMatrixForTimeRanges(
-	ctx *fiber.Ctx, queryServer string, rangeIds []int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int) ([]map[string]int, error) {
-	timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, queryServer)
+	ctx *fiber.Ctx, queryServer string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId *null.Int) ([]map[string]interface{}, error) {
+	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, queryServer, timeRanges, stageIdFilter, itemIdFilter)
 	if err != nil {
 		return nil, err
 	}
 
-	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, queryServer, rangeIds, stageIdFilter, itemIdFilter)
-	if err != nil {
-		return nil, err
-	}
-
-	var dropInfosByRangeId []linq.Group
-	linq.From(dropInfos).
-		GroupByT(
-			func(dropInfo *models.DropInfo) int { return dropInfo.RangeID },
-			func(dropInfo *models.DropInfo) *models.DropInfo { return dropInfo }).
-		ToSlice(&dropInfosByRangeId)
-
-	results := make([]map[string]int, 0)
-	for _, el := range dropInfosByRangeId {
-		rangeId := el.Key.(int)
-		timeRange := timeRangesMap[rangeId]
-		quantityResults, err := s.DropReportService.CalcTotalQuantity(ctx, queryServer, timeRange, dropInfos, accountId)
+	results := make([]map[string]interface{}, 0)
+	for _, timeRange := range timeRanges {
+		quantityResults, err := s.DropReportService.CalcTotalQuantity(ctx, queryServer, timeRange, getStageIdItemIdMapFromDropInfos(dropInfos), accountId)
 		if err != nil {
 			return nil, err
 		}
-		timesResults, err := s.DropReportService.CalcTotalTimes(ctx, queryServer, timeRange, dropInfos, accountId)
+		timesResults, err := s.DropReportService.CalcTotalTimes(ctx, queryServer, timeRange, getStageIdsFromDropInfos(dropInfos), accountId)
 		if err != nil {
 			return nil, err
 		}
 		combinedResults := combineQuantityAndTimesResults(quantityResults, timesResults)
 		for _, result := range combinedResults {
-			result["rangeId"] = rangeId
+			result["timeRange"] = timeRange
 			results = append(results, result)
 		}
 	}
 	return results, nil
 }
 
-func combineQuantityAndTimesResults(quantityResults []map[string]interface{}, timesResults []map[string]interface{}) []map[string]int {
+func combineQuantityAndTimesResults(quantityResults []map[string]interface{}, timesResults []map[string]interface{}) []map[string]interface{} {
 	var firstGroupResults []linq.Group
-	combinedResults := make([]map[string]int, 0)
+	combinedResults := make([]map[string]interface{}, 0)
 	linq.From(quantityResults).
 		GroupByT(
 			func(result map[string]interface{}) interface{} { return result["stage_id"] },
@@ -203,7 +189,7 @@ func combineQuantityAndTimesResults(quantityResults []map[string]interface{}, ti
 		for _, el := range secondGroupResults.Group {
 			times := int(el.(map[string]interface{})["total_times"].(int64))
 			for itemId, quantity := range quantityResultsMapForOneStage {
-				combinedResults = append(combinedResults, map[string]int{
+				combinedResults = append(combinedResults, map[string]interface{}{
 					"stageId":  stageId,
 					"itemId":   itemId,
 					"times":    times,
@@ -213,4 +199,30 @@ func combineQuantityAndTimesResults(quantityResults []map[string]interface{}, ti
 		}
 	}
 	return combinedResults
+}
+
+func getStageIdItemIdMapFromDropInfos(dropInfos []*models.DropInfo) map[int][]int {
+	stageIdItemIdMap := make(map[int][]int)
+	var groupedResults []linq.Group
+	linq.From(dropInfos).
+		WhereT(func (dropInfo *models.DropInfo) bool { return dropInfo.ItemID.Valid }).
+		GroupByT(
+			func (dropInfo *models.DropInfo) int { return dropInfo.StageID }, 
+			func (dropInfo *models.DropInfo) int { return int(dropInfo.ItemID.Int64) },
+		).ToSlice(&groupedResults)
+	for _, groupedResult := range groupedResults {
+		stageId := groupedResult.Key.(int)
+		itemIds := make([]int, 0)
+		linq.From(groupedResult.Group).Distinct().ToSlice(&itemIds)
+		if len(itemIds) > 0 {
+			stageIdItemIdMap[stageId] = itemIds
+		}
+	}
+	return stageIdItemIdMap
+}
+
+func getStageIdsFromDropInfos(dropInfos []*models.DropInfo) []int {
+	stageIds := make([]int, 0)
+	linq.From(dropInfos).SelectT(func (dropInfo *models.DropInfo) int { return dropInfo.StageID }).Distinct().ToSlice(&stageIds)
+	return stageIds
 }

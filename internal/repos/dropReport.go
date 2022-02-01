@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ahmetb/go-linq/v3"
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
@@ -22,49 +21,42 @@ func NewDropReportRepo(db *bun.DB) *DropReportRepo {
 	return &DropReportRepo{DB: db}
 }
 
-func (s *DropReportRepo) CalcTotalQuantity(ctx context.Context, server string, timeRange *models.TimeRange, dropInfos []*models.DropInfo, accountId *null.Int) ([]map[string]interface{}, error) {
+func (s *DropReportRepo) CalcTotalQuantity(ctx context.Context, server string, timeRange *models.TimeRange, stageIdItemIdMap map[int][]int, accountId *null.Int) ([]map[string]interface{}, error) {
 	results := make([]map[string]interface{}, 0)
-	dropInfosByStageId := groupDropInfosByStageId(dropInfos)
+	if len(stageIdItemIdMap) == 0 {
+		return results, nil
+	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Format(time.RFC3339))
 	fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Format(time.RFC3339))
-	b.WriteString(" AND (")
-	for idx, el := range dropInfosByStageId {
-		stageId := el.Key.(int)
-		var itemIds []int
-		linq.From(el.Group).
-			SelectT(func(dropInfo *models.DropInfo) int {
-				return int(dropInfo.ItemID.Int64)
-			}).
-			ToSlice(&itemIds)
-
-		fmt.Fprintf(&b, "dr.stage_id = %d AND dpe.item_id", stageId)
+	stageConditions := make([]string, 0)
+	for stageId, itemIds := range stageIdItemIdMap {
+		var stageB strings.Builder
+		fmt.Fprintf(&stageB, "dr.stage_id = %d AND dpe.item_id", stageId)
 		if len(itemIds) == 1 {
-			fmt.Fprintf(&b, " = %d", itemIds[0])
+			fmt.Fprintf(&stageB, " = %d", itemIds[0])
 		} else {
 			var itemIdsStr []string
 			for _, itemId := range itemIds {
 				itemIdsStr = append(itemIdsStr, strconv.FormatInt(int64(itemId), 10))
 			}
-			fmt.Fprintf(&b, " IN (%s)", strings.Join(itemIdsStr, ","))
+			fmt.Fprintf(&stageB, " IN (%s)", strings.Join(itemIdsStr, ","))
 		}
-		if idx != len(dropInfosByStageId)-1 {
-			b.WriteString(" OR ")
-		}
+		stageConditions = append(stageConditions, stageB.String())
 	}
-	b.WriteString(")")
+	fmt.Fprintf(&b, " AND (%s)", strings.Join(stageConditions, " OR "))
 
 	query := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
 		Column("dr.stage_id", "dpe.item_id").
 		ColumnExpr("SUM(dpe.quantity) AS total_quantity").
-		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id").
-		Where("dr.deleted = false AND dr.server = ? AND "+b.String(), server)
+		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id")
 	if accountId.Valid {
-		query.Where("dr.account_id = ?", accountId.Int64)
+		query = query.Where("dr.account_id = ?", accountId.Int64)
 	} else {
-		query.Where("dr.reliable = true")
+		query = query.Where("dr.reliable = true")
 	}
+	query = query.Where("dr.deleted = false AND dr.server = ? AND "+b.String(), server)
 	if err := query.
 		Group("dr.stage_id", "dpe.item_id").
 		Scan(ctx, &results); err != nil {
@@ -73,19 +65,15 @@ func (s *DropReportRepo) CalcTotalQuantity(ctx context.Context, server string, t
 	return results, nil
 }
 
-func (s *DropReportRepo) CalcTotalTimes(ctx context.Context, server string, timeRange *models.TimeRange, dropInfos []*models.DropInfo, accountId *null.Int) ([]map[string]interface{}, error) {
+func (s *DropReportRepo) CalcTotalTimes(ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId *null.Int) ([]map[string]interface{}, error) {
 	results := make([]map[string]interface{}, 0)
-	dropInfosByStageId := groupDropInfosByStageId(dropInfos)
+	if len(stageIds) == 0 {
+		return results, nil
+	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Format(time.RFC3339))
 	fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Format(time.RFC3339))
 	b.WriteString(" AND dr.stage_id")
-	var stageIds []int
-	linq.From(dropInfosByStageId).
-		SelectT(func(group linq.Group) int { return group.Key.(int) }).
-		Distinct().
-		SortT(func(a int, b int) bool { return a < b }).
-		ToSlice(&stageIds)
 	if len(stageIds) == 1 {
 		fmt.Fprintf(&b, "= %d", stageIds[0])
 	} else {
@@ -99,27 +87,17 @@ func (s *DropReportRepo) CalcTotalTimes(ctx context.Context, server string, time
 	query := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
 		Column("dr.stage_id").
-		ColumnExpr("COUNT(*) AS total_times").
-		Where("dr.deleted = false AND dr.server = ? AND "+b.String(), server)
+		ColumnExpr("COUNT(*) AS total_times")
 	if accountId.Valid {
-		query.Where("dr.account_id = ?", accountId.Int64)
+		query = query.Where("dr.account_id = ?", accountId.Int64)
 	} else {
-		query.Where("dr.reliable = true")
+		query = query.Where("dr.reliable = true")
 	}
+	query = query.Where("dr.deleted = false AND dr.server = ? AND "+b.String(), server)
 	if err := query.
 		Group("dr.stage_id").
 		Scan(ctx, &results); err != nil {
 		return nil, err
 	}
 	return results, nil
-}
-
-func groupDropInfosByStageId(dropInfos []*models.DropInfo) []linq.Group {
-	var dropInfosByStageId []linq.Group
-	linq.From(dropInfos).
-		GroupByT(
-			func(dropInfo *models.DropInfo) int { return dropInfo.StageID },
-			func(dropInfo *models.DropInfo) *models.DropInfo { return dropInfo }).
-		ToSlice(&dropInfosByStageId)
-	return dropInfosByStageId
 }

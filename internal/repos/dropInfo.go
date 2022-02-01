@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/uptrace/bun"
@@ -38,11 +40,28 @@ func (s *DropInfoRepo) GetDropInfo(ctx context.Context, id int) (*models.DropInf
 	return &dropInfo, nil
 }
 
-func (s *DropInfoRepo) GetDropInfosByStageId(ctx context.Context, stageId int) ([]*models.DropInfo, error) {
+func (s *DropInfoRepo) GetDropInfosByServerAndStageId(ctx context.Context, server string, stageId int) ([]*models.DropInfo, error) {
 	var dropInfo []*models.DropInfo
 	err := s.DB.NewSelect().
 		Model(&dropInfo).
 		Where("stage_id = ?", stageId).
+		Where("server = ?", server).
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return dropInfo, nil
+}
+
+func (s *DropInfoRepo) GetDropInfosByServer(ctx context.Context, server string) ([]*models.DropInfo, error) {
+	var dropInfo []*models.DropInfo
+	err := s.DB.NewSelect().
+		Model(&dropInfo).
+		Where("server = ?", server).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
@@ -163,10 +182,10 @@ func (s *DropInfoRepo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, 
 	return itemDropInfos, typeDropInfos, nil
 }
 
-func (s *DropInfoRepo) GetDropInfosWithFilters(ctx context.Context, server string, rangeIds []int, stageIdFilter []int, itemIdFilter []int) ([]*models.DropInfo, error) {
+func (s *DropInfoRepo) GetDropInfosWithFilters(ctx context.Context, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*models.DropInfo, error) {
 	results := make([]*models.DropInfo, 0)
 	var whereBuilder strings.Builder
-	fmt.Fprintf(&whereBuilder, "di.server = ? AND di.range_id IN (?) AND di.drop_type != ? AND di.item_id IS NOT NULL")
+	fmt.Fprintf(&whereBuilder, "di.server = ? AND di.drop_type != ? AND di.item_id IS NOT NULL")
 
 	if stageIdFilter != nil && len(stageIdFilter) > 0 {
 		fmt.Fprintf(&whereBuilder, " AND di.stage_id IN (?)")
@@ -174,8 +193,35 @@ func (s *DropInfoRepo) GetDropInfosWithFilters(ctx context.Context, server strin
 	if itemIdFilter != nil && len(itemIdFilter) > 0 {
 		fmt.Fprintf(&whereBuilder, " AND di.item_id IN (?)")
 	}
-	if err := s.DB.NewSelect().TableExpr("drop_infos as di").Column("di.stage_id", "di.item_id", "di.range_id", "di.accumulable").
-		Where(whereBuilder.String(), server, bun.In(rangeIds), "RECOGNITION_ONLY", bun.In(stageIdFilter), bun.In(itemIdFilter)).
+
+	allTimeRangesHaveNoRangeId := true
+	for _, timeRange := range timeRanges {
+		if timeRange.RangeID > 0 {
+			allTimeRangesHaveNoRangeId = false
+			break	
+		}
+	}
+
+	if timeRanges != nil && len(timeRanges) > 0 {
+		if allTimeRangesHaveNoRangeId {
+			for _, timeRange := range timeRanges {
+				fmt.Fprintf(&whereBuilder,
+					" AND tr.start_time >= timestamp with time zone '%s' AND tr.end_time <= timestamp with time zone '%s'",
+					timeRange.StartTime.Format(time.RFC3339),
+					timeRange.EndTime.Format(time.RFC3339))
+			}
+		} else {
+			if len(timeRanges) == 1 {
+				fmt.Fprintf(&whereBuilder, " AND di.range_id = %d", timeRanges[0].RangeID)
+			} else {
+				rangeIdStr := make([]string, len(timeRanges))
+				linq.From(timeRanges).SelectT(func (timeRange *models.TimeRange) string { return strconv.FormatInt(int64(timeRange.RangeID), 10) }).ToSlice(&rangeIdStr)
+				fmt.Fprintf(&whereBuilder, " AND di.range_id IN (%s)", strings.Join(rangeIdStr, ","))
+			}
+		}
+	}
+	if err := s.DB.NewSelect().TableExpr("drop_infos as di").Column("di.stage_id", "di.item_id", "di.accumulable").
+		Where(whereBuilder.String(), server, "RECOGNITION_ONLY", bun.In(stageIdFilter), bun.In(itemIdFilter)).
 		Join("JOIN time_ranges AS tr ON tr.range_id = di.range_id").
 		Scan(ctx, &results); err != nil {
 		return nil, err

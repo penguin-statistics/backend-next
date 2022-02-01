@@ -21,7 +21,7 @@ func NewDropInfoService(dropInfoRepo *repos.DropInfoRepo, timeRangeService *Time
 }
 
 func (s *DropInfoService) GetMaxAccumulableTimeRangesByStageId(ctx *fiber.Ctx, server string, stageId int) (map[int] *models.TimeRange, error) {
-	dropInfos, err := s.DropInfoRepo.GetDropInfosByStageId(ctx.Context(), stageId)
+	dropInfos, err := s.DropInfoRepo.GetDropInfosByServerAndStageId(ctx.Context(), server, stageId)
 	if err != nil {
 		return nil, err
 	}
@@ -68,10 +68,20 @@ func (s *DropInfoService) GetMaxAccumulableTimeRangesByStageId(ctx *fiber.Ctx, s
 	return maxAccumulableTimeRanges, nil
 }
 
-func (s *DropInfoService) GetDropInfosWithFilters(ctx *fiber.Ctx, server string, rangeIds []int, stageIdFilter []int, itemIdFilter []int) ([]*models.DropInfo, error) {
-	return s.DropInfoRepo.GetDropInfosWithFilters(ctx.Context(), server, rangeIds, stageIdFilter, itemIdFilter)
+func (s *DropInfoService) GetDropInfosWithFilters(ctx *fiber.Ctx, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*models.DropInfo, error) {
+	return s.DropInfoRepo.GetDropInfosWithFilters(ctx.Context(), server, timeRanges, stageIdFilter, itemIdFilter)
 }
 
 func (s *DropInfoService) GetItemDropSetByStageIdAndRangeId(ctx *fiber.Ctx, server string, stageId int, rangeId int) ([]int, error) {
 	return s.DropInfoRepo.GetItemDropSetByStageIdAndRangeId(ctx.Context(), server, stageId, rangeId)
+}
+
+func (s *DropInfoService) GetStageIdsByServer(ctx *fiber.Ctx, server string) ([]int, error) {
+	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx.Context(), server)
+	if err != nil {
+		return nil, err
+	}
+	var stageIds []int
+	linq.From(dropInfos).SelectT(func (dropInfo *models.DropInfo) int { return dropInfo.StageID }).Distinct().ToSlice(&stageIds)
+	return stageIds, nil
 }

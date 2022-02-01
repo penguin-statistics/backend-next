@@ -10,6 +10,7 @@ import (
 type TestController struct {
 	fx.In
 	DropMatrixService	  *service.DropMatrixService
+	DropInfoService       *service.DropInfoService
 }
 
 func RegisterTestController(v3 *server.V3, c TestController) {
@@ -17,6 +18,6 @@ func RegisterTestController(v3 *server.V3, c TestController) {
 }
 
 func (c *TestController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
-	queryServer := ctx.Params("server")
-	return c.DropMatrixService.RefreshAllDropMatrixElements(ctx, queryServer)
+	server := ctx.Params("server")
+	return c.DropMatrixService.RefreshAllDropMatrixElements(ctx, server)
 }
