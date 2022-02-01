@@ -148,6 +148,15 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 	for {
 		select {
 		case msg := <-msgChan:
+			taskCtx, cancelTask := context.WithDeadline(ctx, time.Now().Add(time.Second*10))
+			inprogressInformer := time.AfterFunc(time.Second*5, func() {
+				msg.InProgress()
+			})
+			defer func() {
+				inprogressInformer.Stop()
+				cancelTask()
+			}()
+
 			reportCtx := &types.ReportContext{}
 			if err := json.Unmarshal(msg.Data, reportCtx); err != nil {
 				ch <- err
@@ -155,7 +164,7 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 				continue
 			}
 
-			err = s.consumeReportTask(ctx, reportCtx)
+			err = s.consumeReportTask(taskCtx, reportCtx)
 			if err != nil {
 				ch <- err
 				msg.Nak()
