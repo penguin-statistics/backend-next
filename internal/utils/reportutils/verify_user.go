@@ -18,8 +18,8 @@ func NewUserVerifier(accountRepo *repos.AccountRepo) *UserVerifier {
 	}
 }
 
-func (u *UserVerifier) Verify(ctx context.Context, report *types.SingleReport, reportCtx *types.ReportContext) error {
-	id := reportCtx.AccountID
+func (u *UserVerifier) Verify(ctx context.Context, report *types.SingleReport, reportTask *types.ReportTask) error {
+	id := reportTask.AccountID
 	if id == 0 {
 		return errors.New("account id is empty")
 	}

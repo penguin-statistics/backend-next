@@ -7,7 +7,7 @@ import (
 )
 
 type Verifier interface {
-	Verify(ctx context.Context, report *types.SingleReport, reportCtx *types.ReportContext) error
+	Verify(ctx context.Context, report *types.SingleReport, reportTask *types.ReportTask) error
 }
 
 type ReportVerifier []Verifier
@@ -20,10 +20,10 @@ func NewReportVerifier(userVerifier *UserVerifier, dropVerifier *DropVerifier, m
 	}
 }
 
-func (verifier ReportVerifier) Verify(ctx context.Context, reportCtx *types.ReportContext) error {
-	for _, report := range reportCtx.Reports {
+func (verifier ReportVerifier) Verify(ctx context.Context, reportTask *types.ReportTask) error {
+	for _, report := range reportTask.Reports {
 		for _, pipe := range verifier {
-			if err := pipe.Verify(ctx, report, reportCtx); err != nil {
+			if err := pipe.Verify(ctx, report, reportTask); err != nil {
 				return err
 			}
 		}

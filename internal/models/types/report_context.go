@@ -10,7 +10,7 @@ type SingleReport struct {
 	Metadata *ReportRequestMetadata `json:"metadata" validate:"dive"`
 }
 
-type ReportContext struct {
+type ReportTask struct {
 	FragmentReportCommon
 
 	Reports []*SingleReport `json:"report"`

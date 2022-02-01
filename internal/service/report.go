@@ -19,20 +19,22 @@ import (
 )
 
 type ReportService struct {
-	NatsConn       *nats.Conn
-	StageRepo      *repos.StageRepo
-	DropInfoRepo   *repos.DropInfoRepo
-	AccountRepo    *repos.AccountRepo
-	ReportVerifier *reportutils.ReportVerifier
+	NatsConn        *nats.Conn
+	StageRepo       *repos.StageRepo
+	DropInfoRepo    *repos.DropInfoRepo
+	DropPatternRepo *repos.DropPatternRepo
+	AccountRepo     *repos.AccountRepo
+	ReportVerifier  *reportutils.ReportVerifier
 }
 
-func NewReportService(natsConn *nats.Conn, stageRepo *repos.StageRepo, dropInfoRepo *repos.DropInfoRepo, accountRepo *repos.AccountRepo, reportVerifier *reportutils.ReportVerifier) *ReportService {
+func NewReportService(natsConn *nats.Conn, stageRepo *repos.StageRepo, dropInfoRepo *repos.DropInfoRepo, dropPatternRepo *repos.DropPatternRepo, accountRepo *repos.AccountRepo, reportVerifier *reportutils.ReportVerifier) *ReportService {
 	service := &ReportService{
-		NatsConn:       natsConn,
-		StageRepo:      stageRepo,
-		DropInfoRepo:   dropInfoRepo,
-		AccountRepo:    accountRepo,
-		ReportVerifier: reportVerifier,
+		NatsConn:        natsConn,
+		StageRepo:       stageRepo,
+		DropInfoRepo:    dropInfoRepo,
+		DropPatternRepo: dropPatternRepo,
+		AccountRepo:     accountRepo,
+		ReportVerifier:  reportVerifier,
 	}
 
 	go func() {
@@ -45,7 +47,14 @@ func NewReportService(natsConn *nats.Conn, stageRepo *repos.StageRepo, dropInfoR
 			}
 		}()
 
-		service.ReportConsumeWorker(context.Background(), ch)
+		for i := 0; i < 5; i++ {
+			go func() {
+				err := service.ReportConsumeWorker(context.Background(), ch)
+				if err != nil {
+					ch <- err
+				}
+			}()
+		}
 	}()
 	return service
 }
@@ -86,7 +95,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, report 
 	}
 
 	// construct ReportContext
-	reportCtx := &types.ReportContext{
+	reportTask := &types.ReportTask{
 		FragmentReportCommon: types.FragmentReportCommon{
 			Server:  report.Server,
 			Source:  report.Source,
@@ -102,12 +111,12 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, report 
 		return err
 	}
 
-	reportCtxJson, err := json.Marshal(reportCtx)
+	reportTaskJson, err := json.Marshal(reportTask)
 	if err != nil {
 		return err
 	}
 
-	pub, err := js.PublishAsync("REPORT.SINGLE", reportCtxJson, nats.MsgId(idempotencyKey))
+	pub, err := js.PublishAsync("report.single", reportTaskJson, nats.MsgId(idempotencyKey))
 	if err != nil {
 		return err
 	}
@@ -123,7 +132,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, report 
 		return fmt.Errorf("timeout waiting for NATS response")
 	}
 
-	// if err := s.ReportVerifier.Verify(ctx.Context(), reportCtx); err != nil {
+	// if err := s.ReportVerifier.Verify(ctx.Context(), reportTask); err != nil {
 	// 	return err
 	// }
 
@@ -131,17 +140,22 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, report 
 }
 
 func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) error {
-	defer close(ch)
-
 	js, err := s.NatsConn.JetStream()
 	if err != nil {
 		return err
 	}
 
+	info, err := js.StreamInfo("penguin-reports")
+	if err != nil {
+		return err
+	}
+	fmt.Println(info.Config.Subjects)
+
 	msgChan := make(chan *nats.Msg, 16)
 
-	_, err = js.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.AckWait(time.Second*10), nats.MaxAckPending(128))
+	_, err = js.ChanQueueSubscribe("report.*", "penguin-reports", msgChan, nats.BindStream("penguin-reports"), nats.AckWait(time.Second*10), nats.MaxAckPending(128))
 	if err != nil {
+		fmt.Println("error subscribing to report.single:", err)
 		return err
 	}
 
@@ -155,41 +169,47 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 			defer func() {
 				inprogressInformer.Stop()
 				cancelTask()
+				msg.Ack()
 			}()
 
-			reportCtx := &types.ReportContext{}
-			if err := json.Unmarshal(msg.Data, reportCtx); err != nil {
+			reportTask := &types.ReportTask{}
+			if err := json.Unmarshal(msg.Data, reportTask); err != nil {
 				ch <- err
-				msg.Nak()
 				continue
 			}
 
-			err = s.consumeReportTask(taskCtx, reportCtx)
+			err = s.consumeReportTask(taskCtx, reportTask)
 			if err != nil {
 				ch <- err
-				msg.Nak()
 				continue
 			}
-
-			msg.Ack()
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 }
 
-func (s *ReportService) consumeReportTask(ctx context.Context, reportCtx *types.ReportContext) error {
-	fmt.Println("now processing reportCtx: ", reportCtx)
-	if err := s.ReportVerifier.Verify(ctx, reportCtx); err != nil {
+func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types.ReportTask) error {
+	fmt.Println("now processing reportTask: ", reportTask)
+	if err := s.ReportVerifier.Verify(ctx, reportTask); err != nil {
 		return err
 	}
+	fmt.Println("reportTask verified successfully")
 
-	fmt.Println("reportCtx verified successfully")
+	// calculate drop pattern hash for each report
+	for _, report := range reportTask.Reports {
+		dropPatternHash := reportutils.CalculateDropPatternHash(report.Drops)
+		dropPattern, err := s.DropPatternRepo.GetOrCreateDropPatternByHash(ctx, dropPatternHash)
+		if err != nil {
+			return err
+		}
+		fmt.Println("pattern ID:", dropPattern.PatternID)
+	}
 
 	return nil
 
 	// save to database
-	// if err := s.DropInfoRepo.SaveDrops(msg.Context(), reportCtx.Reports); err != nil {
+	// if err := s.DropInfoRepo.SaveDrops(msg.Context(), reportTask.Reports); err != nil {
 	// 	continue
 	// }
 }
@@ -233,7 +253,7 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportCtx *types.
 // 	}
 
 // 	// construct ReportContext
-// 	reportCtx := &types.ReportContext{
+// 	reportTask := &types.ReportContext{
 // 		FragmentReportCommon: types.FragmentReportCommon{
 // 			Server:  report.Server,
 // 			Source:  report.Source,

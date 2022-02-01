@@ -149,10 +149,8 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 
 		return set(trans)
 	})
-
 	if config.DevMode {
 		fmt.Println("Running in DEV mode")
-
 		app.Use(pprof.New())
 
 		app.Use(logger.New(logger.Config{

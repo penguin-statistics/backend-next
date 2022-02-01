@@ -49,3 +49,47 @@ func (s *DropPatternRepo) GetDropPatternByHash(ctx context.Context, hash string)
 
 	return &dropPattern, nil
 }
+
+func (s *DropPatternRepo) GetOrCreateDropPatternByHash(ctx context.Context, hash string) (*models.DropPattern, error) {
+	var patternId int64
+	// Yes, I, know. Raw SQL. I spend 7 hours trying to figure out how to do this with bun.
+	// This is what I come up with. I'm sorry.
+	// This however still is safe enough, since we are using '?' as placeholder. So overall not bad.
+	err := s.DB.DB.QueryRow(`WITH new_row AS (
+INSERT INTO drop_patterns (hash)
+SELECT
+	'?'
+WHERE
+	NOT EXISTS (
+		SELECT
+			*
+		FROM
+			drop_patterns
+		WHERE
+			hash = '?')
+	RETURNING
+		pattern_id
+)
+SELECT
+	pattern_id
+FROM
+	new_row
+UNION
+SELECT
+	pattern_id
+FROM
+	drop_patterns
+WHERE
+	hash = '?';`, hash).Scan(&patternId)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return &models.DropPattern{
+		PatternID: int(patternId),
+		Hash:      hash,
+	}, nil
+}

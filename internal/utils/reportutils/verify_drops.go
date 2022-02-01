@@ -22,7 +22,7 @@ func NewDropVerifier(dropInfoRepo *repos.DropInfoRepo) *DropVerifier {
 	}
 }
 
-func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, reportCtx *types.ReportContext) error {
+func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, reportTask *types.ReportTask) error {
 	drops := report.Drops
 	tuples := make([][]string, 0, len(drops))
 	var err error
@@ -44,7 +44,7 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, r
 	}
 
 	itemDropInfos, typeDropInfos, err := d.DropInfoRepo.GetForCurrentTimeRangeWithDropTypes(ctx, &repos.DropInfoQuery{
-		Server:     reportCtx.Server,
+		Server:     reportTask.Server,
 		ArkStageId: report.StageID,
 		DropTuples: tuples,
 	})
