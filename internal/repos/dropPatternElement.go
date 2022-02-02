@@ -51,12 +51,12 @@ func (r *DropPatternElementRepo) GetDropPatternElementByHash(ctx context.Context
 	return &DropPatternElement, nil
 }
 
-func (r *DropPatternElementRepo) CreateDropPatternElements(ctx context.Context, tx bun.Tx, patternId int, drops []types.Drop) ([]*models.DropPatternElement, error) {
+func (r *DropPatternElementRepo) CreateDropPatternElements(ctx context.Context, tx bun.Tx, patternId int, drops []types.ArkDrop) ([]*models.DropPatternElement, error) {
 	var elements []*models.DropPatternElement
 	for _, drop := range drops {
 
 		element := &models.DropPatternElement{
-			ItemID:        drop.ItemID,
+			// ItemID:        drop.ItemID,
 			Quantity:      drop.Quantity,
 			DropPatternID: patternId,
 		}

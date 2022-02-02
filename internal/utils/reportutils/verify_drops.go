@@ -27,7 +27,7 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, r
 	tuples := make([][]string, 0, len(drops))
 	var err error
 	linq.From(drops).
-		SelectT(func(drop types.Drop) []string {
+		SelectT(func(drop types.ArkDrop) []string {
 			mappedDropType, have := konst.DropTypeMap[drop.DropType]
 			if !have {
 				err = fmt.Errorf("invalid drop type: expected one of %v, but got `%s`", konst.DropTypeMapKeys, drop.DropType)
@@ -70,7 +70,7 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, r
 func (d *DropVerifier) verifyDropType(ctx context.Context, report *types.SingleReport, dropInfos []*models.DropInfo) error {
 	dropTypeAmountMap := make(map[string]int)
 	linq.From(report.Drops).
-		SelectT(func(drop types.Drop) string {
+		SelectT(func(drop types.ArkDrop) string {
 			// only pick dropType
 			return drop.DropType
 		}).

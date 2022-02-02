@@ -11,7 +11,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 )
 
-func CalculateDropPatternHash(drops []types.Drop) string {
+func CalculateDropPatternHash(drops []types.ArkDrop) string {
 	segments := make([]string, 0, len(drops))
 
 	for _, drop := range drops {

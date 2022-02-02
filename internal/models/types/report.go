@@ -1,6 +1,6 @@
 package types
 
-type Drop struct {
+type ArkDrop struct {
 	DropType string `json:"dropType" validate:"required,oneof=REGULAR_DROP NORMAL_DROP SPECIAL_DROP EXTRA_DROP"`
 	ItemID   string `json:"itemId" validate:"required"`
 	Quantity int    `json:"quantity" validate:"required,lte=1000"`
@@ -10,11 +10,11 @@ type SingleReportRequest struct {
 	FragmentStageID
 	FragmentReportCommon
 
-	Drops []Drop `json:"drops" validate:"dive"`
+	Drops []ArkDrop `json:"drops" validate:"dive"`
 }
 
 type BatchReportDrop struct {
-	Drops    []Drop                `json:"drops"`
+	Drops    []ArkDrop             `json:"drops"`
 	StageID  string                `json:"stageId"`
 	Metadata ReportRequestMetadata `json:"metadata" validate:"dive"`
 }
