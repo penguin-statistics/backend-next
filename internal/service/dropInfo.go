@@ -20,8 +20,12 @@ func NewDropInfoService(dropInfoRepo *repos.DropInfoRepo, timeRangeService *Time
 	}
 }
 
-func (s *DropInfoService) GetMaxAccumulableTimeRangesByStageId(ctx *fiber.Ctx, server string, stageId int) (map[int] *models.TimeRange, error) {
-	dropInfos, err := s.DropInfoRepo.GetDropInfosByServerAndStageId(ctx.Context(), server, stageId)
+func (s *DropInfoService) GetDropInfosByServer(ctx *fiber.Ctx, server string) ([]*models.DropInfo, error) {
+	return s.DropInfoRepo.GetDropInfosByServer(ctx.Context(), server)
+}
+
+func (s *DropInfoService) GetMaxAccumulableTimeRangesByServer(ctx *fiber.Ctx, server string) (map[int] map[int] []*models.TimeRange, error) {
+	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx.Context(), server)
 	if err != nil {
 		return nil, err
 	}
@@ -29,44 +33,60 @@ func (s *DropInfoService) GetMaxAccumulableTimeRangesByStageId(ctx *fiber.Ctx, s
 	if err != nil {
 		return nil, err
 	}
+	maxAccumulableTimeRanges := make(map[int] map[int] []*models.TimeRange, 0)
 	var groupedResults []linq.Group
 	linq.From(dropInfos).
 		WhereT(func (dropInfo *models.DropInfo) bool { return dropInfo.ItemID.Valid }).
 		GroupByT(
-			func (dropInfo *models.DropInfo) int { return int(dropInfo.ItemID.Int64) },
+			func (dropInfo *models.DropInfo) int { return dropInfo.StageID },
 			func (dropInfo *models.DropInfo) *models.DropInfo { return dropInfo },
 		).
 		ToSlice(&groupedResults)
-	maxAccumulableTimeRanges := make(map[int] *models.TimeRange)
 	for _, el := range groupedResults {
-		itemId := el.Key.(int)
-		var sortedDropInfos []*models.DropInfo
+		stageId := el.Key.(int)
+		var groupedResults2 []linq.Group
 		linq.From(el.Group).
-			Distinct().
-			SortT(
-				func (a, b *models.DropInfo) bool { 
-					return timeRangesMap[a.RangeID].StartTime.After(*timeRangesMap[b.RangeID].StartTime) 
-				}).
-			ToSlice(&sortedDropInfos)
-		startDropInfo := sortedDropInfos[len(sortedDropInfos) - 1]
-		endDropInfo := sortedDropInfos[0]
-		for idx, dropInfo := range sortedDropInfos {
-			if !dropInfo.Accumulable {
-				targetStartIdx := idx
-				if idx != 0 {
-					targetStartIdx = idx - 1
+			GroupByT(
+				func (dropInfo interface{}) int { return int(dropInfo.(*models.DropInfo).ItemID.Int64) },
+				func (dropInfo interface{}) *models.DropInfo { return dropInfo.(*models.DropInfo) },
+			).
+			ToSlice(&groupedResults2)
+		maxAccumulableTimeRangesForOneStage := make(map[int] []*models.TimeRange)
+		for _, el := range groupedResults2 {
+			itemId := el.Key.(int)
+			var sortedDropInfos []*models.DropInfo
+			linq.From(el.Group).
+				Distinct().
+				SortT(
+					func (a, b *models.DropInfo) bool { 
+						return timeRangesMap[a.RangeID].StartTime.After(*timeRangesMap[b.RangeID].StartTime) 
+					}).
+				ToSlice(&sortedDropInfos)
+			startIdx := len(sortedDropInfos) - 1
+			endIdx := 0
+			timeRanges := make([]*models.TimeRange, 0)
+			for idx, dropInfo := range sortedDropInfos {
+				if !dropInfo.Accumulable {
+					startIdx = idx
+					if idx != 0 {
+						startIdx = idx - 1
+					}
+					break
 				}
-				startDropInfo = sortedDropInfos[targetStartIdx]
-				break
+			}
+			for i := endIdx; i <= startIdx; i++ {
+				timeRanges = append(timeRanges, timeRangesMap[sortedDropInfos[i].RangeID])
+			}
+			if len(timeRanges) > 0 {
+				maxAccumulableTimeRangesForOneStage[itemId] = timeRanges
 			}
 		}
-		maxAccumulableTimeRanges[itemId] = &models.TimeRange{
-			StartTime: timeRangesMap[startDropInfo.RangeID].StartTime, 
-			EndTime: timeRangesMap[endDropInfo.RangeID].EndTime,
+		if len(maxAccumulableTimeRangesForOneStage) > 0 {
+			maxAccumulableTimeRanges[stageId] = maxAccumulableTimeRangesForOneStage
 		}
 	}
 	return maxAccumulableTimeRanges, nil
-}
+} 
 
 func (s *DropInfoService) GetDropInfosWithFilters(ctx *fiber.Ctx, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*models.DropInfo, error) {
 	return s.DropInfoRepo.GetDropInfosWithFilters(ctx.Context(), server, timeRanges, stageIdFilter, itemIdFilter)
