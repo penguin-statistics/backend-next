@@ -73,7 +73,7 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 			startTime := time.Now()
 
 			timeRanges := []*models.TimeRange{timeRange}
-			currentBatch, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, &null.Int{})
+			currentBatch, err := s.CalcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, &null.Int{})
 			if err != nil {
 				return
 			}
@@ -111,13 +111,13 @@ func (s *DropMatrixService) getMaxAccumulableDropMatrixElements(ctx *fiber.Ctx, 
 		for _, timeRange := range timeRangesMap {
 			timeRanges = append(timeRanges, timeRange)
 		}
-		return s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId)
+		return s.CalcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId)
 	} else {
 		return s.DropMatrixElementService.GetElementsByServer(ctx, server)
 	}
 }
 
-func (s *DropMatrixService) calcDropMatrixForTimeRanges(
+func (s *DropMatrixService) CalcDropMatrixForTimeRanges(
 	ctx *fiber.Ctx, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId *null.Int) ([]*models.DropMatrixElement, error) {
 	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, itemIdFilter)
 	if err != nil {

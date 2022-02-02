@@ -205,10 +205,12 @@ func (s *DropInfoRepo) GetDropInfosWithFilters(ctx context.Context, server strin
 	if timeRanges != nil && len(timeRanges) > 0 {
 		if allTimeRangesHaveNoRangeId {
 			for _, timeRange := range timeRanges {
+				startTimeStr := timeRange.StartTime.Format(time.RFC3339)
+				endTimeStr := timeRange.EndTime.Format(time.RFC3339)
 				fmt.Fprintf(&whereBuilder,
-					" AND tr.start_time >= timestamp with time zone '%s' AND tr.end_time <= timestamp with time zone '%s'",
-					timeRange.StartTime.Format(time.RFC3339),
-					timeRange.EndTime.Format(time.RFC3339))
+					" AND tr.start_time <= timestamp with time zone '%s' AND tr.end_time >= timestamp with time zone '%s'",
+					endTimeStr,
+					startTimeStr)
 			}
 		} else {
 			if len(timeRanges) == 1 {
