@@ -93,7 +93,7 @@ func (s *DropInfoRepo) GetForCurrentTimeRange(ctx context.Context, query *DropIn
 			Where("st.ark_stage_id = ?", query.ArkStageId).
 			WhereGroup(" AND ", func(sq *bun.SelectQuery) *bun.SelectQuery {
 				return sq.
-					Where("(it.ark_item_id, di.drop_type) IN (?)", bun.In(query.DropTuples)).
+					Where("(it.item_id, di.drop_type) IN (?)", bun.In(query.DropTuples)).
 					WhereGroup(" OR ", func(sq *bun.SelectQuery) *bun.SelectQuery {
 						if query.withDropTypes == nil {
 							return sq
@@ -198,7 +198,7 @@ func (s *DropInfoRepo) GetDropInfosWithFilters(ctx context.Context, server strin
 	for _, timeRange := range timeRanges {
 		if timeRange.RangeID > 0 {
 			allTimeRangesHaveNoRangeId = false
-			break	
+			break
 		}
 	}
 
@@ -217,7 +217,7 @@ func (s *DropInfoRepo) GetDropInfosWithFilters(ctx context.Context, server strin
 				fmt.Fprintf(&whereBuilder, " AND di.range_id = %d", timeRanges[0].RangeID)
 			} else {
 				rangeIdStr := make([]string, len(timeRanges))
-				linq.From(timeRanges).SelectT(func (timeRange *models.TimeRange) string { return strconv.FormatInt(int64(timeRange.RangeID), 10) }).ToSlice(&rangeIdStr)
+				linq.From(timeRanges).SelectT(func(timeRange *models.TimeRange) string { return strconv.FormatInt(int64(timeRange.RangeID), 10) }).ToSlice(&rangeIdStr)
 				fmt.Fprintf(&whereBuilder, " AND di.range_id IN (%s)", strings.Join(rangeIdStr, ","))
 			}
 		}

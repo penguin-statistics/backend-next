@@ -48,3 +48,11 @@ func (c *DropReportExtraRepo) IsDropReportExtraMD5Exist(ctx context.Context, md5
 
 	return count > 0
 }
+
+func (c *DropReportExtraRepo) CreateDropReportExtra(ctx context.Context, tx bun.Tx, report *models.DropReportExtra) error {
+	_, err := c.DB.NewInsert().
+		Model(report).
+		Exec(ctx)
+
+	return err
+}

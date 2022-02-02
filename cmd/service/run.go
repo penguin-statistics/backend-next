@@ -30,6 +30,9 @@ func run(app *fiber.App, config *config.Config, lc fx.Lifecycle) {
 			}
 		},
 		OnStop: func(ctx context.Context) error {
+			if config.DevMode {
+				return nil
+			}
 			return app.Shutdown()
 		},
 	})

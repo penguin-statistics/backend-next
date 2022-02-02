@@ -11,11 +11,11 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 )
 
-func CalculateDropPatternHash(drops []types.ArkDrop) string {
+func CalculateDropPatternHash(drops []*types.Drop) string {
 	segments := make([]string, 0, len(drops))
 
 	for _, drop := range drops {
-		segments = append(segments, fmt.Sprintf("%s:%d", drop.DropType, drop.Quantity))
+		segments = append(segments, fmt.Sprintf("%d:%d", drop.ItemID, drop.Quantity))
 	}
 
 	sort.Strings(segments)

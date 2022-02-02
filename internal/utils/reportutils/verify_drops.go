@@ -3,6 +3,7 @@ package reportutils
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/ahmetb/go-linq/v3"
 
@@ -27,14 +28,14 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, r
 	tuples := make([][]string, 0, len(drops))
 	var err error
 	linq.From(drops).
-		SelectT(func(drop types.ArkDrop) []string {
+		SelectT(func(drop *types.Drop) []string {
 			mappedDropType, have := konst.DropTypeMap[drop.DropType]
 			if !have {
 				err = fmt.Errorf("invalid drop type: expected one of %v, but got `%s`", konst.DropTypeMapKeys, drop.DropType)
 				return []string{}
 			}
 			return []string{
-				drop.ItemID,
+				strconv.Itoa(drop.ItemID),
 				mappedDropType,
 			}
 		}).
@@ -70,7 +71,7 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, r
 func (d *DropVerifier) verifyDropType(ctx context.Context, report *types.SingleReport, dropInfos []*models.DropInfo) error {
 	dropTypeAmountMap := make(map[string]int)
 	linq.From(report.Drops).
-		SelectT(func(drop types.ArkDrop) string {
+		SelectT(func(drop *types.Drop) string {
 			// only pick dropType
 			return drop.DropType
 		}).

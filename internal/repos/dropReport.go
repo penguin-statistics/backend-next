@@ -21,6 +21,14 @@ func NewDropReportRepo(db *bun.DB) *DropReportRepo {
 	return &DropReportRepo{DB: db}
 }
 
+func (s *DropReportRepo) CreateDropReport(ctx context.Context, tx bun.Tx, dropReport *models.DropReport) error {
+	_, err := tx.NewInsert().
+		Model(dropReport).
+		ExcludeColumn("created_at").
+		Exec(ctx)
+	return err
+}
+
 func (s *DropReportRepo) CalcTotalQuantity(ctx context.Context, server string, timeRange *models.TimeRange, stageIdItemIdMap map[int][]int, accountId *null.Int) ([]map[string]interface{}, error) {
 	results := make([]map[string]interface{}, 0)
 	if len(stageIdItemIdMap) == 0 {

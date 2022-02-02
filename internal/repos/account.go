@@ -27,17 +27,17 @@ func NewAccountRepo(db *bun.DB) *AccountRepo {
 // PenguinID is a 8 number string and padded with 0
 func generateRandomPenguinId() string {
 	rand.Seed(time.Now().UnixNano())
-	return fmt.Sprintf("%08d", rand.Intn(1e9))
+	return fmt.Sprintf("%08d", rand.Intn(1e8))
 }
 
 func (c *AccountRepo) CreateAccountWithRandomPenguinID(ctx context.Context) (*models.Account, error) {
 	// retry if account already exists
-	var account *models.Account
 	for i := 0; i < ACCOUNT_MAX_RETRY; i++ {
-		id := generateRandomPenguinId()
+		account := &models.Account{
+			PenguinID: generateRandomPenguinId(),
+		}
 		_, err := c.db.NewInsert().
 			Model(account).
-			Set("penguin_id", id).
 			Returning("account_id").
 			Exec(ctx)
 		if err != nil {

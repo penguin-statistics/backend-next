@@ -59,7 +59,7 @@ func (s *DropPatternRepo) GetOrCreateDropPatternByHash(ctx context.Context, tx b
 	err := tx.QueryRow(`WITH new_row AS (
 INSERT INTO drop_patterns (hash)
 SELECT
-	'?'
+	?
 WHERE
 	NOT EXISTS (
 		SELECT
@@ -67,7 +67,7 @@ WHERE
 		FROM
 			drop_patterns
 		WHERE
-			hash = '?')
+			hash = ?)
 	RETURNING
 		pattern_id
 )
@@ -83,7 +83,7 @@ SELECT
 FROM
 	drop_patterns
 WHERE
-	hash = '?';`, hash).Scan(&patternId)
+	hash = ?;`, hash, hash, hash).Scan(&patternId, &created)
 
 	if err == sql.ErrNoRows {
 		return nil, false, errors.ErrNotFound

@@ -19,7 +19,7 @@ func NewMD5Verifier(dropReportExtraRepo *repos.DropReportExtraRepo) *MD5Verifier
 }
 
 func (u *MD5Verifier) Verify(ctx context.Context, report *types.SingleReport, reportTask *types.ReportTask) error {
-	if report.Metadata != nil && u.DropReportExtraRepo.IsDropReportExtraMD5Exist(ctx, report.Metadata.MD5) {
+	if report.Metadata != nil && report.Metadata.MD5.Valid && u.DropReportExtraRepo.IsDropReportExtraMD5Exist(ctx, report.Metadata.MD5.String) {
 		return errors.New("report with md5 already exist")
 	}
 	return nil

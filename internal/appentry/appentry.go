@@ -40,6 +40,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(repos.NewDropInfoRepo),
 		fx.Provide(repos.NewDropReportExtraRepo),
 		fx.Provide(repos.NewDropPatternRepo),
+		fx.Provide(repos.NewDropPatternElementRepo),
 		fx.Provide(repos.NewDropMatrixElementRepo),
 		fx.Provide(repos.NewTimeRangeRepo),
 		fx.Provide(repos.NewDropReportRepo),

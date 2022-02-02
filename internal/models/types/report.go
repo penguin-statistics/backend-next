@@ -1,9 +1,17 @@
 package types
 
+import "gopkg.in/guregu/null.v3"
+
 type ArkDrop struct {
 	DropType string `json:"dropType" validate:"required,oneof=REGULAR_DROP NORMAL_DROP SPECIAL_DROP EXTRA_DROP"`
 	ItemID   string `json:"itemId" validate:"required"`
 	Quantity int    `json:"quantity" validate:"required,lte=1000"`
+}
+
+type Drop struct {
+	DropType string
+	ItemID   int
+	Quantity int
 }
 
 type SingleReportRequest struct {
@@ -20,10 +28,10 @@ type BatchReportDrop struct {
 }
 
 type ReportRequestMetadata struct {
-	Fingerprint  string `json:"fingerprint" validate:"lte=128"`
-	MD5          string `json:"md5" validate:"lte=32"`
-	FileName     string `json:"fileName" validate:"lte=512"`
-	LastModified int    `json:"lastModified"`
+	Fingerprint  string      `json:"fingerprint" validate:"lte=128"`
+	MD5          null.String `json:"md5" validate:"lte=32"`
+	FileName     string      `json:"fileName" validate:"lte=512"`
+	LastModified int         `json:"lastModified"`
 }
 
 type BatchReportRequest struct {

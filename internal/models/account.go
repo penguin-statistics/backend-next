@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/uptrace/bun"
 )
 
@@ -11,5 +13,5 @@ type Account struct {
 	PenguinID string  `json:"penguinId"`
 	Weight    float64 `json:"weight"`
 	// Tags      []string `json:"tags"`
-	CreatedAt string `json:"createdAt"`
+	CreatedAt time.Time `json:"createdAt"`
 }

@@ -10,9 +10,11 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gofiber/fiber/v2"
 	"github.com/nats-io/nats.go"
+	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
+	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/models/convertion"
+	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/konst"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/repos"
@@ -22,23 +24,29 @@ import (
 type ReportService struct {
 	DB                     *bun.DB
 	NatsConn               *nats.Conn
+	ItemRepo               *repos.ItemRepo
 	StageRepo              *repos.StageRepo
-	DropInfoRepo           *repos.DropInfoRepo
-	DropPatternRepo        *repos.DropPatternRepo
-	DropPatternElementRepo *repos.DropPatternElementRepo
 	AccountRepo            *repos.AccountRepo
+	DropInfoRepo           *repos.DropInfoRepo
+	DropReportRepo         *repos.DropReportRepo
+	DropPatternRepo        *repos.DropPatternRepo
+	DropReportExtraRepo    *repos.DropReportExtraRepo
+	DropPatternElementRepo *repos.DropPatternElementRepo
 	ReportVerifier         *reportutils.ReportVerifier
 }
 
-func NewReportService(db *bun.DB, natsConn *nats.Conn, stageRepo *repos.StageRepo, dropInfoRepo *repos.DropInfoRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountRepo *repos.AccountRepo, reportVerifier *reportutils.ReportVerifier) *ReportService {
+func NewReportService(db *bun.DB, natsConn *nats.Conn, itemRepo *repos.ItemRepo, stageRepo *repos.StageRepo, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountRepo *repos.AccountRepo, reportVerifier *reportutils.ReportVerifier) *ReportService {
 	service := &ReportService{
 		DB:                     db,
 		NatsConn:               natsConn,
+		ItemRepo:               itemRepo,
 		StageRepo:              stageRepo,
-		DropInfoRepo:           dropInfoRepo,
-		DropPatternRepo:        dropPatternRepo,
-		DropPatternElementRepo: dropPatternElementRepo,
 		AccountRepo:            accountRepo,
+		DropInfoRepo:           dropInfoRepo,
+		DropReportRepo:         dropReportRepo,
+		DropPatternRepo:        dropPatternRepo,
+		DropReportExtraRepo:    dropReportExtraRepo,
+		DropPatternElementRepo: dropPatternElementRepo,
 		ReportVerifier:         reportVerifier,
 	}
 
@@ -64,16 +72,21 @@ func NewReportService(db *bun.DB, natsConn *nats.Conn, stageRepo *repos.StageRep
 	return service
 }
 
-func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, report *types.SingleReportRequest) error {
+func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingleReportRequest) error {
 	// get PenguinID from HTTP header in form of Authorization: PenguinID ########
 	penguinID := strings.TrimSpace(strings.TrimPrefix(ctx.Get("Authorization"), "PenguinID"))
 	idempotencyKey := ctx.Get("Idempotency-Key")
 
 	// if PenguinID is empty, create new PenguinID
-	account, err := s.AccountRepo.GetAccountByPenguinId(ctx.Context(), penguinID)
-	if err != nil {
-		return err
+	var account *models.Account
+	var err error
+	if penguinID != "" {
+		account, err = s.AccountRepo.GetAccountByPenguinId(ctx.Context(), penguinID)
+		if err != nil {
+			return err
+		}
 	}
+
 	var accountId int
 	if account == nil {
 		createdAccount, err := s.AccountRepo.CreateAccountWithRandomPenguinID(ctx.Context())
@@ -81,14 +94,32 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, report 
 			return err
 		}
 		accountId = createdAccount.AccountID
+		ctx.Set("X-Penguin-Set-PenguinID", createdAccount.PenguinID)
 	} else {
 		accountId = account.AccountID
 	}
 
 	// merge drops with same (dropType, itemId) pair
-	report.Drops = reportutils.MergeDrops(report.Drops)
+	req.Drops = reportutils.MergeDrops(req.Drops)
 
-	singleReport := convertion.SingleReportRequestToSingleReport(report)
+	drops := make([]*types.Drop, 0, len(req.Drops))
+	for _, drop := range req.Drops {
+		item, err := s.ItemRepo.GetItemByArkId(ctx.Context(), drop.ItemID)
+		if err != nil {
+			return err
+		}
+
+		drops = append(drops, &types.Drop{
+			DropType: drop.DropType,
+			ItemID:   item.ItemID,
+			Quantity: drop.Quantity,
+		})
+	}
+
+	singleReport := &types.SingleReport{
+		FragmentStageID: req.FragmentStageID,
+		Drops:           drops,
+	}
 
 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
 	category, err := s.StageRepo.GetStageExtraProcessTypeByArkId(ctx.Context(), singleReport.StageID)
@@ -102,9 +133,9 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, report 
 	// construct ReportContext
 	reportTask := &types.ReportTask{
 		FragmentReportCommon: types.FragmentReportCommon{
-			Server:  report.Server,
-			Source:  report.Source,
-			Version: report.Version,
+			Server:  req.Server,
+			Source:  req.Source,
+			Version: req.Version,
 		},
 		Reports:   []*types.SingleReport{singleReport},
 		AccountID: accountId,
@@ -152,9 +183,9 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 
 	msgChan := make(chan *nats.Msg, 16)
 
-	_, err = js.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.BindStream("penguin-reports"), nats.AckWait(time.Second*10), nats.MaxAckPending(128))
+	_, err = js.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.AckWait(time.Second*10), nats.MaxAckPending(128))
 	if err != nil {
-		fmt.Println("error subscribing to report.single:", err)
+		fmt.Println("error subscribing:", err)
 		return err
 	}
 
@@ -193,7 +224,8 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 }
 
 func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types.ReportTask) error {
-	fmt.Println("now processing reportTask: ", reportTask)
+	log.Debug().Msg("now processing new report task")
+	spew.Dump(reportTask)
 	if err := s.ReportVerifier.Verify(ctx, reportTask); err != nil {
 		return err
 	}
@@ -219,7 +251,52 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 		}
 		fmt.Println("pattern ID:", dropPattern.PatternID)
 		if created {
-			s.DropPatternElementRepo.CreateDropPatternElements(ctx, tx, dropPattern.PatternID, report.Drops)
+			_, err := s.DropPatternElementRepo.CreateDropPatternElements(ctx, tx, dropPattern.PatternID, report.Drops)
+			if err != nil {
+				return err
+			}
+		}
+
+		stage, err := s.StageRepo.GetStageByArkId(ctx, report.StageID)
+		if err != nil {
+			return err
+		}
+		times := report.Times
+		if times == 0 {
+			times = 1
+		}
+		dropReport := &models.DropReport{
+			StageID:   stage.StageID,
+			PatternID: dropPattern.PatternID,
+			Times:     times,
+			Reliable:  true, // TODO: use validate result
+			Deleted:   false,
+			Server:    reportTask.Server,
+			AccountID: reportTask.AccountID,
+		}
+		if err = s.DropReportRepo.CreateDropReport(ctx, tx, dropReport); err != nil {
+			// panic(err)
+			return err
+		}
+
+		var md5 null.String
+		if report.Metadata != nil {
+			md5 = report.Metadata.MD5
+		}
+		ip := reportTask.IP
+		if ip == "" {
+			// FIXME: temporary hack
+			ip = "127.0.0.1"
+		}
+		if err = s.DropReportExtraRepo.CreateDropReportExtra(ctx, tx, &models.DropReportExtra{
+			ReportID: dropReport.ReportID,
+			IP:       ip,
+			Source:   reportTask.Source,
+			Version:  reportTask.Version,
+			Metadata: report.Metadata,
+			MD5:      md5,
+		}); err != nil {
+			return err
 		}
 	}
 
