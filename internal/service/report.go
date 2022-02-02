@@ -116,7 +116,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, report 
 		return err
 	}
 
-	pub, err := js.PublishAsync("report.single", reportTaskJson, nats.MsgId(idempotencyKey))
+	pub, err := js.PublishAsync("REPORT.SINGLE", reportTaskJson, nats.MsgId(idempotencyKey))
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, report 
 		return nil
 	case <-ctx.Context().Done():
 		return ctx.Context().Err()
-	case <-time.After(time.Millisecond * 500):
+	case <-time.After(time.Second * 2):
 		return fmt.Errorf("timeout waiting for NATS response")
 	}
 
@@ -145,44 +145,42 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 		return err
 	}
 
-	info, err := js.StreamInfo("penguin-reports")
-	if err != nil {
-		return err
-	}
-	fmt.Println(info.Config.Subjects)
-
 	msgChan := make(chan *nats.Msg, 16)
 
-	_, err = js.ChanQueueSubscribe("report.*", "penguin-reports", msgChan, nats.BindStream("penguin-reports"), nats.AckWait(time.Second*10), nats.MaxAckPending(128))
+	_, err = js.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.BindStream("penguin-reports"), nats.AckWait(time.Second*10), nats.MaxAckPending(128))
 	if err != nil {
 		fmt.Println("error subscribing to report.single:", err)
 		return err
 	}
 
+	time.Now().UnixMilli()
+
 	for {
 		select {
 		case msg := <-msgChan:
-			taskCtx, cancelTask := context.WithDeadline(ctx, time.Now().Add(time.Second*10))
-			inprogressInformer := time.AfterFunc(time.Second*5, func() {
-				msg.InProgress()
-			})
-			defer func() {
-				inprogressInformer.Stop()
-				cancelTask()
-				msg.Ack()
+			func() {
+				taskCtx, cancelTask := context.WithDeadline(ctx, time.Now().Add(time.Second*10))
+				inprogressInformer := time.AfterFunc(time.Second*5, func() {
+					msg.InProgress()
+				})
+				defer func() {
+					inprogressInformer.Stop()
+					cancelTask()
+					msg.Ack()
+				}()
+
+				reportTask := &types.ReportTask{}
+				if err := json.Unmarshal(msg.Data, reportTask); err != nil {
+					ch <- err
+					return
+				}
+
+				err = s.consumeReportTask(taskCtx, reportTask)
+				if err != nil {
+					ch <- err
+					return
+				}
 			}()
-
-			reportTask := &types.ReportTask{}
-			if err := json.Unmarshal(msg.Data, reportTask); err != nil {
-				ch <- err
-				continue
-			}
-
-			err = s.consumeReportTask(taskCtx, reportTask)
-			if err != nil {
-				ch <- err
-				continue
-			}
 		case <-ctx.Done():
 			return ctx.Err()
 		}
