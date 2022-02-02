@@ -17,11 +17,12 @@ RUN go build -o backend .
 
 # runner
 FROM base AS runner
-COPY --from=builder /app/backend /app/backend
-EXPOSE 8080
-
 ENV TINI_VERSION v0.19.0
 ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
 RUN chmod +x /tini
+
+COPY --from=builder /app/backend /app/backend
+EXPOSE 8080
+
 ENTRYPOINT ["/tini", "--"]
 CMD [ "/app/backend" ]
