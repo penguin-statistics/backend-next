@@ -12,6 +12,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
 type DropMatrixService struct {
@@ -35,67 +36,22 @@ func NewDropMatrixService(
 	}
 }
 
-func (s *DropMatrixService) GetGlobalDropMatrix(ctx *fiber.Ctx, server string) ([]map[string]interface{}, error) {
-	results := make([]map[string]interface{}, 0)
-	elementsMap, err:= s.DropMatrixElementService.GetElementsMapByServer(ctx, server)
+func (s *DropMatrixService) GetMaxAccumulableDropMatrixElementsMap(ctx *fiber.Ctx, server string, accountId *null.Int) ([]map[string]interface{}, error) {
+	dropMatrixElements, err := s.getMaxAccumulableDropMatrixElements(ctx, server, accountId)
 	if err != nil {
 		return nil, err
 	}
-	maxAccumulableTimeRanges, err := s.DropInfoService.GetMaxAccumulableTimeRangesByServer(ctx, server)
-	if err != nil {
-		return nil, err
-	}
-	for stageId, maxAccumulableTimeRangesForOneStage := range maxAccumulableTimeRanges {
-		subMapByItemId := elementsMap[stageId]
-		for itemId, timeRanges := range maxAccumulableTimeRangesForOneStage {
-			subMapByRangeId := subMapByItemId[itemId]
-			startTime := timeRanges[0].StartTime
-			endTime := timeRanges[0].EndTime
-			var combinedDropMatrixResult map[string]interface{}
-			combinedDropMatrixResult = nil
-			for _, timeRange := range timeRanges {
-				element, ok := subMapByRangeId[timeRange.RangeID]
-				if !ok {
-					continue
-				}
-				oneElementResult := map[string]interface{}{
-					"stageId": stageId,
-					"itemId": itemId,
-					"quantity": element.Quantity,
-					"times": element.Times,
-				}
-				if timeRange.StartTime.Before(*startTime) {
-					startTime = timeRange.StartTime
-				}
-				if timeRange.EndTime.After(*endTime) {
-					endTime = timeRange.EndTime
-				}
-				if combinedDropMatrixResult == nil {
-					combinedDropMatrixResult = oneElementResult
-				} else {
-					combinedDropMatrixResult, err = combineDropMatrixResults(combinedDropMatrixResult, oneElementResult)
-					if (err != nil) {
-						return nil, err
-					}
-				}
-			}
-			if combinedDropMatrixResult != nil {
-				combinedDropMatrixResult["startTime"] = startTime
-				combinedDropMatrixResult["endTime"] = endTime
-				results = append(results, combinedDropMatrixResult)	
-			}
-		}
-	}
-	return results, nil
+	elementsMap := utils.GetDropMatrixElementsMap(dropMatrixElements)
+	return s.getMaxAccumulableResultsFromDropMatrixElementsMap(ctx, server, elementsMap)	
 }
 
 func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server string) error {
-	toSave := []models.DropMatrixElement{}
+	toSave := []*models.DropMatrixElement{}
 	allTimeRanges, err := s.TimeRangeService.GetAllTimeRangesByServer(ctx, server)
 	if err != nil {
 		return err
 	}
-	ch := make(chan []models.DropMatrixElement, 15)
+	ch := make(chan []*models.DropMatrixElement, 15)
 	var wg sync.WaitGroup
 
 	go func() {
@@ -117,62 +73,11 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 			startTime := time.Now()
 
 			timeRanges := []*models.TimeRange{timeRange}
-			results, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, &null.Int{})
+			currentBatch, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, &null.Int{})
 			if err != nil {
 				return
 			}
 
-			stageTimesMap := map[int]int{} // save stage times for later use
-
-			// grouping results by stage id
-			var groupedResults []linq.Group
-			linq.From(results).
-				GroupByT(
-					func(el map[string]interface{}) int { return el["stageId"].(int) },
-					func(el map[string]interface{}) map[string]interface{} { return el }).ToSlice(&groupedResults)
-
-			currentBatch := []models.DropMatrixElement{}
-			for _, el := range groupedResults {
-				stageId := el.Key.(int)
-
-				// get all item ids which are dropped in this stage and in this time range
-				dropItemIds, _ := s.DropInfoService.GetItemDropSetByStageIdAndRangeId(ctx, server, stageId, timeRange.RangeID)
-
-				// use a fake hashset to save item ids
-				dropSet := make(map[int]struct{}, len(dropItemIds))
-				for _, itemId := range dropItemIds {
-					dropSet[itemId] = struct{}{}
-				}
-
-				for _, el2 := range el.Group {
-					itemId := el2.(map[string]interface{})["itemId"].(int)
-					quantity := el2.(map[string]interface{})["quantity"].(int)
-					times := el2.(map[string]interface{})["times"].(int)
-					dropMatrixElement := models.DropMatrixElement{
-						StageID:  stageId,
-						ItemID:   itemId,
-						RangeID:  timeRange.RangeID,
-						Quantity: quantity,
-						Times:    times,
-						Server:   server,
-					}
-					currentBatch = append(currentBatch, dropMatrixElement)
-					delete(dropSet, itemId)        // remove existing item ids from drop set
-					stageTimesMap[stageId] = times // record stage times into a map
-				}
-				// add those items which do not show up in the matrix (quantity is 0)
-				for itemId := range dropSet {
-					dropMatrixElementWithZeroQuantity := models.DropMatrixElement{
-						StageID:  stageId,
-						ItemID:   itemId,
-						RangeID:  timeRange.RangeID,
-						Quantity: 0,
-						Times:    stageTimesMap[stageId],
-						Server:   server,
-					}
-					currentBatch = append(currentBatch, dropMatrixElementWithZeroQuantity)
-				}
-			}
 			ch <- currentBatch
 			<-limiter
 
@@ -187,20 +92,45 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 	return s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server)
 }
 
+func (s *DropMatrixService) getMaxAccumulableDropMatrixElements(ctx *fiber.Ctx, server string, accountId *null.Int) ([]*models.DropMatrixElement, error){
+	if accountId.Valid {
+		maxAccumulableTimeRanges, err := s.DropInfoService.GetMaxAccumulableTimeRangesByServer(ctx, server)
+		if err != nil {
+			return nil, err
+		}
+		timeRanges := make([]*models.TimeRange, 0)
+
+		timeRangesMap := make(map[int]*models.TimeRange, 0)
+		for _, maxAccumulableTimeRangesForOneStage := range maxAccumulableTimeRanges {
+			for _, timeRanges := range maxAccumulableTimeRangesForOneStage {
+				for _, timeRange := range timeRanges {
+					timeRangesMap[timeRange.RangeID] = timeRange
+				}
+			}
+		}
+		for _, timeRange := range timeRangesMap {
+			timeRanges = append(timeRanges, timeRange)
+		}
+		return s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId)
+	} else {
+		return s.DropMatrixElementService.GetElementsByServer(ctx, server)
+	}
+}
+
 func (s *DropMatrixService) calcDropMatrixForTimeRanges(
-	ctx *fiber.Ctx, queryServer string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId *null.Int) ([]map[string]interface{}, error) {
-	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, queryServer, timeRanges, stageIdFilter, itemIdFilter)
+	ctx *fiber.Ctx, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId *null.Int) ([]*models.DropMatrixElement, error) {
+	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, itemIdFilter)
 	if err != nil {
 		return nil, err
 	}
 
 	results := make([]map[string]interface{}, 0)
 	for _, timeRange := range timeRanges {
-		quantityResults, err := s.DropReportService.CalcTotalQuantity(ctx, queryServer, timeRange, getStageIdItemIdMapFromDropInfos(dropInfos), accountId)
+		quantityResults, err := s.DropReportService.CalcTotalQuantity(ctx, server, timeRange, getStageIdItemIdMapFromDropInfos(dropInfos), accountId)
 		if err != nil {
 			return nil, err
 		}
-		timesResults, err := s.DropReportService.CalcTotalTimes(ctx, queryServer, timeRange, getStageIdsFromDropInfos(dropInfos), accountId)
+		timesResults, err := s.DropReportService.CalcTotalTimes(ctx, server, timeRange, getStageIdsFromDropInfos(dropInfos), accountId)
 		if err != nil {
 			return nil, err
 		}
@@ -210,7 +140,93 @@ func (s *DropMatrixService) calcDropMatrixForTimeRanges(
 			results = append(results, result)
 		}
 	}
-	return results, nil
+
+	// save stage times for later use
+	stageTimesMap := map[int]int{}
+
+	// grouping results by stage id
+	var groupedResults []linq.Group
+	linq.From(results).
+		GroupByT(
+			func(el map[string]interface{}) int { return el["stageId"].(int) },
+			func(el map[string]interface{}) map[string]interface{} { return el }).ToSlice(&groupedResults)
+
+	dropMatrixElements := make([]*models.DropMatrixElement, 0)
+	for _, el := range groupedResults {
+		stageId := el.Key.(int)
+		var groupedResults2 []linq.Group
+		linq.From(el.Group).
+			GroupByT(
+				func (el map[string]interface{}) int { return el["timeRange"].(*models.TimeRange).RangeID }, 
+				func (el map[string]interface{}) map[string]interface{} { return el }).
+			ToSlice(&groupedResults2)
+		for _, el2 := range groupedResults2 {
+			rangeId := el2.Key.(int)
+			// get all item ids which are dropped in this stage and in this time range
+			dropItemIds, _ := s.DropInfoService.GetItemDropSetByStageIdAndRangeId(ctx, server, stageId, rangeId)
+
+			// use a fake hashset to save item ids
+			dropSet := make(map[int]struct{}, len(dropItemIds))
+			for _, itemId := range dropItemIds {
+				dropSet[itemId] = struct{}{}
+			}	
+			for _, el3 := range el2.Group {
+				itemId := el3.(map[string]interface{})["itemId"].(int)
+				quantity := el3.(map[string]interface{})["quantity"].(int)
+				times := el3.(map[string]interface{})["times"].(int)
+				dropMatrixElement := models.DropMatrixElement{
+					StageID:  stageId,
+					ItemID:   itemId,
+					RangeID:  rangeId,
+					Quantity: quantity,
+					Times:    times,
+					Server:   server,
+				}
+				dropMatrixElements = append(dropMatrixElements, &dropMatrixElement)
+				delete(dropSet, itemId)        // remove existing item ids from drop set
+				stageTimesMap[stageId] = times // record stage times into a map
+			}
+			// add those items which do not show up in the matrix (quantity is 0)
+			for itemId := range dropSet {
+				dropMatrixElementWithZeroQuantity := models.DropMatrixElement{
+					StageID:  stageId,
+					ItemID:   itemId,
+					RangeID:  rangeId,
+					Quantity: 0,
+					Times:    stageTimesMap[stageId],
+					Server:   server,
+				}
+				dropMatrixElements = append(dropMatrixElements, &dropMatrixElementWithZeroQuantity)
+			}
+		}
+	}
+	return dropMatrixElements, nil
+}
+
+func getStageIdItemIdMapFromDropInfos(dropInfos []*models.DropInfo) map[int][]int {
+	stageIdItemIdMap := make(map[int][]int)
+	var groupedResults []linq.Group
+	linq.From(dropInfos).
+		WhereT(func (dropInfo *models.DropInfo) bool { return dropInfo.ItemID.Valid }).
+		GroupByT(
+			func (dropInfo *models.DropInfo) int { return dropInfo.StageID }, 
+			func (dropInfo *models.DropInfo) int { return int(dropInfo.ItemID.Int64) },
+		).ToSlice(&groupedResults)
+	for _, groupedResult := range groupedResults {
+		stageId := groupedResult.Key.(int)
+		itemIds := make([]int, 0)
+		linq.From(groupedResult.Group).Distinct().ToSlice(&itemIds)
+		if len(itemIds) > 0 {
+			stageIdItemIdMap[stageId] = itemIds
+		}
+	}
+	return stageIdItemIdMap
+}
+
+func getStageIdsFromDropInfos(dropInfos []*models.DropInfo) []int {
+	stageIds := make([]int, 0)
+	linq.From(dropInfos).SelectT(func (dropInfo *models.DropInfo) int { return dropInfo.StageID }).Distinct().ToSlice(&stageIds)
+	return stageIds
 }
 
 func combineQuantityAndTimesResults(quantityResults []map[string]interface{}, timesResults []map[string]interface{}) []map[string]interface{} {
@@ -256,30 +272,54 @@ func combineQuantityAndTimesResults(quantityResults []map[string]interface{}, ti
 	return combinedResults
 }
 
-func getStageIdItemIdMapFromDropInfos(dropInfos []*models.DropInfo) map[int][]int {
-	stageIdItemIdMap := make(map[int][]int)
-	var groupedResults []linq.Group
-	linq.From(dropInfos).
-		WhereT(func (dropInfo *models.DropInfo) bool { return dropInfo.ItemID.Valid }).
-		GroupByT(
-			func (dropInfo *models.DropInfo) int { return dropInfo.StageID }, 
-			func (dropInfo *models.DropInfo) int { return int(dropInfo.ItemID.Int64) },
-		).ToSlice(&groupedResults)
-	for _, groupedResult := range groupedResults {
-		stageId := groupedResult.Key.(int)
-		itemIds := make([]int, 0)
-		linq.From(groupedResult.Group).Distinct().ToSlice(&itemIds)
-		if len(itemIds) > 0 {
-			stageIdItemIdMap[stageId] = itemIds
+func (s *DropMatrixService) getMaxAccumulableResultsFromDropMatrixElementsMap(ctx *fiber.Ctx, server string, elementsMap map[int] map[int] map[int] *models.DropMatrixElement) ([]map[string]interface{}, error) {
+	results := make([]map[string]interface{}, 0)
+	maxAccumulableTimeRanges, err := s.DropInfoService.GetMaxAccumulableTimeRangesByServer(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	for stageId, maxAccumulableTimeRangesForOneStage := range maxAccumulableTimeRanges {
+		subMapByItemId := elementsMap[stageId]
+		for itemId, timeRanges := range maxAccumulableTimeRangesForOneStage {
+			subMapByRangeId := subMapByItemId[itemId]
+			startTime := timeRanges[0].StartTime
+			endTime := timeRanges[0].EndTime
+			var combinedDropMatrixResult map[string]interface{}
+			combinedDropMatrixResult = nil
+			for _, timeRange := range timeRanges {
+				element, ok := subMapByRangeId[timeRange.RangeID]
+				if !ok {
+					continue
+				}
+				oneElementResult := map[string]interface{}{
+					"stageId": stageId,
+					"itemId": itemId,
+					"quantity": element.Quantity,
+					"times": element.Times,
+				}
+				if timeRange.StartTime.Before(*startTime) {
+					startTime = timeRange.StartTime
+				}
+				if timeRange.EndTime.After(*endTime) {
+					endTime = timeRange.EndTime
+				}
+				if combinedDropMatrixResult == nil {
+					combinedDropMatrixResult = oneElementResult
+				} else {
+					combinedDropMatrixResult, err = combineDropMatrixResults(combinedDropMatrixResult, oneElementResult)
+					if (err != nil) {
+						return nil, err
+					}
+				}
+			}
+			if combinedDropMatrixResult != nil {
+				combinedDropMatrixResult["start"] = startTime.UnixMilli()
+				combinedDropMatrixResult["end"] = endTime.UnixMilli()
+				results = append(results, combinedDropMatrixResult)	
+			}
 		}
 	}
-	return stageIdItemIdMap
-}
-
-func getStageIdsFromDropInfos(dropInfos []*models.DropInfo) []int {
-	stageIds := make([]int, 0)
-	linq.From(dropInfos).SelectT(func (dropInfo *models.DropInfo) int { return dropInfo.StageID }).Distinct().ToSlice(&stageIds)
-	return stageIds
+	return results, nil	
 }
 
 func combineDropMatrixResults(a map[string]interface{}, b map[string]interface{}) (map[string]interface{}, error) {

@@ -17,7 +17,7 @@ func NewDropMatrixElementRepo(db *bun.DB) *DropMatrixElementRepo {
 	return &DropMatrixElementRepo{db: db}
 }
 
-func (s *DropMatrixElementRepo) BatchSaveElements(ctx context.Context, elements []models.DropMatrixElement, server string) error {
+func (s *DropMatrixElementRepo) BatchSaveElements(ctx context.Context, elements []*models.DropMatrixElement, server string) error {
 	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		_, err := tx.NewDelete().Model((*models.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
 		if err != nil {
