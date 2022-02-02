@@ -2,6 +2,7 @@ package reportutils
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -11,16 +12,14 @@ import (
 )
 
 func CalculateDropPatternHash(drops []types.Drop) string {
-	var sb strings.Builder
+	segments := make([]string, 0, len(drops))
 
 	for _, drop := range drops {
-		sb.WriteString(fmt.Sprintf("%s:%d", drop.DropType, drop.Quantity))
-		// add separator | if not last one
-		if drop != drops[len(drops)-1] {
-			sb.WriteString("|")
-		}
+		segments = append(segments, fmt.Sprintf("%s:%d", drop.DropType, drop.Quantity))
 	}
 
-	hash := xxhash.Sum64String(sb.String())
+	sort.Strings(segments)
+
+	hash := xxhash.Sum64String(strings.Join(segments, "|"))
 	return strconv.FormatUint(hash, 16)
 }
