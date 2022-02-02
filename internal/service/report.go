@@ -10,6 +10,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gofiber/fiber/v2"
 	"github.com/nats-io/nats.go"
+	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models/convertion"
 	"github.com/penguin-statistics/backend-next/internal/models/konst"
@@ -19,22 +20,26 @@ import (
 )
 
 type ReportService struct {
-	NatsConn        *nats.Conn
-	StageRepo       *repos.StageRepo
-	DropInfoRepo    *repos.DropInfoRepo
-	DropPatternRepo *repos.DropPatternRepo
-	AccountRepo     *repos.AccountRepo
-	ReportVerifier  *reportutils.ReportVerifier
+	DB                     *bun.DB
+	NatsConn               *nats.Conn
+	StageRepo              *repos.StageRepo
+	DropInfoRepo           *repos.DropInfoRepo
+	DropPatternRepo        *repos.DropPatternRepo
+	DropPatternElementRepo *repos.DropPatternElementRepo
+	AccountRepo            *repos.AccountRepo
+	ReportVerifier         *reportutils.ReportVerifier
 }
 
-func NewReportService(natsConn *nats.Conn, stageRepo *repos.StageRepo, dropInfoRepo *repos.DropInfoRepo, dropPatternRepo *repos.DropPatternRepo, accountRepo *repos.AccountRepo, reportVerifier *reportutils.ReportVerifier) *ReportService {
+func NewReportService(db *bun.DB, natsConn *nats.Conn, stageRepo *repos.StageRepo, dropInfoRepo *repos.DropInfoRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountRepo *repos.AccountRepo, reportVerifier *reportutils.ReportVerifier) *ReportService {
 	service := &ReportService{
-		NatsConn:        natsConn,
-		StageRepo:       stageRepo,
-		DropInfoRepo:    dropInfoRepo,
-		DropPatternRepo: dropPatternRepo,
-		AccountRepo:     accountRepo,
-		ReportVerifier:  reportVerifier,
+		DB:                     db,
+		NatsConn:               natsConn,
+		StageRepo:              stageRepo,
+		DropInfoRepo:           dropInfoRepo,
+		DropPatternRepo:        dropPatternRepo,
+		DropPatternElementRepo: dropPatternElementRepo,
+		AccountRepo:            accountRepo,
+		ReportVerifier:         reportVerifier,
 	}
 
 	go func() {
@@ -194,17 +199,32 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 	}
 	fmt.Println("reportTask verified successfully")
 
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	intendedCommit := false
+	defer func() {
+		if !intendedCommit {
+			tx.Rollback()
+		}
+	}()
+
 	// calculate drop pattern hash for each report
 	for _, report := range reportTask.Reports {
 		dropPatternHash := reportutils.CalculateDropPatternHash(report.Drops)
-		dropPattern, err := s.DropPatternRepo.GetOrCreateDropPatternByHash(ctx, dropPatternHash)
+		dropPattern, created, err := s.DropPatternRepo.GetOrCreateDropPatternByHash(ctx, tx, dropPatternHash)
 		if err != nil {
 			return err
 		}
 		fmt.Println("pattern ID:", dropPattern.PatternID)
+		if created {
+			s.DropPatternElementRepo.CreateDropPatternElements(ctx, tx, dropPattern.PatternID, report.Drops)
+		}
 	}
 
-	return nil
+	intendedCommit = true
+	return tx.Commit()
 
 	// save to database
 	// if err := s.DropInfoRepo.SaveDrops(msg.Context(), reportTask.Reports); err != nil {

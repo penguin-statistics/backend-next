@@ -50,12 +50,13 @@ func (s *DropPatternRepo) GetDropPatternByHash(ctx context.Context, hash string)
 	return &dropPattern, nil
 }
 
-func (s *DropPatternRepo) GetOrCreateDropPatternByHash(ctx context.Context, hash string) (*models.DropPattern, error) {
+func (s *DropPatternRepo) GetOrCreateDropPatternByHash(ctx context.Context, tx bun.Tx, hash string) (*models.DropPattern, bool, error) {
 	var patternId int64
+	var created bool
 	// Yes, I, know. Raw SQL. I spend 7 hours trying to figure out how to do this with bun.
 	// This is what I come up with. I'm sorry.
 	// This however still is safe enough, since we are using '?' as placeholder. So overall not bad.
-	err := s.DB.DB.QueryRow(`WITH new_row AS (
+	err := tx.QueryRow(`WITH new_row AS (
 INSERT INTO drop_patterns (hash)
 SELECT
 	'?'
@@ -71,25 +72,27 @@ WHERE
 		pattern_id
 )
 SELECT
-	pattern_id
+	pattern_id,
+	TRUE
 FROM
 	new_row
 UNION
 SELECT
-	pattern_id
+	pattern_id,
+	FALSE
 FROM
 	drop_patterns
 WHERE
 	hash = '?';`, hash).Scan(&patternId)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, false, errors.ErrNotFound
 	} else if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	return &models.DropPattern{
 		PatternID: int(patternId),
 		Hash:      hash,
-	}, nil
+	}, created, nil
 }
