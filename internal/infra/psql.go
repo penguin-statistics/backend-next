@@ -16,12 +16,14 @@ import (
 
 func ProvidePostgres(config *config.Config) (*bun.DB, error) {
 	// Open a PostgreSQL database.
-	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(config.PostgresDSN)))
+	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(config.PostgresDSN), pgdriver.WithApplicationName("penguin-backend")))
 
 	// Create a Bun db on top of it.
 	db := bun.NewDB(pgdb, pgdialect.New())
-	db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithEnabled(true), bundebug.WithVerbose(config.BunDebugVerbose)))
-	db.AddQueryHook(bunotel.NewQueryHook(bunotel.WithDBName("penguin_structured")))
+	if config.DevMode {
+		db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithEnabled(true), bundebug.WithVerbose(config.BunDebugVerbose)))
+		db.AddQueryHook(bunotel.NewQueryHook(bunotel.WithDBName("penguin_structured")))
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()

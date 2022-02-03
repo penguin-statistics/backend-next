@@ -9,15 +9,15 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/config"
 )
 
-func ProvideNats(config *config.Config) (*nats.Conn, error) {
+func ProvideNats(config *config.Config) (*nats.Conn, nats.JetStreamContext, error) {
 	nc, err := nats.Connect(config.NatsURL)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	js, err := nc.JetStream()
+	js, err := nc.JetStream(nats.PublishAsyncMaxPending(128))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	_, err = js.AddStream(&nats.StreamConfig{
@@ -38,5 +38,5 @@ func ProvideNats(config *config.Config) (*nats.Conn, error) {
 		log.Warn().Err(err).Msg("failed to create jetstream stream: is it already created?")
 	}
 
-	return nc, nil
+	return nc, js, nil
 }

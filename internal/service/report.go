@@ -23,7 +23,7 @@ import (
 
 type ReportService struct {
 	DB                     *bun.DB
-	NatsConn               *nats.Conn
+	NatsJS                 nats.JetStreamContext
 	ItemRepo               *repos.ItemRepo
 	StageRepo              *repos.StageRepo
 	AccountRepo            *repos.AccountRepo
@@ -35,10 +35,10 @@ type ReportService struct {
 	ReportVerifier         *reportutils.ReportVerifier
 }
 
-func NewReportService(db *bun.DB, natsConn *nats.Conn, itemRepo *repos.ItemRepo, stageRepo *repos.StageRepo, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountRepo *repos.AccountRepo, reportVerifier *reportutils.ReportVerifier) *ReportService {
+func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, itemRepo *repos.ItemRepo, stageRepo *repos.StageRepo, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountRepo *repos.AccountRepo, reportVerifier *reportutils.ReportVerifier) *ReportService {
 	service := &ReportService{
 		DB:                     db,
-		NatsConn:               natsConn,
+		NatsJS:                 natsJs,
 		ItemRepo:               itemRepo,
 		StageRepo:              stageRepo,
 		AccountRepo:            accountRepo,
@@ -50,6 +50,7 @@ func NewReportService(db *bun.DB, natsConn *nats.Conn, itemRepo *repos.ItemRepo,
 		ReportVerifier:         reportVerifier,
 	}
 
+	// TODO: isolate report consumer as standalone workers
 	go func() {
 		ch := make(chan error)
 
@@ -77,7 +78,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 	penguinID := strings.TrimSpace(strings.TrimPrefix(ctx.Get("Authorization"), "PenguinID"))
 	idempotencyKey := ctx.Get("Idempotency-Key")
 
-	// if PenguinID is empty, create new PenguinID
+	// check PenguinID validity
 	var account *models.Account
 	var err error
 	if penguinID != "" {
@@ -87,6 +88,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 		}
 	}
 
+	// if account is not found, create new account
 	var accountId int
 	if account == nil {
 		createdAccount, err := s.AccountRepo.CreateAccountWithRandomPenguinID(ctx.Context())
@@ -142,17 +144,12 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 		IP:        ctx.IP(),
 	}
 
-	js, err := s.NatsConn.JetStream(nats.PublishAsyncMaxPending(128))
-	if err != nil {
-		return err
-	}
-
 	reportTaskJson, err := json.Marshal(reportTask)
 	if err != nil {
 		return err
 	}
 
-	pub, err := js.PublishAsync("REPORT.SINGLE", reportTaskJson, nats.MsgId(idempotencyKey))
+	pub, err := s.NatsJS.PublishAsync("REPORT.SINGLE", reportTaskJson, nats.MsgId(idempotencyKey))
 	if err != nil {
 		return err
 	}
@@ -176,14 +173,9 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 }
 
 func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) error {
-	js, err := s.NatsConn.JetStream()
-	if err != nil {
-		return err
-	}
-
 	msgChan := make(chan *nats.Msg, 16)
 
-	_, err = js.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.AckWait(time.Second*10), nats.MaxAckPending(128))
+	_, err := s.NatsJS.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.AckWait(time.Second*10), nats.MaxAckPending(128))
 	if err != nil {
 		fmt.Println("error subscribing:", err)
 		return err
@@ -226,8 +218,10 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types.ReportTask) error {
 	log.Debug().Msg("now processing new report task")
 	spew.Dump(reportTask)
+	taskReliability := true
 	if err := s.ReportVerifier.Verify(ctx, reportTask); err != nil {
-		return err
+		taskReliability = false
+		log.Warn().Err(err).Msg("report task verification failed, marking task as unreliable")
 	}
 	fmt.Println("reportTask verified successfully")
 
@@ -269,7 +263,7 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 			StageID:   stage.StageID,
 			PatternID: dropPattern.PatternID,
 			Times:     times,
-			Reliable:  true, // TODO: use validate result
+			Reliable:  taskReliability,
 			Deleted:   false,
 			Server:    reportTask.Server,
 			AccountID: reportTask.AccountID,
