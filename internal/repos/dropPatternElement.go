@@ -71,3 +71,19 @@ func (r *DropPatternElementRepo) CreateDropPatternElements(ctx context.Context, 
 
 	return elements, nil
 }
+
+func (r *DropPatternElementRepo) GetDropPatternElementsByPatternIds(ctx context.Context, patternIds []int) ([]*models.DropPatternElement, error) {
+	var elements []*models.DropPatternElement
+	err := r.DB.NewSelect().
+		Model(&elements).
+		Where("drop_pattern_id in (?)", bun.In(patternIds)).
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return elements, nil
+}

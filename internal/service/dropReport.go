@@ -18,10 +18,18 @@ func NewDropReportService(dropReportRepo *repos.DropReportRepo) *DropReportServi
 	}
 }
 
-func (s *DropReportService) CalcTotalQuantity(ctx *fiber.Ctx, server string, timeRange *models.TimeRange, stageIdItemIdMap map[int][]int, accountId *null.Int) ([]map[string]interface{}, error) {
-	return s.DropReportRepo.CalcTotalQuantity(ctx.Context(), server, timeRange, stageIdItemIdMap, accountId)	
+func (s *DropReportService) CalcTotalQuantityForDropMatrix(ctx *fiber.Ctx, server string, timeRange *models.TimeRange, stageIdItemIdMap map[int][]int, accountId *null.Int) ([]map[string]interface{}, error) {
+	return s.DropReportRepo.CalcTotalQuantityForDropMatrix(ctx.Context(), server, timeRange, stageIdItemIdMap, accountId)	
 }
 
-func (s *DropReportService) CalcTotalTimes(ctx *fiber.Ctx, server string, timeRange *models.TimeRange, stageIds []int, accountId *null.Int) ([]map[string]interface{}, error) {
-	return s.DropReportRepo.CalcTotalTimes(ctx.Context(), server, timeRange, stageIds, accountId)
+func (s *DropReportService) CalcTotalQuantityForPatternMatrix(ctx *fiber.Ctx, server string, timeRange *models.TimeRange, stageIds []int, accountId *null.Int) ([]map[string]interface{}, error) {
+	return s.DropReportRepo.CalcTotalQuantityForPatternMatrix(ctx.Context(), server, timeRange, stageIds, accountId)	
+}
+
+func (s *DropReportService) CalcTotalTimesForDropMatrix(ctx *fiber.Ctx, server string, timeRange *models.TimeRange, stageIds []int, accountId *null.Int) ([]map[string]interface{}, error) {
+	return s.DropReportRepo.CalcTotalTimes(ctx.Context(), server, timeRange, stageIds, accountId, false)
+}
+
+func (s *DropReportService) CalcTotalTimesForPatternMatrix(ctx *fiber.Ctx, server string, timeRange *models.TimeRange, stageIds []int, accountId *null.Int) ([]map[string]interface{}, error) {
+	return s.DropReportRepo.CalcTotalTimes(ctx.Context(), server, timeRange, stageIds, accountId, true)
 }

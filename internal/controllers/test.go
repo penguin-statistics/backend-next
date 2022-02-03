@@ -16,13 +16,19 @@ type TestController struct {
 	fx.In
 	DropMatrixService	  *service.DropMatrixService
 	DropInfoService       *service.DropInfoService
+	PatternMatrixService  *service.PatternMatrixService
 }
 
 func RegisterTestController(v3 *server.V3, c TestController) {
-	v3.Get("/refresh/:server", c.RefreshAllDropMatrixElements)
-	v3.Get("/matrix/:server", c.GetGlobalDropMatrix)
-	v3.Get("/personal/:server/:accountId", c.GetPersonalDropMatrix)
+	v3.Get("/refresh/matrix/:server", c.RefreshAllDropMatrixElements)
+	v3.Get("/global/matrix/:server", c.GetGlobalDropMatrix)
+	v3.Get("/personal/matrix/:server/:accountId", c.GetPersonalDropMatrix)
+
 	v3.Get("/advanced", c.AdvancedQuery)
+
+	v3.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
+	v3.Get("/global/pattern/:server", c.GetGlobalPatternMatrix)
+	v3.Get("/personal/pattern/:server/:accountId", c.GetPersonalPatternMatrix)
 }
 
 func (c *TestController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
@@ -33,7 +39,7 @@ func (c *TestController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
 func (c *TestController) GetGlobalDropMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	accountId := null.NewInt(0, false)
-	globalDropMatrix, err := c.DropMatrixService.GetMaxAccumulableDropMatrixElementsMap(ctx, server, &accountId)
+	globalDropMatrix, err := c.DropMatrixService.GetMaxAccumulableDropMatrixResults(ctx, server, &accountId)
 	if err != nil {
 		return err
 	}
@@ -48,7 +54,7 @@ func (c *TestController) GetPersonalDropMatrix(ctx *fiber.Ctx) error {
 		return err
 	}
 	accountIdNull := null.IntFrom(int64(accountIdNum))
-	personalDropMatrix, err := c.DropMatrixService.GetMaxAccumulableDropMatrixElementsMap(ctx, server, &accountIdNull)
+	personalDropMatrix, err := c.DropMatrixService.GetMaxAccumulableDropMatrixResults(ctx, server, &accountIdNull)
 	if err != nil {
 		return err
 	}
@@ -68,4 +74,34 @@ func (c *TestController) AdvancedQuery(ctx *fiber.Ctx) error {
 		return err
 	}
 	return ctx.JSON(elements)
+}
+
+func (c *TestController) RefreshAllPatternMatrixElements(ctx *fiber.Ctx) error {
+	server := ctx.Params("server")
+	return c.PatternMatrixService.RefreshAllPatternMatrixElements(ctx, server)
+}
+
+func (c *TestController) GetGlobalPatternMatrix(ctx *fiber.Ctx) error {
+	server := ctx.Params("server")
+	accountId := null.NewInt(0, false)
+	globalPatternMatrix, err := c.PatternMatrixService.GetLatestPatternMatrixResults(ctx, server, &accountId)
+	if err != nil {
+		return err
+	}
+	return ctx.JSON(globalPatternMatrix)
+}
+
+func (c *TestController) GetPersonalPatternMatrix(ctx *fiber.Ctx) error {
+	server := ctx.Params("server")
+	accountIdStr := ctx.Params("accountId")
+	accountIdNum, err := strconv.Atoi(accountIdStr)
+	if err != nil {
+		return err
+	}
+	accountIdNull := null.IntFrom(int64(accountIdNum))
+	personalPatternMatrix, err := c.PatternMatrixService.GetLatestPatternMatrixResults(ctx, server, &accountIdNull)
+	if err != nil {
+		return err
+	}
+	return ctx.JSON(personalPatternMatrix)
 }
