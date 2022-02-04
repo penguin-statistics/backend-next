@@ -71,11 +71,11 @@ func (s *DropReportRepo) CalcTotalQuantityForDropMatrix(ctx context.Context, ser
 		ColumnExpr("SUM(dpe.quantity) AS total_quantity").
 		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id")
 	if accountId.Valid {
-		query = query.Where("dr.account_id = ?", accountId.Int64)
+		query = query.Where("dr.reliability >= 0 AND dr.account_id = ?", accountId.Int64)
 	} else {
-		query = query.Where("dr.reliable = true")
+		query = query.Where("dr.reliability = 0")
 	}
-	query = query.Where("dr.deleted = false AND dr.server = ? AND "+b.String(), server)
+	query = query.Where("dr.server = ? AND "+b.String(), server)
 	if err := query.
 		Group("dr.stage_id", "dpe.item_id").
 		Scan(ctx, &results); err != nil {
@@ -108,11 +108,11 @@ func (s *DropReportRepo) CalcTotalQuantityForPatternMatrix(ctx context.Context, 
 		Column("dr.stage_id", "dr.pattern_id").
 		ColumnExpr("COUNT(*) AS total_quantity")
 	if accountId.Valid {
-		query = query.Where("dr.account_id = ?", accountId.Int64)
+		query = query.Where("dr.reliability >= 0 AND dr.account_id = ?", accountId.Int64)
 	} else {
-		query = query.Where("dr.reliable = true")
+		query = query.Where("dr.reliability = 0")
 	}
-	query = query.Where("dr.deleted = false AND dr.server = ? AND dr.times = ? AND "+b.String(), server, 1)
+	query = query.Where("dr.server = ? AND dr.times = ? AND "+b.String(), server, 1)
 	if err := query.
 		Group("dr.stage_id", "dr.pattern_id").
 		Scan(ctx, &results); err != nil {
@@ -145,14 +145,14 @@ func (s *DropReportRepo) CalcTotalTimes(ctx context.Context, server string, time
 		Column("dr.stage_id").
 		ColumnExpr("COUNT(*) AS total_times")
 	if accountId.Valid {
-		query = query.Where("dr.account_id = ?", accountId.Int64)
+		query = query.Where("dr.reliability >= 0 AND dr.account_id = ?", accountId.Int64)
 	} else {
-		query = query.Where("dr.reliable = true")
+		query = query.Where("dr.reliability = 0")
 	}
 	if excludeNonOneTimes {
 		query = query.Where("dr.times = 1")
 	}
-	query = query.Where("dr.deleted = false AND dr.server = ? AND "+b.String(), server)
+	query = query.Where("dr.server = ? AND "+b.String(), server)
 	if err := query.
 		Group("dr.stage_id").
 		Scan(ctx, &results); err != nil {
@@ -212,11 +212,11 @@ func (s *DropReportRepo) CalcTotalQuantityForTrend(
 		Join("RIGHT JOIN intervals AS sub").
 		JoinOn("dr.created_at >= sub.interval_start AND dr.created_at < sub.interval_end")
 	if accountId.Valid {
-		query = query.Where("dr.account_id = ?", accountId.Int64)
+		query = query.Where("dr.reliability >= 0 AND dr.account_id = ?", accountId.Int64)
 	} else {
-		query = query.Where("dr.reliable = true")
+		query = query.Where("dr.reliability = 0")
 	}
-	query = query.Where("dr.deleted = false AND dr.server = ? AND "+b.String(), server)
+	query = query.Where("dr.server = ? AND "+b.String(), server)
 	if err := query.
 		Group("sub.group_idx", "sub.interval_start", "sub.interval_end", "dr.stage_id", "dpe.item_id").
 		Scan(ctx, &results); err != nil {
@@ -269,11 +269,11 @@ func (s *DropReportRepo) CalcTotalTimesForTrend(
 		Join("RIGHT JOIN intervals AS sub").
 		JoinOn("dr.created_at >= sub.interval_start AND dr.created_at < sub.interval_end")
 	if accountId.Valid {
-		query = query.Where("dr.account_id = ?", accountId.Int64)
+		query = query.Where("dr.reliability >= 0 AND dr.account_id = ?", accountId.Int64)
 	} else {
-		query = query.Where("dr.reliable = true")
+		query = query.Where("dr.reliability = 0")
 	}
-	query = query.Where("dr.deleted = false AND dr.server = ? AND "+b.String(), server)
+	query = query.Where("dr.server = ? AND "+b.String(), server)
 	if err := query.
 		Group("sub.group_idx", "sub.interval_start", "sub.interval_end", "dr.stage_id").
 		Scan(ctx, &results); err != nil {
@@ -298,7 +298,7 @@ func (s *DropReportRepo) CalcTotalSanityCostForShimSiteStats(ctx context.Context
 		s.DB.NewSelect().
 			TableExpr("drop_reports AS dr").
 			ColumnExpr("SUM(st.sanity * dr.times)").
-			Where("dr.deleted = false AND dr.server = ?", server),
+			Where("dr.reliability = 0 AND dr.server = ?", server),
 	).
 		UseStageById("dr.stage_id").
 		Q.Scan(ctx, &sanity)
@@ -313,7 +313,7 @@ func (s *DropReportRepo) CalcTotalStageQuantityForShimSiteStats(ctx context.Cont
 			TableExpr("drop_reports AS dr").
 			Column("st.ark_stage_id").
 			ColumnExpr("SUM(dr.times) AS total_times").
-			Where("dr.reliable = true AND dr.deleted = false AND dr.server = ?", server).
+			Where("dr.reliability = 0 AND dr.server = ?", server).
 			Apply(func(sq *bun.SelectQuery) *bun.SelectQuery {
 				if isRecent24h {
 					return sq.Where("dr.created_at >= now() - interval '24 hours'")
@@ -340,7 +340,7 @@ func (s *DropReportRepo) CalcTotalItemQuantityForShimSiteStats(ctx context.Conte
 			Column("it.ark_item_id").
 			ColumnExpr("SUM(dpe.quantity) AS total_quantity").
 			Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id").
-			Where("dr.reliable = true AND dr.deleted = false AND dr.server = ?", server).
+			Where("dr.reliability = 0 AND dr.server = ?", server).
 			Group("it.ark_item_id"),
 	).
 		UseItemById("dpe.item_id").
