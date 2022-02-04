@@ -217,9 +217,9 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 
 func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types.ReportTask) error {
 	log.Debug().Msg("now processing new report task")
-	spew.Dump(reportTask)
 	taskReliability := 0
 	if err := s.ReportVerifier.Verify(ctx, reportTask); err != nil {
+		// TODO: use different error code for different types of error
 		taskReliability = 1
 		log.Warn().Err(err).Msg("report task verification failed, marking task as unreliable")
 	}
