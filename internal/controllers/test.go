@@ -17,6 +17,7 @@ type TestController struct {
 	DropMatrixService	  *service.DropMatrixService
 	DropInfoService       *service.DropInfoService
 	PatternMatrixService  *service.PatternMatrixService
+	TrendService          *service.TrendService
 }
 
 func RegisterTestController(v3 *server.V3, c TestController) {
@@ -29,6 +30,8 @@ func RegisterTestController(v3 *server.V3, c TestController) {
 	v3.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
 	v3.Get("/global/pattern/:server", c.GetGlobalPatternMatrix)
 	v3.Get("/personal/pattern/:server/:accountId", c.GetPersonalPatternMatrix)
+
+	v3.Get("/refresh/trend/:server", c.RefreshAllTrendElements)
 }
 
 func (c *TestController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
@@ -104,4 +107,9 @@ func (c *TestController) GetPersonalPatternMatrix(ctx *fiber.Ctx) error {
 		return err
 	}
 	return ctx.JSON(personalPatternMatrix)
+}
+
+func (c *TestController) RefreshAllTrendElements(ctx *fiber.Ctx) error {
+	server := ctx.Params("server")
+	return c.TrendService.RefreshTrendElements(ctx, server)
 }

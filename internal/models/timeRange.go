@@ -38,7 +38,7 @@ func (tr *TimeRange) FromString(s string) *TimeRange {
 			return nil
 		}
 		startTime = time.Unix(startTimestamp / 1000, 0)
-		endTimestamp, err := strconv.ParseInt(times[0], 10, 64)
+		endTimestamp, err := strconv.ParseInt(times[1], 10, 64)
 		if err != nil {
 			return nil
 		}

@@ -37,7 +37,7 @@ func NewDropMatrixService(
 }
 
 func (s *DropMatrixService) GetMaxAccumulableDropMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) ([]map[string]interface{}, error) {
-	dropMatrixElements, err := s.getMaxAccumulableDropMatrixElements(ctx, server, accountId)
+	dropMatrixElements, err := s.getDropMatrixElements(ctx, server, accountId)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 	return s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server)
 }
 
-func (s *DropMatrixService) getMaxAccumulableDropMatrixElements(ctx *fiber.Ctx, server string, accountId *null.Int) ([]*models.DropMatrixElement, error){
+func (s *DropMatrixService) getDropMatrixElements(ctx *fiber.Ctx, server string, accountId *null.Int) ([]*models.DropMatrixElement, error){
 	if accountId.Valid {
 		maxAccumulableTimeRanges, err := s.TimeRangeService.GetMaxAccumulableTimeRangesByServer(ctx, server)
 		if err != nil {
