@@ -218,9 +218,9 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types.ReportTask) error {
 	log.Debug().Msg("now processing new report task")
 	spew.Dump(reportTask)
-	taskReliability := true
+	taskReliability := 0
 	if err := s.ReportVerifier.Verify(ctx, reportTask); err != nil {
-		taskReliability = false
+		taskReliability = 1
 		log.Warn().Err(err).Msg("report task verification failed, marking task as unreliable")
 	}
 	fmt.Println("reportTask verified successfully")
@@ -260,13 +260,12 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 			times = 1
 		}
 		dropReport := &models.DropReport{
-			StageID:   stage.StageID,
-			PatternID: dropPattern.PatternID,
-			Times:     times,
-			Reliable:  taskReliability,
-			Deleted:   false,
-			Server:    reportTask.Server,
-			AccountID: reportTask.AccountID,
+			StageID:     stage.StageID,
+			PatternID:   dropPattern.PatternID,
+			Times:       times,
+			Reliability: taskReliability,
+			Server:      reportTask.Server,
+			AccountID:   reportTask.AccountID,
 		}
 		if err = s.DropReportRepo.CreateDropReport(ctx, tx, dropReport); err != nil {
 			// panic(err)
