@@ -32,6 +32,7 @@ func RegisterTestController(v3 *server.V3, c TestController) {
 	v3.Get("/personal/pattern/:server/:accountId", c.GetPersonalPatternMatrix)
 
 	v3.Get("/refresh/trend/:server", c.RefreshAllTrendElements)
+	v3.Get("/global/trend/:server", c.GetTrend)
 }
 
 func (c *TestController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
@@ -112,4 +113,13 @@ func (c *TestController) GetPersonalPatternMatrix(ctx *fiber.Ctx) error {
 func (c *TestController) RefreshAllTrendElements(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	return c.TrendService.RefreshTrendElements(ctx, server)
+}
+
+func (c *TestController) GetTrend(ctx *fiber.Ctx) error {
+	server := ctx.Params("server")
+	trend, err := c.TrendService.GetTrendResults(ctx, server)
+	if err != nil {
+		return err
+	}
+	return ctx.JSON(trend)
 }

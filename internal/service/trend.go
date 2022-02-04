@@ -44,6 +44,55 @@ func NewTrendService(
 	}
 }
 
+func (s *TrendService) GetTrendResults(ctx *fiber.Ctx, server string) (map[int]interface{}, error) {
+	trendElements, err := s.TrendElementService.GetElementsByServer(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	var groupedResults []linq.Group
+	linq.From(trendElements).
+		GroupByT(
+			func (el *models.TrendElement) int { return el.StageID }, 
+			func (el *models.TrendElement) *models.TrendElement { return el },
+		).
+		ToSlice(&groupedResults)
+	results := make(map[int]interface{}, 0)
+	for _, el := range groupedResults {
+		stageId := el.Key.(int)
+		oneItemIdResult := make(map[int]interface{})
+		var groupedResults2 []linq.Group
+		linq.From(el.Group).
+			GroupByT(
+				func (el *models.TrendElement) int { return el.ItemID },
+				func (el *models.TrendElement) *models.TrendElement { return el },
+			).
+			ToSlice(&groupedResults2)
+		var startTime *time.Time
+		for _, el2 := range groupedResults2 {
+			itemId := el2.Key.(int)
+			var sortedElements []*models.TrendElement
+			linq.From(el2.Group).
+				SortT(func (el1, el2 *models.TrendElement) bool { return el1.GroupID < el2.GroupID }).
+				ToSlice(&sortedElements)
+			startTime = sortedElements[0].StartTime
+			maxGroupId := linq.From(sortedElements).SelectT(func (el *models.TrendElement) int { return el.GroupID }).Max().(int)
+			timesArray := make([]int, maxGroupId + 1)
+			quantityArray := make([]int, maxGroupId + 1)
+			for _, el3 := range sortedElements {
+				timesArray[el3.GroupID] = el3.Times
+				quantityArray[el3.GroupID] = el3.Quantity
+			}
+			oneItemIdResult[itemId] = map[string] interface{} {
+				"times": timesArray,
+				"quantity": quantityArray,
+				"startTime": startTime.UnixMilli(),
+			}
+		}
+		results[stageId] = oneItemIdResult
+	}
+	return results, nil
+}
+
 func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error {
 	maxAccumulableTimeRanges, err := s.TimeRangeService.GetMaxAccumulableTimeRangesByServer(ctx, server)
 	if err != nil {
@@ -164,6 +213,7 @@ func (s *TrendService) CalcTrend(
 				Server: server,
 				StartTime: el["startTime"].(*time.Time),
 				EndTime: el["endTime"].(*time.Time),
+				GroupID: el["groupId"].(int),
 			}
 		}).
 		ToSlice(&finalResults)
