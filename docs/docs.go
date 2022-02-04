@@ -39,7 +39,7 @@ var doc = `{
                 "tags": [
                     "Item"
                 ],
-                "summary": "Get all Items",
+                "summary": "Get All Items",
                 "deprecated": true,
                 "responses": {
                     "200": {
@@ -139,7 +139,7 @@ var doc = `{
                 "tags": [
                     "Stage"
                 ],
-                "summary": "Get all Stages",
+                "summary": "Get All Stages",
                 "deprecated": true,
                 "responses": {
                     "200": {
@@ -239,7 +239,7 @@ var doc = `{
                 "tags": [
                     "Zone"
                 ],
-                "summary": "Get all Zones",
+                "summary": "Get All Zones",
                 "deprecated": true,
                 "responses": {
                     "200": {
@@ -339,7 +339,7 @@ var doc = `{
                 "tags": [
                     "Item"
                 ],
-                "summary": "Get all Items",
+                "summary": "Get All Items",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -443,7 +443,7 @@ var doc = `{
                 "tags": [
                     "Stage"
                 ],
-                "summary": "Get all Stages",
+                "summary": "Get All Stages",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -541,7 +541,7 @@ var doc = `{
                 "tags": [
                     "Zone"
                 ],
-                "summary": "Get all Zones",
+                "summary": "Get All Zones",
                 "responses": {
                     "200": {
                         "description": "OK",

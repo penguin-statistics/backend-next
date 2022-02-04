@@ -39,7 +39,7 @@ func buildSanitizer(sanitizer ...func(string) bool) func(ctx *fiber.Ctx) error {
 	}
 }
 
-// @Summary      Get all Items
+// @Summary      Get All Items
 // @Tags         Item
 // @Produce      json
 // @Success      200     {array}  models.Item{name=models.I18nString,existence=models.Existence,keywords=models.Keywords}

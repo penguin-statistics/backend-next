@@ -11,17 +11,19 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	"github.com/penguin-statistics/backend-next/internal/utils/pquery"
 )
 
 type DropReportRepo struct {
-	DB *bun.DB
-	locMap map[string] *time.Location
+	DB     *bun.DB
+	locMap map[string]*time.Location
 }
 
 func NewDropReportRepo(db *bun.DB) *DropReportRepo {
 	return &DropReportRepo{
-		DB: db, 
-		locMap: map[string] *time.Location {
+		DB: db,
+		locMap: map[string]*time.Location{
 			"CN": time.FixedZone("UTC+8", +8*60*60),
 			"US": time.FixedZone("UTC-7", -7*60*60),
 			"JP": time.FixedZone("UTC+9", +9*60*60),
@@ -167,7 +169,7 @@ func (s *DropReportRepo) CalcTotalQuantityForTrend(
 	}
 
 	gameDayStart := s.getGameDateStartTime(server, *startTime)
-	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(intervalLength_hrs * (intervalNum + 1)))
+	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(intervalLength_hrs*(intervalNum+1)))
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "dr.created_at >= to_timestamp(%d)", gameDayStart.Unix())
@@ -192,13 +194,13 @@ func (s *DropReportRepo) CalcTotalQuantityForTrend(
 	var subQueryExprBuilder strings.Builder
 	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + (n || ' hours')::interval AS interval_start, ")
 	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + ((n + ?) || ' hours')::interval AS interval_end, ")
-	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_idx")	
+	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_idx")
 	subQuery := s.DB.NewSelect().
 		TableExpr("generate_series(?, ? * ?, ?) AS n", 0, intervalLength_hrs, intervalNum, intervalLength_hrs).
-		ColumnExpr(subQueryExprBuilder.String(), 
-			gameDayStart.Unix(), 
-			gameDayStart.Unix(), 
-			intervalLength_hrs, 
+		ColumnExpr(subQueryExprBuilder.String(),
+			gameDayStart.Unix(),
+			gameDayStart.Unix(),
+			intervalLength_hrs,
 			intervalLength_hrs,
 		)
 	query := s.DB.NewSelect().
@@ -231,7 +233,7 @@ func (s *DropReportRepo) CalcTotalTimesForTrend(
 	}
 
 	gameDayStart := s.getGameDateStartTime(server, *startTime)
-	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(intervalLength_hrs * (intervalNum + 1)))
+	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(intervalLength_hrs*(intervalNum+1)))
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "dr.created_at >= to_timestamp(%d)", gameDayStart.Unix())
@@ -250,13 +252,13 @@ func (s *DropReportRepo) CalcTotalTimesForTrend(
 	var subQueryExprBuilder strings.Builder
 	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + (n || ' hours')::interval AS interval_start, ")
 	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + ((n + ?) || ' hours')::interval AS interval_end, ")
-	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_idx")	
+	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_idx")
 	subQuery := s.DB.NewSelect().
 		TableExpr("generate_series(?, ? * ?, ?) AS n", 0, intervalLength_hrs, intervalNum, intervalLength_hrs).
-		ColumnExpr(subQueryExprBuilder.String(), 
-			gameDayStart.Unix(), 
-			gameDayStart.Unix(), 
-			intervalLength_hrs, 
+		ColumnExpr(subQueryExprBuilder.String(),
+			gameDayStart.Unix(),
+			gameDayStart.Unix(),
+			intervalLength_hrs,
 			intervalLength_hrs,
 		)
 	query := s.DB.NewSelect().
@@ -289,4 +291,62 @@ func (s *DropReportRepo) getGameDateStartTime(server string, t time.Time) time.T
 	}
 	newT := time.Date(t.Year(), t.Month(), t.Day(), 4, 0, 0, 0, loc)
 	return newT
+}
+
+func (s *DropReportRepo) CalcTotalSanityCostForShimSiteStats(ctx context.Context, server string) (sanity int, err error) {
+	err = pquery.New(
+		s.DB.NewSelect().
+			TableExpr("drop_reports AS dr").
+			ColumnExpr("SUM(st.sanity * dr.times)").
+			Where("dr.deleted = false AND dr.server = ?", server),
+	).
+		UseStageById("dr.stage_id").
+		Q.Scan(ctx, &sanity)
+	return sanity, err
+}
+
+func (s *DropReportRepo) CalcTotalStageQuantityForShimSiteStats(ctx context.Context, server string, isRecent24h bool) ([]*shims.TotalStageTime, error) {
+	results := make([]*shims.TotalStageTime, 0)
+
+	err := pquery.New(
+		s.DB.NewSelect().
+			TableExpr("drop_reports AS dr").
+			Column("st.ark_stage_id").
+			ColumnExpr("SUM(dr.times) AS total_times").
+			Where("dr.reliable = true AND dr.deleted = false AND dr.server = ?", server).
+			Apply(func(sq *bun.SelectQuery) *bun.SelectQuery {
+				if isRecent24h {
+					return sq.Where("dr.created_at >= now() - interval '24 hours'")
+				} else {
+					return sq
+				}
+			}).
+			Group("st.ark_stage_id"),
+	).
+		UseStageById("dr.stage_id").
+		Q.Scan(ctx, &results)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func (s *DropReportRepo) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, server string) ([]*shims.TotalItemQuantity, error) {
+	results := make([]*shims.TotalItemQuantity, 0)
+
+	err := pquery.New(
+		s.DB.NewSelect().
+			TableExpr("drop_reports AS dr").
+			Column("it.ark_item_id").
+			ColumnExpr("SUM(dpe.quantity) AS total_quantity").
+			Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id").
+			Where("dr.reliable = true AND dr.deleted = false AND dr.server = ?", server).
+			Group("it.ark_item_id"),
+	).
+		UseItemById("dpe.item_id").
+		Q.Scan(ctx, &results)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
 }

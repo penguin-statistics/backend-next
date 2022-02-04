@@ -21,7 +21,7 @@ func RegisterStageController(v3 *server.V3, c StageController) {
 	v3.Get("/stages/:stageId", c.GetStageById)
 }
 
-// @Summary      Get all Stages
+// @Summary      Get All Stages
 // @Tags         Stage
 // @Produce      json
 // @Success      200     {array}  models.Stage{existence=models.Existence,code=models.I18nString}

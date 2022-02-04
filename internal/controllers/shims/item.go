@@ -56,12 +56,12 @@ func (c *ItemController) applyShim(item *shims.Item) {
 	item.PronMap = json.RawMessage(utils.Must(json.Marshal(keywords.Get("pron").Value().(map[string]interface{}))).([]byte))
 }
 
-// @Summary      Get all Items
+// @Summary      Get All Items
 // @Tags         Item
 // @Produce      json
 // @Success      200     {array}  shims.Item{name_i18n=models.I18nString,existence=models.Existence}
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
-// @Router       /PenguinStats/v2/items [GET]
+// @Router       /PenguinStats/api/v2/items [GET]
 // @Deprecated
 func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
 	items, err := c.repo.GetShimItems(ctx.Context())
@@ -83,7 +83,7 @@ func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
 // @Success      200     {object}  shims.Item{name_i18n=models.I18nString,existence=models.Existence}
 // @Failure      400     {object}  errors.PenguinError "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item."
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
-// @Router       /PenguinStats/v2/items/{itemId} [GET]
+// @Router       /PenguinStats/api/v2/items/{itemId} [GET]
 // @Deprecated
 func (c *ItemController) GetItemByArkId(ctx *fiber.Ctx) error {
 	itemId := ctx.Params("itemId")

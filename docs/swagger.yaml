@@ -311,7 +311,7 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/errors.PenguinError'
-      summary: Get all Items
+      summary: Get All Items
       tags:
       - Item
   /v2/items/{itemId}:
@@ -372,7 +372,7 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/errors.PenguinError'
-      summary: Get all Stages
+      summary: Get All Stages
       tags:
       - Stage
   /v2/stages/{stageId}:
@@ -434,7 +434,7 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/errors.PenguinError'
-      summary: Get all Zones
+      summary: Get All Zones
       tags:
       - Zone
   /v2/zones/{zoneId}:
@@ -497,7 +497,7 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/errors.PenguinError'
-      summary: Get all Items
+      summary: Get All Items
       tags:
       - Item
   /v3/items/{itemId}:
@@ -558,7 +558,7 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/errors.PenguinError'
-      summary: Get all Stages
+      summary: Get All Stages
       tags:
       - Stage
   /v3/stages/{stageId}:
@@ -618,7 +618,7 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/errors.PenguinError'
-      summary: Get all Zones
+      summary: Get All Zones
       tags:
       - Zone
   /v3/zones/{zoneId}:

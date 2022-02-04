@@ -9,16 +9,15 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/server"
 )
 
-type ZoneController struct {
+type SiteStatsController struct {
 	fx.In
 
 	Repo  *repos.ZoneRepo
 	Redis *redis.Client
 }
 
-func RegisterZoneController(v3 *server.V3, c ZoneController) {
-	v3.Get("/zones", c.GetZones)
-	v3.Get("/zones/:zoneId", c.GetZoneById)
+func RegisterSiteStatsController(v3 *server.V3, c SiteStatsController) {
+	v3.Get("/stats", c.GetSiteStats)
 }
 
 // @Summary      Get All Zones
@@ -27,7 +26,7 @@ func RegisterZoneController(v3 *server.V3, c ZoneController) {
 // @Success      200     {array}  models.Zone{existence=models.Existence,name=models.I18nString}
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/zones [GET]
-func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
+func (c *SiteStatsController) GetSiteStats(ctx *fiber.Ctx) error {
 	zones, err := c.Repo.GetZones(ctx.Context())
 	if err != nil {
 		return err
@@ -44,7 +43,7 @@ func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
 // @Failure      400     {object}  errors.PenguinError "Invalid or missing zoneId. Notice that this shall be the **string ID** of the zone, instead of the internally used numerical ID of the zone."
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/zones/{zoneId} [GET]
-func (c *ZoneController) GetZoneById(ctx *fiber.Ctx) error {
+func (c *SiteStatsController) GetZoneById(ctx *fiber.Ctx) error {
 	zoneId := ctx.Params("zoneId")
 
 	zone, err := c.Repo.GetZoneByArkId(ctx.Context(), zoneId)

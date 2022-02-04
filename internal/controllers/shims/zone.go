@@ -34,12 +34,12 @@ func (c *ZoneController) applyShim(zone *shims.Zone) {
 	}
 }
 
-// @Summary      Get all Zones
+// @Summary      Get All Zones
 // @Tags         Zone
 // @Produce      json
 // @Success      200     {array}  shims.Zone{existence=models.Existence,zoneName_i18n=models.I18nString}
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
-// @Router       /PenguinStats/v2/zones [GET]
+// @Router       /PenguinStats/api/v2/zones [GET]
 // @Deprecated
 func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
 	zones, err := c.repo.GetShimZones(ctx.Context())
@@ -61,7 +61,7 @@ func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
 // @Success      200     {object}  shims.Zone{existence=models.Existence,zoneName_i18n=models.I18nString}
 // @Failure      400     {object}  errors.PenguinError "Invalid or missing zoneId. Notice that this shall be the **string ID** of the zone, instead of the v3 API internally used numerical ID of the zone."
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
-// @Router       /PenguinStats/v2/zones/{zoneId} [GET]
+// @Router       /PenguinStats/api/v2/zones/{zoneId} [GET]
 // @Deprecated
 func (c *ZoneController) GetZoneByArkId(ctx *fiber.Ctx) error {
 	zoneId := ctx.Params("zoneId")
