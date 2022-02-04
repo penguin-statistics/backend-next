@@ -55,7 +55,7 @@ func (s *DropReportRepo) CalcTotalQuantityForDropMatrix(ctx context.Context, ser
 		} else {
 			var itemIdsStr []string
 			for _, itemId := range itemIds {
-				itemIdsStr = append(itemIdsStr, strconv.FormatInt(int64(itemId), 10))
+				itemIdsStr = append(itemIdsStr, strconv.Itoa(itemId))
 			}
 			fmt.Fprintf(&stageB, " IN (%s)", strings.Join(itemIdsStr, ","))
 		}
@@ -96,7 +96,7 @@ func (s *DropReportRepo) CalcTotalQuantityForPatternMatrix(ctx context.Context, 
 	} else {
 		var stageIdsStr []string
 		for _, stageId := range stageIds {
-			stageIdsStr = append(stageIdsStr, strconv.FormatInt(int64(stageId), 10))
+			stageIdsStr = append(stageIdsStr, strconv.Itoa(stageId))
 		}
 		fmt.Fprintf(&b, " IN (%s)", strings.Join(stageIdsStr, ","))
 	}
@@ -133,7 +133,7 @@ func (s *DropReportRepo) CalcTotalTimes(ctx context.Context, server string, time
 	} else {
 		var stageIdsStr []string
 		for _, stageId := range stageIds {
-			stageIdsStr = append(stageIdsStr, strconv.FormatInt(int64(stageId), 10))
+			stageIdsStr = append(stageIdsStr, strconv.Itoa(stageId))
 		}
 		fmt.Fprintf(&b, " IN (%s)", strings.Join(stageIdsStr, ","))
 	}

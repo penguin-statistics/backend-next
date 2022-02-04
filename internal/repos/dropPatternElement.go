@@ -76,7 +76,12 @@ func (r *DropPatternElementRepo) GetDropPatternElementsByPatternIds(ctx context.
 	var elements []*models.DropPatternElement
 	err := r.DB.NewSelect().
 		Model(&elements).
-		Where("drop_pattern_id in (?)", bun.In(patternIds)).
+		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
+			if len(patternIds) > 0 {
+				return q.Where("drop_pattern_id in (?)", bun.In(patternIds))
+			}
+			return q
+		}).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {

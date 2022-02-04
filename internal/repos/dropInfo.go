@@ -217,7 +217,7 @@ func (s *DropInfoRepo) GetDropInfosWithFilters(ctx context.Context, server strin
 				fmt.Fprintf(&whereBuilder, " AND di.range_id = %d", timeRanges[0].RangeID)
 			} else {
 				rangeIdStr := make([]string, len(timeRanges))
-				linq.From(timeRanges).SelectT(func(timeRange *models.TimeRange) string { return strconv.FormatInt(int64(timeRange.RangeID), 10) }).ToSlice(&rangeIdStr)
+				linq.From(timeRanges).SelectT(func(timeRange *models.TimeRange) string { return strconv.Itoa(timeRange.RangeID) }).ToSlice(&rangeIdStr)
 				fmt.Fprintf(&whereBuilder, " AND di.range_id IN (%s)", strings.Join(rangeIdStr, ","))
 			}
 		}
