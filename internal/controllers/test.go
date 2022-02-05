@@ -25,7 +25,8 @@ func RegisterTestController(v3 *server.V3, c TestController) {
 	v3.Get("/global/matrix/:server", c.GetGlobalDropMatrix)
 	v3.Get("/personal/matrix/:server/:accountId", c.GetPersonalDropMatrix)
 
-	v3.Get("/advanced", c.AdvancedQuery)
+	v3.Get("/advanced/matrix", c.AdvancedDropMatrixQuery)
+	v3.Get("/advanced/trend", c.AdvancedTrendQuery)
 
 	v3.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
 	v3.Get("/global/pattern/:server", c.GetGlobalPatternMatrix)
@@ -65,7 +66,7 @@ func (c *TestController) GetPersonalDropMatrix(ctx *fiber.Ctx) error {
 	return ctx.JSON(personalDropMatrix)
 }
 
-func (c *TestController) AdvancedQuery(ctx *fiber.Ctx) error {
+func (c *TestController) AdvancedDropMatrixQuery(ctx *fiber.Ctx) error {
 	server := "CN"
 	accountId := null.NewInt(75681, true)
 	stageId := 383
@@ -122,4 +123,19 @@ func (c *TestController) GetTrend(ctx *fiber.Ctx) error {
 		return err
 	}
 	return ctx.JSON(trend)
+}
+
+func (c *TestController) AdvancedTrendQuery(ctx *fiber.Ctx) error {
+	server := "CN"
+	accountId := null.NewInt(75681, false)
+	stageId := 18
+	itemIds := []int{7, 1}
+	startTime := time.Unix(1640966400, 0)
+	// endTime := time.Unix(1641052800, 0)
+	// timeRange := &models.TimeRange{ StartTime: &startTime, EndTime: &endTime }
+	elements, err := c.TrendService.CalcTrend(ctx, server, &startTime, 6, 3, []int{stageId}, itemIds, &accountId)
+	if err != nil {
+		return err
+	}
+	return ctx.JSON(elements)
 }

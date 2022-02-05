@@ -254,7 +254,7 @@ func (s *DropReportRepo) CalcTotalTimesForTrend(
 	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + ((n + ?) || ' hours')::interval AS interval_end, ")
 	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_idx")
 	subQuery := s.DB.NewSelect().
-		TableExpr("generate_series(?, ? * ?, ?) AS n", 0, intervalLength_hrs, intervalNum, intervalLength_hrs).
+		TableExpr("generate_series(?, ? * ?, ?) AS n", 0, intervalLength_hrs, intervalNum - 1, intervalLength_hrs).
 		ColumnExpr(subQueryExprBuilder.String(),
 			gameDayStart.Unix(),
 			gameDayStart.Unix(),
