@@ -1,6 +1,8 @@
 package service
 
 import (
+	"time"
+
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/gofiber/fiber/v2"
 
@@ -25,6 +27,19 @@ func (s *TimeRangeService) GetAllTimeRangesByServer(ctx *fiber.Ctx, server strin
 	if err != nil {
 		return nil, err
 	}
+	return timeRanges, nil
+}
+
+func (s *TimeRangeService) GetCurrentTimeRangesByServer(ctx *fiber.Ctx, server string) ([]*models.TimeRange, error) {
+	timeRanges, err := s.TimeRangeRepo.GetTimeRangesByServer(ctx.Context(), server)
+	if err != nil {
+		return nil, err
+	}
+
+	linq.From(timeRanges).WhereT(func(timeRange *models.TimeRange) bool {
+		return timeRange.StartTime.Before(time.Now()) && timeRange.EndTime.After(time.Now())
+	}).ToSlice(&timeRanges)
+
 	return timeRanges, nil
 }
 

@@ -41,3 +41,19 @@ func (s *DropInfoService) GetStageIdsByServer(ctx *fiber.Ctx, server string) ([]
 	linq.From(dropInfos).SelectT(func (dropInfo *models.DropInfo) int { return dropInfo.StageID }).Distinct().ToSlice(&stageIds)
 	return stageIds, nil
 }
+
+func (s *DropInfoService) GetCurrentDropInfosByServer(ctx *fiber.Ctx, server string) ([]*models.DropInfo, error) {
+	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx.Context(), server)
+	if err != nil {
+		return nil, err
+	}
+	currentTimeRanges, err := s.TimeRangeService.GetCurrentTimeRangesByServer(ctx, server)
+	currentTimeRangesMap := make(map[int]*models.TimeRange)
+	for _, timeRange := range currentTimeRanges {
+		currentTimeRangesMap[timeRange.RangeID] = timeRange
+	}
+	linq.From(dropInfos).WhereT(func (dropInfo *models.DropInfo) bool {
+		return currentTimeRangesMap[dropInfo.RangeID] != nil
+	}).ToSlice(&dropInfos)
+	return dropInfos, nil
+}

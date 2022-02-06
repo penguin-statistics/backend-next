@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -26,7 +25,7 @@ type ReportService struct {
 	NatsJS                 nats.JetStreamContext
 	ItemRepo               *repos.ItemRepo
 	StageRepo              *repos.StageRepo
-	AccountRepo            *repos.AccountRepo
+	AccountService         *AccountService
 	DropInfoRepo           *repos.DropInfoRepo
 	DropReportRepo         *repos.DropReportRepo
 	DropPatternRepo        *repos.DropPatternRepo
@@ -35,13 +34,13 @@ type ReportService struct {
 	ReportVerifier         *reportutils.ReportVerifier
 }
 
-func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, itemRepo *repos.ItemRepo, stageRepo *repos.StageRepo, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountRepo *repos.AccountRepo, reportVerifier *reportutils.ReportVerifier) *ReportService {
+func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, itemRepo *repos.ItemRepo, stageRepo *repos.StageRepo, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
 	service := &ReportService{
 		DB:                     db,
 		NatsJS:                 natsJs,
 		ItemRepo:               itemRepo,
 		StageRepo:              stageRepo,
-		AccountRepo:            accountRepo,
+		AccountService:         accountService,
 		DropInfoRepo:           dropInfoRepo,
 		DropReportRepo:         dropReportRepo,
 		DropPatternRepo:        dropPatternRepo,
@@ -74,24 +73,17 @@ func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, itemRepo *repos.
 }
 
 func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingleReportRequest) error {
-	// get PenguinID from HTTP header in form of Authorization: PenguinID ########
-	penguinID := strings.TrimSpace(strings.TrimPrefix(ctx.Get("Authorization"), "PenguinID"))
-	idempotencyKey := ctx.Get("Idempotency-Key")
-
-	// check PenguinID validity
-	var account *models.Account
-	var err error
-	if penguinID != "" {
-		account, err = s.AccountRepo.GetAccountByPenguinId(ctx.Context(), penguinID)
-		if err != nil {
-			return err
-		}
+	account, err := s.AccountService.GetAccountFromAuthHeader(ctx, ctx.Get("Authorization"))
+	if err != nil {
+		return err
 	}
+
+	idempotencyKey := ctx.Get("Idempotency-Key")
 
 	// if account is not found, create new account
 	var accountId int
 	if account == nil {
-		createdAccount, err := s.AccountRepo.CreateAccountWithRandomPenguinID(ctx.Context())
+		createdAccount, err := s.AccountService.CreateAccountWithRandomPenguinID(ctx)
 		if err != nil {
 			return err
 		}
