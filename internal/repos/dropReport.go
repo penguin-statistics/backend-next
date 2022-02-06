@@ -40,8 +40,10 @@ func (s *DropReportRepo) CreateDropReport(ctx context.Context, tx bun.Tx, dropRe
 	return err
 }
 
-func (s *DropReportRepo) CalcTotalQuantityForDropMatrix(ctx context.Context, server string, timeRange *models.TimeRange, stageIdItemIdMap map[int][]int, accountId *null.Int) ([]map[string]interface{}, error) {
-	results := make([]map[string]interface{}, 0)
+func (s *DropReportRepo) CalcTotalQuantityForDropMatrix(
+	ctx context.Context, server string, timeRange *models.TimeRange, stageIdItemIdMap map[int][]int, accountId *null.Int,
+	) ([]*models.TotalQuantityResultForDropMatrix, error) {
+	results := make([]*models.TotalQuantityResultForDropMatrix, 0)
 	if len(stageIdItemIdMap) == 0 {
 		return results, nil
 	}
@@ -84,8 +86,10 @@ func (s *DropReportRepo) CalcTotalQuantityForDropMatrix(ctx context.Context, ser
 	return results, nil
 }
 
-func (s *DropReportRepo) CalcTotalQuantityForPatternMatrix(ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId *null.Int) ([]map[string]interface{}, error) {
-	results := make([]map[string]interface{}, 0)
+func (s *DropReportRepo) CalcTotalQuantityForPatternMatrix(
+	ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId *null.Int,
+	) ([]*models.TotalQuantityResultForPatternMatrix, error) {
+	results := make([]*models.TotalQuantityResultForPatternMatrix, 0)
 	if len(stageIds) == 0 {
 		return results, nil
 	}
@@ -121,8 +125,10 @@ func (s *DropReportRepo) CalcTotalQuantityForPatternMatrix(ctx context.Context, 
 	return results, nil
 }
 
-func (s *DropReportRepo) CalcTotalTimes(ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId *null.Int, excludeNonOneTimes bool) ([]map[string]interface{}, error) {
-	results := make([]map[string]interface{}, 0)
+func (s *DropReportRepo) CalcTotalTimes(
+	ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId *null.Int, excludeNonOneTimes bool,
+	) ([]*models.TotalTimesResult, error) {
+	results := make([]*models.TotalTimesResult, 0)
 	if len(stageIds) == 0 {
 		return results, nil
 	}
@@ -162,8 +168,9 @@ func (s *DropReportRepo) CalcTotalTimes(ctx context.Context, server string, time
 }
 
 func (s *DropReportRepo) CalcTotalQuantityForTrend(
-	ctx context.Context, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdItemIdMap map[int][]int, accountId *null.Int) ([]map[string]interface{}, error) {
-	results := make([]map[string]interface{}, 0)
+	ctx context.Context, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdItemIdMap map[int][]int, accountId *null.Int,
+	) ([]*models.TotalQuantityResultForTrend, error) {
+	results := make([]*models.TotalQuantityResultForTrend, 0)
 	if len(stageIdItemIdMap) == 0 {
 		return results, nil
 	}
@@ -194,7 +201,7 @@ func (s *DropReportRepo) CalcTotalQuantityForTrend(
 	var subQueryExprBuilder strings.Builder
 	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + (n || ' hours')::interval AS interval_start, ")
 	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + ((n + ?) || ' hours')::interval AS interval_end, ")
-	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_idx")
+	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_id")
 	subQuery := s.DB.NewSelect().
 		TableExpr("generate_series(?, ? * ?, ?) AS n", 0, intervalLength_hrs, intervalNum, intervalLength_hrs).
 		ColumnExpr(subQueryExprBuilder.String(),
@@ -206,7 +213,7 @@ func (s *DropReportRepo) CalcTotalQuantityForTrend(
 	query := s.DB.NewSelect().
 		With("intervals", subQuery).
 		TableExpr("drop_reports AS dr").
-		Column("sub.group_idx", "sub.interval_start", "sub.interval_end", "dr.stage_id", "dpe.item_id").
+		Column("sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id", "dpe.item_id").
 		ColumnExpr("SUM(dpe.quantity) AS total_quantity").
 		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id").
 		Join("RIGHT JOIN intervals AS sub").
@@ -218,7 +225,7 @@ func (s *DropReportRepo) CalcTotalQuantityForTrend(
 	}
 	query = query.Where("dr.server = ? AND "+b.String(), server)
 	if err := query.
-		Group("sub.group_idx", "sub.interval_start", "sub.interval_end", "dr.stage_id", "dpe.item_id").
+		Group("sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id", "dpe.item_id").
 		Scan(ctx, &results); err != nil {
 		return nil, err
 	}
@@ -226,8 +233,9 @@ func (s *DropReportRepo) CalcTotalQuantityForTrend(
 }
 
 func (s *DropReportRepo) CalcTotalTimesForTrend(
-	ctx context.Context, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIds []int, accountId *null.Int) ([]map[string]interface{}, error) {
-	results := make([]map[string]interface{}, 0)
+	ctx context.Context, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIds []int, accountId *null.Int,
+	) ([]*models.TotalTimesResultForTrend, error) {
+	results := make([]*models.TotalTimesResultForTrend, 0)
 	if len(stageIds) == 0 {
 		return results, nil
 	}
@@ -252,7 +260,7 @@ func (s *DropReportRepo) CalcTotalTimesForTrend(
 	var subQueryExprBuilder strings.Builder
 	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + (n || ' hours')::interval AS interval_start, ")
 	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + ((n + ?) || ' hours')::interval AS interval_end, ")
-	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_idx")
+	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_id")
 	subQuery := s.DB.NewSelect().
 		TableExpr("generate_series(?, ? * ?, ?) AS n", 0, intervalLength_hrs, intervalNum - 1, intervalLength_hrs).
 		ColumnExpr(subQueryExprBuilder.String(),
@@ -264,7 +272,7 @@ func (s *DropReportRepo) CalcTotalTimesForTrend(
 	query := s.DB.NewSelect().
 		With("intervals", subQuery).
 		TableExpr("drop_reports AS dr").
-		Column("sub.group_idx", "sub.interval_start", "sub.interval_end", "dr.stage_id").
+		Column("sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id").
 		ColumnExpr("SUM(dr.times) AS total_times").
 		Join("RIGHT JOIN intervals AS sub").
 		JoinOn("dr.created_at >= sub.interval_start AND dr.created_at < sub.interval_end")
@@ -275,7 +283,7 @@ func (s *DropReportRepo) CalcTotalTimesForTrend(
 	}
 	query = query.Where("dr.server = ? AND "+b.String(), server)
 	if err := query.
-		Group("sub.group_idx", "sub.interval_start", "sub.interval_end", "dr.stage_id").
+		Group("sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id").
 		Scan(ctx, &results); err != nil {
 		return nil, err
 	}

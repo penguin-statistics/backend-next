@@ -10,7 +10,6 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
@@ -21,7 +20,6 @@ type TrendService struct {
 	PatternMatrixElementService *PatternMatrixElementService
 	DropPatternElementService   *DropPatternElementService
 	TrendElementService         *TrendElementService
-	DropReportRepo              *repos.DropReportRepo
 }
 
 func NewTrendService(
@@ -31,7 +29,6 @@ func NewTrendService(
 	patternMatrixElementService *PatternMatrixElementService,
 	dropPatternElementService *DropPatternElementService,
 	trendElementService *TrendElementService,
-	dropReportRepo *repos.DropReportRepo,
 ) *TrendService {
 	return &TrendService{
 		TimeRangeService: timeRangeService,
@@ -40,11 +37,10 @@ func NewTrendService(
 		PatternMatrixElementService: patternMatrixElementService,
 		DropPatternElementService: dropPatternElementService,
 		TrendElementService: trendElementService,
-		DropReportRepo: dropReportRepo,
 	}
 }
 
-func (s *TrendService) GetTrendResults(ctx *fiber.Ctx, server string) (map[int]interface{}, error) {
+func (s *TrendService) GetTrendResults(ctx *fiber.Ctx, server string) (*models.TrendQueryResult, error) {
 	trendElements, err := s.TrendElementService.GetElementsByServer(ctx, server)
 	if err != nil {
 		return nil, err
@@ -56,10 +52,15 @@ func (s *TrendService) GetTrendResults(ctx *fiber.Ctx, server string) (map[int]i
 			func (el *models.TrendElement) *models.TrendElement { return el },
 		).
 		ToSlice(&groupedResults)
-	results := make(map[int]interface{}, 0)
+	trendQueryResult := &models.TrendQueryResult{
+		Trends: make([]*models.StageTrend, 0),
+	}
 	for _, el := range groupedResults {
 		stageId := el.Key.(int)
-		oneItemIdResult := make(map[int]interface{})
+		stageTrend := &models.StageTrend{
+			StageID: stageId,
+			Results: make([]*models.ItemTrend, 0),
+		}
 		var groupedResults2 []linq.Group
 		linq.From(el.Group).
 			GroupByT(
@@ -82,15 +83,16 @@ func (s *TrendService) GetTrendResults(ctx *fiber.Ctx, server string) (map[int]i
 				timesArray[el3.GroupID] = el3.Times
 				quantityArray[el3.GroupID] = el3.Quantity
 			}
-			oneItemIdResult[itemId] = map[string] interface{} {
-				"times": timesArray,
-				"quantity": quantityArray,
-				"startTime": startTime.UnixMilli(),
-			}
+			stageTrend.Results = append(stageTrend.Results, &models.ItemTrend{
+				ItemID: itemId,
+				Times: timesArray,
+				Quantity: quantityArray,
+				StartTime: startTime,
+			})
 		}
-		results[stageId] = oneItemIdResult
+		trendQueryResult.Trends = append(trendQueryResult.Trends, stageTrend)
 	}
-	return results, nil
+	return trendQueryResult, nil
 }
 
 func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error {
@@ -181,7 +183,8 @@ func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error
 }
 
 func (s *TrendService) CalcTrend(
-	ctx *fiber.Ctx, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int) ([]*models.TrendElement, error) {
+	ctx *fiber.Ctx, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
+	) ([]*models.TrendElement, error) {
 	endTime := startTime.Add(time.Hour * time.Duration(intervalLength_hrs * intervalNum))
 	timeRange := models.TimeRange{
 		StartTime: startTime,
@@ -192,41 +195,43 @@ func (s *TrendService) CalcTrend(
 		return nil, err
 	}
 
-	quantityResults, err := s.DropReportRepo.CalcTotalQuantityForTrend(ctx.Context(), server, startTime, intervalLength_hrs, intervalNum, utils.GetStageIdItemIdMapFromDropInfos(dropInfos), accountId)
+	quantityResults, err := s.DropReportService.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength_hrs, intervalNum, utils.GetStageIdItemIdMapFromDropInfos(dropInfos), accountId)
 	if err != nil {
 		return nil, err
 	}
-	timesResults, err := s.DropReportRepo.CalcTotalTimesForTrend(ctx.Context(), server, startTime, intervalLength_hrs, intervalNum, utils.GetStageIdsFromDropInfos(dropInfos), accountId)
+	timesResults, err := s.DropReportService.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength_hrs, intervalNum, utils.GetStageIdsFromDropInfos(dropInfos), accountId)
 	if err != nil {
 		return nil, err
 	}
 	combinedResults := s.combineQuantityAndTimesResults(quantityResults, timesResults)
-	
+
 	finalResults := make([]*models.TrendElement, 0)
 	linq.From(combinedResults).
-		SelectT(func (el map[string]interface{}) *models.TrendElement {
+		SelectT(func (el *models.CombinedResultForTrend) *models.TrendElement {
 			return &models.TrendElement{
-				StageID: el["stageId"].(int),
-				ItemID: el["itemId"].(int),
-				Quantity: el["quantity"].(int),
-				Times: el["times"].(int),
+				StageID: el.StageID,
+				ItemID: el.ItemID,
+				Quantity: el.Quantity,
+				Times: el.Times,
 				Server: server,
-				StartTime: el["startTime"].(*time.Time),
-				EndTime: el["endTime"].(*time.Time),
-				GroupID: el["groupId"].(int),
+				StartTime: el.StartTime,
+				EndTime: el.EndTime,
+				GroupID: el.GroupID,
 			}
 		}).
 		ToSlice(&finalResults)
 	return finalResults, nil
 }
 
-func (s *TrendService) combineQuantityAndTimesResults(quantityResults []map[string]interface{}, timesResults []map[string]interface{}) []map[string]interface{} {
+func (s *TrendService) combineQuantityAndTimesResults(
+	quantityResults []*models.TotalQuantityResultForTrend, timesResults []*models.TotalTimesResultForTrend,
+	) []*models.CombinedResultForTrend {
 	var firstGroupResultsForQuantity []linq.Group
-	combinedResults := make([]map[string]interface{}, 0)
+	combinedResults := make([]*models.CombinedResultForTrend, 0)
 	linq.From(quantityResults).
 		GroupByT(
-			func(result map[string]interface{}) int { return int(result["group_idx"].(int64)) },
-			func(result map[string]interface{}) map[string]interface{} { return result }).
+			func(result *models.TotalQuantityResultForTrend) int { return result.GroupID },
+			func(result *models.TotalQuantityResultForTrend) *models.TotalQuantityResultForTrend { return result }).
 		ToSlice(&firstGroupResultsForQuantity)
 	groupResultsMap := make(map[int]map[int]map[int]int)
 	for _, firstGroupElements := range firstGroupResultsForQuantity {
@@ -234,8 +239,8 @@ func (s *TrendService) combineQuantityAndTimesResults(quantityResults []map[stri
 		var secondGroupResultsForQuantity []linq.Group
 		linq.From(firstGroupElements.Group).
 			GroupByT(
-				func(result map[string]interface{}) int { return int(result["stage_id"].(int64)) },
-				func(result map[string]interface{}) map[string]interface{} { return result }).
+				func(result *models.TotalQuantityResultForTrend) int { return result.StageID },
+				func(result *models.TotalQuantityResultForTrend) *models.TotalQuantityResultForTrend { return result }).
 			ToSlice(&secondGroupResultsForQuantity)
 		quantityResultsMap := make(map[int]map[int]int)
 		for _, secondGroupElements := range secondGroupResultsForQuantity {
@@ -243,8 +248,8 @@ func (s *TrendService) combineQuantityAndTimesResults(quantityResults []map[stri
 			resultsMap := make(map[int]int, 0)
 			linq.From(secondGroupElements.Group).
 				ToMapByT(&resultsMap,
-					func(el interface{}) int { return int(el.(map[string]interface{})["item_id"].(int64)) },
-					func(el interface{}) int { return int(el.(map[string]interface{})["total_quantity"].(int64)) })
+					func(el interface{}) int { return el.(*models.TotalQuantityResultForTrend).ItemID },
+					func(el interface{}) int { return el.(*models.TotalQuantityResultForTrend).TotalQuantity })
 			quantityResultsMap[stageId] = resultsMap
 		}
 		groupResultsMap[groupId] = quantityResultsMap
@@ -253,8 +258,8 @@ func (s *TrendService) combineQuantityAndTimesResults(quantityResults []map[stri
 	var firstGroupResultsForTimes []linq.Group
 	linq.From(timesResults).
 		GroupByT(
-			func(result map[string]interface{}) int { return int(result["group_idx"].(int64)) },
-			func(result map[string]interface{}) map[string]interface{} { return result }).
+			func(result *models.TotalTimesResultForTrend) int { return result.GroupID },
+			func(result *models.TotalTimesResultForTrend) *models.TotalTimesResultForTrend { return result }).
 		ToSlice(&firstGroupResultsForTimes)
 	for _, firstGroupElements := range firstGroupResultsForTimes {
 		groupId := firstGroupElements.Key.(int)
@@ -262,25 +267,25 @@ func (s *TrendService) combineQuantityAndTimesResults(quantityResults []map[stri
 		var secondGroupResultsForTimes []linq.Group
 		linq.From(firstGroupElements.Group).
 			GroupByT(
-				func(result map[string]interface{}) int { return int(result["stage_id"].(int64)) },
-				func(result map[string]interface{}) map[string]interface{} { return result }).
+				func(result *models.TotalTimesResultForTrend) int { return result.StageID },
+				func(result *models.TotalTimesResultForTrend) *models.TotalTimesResultForTrend { return result }).
 			ToSlice(&secondGroupResultsForTimes)
 		for _, secondGroupElements := range secondGroupResultsForTimes {
 			stageId := secondGroupElements.Key.(int)
 			resultsMap := quantityResultsMapForOneGroup[stageId]
 			for _, el := range secondGroupElements.Group {
-				times := int(el.(map[string]interface{})["total_times"].(int64))
+				times := el.(*models.TotalTimesResultForTrend).TotalTimes
 				for itemId, quantity := range resultsMap {
-					startTime := el.(map[string]interface{})["interval_start"].(time.Time)
-					endTime := el.(map[string]interface{})["interval_end"].(time.Time)
-					combinedResults = append(combinedResults, map[string]interface{}{
-						"groupId": groupId,
-						"stageId": stageId,
-						"itemId":  itemId,
-						"times":   times,
-						"quantity": quantity,
-						"startTime": &startTime,
-						"endTime": &endTime,
+					startTime := el.(*models.TotalTimesResultForTrend).IntervalStart
+					endTime := el.(*models.TotalTimesResultForTrend).IntervalEnd
+					combinedResults = append(combinedResults, &models.CombinedResultForTrend{
+						GroupID: groupId,
+						StageID: stageId,
+						ItemID: itemId,
+						Quantity: quantity,
+						Times: times,
+						StartTime: startTime,
+						EndTime: endTime,
 					})
 				}
 			}
