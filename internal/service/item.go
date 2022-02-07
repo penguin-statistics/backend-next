@@ -31,3 +31,7 @@ func (s *ItemService) GetItemsMap(ctx *fiber.Ctx) (map[int]*models.Item, error) 
 			func(item *models.Item) *models.Item { return item })
 	return itemsMap, nil
 }
+
+func (s *ItemService) GetItemById(ctx *fiber.Ctx, itemId int) (*models.Item, error) {
+	return s.ItemRepo.GetItemById(ctx.Context(), itemId)
+}

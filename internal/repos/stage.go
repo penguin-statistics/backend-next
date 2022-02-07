@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"strconv"
 
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
@@ -34,6 +35,28 @@ func (c *StageRepo) GetStages(ctx context.Context) ([]*models.Stage, error) {
 	}
 
 	return stages, nil
+}
+
+func (c *StageRepo) GetStageById(ctx context.Context, stageId int) (*models.Stage, error) {
+	var stage models.Stage
+	err := cache.StageFromId.Get(strconv.Itoa(stageId), &stage)
+	if err == nil {
+		return &stage, nil
+	}
+
+	err = c.db.NewSelect().
+		Model(&stage).
+		Where("stage_id = ?", stageId).
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	go cache.StageFromId.Set(strconv.Itoa(stageId), &stage)
+	return &stage, nil
 }
 
 func (c *StageRepo) GetStageByArkId(ctx context.Context, stageArkId string) (*models.Stage, error) {

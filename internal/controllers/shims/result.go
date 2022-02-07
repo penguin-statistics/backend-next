@@ -113,17 +113,6 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 		itemFilterSet[itemIdStr] = struct{}{}
 	}
 
-	// get id -> stage/item map, to find their ark id
-	// TODO: use cache here
-	stagesMap, err := c.StageService.GetStagesMap(ctx)
-	if err != nil {
-		return err
-	}
-	itemsMap, err := c.ItemService.GetItemsMap(ctx)
-	if err != nil {
-		return err
-	}
-
 	results := &shims.DropMatrixQueryResult{
 		Matrix: make([]*shims.OneDropMatrixElement, 0),
 	}
@@ -132,24 +121,30 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 			continue
 		}
 
-		arkStageId := stagesMap[el.StageID].ArkStageID
+		stage, err := c.StageService.GetStageById(ctx, el.StageID)
+		if err != nil {
+			return err
+		}
 		if len(stageFilterSet) > 0 {
-			if _, ok := stageFilterSet[arkStageId]; !ok {
+			if _, ok := stageFilterSet[stage.ArkStageID]; !ok {
 				continue
 			}
 		}
 
-		arkItemId := itemsMap[el.ItemID].ArkItemID
+		item, err := c.ItemService.GetItemById(ctx, el.ItemID)
+		if err != nil {
+			return err
+		}
 		if len(itemFilterSet) > 0 {
-			if _, ok := itemFilterSet[arkItemId]; !ok {
+			if _, ok := itemFilterSet[item.ArkItemID]; !ok {
 				continue
 			}
 		}
 
 		endTime := null.NewInt(el.TimeRange.EndTime.UnixMilli(), true)
 		oneDropMatrixElement := shims.OneDropMatrixElement{
-			StageID:   arkStageId,
-			ItemID:    arkItemId,
+			StageID:   stage.ArkStageID,
+			ItemID:    item.ArkItemID,
 			Quantity:  el.Quantity,
 			Times:     el.Times,
 			StartTime: el.TimeRange.StartTime.UnixMilli(),

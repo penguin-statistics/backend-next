@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"strconv"
 
 	"github.com/uptrace/bun"
 
@@ -33,6 +34,28 @@ func (c *ItemRepo) GetItems(ctx context.Context) ([]*models.Item, error) {
 	}
 
 	return items, nil
+}
+
+func (c *ItemRepo) GetItemById(ctx context.Context, itemId int) (*models.Item, error) {
+	var item models.Item
+	err := cache.ItemFromId.Get(strconv.Itoa(itemId), &item)
+	if (err == nil) {
+		return &item, nil
+	}
+
+	err = c.DB.NewSelect().
+		Model(&item).
+		Where("item_id = ?", itemId).
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	go cache.ItemFromId.Set(strconv.Itoa(itemId), &item)
+	return &item, nil
 }
 
 func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*models.Item, error) {
