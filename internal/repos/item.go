@@ -39,7 +39,7 @@ func (c *ItemRepo) GetItems(ctx context.Context) ([]*models.Item, error) {
 func (c *ItemRepo) GetItemById(ctx context.Context, itemId int) (*models.Item, error) {
 	var item models.Item
 	err := cache.ItemFromId.Get(strconv.Itoa(itemId), &item)
-	if (err == nil) {
+	if err == nil {
 		return &item, nil
 	}
 

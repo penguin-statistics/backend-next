@@ -223,12 +223,6 @@ func (s *PatternMatrixService) generateLatestResultsFromPatternMatrixElements(
 	if err != nil {
 		return nil, err
 	}
-	// patternIds := make([]int, 0)
-	// linq.From(patternMatrixElements).SelectT(func (el *models.PatternMatrixElement) int { return el.PatternID }).Distinct().ToSlice(&patternIds)
-	// dropPatternElementsMap, err := s.DropPatternElementService.GetDropPatternElementsMapByPatternIds(ctx, patternIds)
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	result := &models.DropPatternQueryResult{
 		DropPatterns: make([]*models.OneDropPattern, 0),
@@ -244,45 +238,4 @@ func (s *PatternMatrixService) generateLatestResultsFromPatternMatrixElements(
 		})
 	}
 	return result, nil
-
-	// var groupedResults []linq.Group
-	// linq.From(patternMatrixElements).
-	// 	GroupByT(
-	// 		func (el *models.PatternMatrixElement) int { return el.PatternID },
-	// 		func (el *models.PatternMatrixElement) *models.PatternMatrixElement { return el },
-	// 	).
-	// 	ToSlice(&groupedResults)
-	// for _, el := range groupedResults {
-	// 	patternId := el.Key.(int)
-	// 	resultsForOnePatternId := make([]map[string]interface{}, 0)
-	// 	linq.From(el.Group).
-	// 		SelectT(func (el2 interface{}) map[string]interface{} {
-	// 			patternMatrixElement := el2.(*models.PatternMatrixElement)
-	// 			timeRange := timeRangesMap[patternMatrixElement.RangeID]
-	// 			dropPatternElements := dropPatternElementsMap[patternId]
-	// 			dropsMaps := make([]map[string]interface{}, 0)
-	// 			linq.From(dropPatternElements).
-	// 				SelectT(func (dropPatternElement *models.DropPatternElement) map[string]interface{} {
-	// 					return map[string]interface{}{
-	// 						"itemId": dropPatternElement.ItemID,
-	// 						"quantity": dropPatternElement.Quantity,
-	// 					}
-	// 				}).
-	// 				ToSlice(&dropsMaps)
-	// 			patternValue := map[string]interface{}{
-	// 				"drops": dropsMaps,
-	// 			}
-	// 			return map[string]interface{}{
-	// 				"stageId": patternMatrixElement.StageID,
-	// 				"quantity": patternMatrixElement.Quantity,
-	// 				"times": patternMatrixElement.Times,
-	// 				"start": timeRange.StartTime.UnixMilli(),
-	// 				"end": timeRange.EndTime.UnixMilli(),
-	// 				"pattern": patternValue,
-	// 			}
-	// 		}).
-	// 		ToSlice(&resultsForOnePatternId)
-	// 	results = append(results, resultsForOnePatternId...)
-	// }
-	// return results, nil
 }

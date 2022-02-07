@@ -15,3 +15,26 @@ type OneDropMatrixElement struct {
 	StartTime int64     `json:"start"`
 	EndTime   *null.Int `json:"end,omitempty"`
 }
+
+// DropPattern
+type PatternMatrixQueryResult struct {
+	PatternMatrix []*OnePatternMatrixElement `json:"pattern_matrix"`
+}
+
+type OnePatternMatrixElement struct {
+	StageID   string    `json:"stageId"`
+	Pattern   *Pattern  `json:"pattern"`
+	Times     int       `json:"times"`
+	Quantity  int       `json:"quantity"`
+	StartTime int64     `json:"start"`
+	EndTime   *null.Int `json:"end,omitempty"`
+}
+
+type Pattern struct {
+	Drops []*OneDrop `json:"drops"`
+}
+
+type OneDrop struct {
+	ItemID   string `json:"itemId"`
+	Quantity int    `json:"quantity"`
+}

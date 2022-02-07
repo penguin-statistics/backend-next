@@ -17,17 +17,6 @@ func NewDropPatternElementService(dropPatternElementRepo *repos.DropPatternEleme
 	}
 }
 
-func (s *DropPatternElementService) GetDropPatternElementsMapByPatternIds(ctx *fiber.Ctx, patternIds []int) (map[int][]*models.DropPatternElement, error) {
-	elements, err := s.DropPatternElementRepo.GetDropPatternElementsByPatternIds(ctx.Context(), patternIds)
-	if err != nil {
-		return nil, err
-	}
-	results := make(map[int][]*models.DropPatternElement)
-	for _, element := range elements {
-		if _, ok := results[element.DropPatternID]; !ok {
-			results[element.DropPatternID] = make([]*models.DropPatternElement, 0)
-		}
-		results[element.DropPatternID] = append(results[element.DropPatternID], element)
-	}
-	return results, nil
+func (s *DropPatternElementService) GetDropPatternElementsByPatternId(ctx *fiber.Ctx, patternId int) ([]*models.DropPatternElement, error) {
+	return s.DropPatternElementRepo.GetDropPatternElementsByPatternId(ctx.Context(), patternId)
 }

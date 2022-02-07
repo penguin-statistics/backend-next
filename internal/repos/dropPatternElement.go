@@ -3,10 +3,12 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"strconv"
 
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 )
@@ -72,23 +74,24 @@ func (r *DropPatternElementRepo) CreateDropPatternElements(ctx context.Context, 
 	return elements, nil
 }
 
-func (r *DropPatternElementRepo) GetDropPatternElementsByPatternIds(ctx context.Context, patternIds []int) ([]*models.DropPatternElement, error) {
+func (r *DropPatternElementRepo) GetDropPatternElementsByPatternId(ctx context.Context, patternId int) ([]*models.DropPatternElement, error) {
 	var elements []*models.DropPatternElement
-	err := r.DB.NewSelect().
+	err := cache.DropPatternElementsFromId.Get(strconv.Itoa(patternId), &elements)
+	if err == nil {
+		return elements, nil
+	}
+
+	err = r.DB.NewSelect().
 		Model(&elements).
-		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
-			if len(patternIds) > 0 {
-				return q.Where("drop_pattern_id in (?)", bun.In(patternIds))
-			}
-			return q
-		}).
+		Where("drop_pattern_id = ?", patternId).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		elements = make([]*models.DropPatternElement, 0)
 	} else if err != nil {
 		return nil, err
 	}
 
+	go cache.DropPatternElementsFromId.Set(strconv.Itoa(patternId), &elements)
 	return elements, nil
 }
