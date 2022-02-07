@@ -32,17 +32,17 @@ func (tr *TimeRange) FromString(s string) *TimeRange {
 	var startTime, endTime time.Time
 	if strings.Contains(s, "-") {
 		times := strings.Split(s, "-")
-		
+
 		startTimestamp, err := strconv.ParseInt(times[0], 10, 64)
 		if err != nil {
 			return nil
 		}
-		startTime = time.Unix(startTimestamp / 1000, 0)
+		startTime = time.Unix(startTimestamp/1000, 0)
 		endTimestamp, err := strconv.ParseInt(times[1], 10, 64)
 		if err != nil {
 			return nil
 		}
-		endTime = time.Unix(endTimestamp / 1000, 0)
+		endTime = time.Unix(endTimestamp/1000, 0)
 	}
 
 	return &TimeRange{

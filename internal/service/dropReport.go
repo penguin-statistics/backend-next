@@ -21,11 +21,11 @@ func NewDropReportService(dropReportRepo *repos.DropReportRepo) *DropReportServi
 }
 
 func (s *DropReportService) CalcTotalQuantityForDropMatrix(ctx *fiber.Ctx, server string, timeRange *models.TimeRange, stageIdItemIdMap map[int][]int, accountId *null.Int) ([]*models.TotalQuantityResultForDropMatrix, error) {
-	return s.DropReportRepo.CalcTotalQuantityForDropMatrix(ctx.Context(), server, timeRange, stageIdItemIdMap, accountId)	
+	return s.DropReportRepo.CalcTotalQuantityForDropMatrix(ctx.Context(), server, timeRange, stageIdItemIdMap, accountId)
 }
 
 func (s *DropReportService) CalcTotalQuantityForPatternMatrix(ctx *fiber.Ctx, server string, timeRange *models.TimeRange, stageIds []int, accountId *null.Int) ([]*models.TotalQuantityResultForPatternMatrix, error) {
-	return s.DropReportRepo.CalcTotalQuantityForPatternMatrix(ctx.Context(), server, timeRange, stageIds, accountId)	
+	return s.DropReportRepo.CalcTotalQuantityForPatternMatrix(ctx.Context(), server, timeRange, stageIds, accountId)
 }
 
 func (s *DropReportService) CalcTotalTimesForDropMatrix(ctx *fiber.Ctx, server string, timeRange *models.TimeRange, stageIds []int, accountId *null.Int) ([]*models.TotalTimesResult, error) {

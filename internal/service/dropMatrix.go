@@ -23,15 +23,15 @@ type DropMatrixService struct {
 }
 
 func NewDropMatrixService(
-	timeRangeService *TimeRangeService, 
-	dropReportService *DropReportService, 
+	timeRangeService *TimeRangeService,
+	dropReportService *DropReportService,
 	dropInfoService *DropInfoService,
 	dropMatrixElementService *DropMatrixElementService,
 ) *DropMatrixService {
 	return &DropMatrixService{
-		TimeRangeService: timeRangeService,
-		DropReportService: dropReportService,
-		DropInfoService: dropInfoService,
+		TimeRangeService:         timeRangeService,
+		DropReportService:        dropReportService,
+		DropInfoService:          dropInfoService,
 		DropMatrixElementService: dropMatrixElementService,
 	}
 }
@@ -42,7 +42,7 @@ func (s *DropMatrixService) GetMaxAccumulableDropMatrixResults(ctx *fiber.Ctx, s
 		return nil, err
 	}
 	elementsMap := utils.GetDropMatrixElementsMap(dropMatrixElements)
-	return s.generateMaxAccumulableResultsFromDropMatrixElementsMap(ctx, server, elementsMap)	
+	return s.generateMaxAccumulableResultsFromDropMatrixElementsMap(ctx, server, elementsMap)
 }
 
 func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server string) error {
@@ -92,7 +92,7 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 	return s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server)
 }
 
-func (s *DropMatrixService) getDropMatrixElements(ctx *fiber.Ctx, server string, accountId *null.Int) ([]*models.DropMatrixElement, error){
+func (s *DropMatrixService) getDropMatrixElements(ctx *fiber.Ctx, server string, accountId *null.Int) ([]*models.DropMatrixElement, error) {
 	if accountId.Valid {
 		maxAccumulableTimeRanges, err := s.TimeRangeService.GetMaxAccumulableTimeRangesByServer(ctx, server)
 		if err != nil {
@@ -119,7 +119,7 @@ func (s *DropMatrixService) getDropMatrixElements(ctx *fiber.Ctx, server string,
 
 func (s *DropMatrixService) CalcDropMatrixForTimeRanges(
 	ctx *fiber.Ctx, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
-	) ([]*models.DropMatrixElement, error) {
+) ([]*models.DropMatrixElement, error) {
 	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, itemIdFilter)
 	if err != nil {
 		return nil, err
@@ -158,8 +158,8 @@ func (s *DropMatrixService) CalcDropMatrixForTimeRanges(
 		var groupedResults2 []linq.Group
 		linq.From(el.Group).
 			GroupByT(
-				func (el *models.CombinedResultForDropMatrix) int { return el.TimeRange.RangeID }, 
-				func (el *models.CombinedResultForDropMatrix) *models.CombinedResultForDropMatrix { return el }).
+				func(el *models.CombinedResultForDropMatrix) int { return el.TimeRange.RangeID },
+				func(el *models.CombinedResultForDropMatrix) *models.CombinedResultForDropMatrix { return el }).
 			ToSlice(&groupedResults2)
 		for _, el2 := range groupedResults2 {
 			rangeId := el2.Key.(int)
@@ -170,7 +170,7 @@ func (s *DropMatrixService) CalcDropMatrixForTimeRanges(
 			dropSet := make(map[int]struct{}, len(dropItemIds))
 			for _, itemId := range dropItemIds {
 				dropSet[itemId] = struct{}{}
-			}	
+			}
 			for _, el3 := range el2.Group {
 				itemId := el3.(*models.CombinedResultForDropMatrix).ItemID
 				quantity := el3.(*models.CombinedResultForDropMatrix).Quantity
@@ -206,13 +206,15 @@ func (s *DropMatrixService) CalcDropMatrixForTimeRanges(
 
 func (s *DropMatrixService) combineQuantityAndTimesResults(
 	quantityResults []*models.TotalQuantityResultForDropMatrix, timesResults []*models.TotalTimesResult, timeRange *models.TimeRange,
-	) []*models.CombinedResultForDropMatrix {
+) []*models.CombinedResultForDropMatrix {
 	var firstGroupResults []linq.Group
 	combinedResults := make([]*models.CombinedResultForDropMatrix, 0)
 	linq.From(quantityResults).
 		GroupByT(
 			func(result *models.TotalQuantityResultForDropMatrix) int { return result.StageID },
-			func(result *models.TotalQuantityResultForDropMatrix) *models.TotalQuantityResultForDropMatrix { return result }).
+			func(result *models.TotalQuantityResultForDropMatrix) *models.TotalQuantityResultForDropMatrix {
+				return result
+			}).
 		ToSlice(&firstGroupResults)
 	quantityResultsMap := make(map[int]map[int]int)
 	for _, firstGroupElements := range firstGroupResults {
@@ -238,10 +240,10 @@ func (s *DropMatrixService) combineQuantityAndTimesResults(
 			times := el.(*models.TotalTimesResult).TotalTimes
 			for itemId, quantity := range quantityResultsMapForOneStage {
 				combinedResults = append(combinedResults, &models.CombinedResultForDropMatrix{
-					StageID:  stageId,
-					ItemID:   itemId,
-					Quantity: quantity,
-					Times:    times,
+					StageID:   stageId,
+					ItemID:    itemId,
+					Quantity:  quantity,
+					Times:     times,
 					TimeRange: timeRange,
 				})
 			}
@@ -251,12 +253,12 @@ func (s *DropMatrixService) combineQuantityAndTimesResults(
 }
 
 func (s *DropMatrixService) generateMaxAccumulableResultsFromDropMatrixElementsMap(
-	ctx *fiber.Ctx, server string, elementsMap map[int] map[int] map[int] *models.DropMatrixElement,
-	) (*models.DropMatrixQueryResult, error) {
+	ctx *fiber.Ctx, server string, elementsMap map[int]map[int]map[int]*models.DropMatrixElement,
+) (*models.DropMatrixQueryResult, error) {
 	result := &models.DropMatrixQueryResult{
 		Matrix: make([]*models.OneDropMatrixElement, 0),
 	}
-		
+
 	maxAccumulableTimeRanges, err := s.TimeRangeService.GetMaxAccumulableTimeRangesByServer(ctx, server)
 	if err != nil {
 		return nil, err
@@ -275,10 +277,10 @@ func (s *DropMatrixService) generateMaxAccumulableResultsFromDropMatrixElementsM
 					continue
 				}
 				oneElementResult := &models.OneDropMatrixElement{
-					StageID: stageId,
-					ItemID: itemId,
+					StageID:  stageId,
+					ItemID:   itemId,
 					Quantity: element.Quantity,
-					Times: element.Times,
+					Times:    element.Times,
 				}
 				if timeRange.StartTime.Before(*startTime) {
 					startTime = timeRange.StartTime
@@ -290,7 +292,7 @@ func (s *DropMatrixService) generateMaxAccumulableResultsFromDropMatrixElementsM
 					combinedDropMatrixResult = oneElementResult
 				} else {
 					combinedDropMatrixResult, err = s.combineDropMatrixResults(combinedDropMatrixResult, oneElementResult)
-					if (err != nil) {
+					if err != nil {
 						return nil, err
 					}
 				}
@@ -298,27 +300,27 @@ func (s *DropMatrixService) generateMaxAccumulableResultsFromDropMatrixElementsM
 			if combinedDropMatrixResult != nil {
 				combinedDropMatrixResult.TimeRange = &models.TimeRange{
 					StartTime: startTime,
-					EndTime: endTime,
+					EndTime:   endTime,
 				}
 				result.Matrix = append(result.Matrix, combinedDropMatrixResult)
 			}
 		}
 	}
-	return result, nil	
+	return result, nil
 }
 
 func (s *DropMatrixService) combineDropMatrixResults(a *models.OneDropMatrixElement, b *models.OneDropMatrixElement) (*models.OneDropMatrixElement, error) {
-	if (a.StageID != b.StageID) {
+	if a.StageID != b.StageID {
 		return nil, errors.New("stageId not match")
 	}
-	if (a.ItemID != b.ItemID) {
+	if a.ItemID != b.ItemID {
 		return nil, errors.New("itemId not match")
 	}
 	result := &models.OneDropMatrixElement{
-		StageID: a.StageID,
-		ItemID: a.ItemID,
+		StageID:  a.StageID,
+		ItemID:   a.ItemID,
 		Quantity: a.Quantity + b.Quantity,
-		Times: a.Times + b.Times,
+		Times:    a.Times + b.Times,
 	}
 	return result, nil
 }

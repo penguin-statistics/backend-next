@@ -7,6 +7,7 @@ import (
 type V2 struct {
 	fiber.Router
 }
+
 type V3 struct {
 	fiber.Router
 }

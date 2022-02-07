@@ -9,9 +9,7 @@ import (
 	"github.com/goccy/go-json"
 )
 
-var (
-	ErrNoKey = errors.New("no such key")
-)
+var ErrNoKey = errors.New("no such key")
 
 type Cache interface {
 	Get(key string, dest interface{}) error

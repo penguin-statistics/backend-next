@@ -5,8 +5,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/server"
 )
 
-type LiveController struct {
-}
+type LiveController struct{}
 
 func RegisterLiveController(v3 *server.V3) {
 	c := &LiveController{}

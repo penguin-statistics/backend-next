@@ -9,13 +9,13 @@ import (
 )
 
 type DropInfoService struct {
-	DropInfoRepo *repos.DropInfoRepo
+	DropInfoRepo     *repos.DropInfoRepo
 	TimeRangeService *TimeRangeService
 }
 
 func NewDropInfoService(dropInfoRepo *repos.DropInfoRepo, timeRangeService *TimeRangeService) *DropInfoService {
 	return &DropInfoService{
-		DropInfoRepo: dropInfoRepo,
+		DropInfoRepo:     dropInfoRepo,
 		TimeRangeService: timeRangeService,
 	}
 }
@@ -38,7 +38,7 @@ func (s *DropInfoService) GetStageIdsByServer(ctx *fiber.Ctx, server string) ([]
 		return nil, err
 	}
 	var stageIds []int
-	linq.From(dropInfos).SelectT(func (dropInfo *models.DropInfo) int { return dropInfo.StageID }).Distinct().ToSlice(&stageIds)
+	linq.From(dropInfos).SelectT(func(dropInfo *models.DropInfo) int { return dropInfo.StageID }).Distinct().ToSlice(&stageIds)
 	return stageIds, nil
 }
 
@@ -52,7 +52,7 @@ func (s *DropInfoService) GetCurrentDropInfosByServer(ctx *fiber.Ctx, server str
 	for _, timeRange := range currentTimeRanges {
 		currentTimeRangesMap[timeRange.RangeID] = timeRange
 	}
-	linq.From(dropInfos).WhereT(func (dropInfo *models.DropInfo) bool {
+	linq.From(dropInfos).WhereT(func(dropInfo *models.DropInfo) bool {
 		return currentTimeRangesMap[dropInfo.RangeID] != nil
 	}).ToSlice(&dropInfos)
 	return dropInfos, nil

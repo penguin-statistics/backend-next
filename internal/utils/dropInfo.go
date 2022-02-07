@@ -10,10 +10,10 @@ func GetStageIdItemIdMapFromDropInfos(dropInfos []*models.DropInfo) map[int][]in
 	stageIdItemIdMap := make(map[int][]int)
 	var groupedResults []linq.Group
 	linq.From(dropInfos).
-		WhereT(func (dropInfo *models.DropInfo) bool { return dropInfo.ItemID.Valid }).
+		WhereT(func(dropInfo *models.DropInfo) bool { return dropInfo.ItemID.Valid }).
 		GroupByT(
-			func (dropInfo *models.DropInfo) int { return dropInfo.StageID }, 
-			func (dropInfo *models.DropInfo) int { return int(dropInfo.ItemID.Int64) },
+			func(dropInfo *models.DropInfo) int { return dropInfo.StageID },
+			func(dropInfo *models.DropInfo) int { return int(dropInfo.ItemID.Int64) },
 		).ToSlice(&groupedResults)
 	for _, groupedResult := range groupedResults {
 		stageId := groupedResult.Key.(int)
@@ -28,6 +28,6 @@ func GetStageIdItemIdMapFromDropInfos(dropInfos []*models.DropInfo) map[int][]in
 
 func GetStageIdsFromDropInfos(dropInfos []*models.DropInfo) []int {
 	stageIds := make([]int, 0)
-	linq.From(dropInfos).SelectT(func (dropInfo *models.DropInfo) int { return dropInfo.StageID }).Distinct().ToSlice(&stageIds)
+	linq.From(dropInfos).SelectT(func(dropInfo *models.DropInfo) int { return dropInfo.StageID }).Distinct().ToSlice(&stageIds)
 	return stageIds
 }

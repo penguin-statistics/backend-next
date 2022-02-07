@@ -8,14 +8,20 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/utils/cache"
 )
 
-var ItemFromId cache.Cache
-var ItemFromArkId cache.Cache
+var (
+	ItemFromId    cache.Cache
+	ItemFromArkId cache.Cache
+)
 
-var StageFromId cache.Cache
-var StageFromArkId cache.Cache
+var (
+	StageFromId    cache.Cache
+	StageFromArkId cache.Cache
+)
 
-var ZoneFromId cache.Cache
-var ZoneFromArkId cache.Cache
+var (
+	ZoneFromId    cache.Cache
+	ZoneFromArkId cache.Cache
+)
 
 var once sync.Once
 

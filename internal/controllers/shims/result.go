@@ -24,7 +24,7 @@ type ResultController struct {
 	ItemService          *service.ItemService
 	StageService         *service.StageService
 
-	FakeEndTimeMilli     int64
+	FakeEndTimeMilli int64
 }
 
 func RegisterResultController(
@@ -36,7 +36,7 @@ func RegisterResultController(
 	dropInfoService *service.DropInfoService,
 	itemService *service.ItemService,
 	stageService *service.StageService,
-	) {
+) {
 	c := &ResultController{
 		DropMatrixService:    dropMatrixService,
 		PatternMatrixService: patternMatrixService,
@@ -82,7 +82,7 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
- 
+
 	// get opening stages from dropinfos
 	var openingStageIds []int
 	if !showClosedZones {
@@ -90,7 +90,7 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 		if err != nil {
 			return err
 		}
-		linq.From(currentDropInfos).SelectT(func (el *models.DropInfo) int { return el.StageID }).Distinct().ToSlice(&openingStageIds)
+		linq.From(currentDropInfos).SelectT(func(el *models.DropInfo) int { return el.StageID }).Distinct().ToSlice(&openingStageIds)
 	}
 
 	// convert comma-splitted stage filter param to a hashset
@@ -148,12 +148,12 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 
 		endTime := null.NewInt(el.TimeRange.EndTime.UnixMilli(), true)
 		oneDropMatrixElement := shims.OneDropMatrixElement{
-			StageID: arkStageId,
-			ItemID: arkItemId,
-			Quantity: el.Quantity,
-			Times: el.Times,
+			StageID:   arkStageId,
+			ItemID:    arkItemId,
+			Quantity:  el.Quantity,
+			Times:     el.Times,
 			StartTime: el.TimeRange.StartTime.UnixMilli(),
-			EndTime: &endTime,
+			EndTime:   &endTime,
 		}
 		if oneDropMatrixElement.EndTime.Int64 == c.FakeEndTimeMilli {
 			oneDropMatrixElement.EndTime = nil

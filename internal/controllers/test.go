@@ -12,12 +12,13 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
+
 type TestController struct {
 	fx.In
-	DropMatrixService	  *service.DropMatrixService
-	DropInfoService       *service.DropInfoService
-	PatternMatrixService  *service.PatternMatrixService
-	TrendService          *service.TrendService
+	DropMatrixService    *service.DropMatrixService
+	DropInfoService      *service.DropInfoService
+	PatternMatrixService *service.PatternMatrixService
+	TrendService         *service.TrendService
 }
 
 func RegisterTestController(v3 *server.V3, c TestController) {
@@ -73,7 +74,7 @@ func (c *TestController) AdvancedDropMatrixQuery(ctx *fiber.Ctx) error {
 	// itemIds := []int{7, 1}
 	startTime := time.Unix(640966400, 0)
 	endTime := time.Unix(11641052800, 0)
-	timeRange := &models.TimeRange{ StartTime: &startTime, EndTime: &endTime }
+	timeRange := &models.TimeRange{StartTime: &startTime, EndTime: &endTime}
 	elements, err := c.DropMatrixService.CalcDropMatrixForTimeRanges(ctx, server, []*models.TimeRange{timeRange}, []int{stageId}, nil, &accountId)
 	if err != nil {
 		return err

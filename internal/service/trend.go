@@ -23,20 +23,20 @@ type TrendService struct {
 }
 
 func NewTrendService(
-	timeRangeService *TimeRangeService, 
-	dropReportService *DropReportService, 
+	timeRangeService *TimeRangeService,
+	dropReportService *DropReportService,
 	dropInfoService *DropInfoService,
 	patternMatrixElementService *PatternMatrixElementService,
 	dropPatternElementService *DropPatternElementService,
 	trendElementService *TrendElementService,
 ) *TrendService {
 	return &TrendService{
-		TimeRangeService: timeRangeService,
-		DropReportService: dropReportService,
-		DropInfoService: dropInfoService,
+		TimeRangeService:            timeRangeService,
+		DropReportService:           dropReportService,
+		DropInfoService:             dropInfoService,
 		PatternMatrixElementService: patternMatrixElementService,
-		DropPatternElementService: dropPatternElementService,
-		TrendElementService: trendElementService,
+		DropPatternElementService:   dropPatternElementService,
+		TrendElementService:         trendElementService,
 	}
 }
 
@@ -48,8 +48,8 @@ func (s *TrendService) GetTrendResults(ctx *fiber.Ctx, server string) (*models.T
 	var groupedResults []linq.Group
 	linq.From(trendElements).
 		GroupByT(
-			func (el *models.TrendElement) int { return el.StageID }, 
-			func (el *models.TrendElement) *models.TrendElement { return el },
+			func(el *models.TrendElement) int { return el.StageID },
+			func(el *models.TrendElement) *models.TrendElement { return el },
 		).
 		ToSlice(&groupedResults)
 	trendQueryResult := &models.TrendQueryResult{
@@ -64,8 +64,8 @@ func (s *TrendService) GetTrendResults(ctx *fiber.Ctx, server string) (*models.T
 		var groupedResults2 []linq.Group
 		linq.From(el.Group).
 			GroupByT(
-				func (el *models.TrendElement) int { return el.ItemID },
-				func (el *models.TrendElement) *models.TrendElement { return el },
+				func(el *models.TrendElement) int { return el.ItemID },
+				func(el *models.TrendElement) *models.TrendElement { return el },
 			).
 			ToSlice(&groupedResults2)
 		var startTime *time.Time
@@ -73,20 +73,20 @@ func (s *TrendService) GetTrendResults(ctx *fiber.Ctx, server string) (*models.T
 			itemId := el2.Key.(int)
 			var sortedElements []*models.TrendElement
 			linq.From(el2.Group).
-				SortT(func (el1, el2 *models.TrendElement) bool { return el1.GroupID < el2.GroupID }).
+				SortT(func(el1, el2 *models.TrendElement) bool { return el1.GroupID < el2.GroupID }).
 				ToSlice(&sortedElements)
 			startTime = sortedElements[0].StartTime
-			maxGroupId := linq.From(sortedElements).SelectT(func (el *models.TrendElement) int { return el.GroupID }).Max().(int)
-			timesArray := make([]int, maxGroupId + 1)
-			quantityArray := make([]int, maxGroupId + 1)
+			maxGroupId := linq.From(sortedElements).SelectT(func(el *models.TrendElement) int { return el.GroupID }).Max().(int)
+			timesArray := make([]int, maxGroupId+1)
+			quantityArray := make([]int, maxGroupId+1)
 			for _, el3 := range sortedElements {
 				timesArray[el3.GroupID] = el3.Times
 				quantityArray[el3.GroupID] = el3.Quantity
 			}
 			stageTrend.Results = append(stageTrend.Results, &models.ItemTrend{
-				ItemID: itemId,
-				Times: timesArray,
-				Quantity: quantityArray,
+				ItemID:    itemId,
+				Times:     timesArray,
+				Quantity:  quantityArray,
 				StartTime: startTime,
 			})
 		}
@@ -106,12 +106,12 @@ func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error
 		itemIdsMapByTimeRange := make(map[string][]int, 0)
 		for itemId, timeRanges := range maxAccumulableTimeRangesForOneStage {
 			sortedTimeRanges := make([]*models.TimeRange, 0)
-			linq.From(timeRanges).SortT(func (a, b *models.TimeRange) bool {
-				return a.StartTime.Before(*b.StartTime) 
+			linq.From(timeRanges).SortT(func(a, b *models.TimeRange) bool {
+				return a.StartTime.Before(*b.StartTime)
 			}).ToSlice(&sortedTimeRanges)
 			combinedTimeRange := models.TimeRange{
 				StartTime: sortedTimeRanges[0].StartTime,
-				EndTime: sortedTimeRanges[len(sortedTimeRanges)-1].EndTime,
+				EndTime:   sortedTimeRanges[len(sortedTimeRanges)-1].EndTime,
 			}
 			if _, ok := itemIdsMapByTimeRange[combinedTimeRange.String()]; !ok {
 				itemIdsMapByTimeRange[combinedTimeRange.String()] = make([]int, 0)
@@ -129,19 +129,19 @@ func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error
 
 			diff := int(endTime.Sub(startTime).Hours())
 			intervalNum := diff / 24
-			if diff % 24 != 0 {
+			if diff%24 != 0 {
 				intervalNum++
 			}
 
 			if intervalNum > 60 {
 				intervalNum = 60
-				startTime = endTime.Add(time.Hour * time.Duration((-1) * 24 * (intervalNum + 1)))
+				startTime = endTime.Add(time.Hour * time.Duration((-1)*24*(intervalNum+1)))
 			}
 
 			toCalc = append(toCalc, map[string]interface{}{
-				"stageId": stageId,
-				"itemIds": itemIds,
-				"startTime": startTime,
+				"stageId":     stageId,
+				"itemIds":     itemIds,
+				"startTime":   startTime,
 				"intervalNum": intervalNum,
 			})
 		}
@@ -163,7 +163,7 @@ func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error
 	wg.Add(len(toCalc))
 	for _, el := range toCalc {
 		limiter <- struct{}{}
-		go func(el map[string] interface{}) {
+		go func(el map[string]interface{}) {
 			startTime := el["startTime"].(time.Time)
 			intervalNum := el["intervalNum"].(int)
 			stageId := el["stageId"].(int)
@@ -184,11 +184,11 @@ func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error
 
 func (s *TrendService) CalcTrend(
 	ctx *fiber.Ctx, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
-	) ([]*models.TrendElement, error) {
-	endTime := startTime.Add(time.Hour * time.Duration(intervalLength_hrs * intervalNum))
+) ([]*models.TrendElement, error) {
+	endTime := startTime.Add(time.Hour * time.Duration(intervalLength_hrs*intervalNum))
 	timeRange := models.TimeRange{
 		StartTime: startTime,
-		EndTime: &endTime,
+		EndTime:   &endTime,
 	}
 	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, []*models.TimeRange{&timeRange}, stageIdFilter, itemIdFilter)
 	if err != nil {
@@ -207,16 +207,16 @@ func (s *TrendService) CalcTrend(
 
 	finalResults := make([]*models.TrendElement, 0)
 	linq.From(combinedResults).
-		SelectT(func (el *models.CombinedResultForTrend) *models.TrendElement {
+		SelectT(func(el *models.CombinedResultForTrend) *models.TrendElement {
 			return &models.TrendElement{
-				StageID: el.StageID,
-				ItemID: el.ItemID,
-				Quantity: el.Quantity,
-				Times: el.Times,
-				Server: server,
+				StageID:   el.StageID,
+				ItemID:    el.ItemID,
+				Quantity:  el.Quantity,
+				Times:     el.Times,
+				Server:    server,
 				StartTime: el.StartTime,
-				EndTime: el.EndTime,
-				GroupID: el.GroupID,
+				EndTime:   el.EndTime,
+				GroupID:   el.GroupID,
 			}
 		}).
 		ToSlice(&finalResults)
@@ -225,7 +225,7 @@ func (s *TrendService) CalcTrend(
 
 func (s *TrendService) combineQuantityAndTimesResults(
 	quantityResults []*models.TotalQuantityResultForTrend, timesResults []*models.TotalTimesResultForTrend,
-	) []*models.CombinedResultForTrend {
+) []*models.CombinedResultForTrend {
 	var firstGroupResultsForQuantity []linq.Group
 	combinedResults := make([]*models.CombinedResultForTrend, 0)
 	linq.From(quantityResults).
@@ -279,13 +279,13 @@ func (s *TrendService) combineQuantityAndTimesResults(
 					startTime := el.(*models.TotalTimesResultForTrend).IntervalStart
 					endTime := el.(*models.TotalTimesResultForTrend).IntervalEnd
 					combinedResults = append(combinedResults, &models.CombinedResultForTrend{
-						GroupID: groupId,
-						StageID: stageId,
-						ItemID: itemId,
-						Quantity: quantity,
-						Times: times,
+						GroupID:   groupId,
+						StageID:   stageId,
+						ItemID:    itemId,
+						Quantity:  quantity,
+						Times:     times,
 						StartTime: startTime,
-						EndTime: endTime,
+						EndTime:   endTime,
 					})
 				}
 			}

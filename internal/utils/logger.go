@@ -14,7 +14,7 @@ func ConfigureLogger() {
 
 	_ = os.Mkdir("logs", os.ModePerm)
 
-	logFile, err := os.OpenFile("logs/app.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	logFile, err := os.OpenFile("logs/app.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o644)
 	if err != nil {
 		log.Panic().Err(err).Msg("Failed to open log file")
 	}

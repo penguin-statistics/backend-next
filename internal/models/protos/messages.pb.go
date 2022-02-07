@@ -7,10 +7,11 @@
 package protos
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -763,20 +764,23 @@ func file_messages_proto_rawDescGZIP() []byte {
 	return file_messages_proto_rawDescData
 }
 
-var file_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
-var file_messages_proto_goTypes = []interface{}{
-	(MessageType)(0),                            // 0: MessageType
-	(*Ping)(nil),                                // 1: Ping
-	(*Pong)(nil),                                // 2: Pong
-	(*Skeleton)(nil),                            // 3: Skeleton
-	(*Header)(nil),                              // 4: Header
-	(*MatrixUpdateMessage)(nil),                 // 5: MatrixUpdateMessage
-	(*MatrixUpdateSubscribeReq)(nil),            // 6: MatrixUpdateSubscribeReq
-	(*MatrixUpdateSubscribeResp)(nil),           // 7: MatrixUpdateSubscribeResp
-	(*MatrixUpdateMessage_Segment)(nil),         // 8: MatrixUpdateMessage.Segment
-	(*MatrixUpdateMessage_Segment_Element)(nil), // 9: MatrixUpdateMessage.Segment.Element
-}
+var (
+	file_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+	file_messages_proto_msgTypes  = make([]protoimpl.MessageInfo, 9)
+	file_messages_proto_goTypes   = []interface{}{
+		(MessageType)(0),                            // 0: MessageType
+		(*Ping)(nil),                                // 1: Ping
+		(*Pong)(nil),                                // 2: Pong
+		(*Skeleton)(nil),                            // 3: Skeleton
+		(*Header)(nil),                              // 4: Header
+		(*MatrixUpdateMessage)(nil),                 // 5: MatrixUpdateMessage
+		(*MatrixUpdateSubscribeReq)(nil),            // 6: MatrixUpdateSubscribeReq
+		(*MatrixUpdateSubscribeResp)(nil),           // 7: MatrixUpdateSubscribeResp
+		(*MatrixUpdateMessage_Segment)(nil),         // 8: MatrixUpdateMessage.Segment
+		(*MatrixUpdateMessage_Segment_Element)(nil), // 9: MatrixUpdateMessage.Segment.Element
+	}
+)
+
 var file_messages_proto_depIdxs = []int32{
 	4, // 0: Ping.header:type_name -> Header
 	4, // 1: Pong.header:type_name -> Header

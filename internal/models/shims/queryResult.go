@@ -8,10 +8,10 @@ type DropMatrixQueryResult struct {
 }
 
 type OneDropMatrixElement struct {
-	StageID string `json:"stageId"`
-	ItemID string `json:"itemId"`
-	Times int `json:"times"`
-	Quantity int `json:"quantity"`
-	StartTime int64 `json:"start"`
-	EndTime *null.Int `json:"end,omitempty"`
+	StageID   string    `json:"stageId"`
+	ItemID    string    `json:"itemId"`
+	Times     int       `json:"times"`
+	Quantity  int       `json:"quantity"`
+	StartTime int64     `json:"start"`
+	EndTime   *null.Int `json:"end,omitempty"`
 }
