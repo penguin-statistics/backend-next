@@ -51,6 +51,18 @@ func RegisterResultController(
 	v2.Get("/result/matrix", c.GetDropMatrix)
 }
 
+// @Summary      Get DropMatrix
+// @Tags         Result
+// @Produce      json
+// @Param        server            query string "CN"  "Server"
+// @Param        is_personal       query bool   false "Whether to query for personal drop matrix or not"
+// @Param        show_closed_zones query    bool   false "Whether to show closed stages or not"
+// @Param        stageFilter       query    string ""    "Comma separated list of ark stage ids"
+// @Param        itemFilter        query    string ""    "Comma separated list of ark item ids"
+// @Success      200               {object} shims.DropMatrixQueryResult
+// @Failure      500               {object} errors.PenguinError "An unexpected error occurred"
+// @Router       /PenguinStats/api/v2/result/matrix [GET]
+// @Deprecated
 func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 	// TODO: the whole result should be cached, and populated when server starts
 	server := ctx.Query("server", "CN")
