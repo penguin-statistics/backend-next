@@ -53,6 +53,7 @@ func RegisterResultController(
 
 	v2.Get("/result/matrix", c.GetDropMatrix)
 	v2.Get("/result/pattern", c.GetPatternMatrix)
+	v2.Get("/result/trends", c.GetTrends)
 }
 
 // @Summary      Get DropMatrix
@@ -259,6 +260,51 @@ func (c *ResultController) GetPatternMatrix(ctx *fiber.Ctx) error {
 			}
 			results.PatternMatrix = append(results.PatternMatrix, &onePatternMatrixElement)
 		}
+	}
+
+	return ctx.JSON(results)
+}
+
+// @Summary      Get Trends
+// @Tags         Result
+// @Produce      json
+// @Param        server            query string "CN"  "Server"
+// @Success      200               {object} shims.TrendQueryResult
+// @Failure      500               {object} errors.PenguinError "An unexpected error occurred"
+// @Router       /PenguinStats/api/v2/result/trends [GET]
+// @Deprecated
+func (c *ResultController) GetTrends(ctx *fiber.Ctx) error {
+	// TODO: the whole result should be cached, and populated when server starts
+	server := ctx.Query("server", "CN")
+
+	queryResult, err := c.TrendService.GetTrendResults(ctx, server)
+	if err != nil {
+		return err
+	}
+
+	results := &shims.TrendQueryResult{
+		Trend: make(map[string]*shims.StageTrend),
+	}
+	for _, stageTrend := range queryResult.Trends {
+		stage, err := c.StageService.GetStageById(ctx, stageTrend.StageID)
+		if err != nil {
+			return err
+		}
+		shimStageTrend := shims.StageTrend{
+			Results: make(map[string]*shims.OneItemTrend),
+		}
+		for _, itemTrend := range stageTrend.Results {
+			item, err := c.ItemService.GetItemById(ctx, itemTrend.ItemID)
+			if err != nil {
+				return err
+			}
+			shimStageTrend.Results[item.ArkItemID] = &shims.OneItemTrend{
+				Quantity:  itemTrend.Quantity,
+				Times:     itemTrend.Times,
+				StartTime: itemTrend.StartTime.UnixMilli(),
+			}
+		}
+		results.Trend[stage.ArkStageID] = &shimStageTrend
 	}
 
 	return ctx.JSON(results)

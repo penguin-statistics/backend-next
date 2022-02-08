@@ -38,3 +38,18 @@ type OneDrop struct {
 	ItemID   string `json:"itemId"`
 	Quantity int    `json:"quantity"`
 }
+
+// Trend
+type TrendQueryResult struct {
+	Trend map[string]*StageTrend `json:"trend"`
+}
+
+type StageTrend struct {
+	Results map[string]*OneItemTrend `json:"results"`
+}
+
+type OneItemTrend struct {
+	Quantity  []int `json:"quantity"`
+	Times     []int `json:"times"`
+	StartTime int64 `json:"startTime"`
+}
