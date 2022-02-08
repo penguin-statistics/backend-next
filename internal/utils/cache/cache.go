@@ -13,7 +13,7 @@ var ErrNoKey = errors.New("no such key")
 
 type Cache interface {
 	Get(key string, dest interface{}) error
-	Set(key string, value interface{}) error
+	Set(key string, value interface{}, expire_min int) error
 	Delete(key string)
 }
 
@@ -38,12 +38,12 @@ func (rbc *redisCache) Get(key string, dest interface{}) error {
 	return json.Unmarshal(resp, dest)
 }
 
-func (rbc *redisCache) Set(key string, value interface{}) error {
+func (rbc *redisCache) Set(key string, value interface{}, expire_min int) error {
 	b, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}
-	return rbc.client.Set(context.Background(), rbc.prefix+key, b, time.Minute).Err()
+	return rbc.client.Set(context.Background(), rbc.prefix+key, b, time.Minute*time.Duration(expire_min)).Err()
 }
 
 func (rbc *redisCache) Delete(key string) {

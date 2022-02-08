@@ -55,7 +55,7 @@ func (c *StageRepo) GetStageById(ctx context.Context, stageId int) (*models.Stag
 		return nil, err
 	}
 
-	go cache.StageFromId.Set(strconv.Itoa(stageId), &stage)
+	go cache.StageFromId.Set(strconv.Itoa(stageId), &stage, 24*60)
 	return &stage, nil
 }
 
@@ -77,7 +77,7 @@ func (c *StageRepo) GetStageByArkId(ctx context.Context, stageArkId string) (*mo
 		return nil, err
 	}
 
-	go cache.StageFromArkId.Set(stageArkId, &stage)
+	go cache.StageFromArkId.Set(stageArkId, &stage, 24*60)
 	return &stage, nil
 }
 

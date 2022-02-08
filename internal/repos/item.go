@@ -54,7 +54,7 @@ func (c *ItemRepo) GetItemById(ctx context.Context, itemId int) (*models.Item, e
 		return nil, err
 	}
 
-	go cache.ItemFromId.Set(strconv.Itoa(itemId), &item)
+	go cache.ItemFromId.Set(strconv.Itoa(itemId), &item, 24*60)
 	return &item, nil
 }
 
@@ -76,7 +76,7 @@ func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*model
 		return nil, err
 	}
 
-	go cache.ItemFromArkId.Set(arkItemId, &item)
+	go cache.ItemFromArkId.Set(arkItemId, &item, 24*60)
 	return &item, nil
 }
 

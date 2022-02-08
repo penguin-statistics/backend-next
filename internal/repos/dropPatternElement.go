@@ -92,6 +92,6 @@ func (r *DropPatternElementRepo) GetDropPatternElementsByPatternId(ctx context.C
 		return nil, err
 	}
 
-	go cache.DropPatternElementsFromId.Set(strconv.Itoa(patternId), &elements)
+	go cache.DropPatternElementsFromId.Set(strconv.Itoa(patternId), &elements, 24*60)
 	return elements, nil
 }

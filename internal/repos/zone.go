@@ -53,7 +53,7 @@ func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model
 		return nil, err
 	}
 
-	go cache.ZoneFromArkId.Set(arkZoneId, &zone)
+	go cache.ZoneFromArkId.Set(arkZoneId, &zone, 24*60)
 	return &zone, nil
 }
 
