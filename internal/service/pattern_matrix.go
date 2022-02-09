@@ -38,12 +38,12 @@ func NewPatternMatrixService(
 	}
 }
 
-func (s *PatternMatrixService) GetLatestPatternMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*models.DropPatternQueryResult, error) {
+func (s *PatternMatrixService) GetSavedPatternMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*models.DropPatternQueryResult, error) {
 	patternMatrixElements, err := s.getLatestPatternMatrixElements(ctx, server, accountId)
 	if err != nil {
 		return nil, err
 	}
-	return s.generateLatestResultsFromPatternMatrixElements(ctx, server, patternMatrixElements)
+	return s.convertPatternMatrixElementsToDropPatternQueryResult(ctx, server, patternMatrixElements)
 }
 
 func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx *fiber.Ctx, server string) error {
@@ -216,7 +216,7 @@ func (s *PatternMatrixService) getStageIdsMapByTimeRange(timeRangesMap map[int]*
 	return results
 }
 
-func (s *PatternMatrixService) generateLatestResultsFromPatternMatrixElements(
+func (s *PatternMatrixService) convertPatternMatrixElementsToDropPatternQueryResult(
 	ctx *fiber.Ctx, server string, patternMatrixElements []*models.PatternMatrixElement,
 ) (*models.DropPatternQueryResult, error) {
 	timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)

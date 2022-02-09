@@ -25,6 +25,8 @@ var (
 
 var DropPatternElementsFromId cache.Cache
 
+var TimeRangeFromId cache.Cache
+
 var once sync.Once
 
 func Populate(client *redis.Client) {
@@ -39,5 +41,7 @@ func Populate(client *redis.Client) {
 		ZoneFromArkId = cache.New(client, "zone#arkId")
 
 		DropPatternElementsFromId = cache.New(client, "dropPatternElement#id")
+
+		TimeRangeFromId = cache.New(client, "timeRange#id")
 	})
 }

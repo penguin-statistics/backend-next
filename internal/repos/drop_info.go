@@ -187,10 +187,10 @@ func (s *DropInfoRepo) GetDropInfosWithFilters(ctx context.Context, server strin
 	var whereBuilder strings.Builder
 	fmt.Fprintf(&whereBuilder, "di.server = ? AND di.drop_type != ? AND di.item_id IS NOT NULL")
 
-	if stageIdFilter != nil && len(stageIdFilter) > 0 {
+	if len(stageIdFilter) > 0 {
 		fmt.Fprintf(&whereBuilder, " AND di.stage_id IN (?)")
 	}
-	if itemIdFilter != nil && len(itemIdFilter) > 0 {
+	if len(itemIdFilter) > 0 {
 		fmt.Fprintf(&whereBuilder, " AND di.item_id IN (?)")
 	}
 
@@ -202,7 +202,7 @@ func (s *DropInfoRepo) GetDropInfosWithFilters(ctx context.Context, server strin
 		}
 	}
 
-	if timeRanges != nil && len(timeRanges) > 0 {
+	if len(timeRanges) > 0 {
 		if allTimeRangesHaveNoRangeId {
 			for _, timeRange := range timeRanges {
 				startTimeStr := timeRange.StartTime.Format(time.RFC3339)

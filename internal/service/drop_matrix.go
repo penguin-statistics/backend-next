@@ -36,13 +36,22 @@ func NewDropMatrixService(
 	}
 }
 
-func (s *DropMatrixService) GetMaxAccumulableDropMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*models.DropMatrixQueryResult, error) {
+func (s *DropMatrixService) GetSavedDropMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*models.DropMatrixQueryResult, error) {
 	dropMatrixElements, err := s.getDropMatrixElements(ctx, server, accountId)
 	if err != nil {
 		return nil, err
 	}
-	elementsMap := utils.GetDropMatrixElementsMap(dropMatrixElements)
-	return s.generateMaxAccumulableResultsFromDropMatrixElementsMap(ctx, server, elementsMap)
+	return s.convertDropMatrixElementsToMaxAccumulableDropMatrixQueryResult(ctx, server, dropMatrixElements)
+}
+
+func (s *DropMatrixService) QueryDropMatrix(
+	ctx *fiber.Ctx, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
+) (*models.DropMatrixQueryResult, error) {
+	dropMatrixElements, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, stageIdFilter, itemIdFilter, accountId)
+	if err != nil {
+		return nil, err
+	}
+	return s.convertDropMatrixElementsToDropMatrixQueryResult(ctx, server, dropMatrixElements)
 }
 
 func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server string) error {
@@ -73,7 +82,7 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 			startTime := time.Now()
 
 			timeRanges := []*models.TimeRange{timeRange}
-			currentBatch, err := s.CalcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, &null.Int{})
+			currentBatch, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, &null.Int{})
 			if err != nil {
 				return
 			}
@@ -111,13 +120,13 @@ func (s *DropMatrixService) getDropMatrixElements(ctx *fiber.Ctx, server string,
 		for _, timeRange := range timeRangesMap {
 			timeRanges = append(timeRanges, timeRange)
 		}
-		return s.CalcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId)
+		return s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId)
 	} else {
 		return s.DropMatrixElementService.GetElementsByServer(ctx, server)
 	}
 }
 
-func (s *DropMatrixService) CalcDropMatrixForTimeRanges(
+func (s *DropMatrixService) calcDropMatrixForTimeRanges(
 	ctx *fiber.Ctx, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
 ) ([]*models.DropMatrixElement, error) {
 	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, itemIdFilter)
@@ -136,10 +145,6 @@ func (s *DropMatrixService) CalcDropMatrixForTimeRanges(
 			return nil, err
 		}
 		combinedResults = s.combineQuantityAndTimesResults(quantityResults, timesResults, timeRange)
-		// for _, result := range combinedResults {
-		// 	result["timeRange"] = timeRange
-		// 	results = append(results, result)
-		// }
 	}
 
 	// save stage times for later use
@@ -163,14 +168,35 @@ func (s *DropMatrixService) CalcDropMatrixForTimeRanges(
 			ToSlice(&groupedResults2)
 		for _, el2 := range groupedResults2 {
 			rangeId := el2.Key.(int)
+			timeRange := el2.Group[0].(*models.CombinedResultForDropMatrix).TimeRange
+
 			// get all item ids which are dropped in this stage and in this time range
-			dropItemIds, _ := s.DropInfoService.GetItemDropSetByStageIdAndRangeId(ctx, server, stageId, rangeId)
+			var dropItemIds []int
+			if rangeId == 0 {
+				// rangeId == 0 means it is a customized time range instead of a time range from the database
+				dropInfosForSpecialTimeRange, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, []*models.TimeRange{el2.Group[0].(*models.CombinedResultForDropMatrix).TimeRange}, nil, nil)
+				if err != nil {
+					return nil, err
+				}
+				linq.From(dropInfosForSpecialTimeRange).
+					WhereT(func(el *models.DropInfo) bool { return el.ItemID.Valid }).
+					SelectT(func(el *models.DropInfo) int { return int(el.ItemID.Int64) }).
+					ToSlice(&dropItemIds)
+			} else {
+				dropItemIds, _ = s.DropInfoService.GetItemDropSetByStageIdAndRangeId(ctx, server, stageId, rangeId)
+			}
+
+			// if item id filter is applied, then filter the drop item ids
+			if len(itemIdFilter) > 0 {
+				linq.From(dropItemIds).WhereT(func(itemId int) bool { return linq.From(itemIdFilter).Contains(itemId) }).ToSlice(&dropItemIds)
+			}
 
 			// use a fake hashset to save item ids
 			dropSet := make(map[int]struct{}, len(dropItemIds))
 			for _, itemId := range dropItemIds {
 				dropSet[itemId] = struct{}{}
 			}
+
 			for _, el3 := range el2.Group {
 				itemId := el3.(*models.CombinedResultForDropMatrix).ItemID
 				quantity := el3.(*models.CombinedResultForDropMatrix).Quantity
@@ -182,6 +208,9 @@ func (s *DropMatrixService) CalcDropMatrixForTimeRanges(
 					Quantity: quantity,
 					Times:    times,
 					Server:   server,
+				}
+				if rangeId == 0 {
+					dropMatrixElement.TimeRange = timeRange
 				}
 				dropMatrixElements = append(dropMatrixElements, &dropMatrixElement)
 				delete(dropSet, itemId)        // remove existing item ids from drop set
@@ -196,6 +225,9 @@ func (s *DropMatrixService) CalcDropMatrixForTimeRanges(
 					Quantity: 0,
 					Times:    stageTimesMap[stageId],
 					Server:   server,
+				}
+				if rangeId == 0 {
+					dropMatrixElementWithZeroQuantity.TimeRange = timeRange
 				}
 				dropMatrixElements = append(dropMatrixElements, &dropMatrixElementWithZeroQuantity)
 			}
@@ -252,9 +284,10 @@ func (s *DropMatrixService) combineQuantityAndTimesResults(
 	return combinedResults
 }
 
-func (s *DropMatrixService) generateMaxAccumulableResultsFromDropMatrixElementsMap(
-	ctx *fiber.Ctx, server string, elementsMap map[int]map[int]map[int]*models.DropMatrixElement,
+func (s *DropMatrixService) convertDropMatrixElementsToMaxAccumulableDropMatrixQueryResult(
+	ctx *fiber.Ctx, server string, dropMatrixElements []*models.DropMatrixElement,
 ) (*models.DropMatrixQueryResult, error) {
+	elementsMap := utils.GetDropMatrixElementsMap(dropMatrixElements)
 	result := &models.DropMatrixQueryResult{
 		Matrix: make([]*models.OneDropMatrixElement, 0),
 	}
@@ -323,4 +356,42 @@ func (s *DropMatrixService) combineDropMatrixResults(a *models.OneDropMatrixElem
 		Times:    a.Times + b.Times,
 	}
 	return result, nil
+}
+
+func (s *DropMatrixService) convertDropMatrixElementsToDropMatrixQueryResult(ctx *fiber.Ctx, server string, dropMatrixElements []*models.DropMatrixElement) (*models.DropMatrixQueryResult, error) {
+	dropMatrixQueryResult := &models.DropMatrixQueryResult{
+		Matrix: make([]*models.OneDropMatrixElement, 0),
+	}
+	var groupedResults []linq.Group
+	linq.From(dropMatrixElements).
+		GroupByT(
+			func(el *models.DropMatrixElement) int { return el.RangeID },
+			func(el *models.DropMatrixElement) *models.DropMatrixElement { return el },
+		).
+		ToSlice(&groupedResults)
+	for _, group := range groupedResults {
+		rangeId := group.Key.(int)
+		var timeRange *models.TimeRange
+		if rangeId == 0 {
+			timeRange = group.Group[0].(*models.DropMatrixElement).TimeRange
+		} else {
+			tr, err := s.TimeRangeService.GetTimeRangeById(ctx, rangeId)
+			if err != nil {
+				return nil, err
+			}
+			timeRange = tr
+		}
+
+		for _, el := range group.Group {
+			dropMatrixElement := el.(*models.DropMatrixElement)
+			dropMatrixQueryResult.Matrix = append(dropMatrixQueryResult.Matrix, &models.OneDropMatrixElement{
+				StageID:   dropMatrixElement.StageID,
+				ItemID:    dropMatrixElement.ItemID,
+				Quantity:  dropMatrixElement.Quantity,
+				Times:     dropMatrixElement.Times,
+				TimeRange: timeRange,
+			})
+		}
+	}
+	return dropMatrixQueryResult, nil
 }

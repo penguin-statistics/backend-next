@@ -2,10 +2,12 @@ package repos
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 )
 
 type TimeRangeRepo struct {
@@ -25,4 +27,22 @@ func (c *TimeRangeRepo) GetTimeRangesByServer(ctx context.Context, server string
 		return nil, err
 	}
 	return timeRanges, nil
+}
+
+func (c *TimeRangeRepo) GetTimeRangeById(ctx context.Context, rangeId int) (*models.TimeRange, error) {
+	var timeRange models.TimeRange
+	err := cache.StageFromId.Get(strconv.Itoa(rangeId), &timeRange)
+	if err == nil {
+		return &timeRange, nil
+	}
+
+	if err := c.db.NewSelect().
+		Model(&timeRange).
+		Where("tr.range_id = ?", rangeId).
+		Scan(ctx); err != nil {
+		return nil, err
+	}
+
+	go cache.StageFromId.Set(strconv.Itoa(rangeId), &timeRange, 24*60)
+	return &timeRange, nil
 }

@@ -30,6 +30,10 @@ func (s *TimeRangeService) GetAllTimeRangesByServer(ctx *fiber.Ctx, server strin
 	return timeRanges, nil
 }
 
+func (s *TimeRangeService) GetTimeRangeById(ctx *fiber.Ctx, rangeId int) (*models.TimeRange, error) {
+	return s.TimeRangeRepo.GetTimeRangeById(ctx.Context(), rangeId)
+}
+
 func (s *TimeRangeService) GetCurrentTimeRangesByServer(ctx *fiber.Ctx, server string) ([]*models.TimeRange, error) {
 	timeRanges, err := s.TimeRangeRepo.GetTimeRangesByServer(ctx.Context(), server)
 	if err != nil {

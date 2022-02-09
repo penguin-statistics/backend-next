@@ -35,3 +35,7 @@ func (s *StageService) GetStagesMap(ctx *fiber.Ctx) (map[int]*models.Stage, erro
 func (s *StageService) GetStageById(ctx *fiber.Ctx, stageId int) (*models.Stage, error) {
 	return s.StageRepo.GetStageById(ctx.Context(), stageId)
 }
+
+func (s *StageService) GetStageByArkId(ctx *fiber.Ctx, stageArkId string) (*models.Stage, error) {
+	return s.StageRepo.GetStageByArkId(ctx.Context(), stageArkId)
+}

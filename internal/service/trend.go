@@ -40,59 +40,22 @@ func NewTrendService(
 	}
 }
 
-func (s *TrendService) GetTrendResults(ctx *fiber.Ctx, server string) (*models.TrendQueryResult, error) {
+func (s *TrendService) GetSavedTrendResults(ctx *fiber.Ctx, server string) (*models.TrendQueryResult, error) {
 	trendElements, err := s.TrendElementService.GetElementsByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
-	var groupedResults []linq.Group
-	linq.From(trendElements).
-		GroupByT(
-			func(el *models.TrendElement) int { return el.StageID },
-			func(el *models.TrendElement) *models.TrendElement { return el },
-		).
-		ToSlice(&groupedResults)
-	trendQueryResult := &models.TrendQueryResult{
-		Trends: make([]*models.StageTrend, 0),
+	return s.convertTrendElementsToTrendQueryResult(trendElements)
+}
+
+func (s *TrendService) QueryTrend(
+	ctx *fiber.Ctx, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
+) (*models.TrendQueryResult, error) {
+	trendElements, err := s.calcTrend(ctx, server, startTime, intervalLength_hrs, intervalNum, stageIdFilter, itemIdFilter, accountId)
+	if err != nil {
+		return nil, err
 	}
-	for _, el := range groupedResults {
-		stageId := el.Key.(int)
-		stageTrend := &models.StageTrend{
-			StageID: stageId,
-			Results: make([]*models.ItemTrend, 0),
-		}
-		var groupedResults2 []linq.Group
-		linq.From(el.Group).
-			GroupByT(
-				func(el *models.TrendElement) int { return el.ItemID },
-				func(el *models.TrendElement) *models.TrendElement { return el },
-			).
-			ToSlice(&groupedResults2)
-		var startTime *time.Time
-		for _, el2 := range groupedResults2 {
-			itemId := el2.Key.(int)
-			var sortedElements []*models.TrendElement
-			linq.From(el2.Group).
-				SortT(func(el1, el2 *models.TrendElement) bool { return el1.GroupID < el2.GroupID }).
-				ToSlice(&sortedElements)
-			startTime = sortedElements[0].StartTime
-			maxGroupId := linq.From(sortedElements).SelectT(func(el *models.TrendElement) int { return el.GroupID }).Max().(int)
-			timesArray := make([]int, maxGroupId+1)
-			quantityArray := make([]int, maxGroupId+1)
-			for _, el3 := range sortedElements {
-				timesArray[el3.GroupID] = el3.Times
-				quantityArray[el3.GroupID] = el3.Quantity
-			}
-			stageTrend.Results = append(stageTrend.Results, &models.ItemTrend{
-				ItemID:    itemId,
-				Times:     timesArray,
-				Quantity:  quantityArray,
-				StartTime: startTime,
-			})
-		}
-		trendQueryResult.Trends = append(trendQueryResult.Trends, stageTrend)
-	}
-	return trendQueryResult, nil
+	return s.convertTrendElementsToTrendQueryResult(trendElements)
 }
 
 func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error {
@@ -168,7 +131,7 @@ func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error
 			intervalNum := el["intervalNum"].(int)
 			stageId := el["stageId"].(int)
 			itemIds := el["itemIds"].([]int)
-			currentBatch, err := s.CalcTrend(ctx, server, &startTime, 24, intervalNum, []int{stageId}, itemIds, &null.Int{})
+			currentBatch, err := s.calcTrend(ctx, server, &startTime, 24, intervalNum, []int{stageId}, itemIds, &null.Int{})
 			if err != nil {
 				return
 			}
@@ -182,7 +145,7 @@ func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error
 	return s.TrendElementService.BatchSaveElements(ctx, toSave, server)
 }
 
-func (s *TrendService) CalcTrend(
+func (s *TrendService) calcTrend(
 	ctx *fiber.Ctx, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
 ) ([]*models.TrendElement, error) {
 	endTime := startTime.Add(time.Hour * time.Duration(intervalLength_hrs*intervalNum))
@@ -292,4 +255,55 @@ func (s *TrendService) combineQuantityAndTimesResults(
 		}
 	}
 	return combinedResults
+}
+
+func (s *TrendService) convertTrendElementsToTrendQueryResult(trendElements []*models.TrendElement) (*models.TrendQueryResult, error) {
+	var groupedResults []linq.Group
+	linq.From(trendElements).
+		GroupByT(
+			func(el *models.TrendElement) int { return el.StageID },
+			func(el *models.TrendElement) *models.TrendElement { return el },
+		).
+		ToSlice(&groupedResults)
+	trendQueryResult := &models.TrendQueryResult{
+		Trends: make([]*models.StageTrend, 0),
+	}
+	for _, el := range groupedResults {
+		stageId := el.Key.(int)
+		stageTrend := &models.StageTrend{
+			StageID: stageId,
+			Results: make([]*models.ItemTrend, 0),
+		}
+		var groupedResults2 []linq.Group
+		linq.From(el.Group).
+			GroupByT(
+				func(el *models.TrendElement) int { return el.ItemID },
+				func(el *models.TrendElement) *models.TrendElement { return el },
+			).
+			ToSlice(&groupedResults2)
+		var startTime *time.Time
+		for _, el2 := range groupedResults2 {
+			itemId := el2.Key.(int)
+			var sortedElements []*models.TrendElement
+			linq.From(el2.Group).
+				SortT(func(el1, el2 *models.TrendElement) bool { return el1.GroupID < el2.GroupID }).
+				ToSlice(&sortedElements)
+			startTime = sortedElements[0].StartTime
+			maxGroupId := linq.From(sortedElements).SelectT(func(el *models.TrendElement) int { return el.GroupID }).Max().(int)
+			timesArray := make([]int, maxGroupId+1)
+			quantityArray := make([]int, maxGroupId+1)
+			for _, el3 := range sortedElements {
+				timesArray[el3.GroupID] = el3.Times
+				quantityArray[el3.GroupID] = el3.Quantity
+			}
+			stageTrend.Results = append(stageTrend.Results, &models.ItemTrend{
+				ItemID:    itemId,
+				Times:     timesArray,
+				Quantity:  quantityArray,
+				StartTime: startTime,
+			})
+		}
+		trendQueryResult.Trends = append(trendQueryResult.Trends, stageTrend)
+	}
+	return trendQueryResult, nil
 }

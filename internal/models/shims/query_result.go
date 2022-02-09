@@ -53,3 +53,8 @@ type OneItemTrend struct {
 	Times     []int `json:"times"`
 	StartTime int64 `json:"startTime"`
 }
+
+// Advanced Query
+type AdvancedQueryResult struct {
+	AdvancedResults []interface{} `json:"advanced_results"`
+}
