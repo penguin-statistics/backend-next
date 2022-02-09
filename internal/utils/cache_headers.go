@@ -7,9 +7,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func SetCtxCacheHeaders(ctx *fiber.Ctx, cacheTime int) {
-	ctx.Set("Cache-Control", "public, max-age="+strconv.Itoa(cacheTime))
-	ctx.Set("Expires", time.Now().Add(time.Duration(cacheTime)*time.Second).Format(time.RFC1123))
+func SetCtxCacheHeaders(ctx *fiber.Ctx, cacheTime time.Duration) {
+	ctx.Set("Cache-Control", "public, max-age="+strconv.Itoa(int(cacheTime.Seconds())))
+	ctx.Set("Expires", time.Now().Add(cacheTime).Format(time.RFC1123))
 }
 
 func SetCtxNoCache(ctx *fiber.Ctx) {
