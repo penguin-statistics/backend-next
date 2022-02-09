@@ -270,7 +270,7 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 		}
 		ip := reportTask.IP
 		if ip == "" {
-			// FIXME: temporary hack
+			// FIXME: temporary hack; find why ip is empty
 			ip = "127.0.0.1"
 		}
 		if err = s.DropReportExtraRepo.CreateDropReportExtra(ctx, tx, &models.DropReportExtra{

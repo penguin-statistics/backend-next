@@ -70,6 +70,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Invoke(shims.RegisterStageController),
 		fx.Invoke(shims.RegisterResultController),
 		fx.Invoke(shims.RegisterNoticeController),
+		fx.Invoke(shims.RegisterAccountController),
 		fx.Invoke(shims.RegisterSiteStatsController),
 		fx.Invoke(controllers.RegisterTestController),
 		fx.Invoke(controllers.RegisterItemController),

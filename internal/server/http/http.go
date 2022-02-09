@@ -98,14 +98,15 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 
 	app.Use(favicon.New())
 	app.Use(cors.New(cors.Config{
+		AllowOrigins:     "*",
 		AllowMethods:     "GET, POST, DELETE, OPTIONS",
 		AllowHeaders:     "Content-Type, Authorization, X-Requested-With, X-Penguin-Variant",
-		ExposeHeaders:    "Content-Type, X-Penguin-Set-PenguinID, X-Penguin-Upgrade, X-Penguin-Compatible, X-Penguin-RequestID",
+		ExposeHeaders:    "Content-Type, X-Penguin-Set-PenguinID, X-Penguin-Upgrade, X-Penguin-Compatible, X-Penguin-Request-ID",
 		AllowCredentials: true,
 	}))
 	app.Use(requestid.New(
 		requestid.Config{
-			Header: "X-Penguin-RequestID",
+			Header: "X-Penguin-Request-ID",
 			Generator: func() string {
 				id := flake.Generate().IntBytes()
 				return hex.EncodeToString(id[:])

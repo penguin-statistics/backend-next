@@ -1,17 +1,17 @@
 package constants
 
 const (
-	FAKE_END_TIME_MILLI int64 = 62141368179000
+	FakeEndTimeMilli int64 = 62141368179000
 
-	CN_SERVER_START_TIME_MILLI int64 = 1556676000000
-	US_SERVER_START_TIME_MILLI int64 = 1579190400000
-	JP_SERVER_START_TIME_MILLI int64 = 1579140000000
-	KR_SERVER_START_TIME_MILLI int64 = 1579140000000
+	CNServerStartTimeMilli int64 = 1556676000000
+	USServerStartTimeMilli int64 = 1579190400000
+	JPServerStartTimeMilli int64 = 1579140000000
+	KRServerStartTimeMilli int64 = 1579140000000
 )
 
-var SERVER_START_TIME_MAP_MILLI = map[string]int64{
-	"CN": CN_SERVER_START_TIME_MILLI,
-	"US": US_SERVER_START_TIME_MILLI,
-	"JP": JP_SERVER_START_TIME_MILLI,
-	"KR": KR_SERVER_START_TIME_MILLI,
+var ServerStartTimeMapMilli = map[string]int64{
+	"CN": CNServerStartTimeMilli,
+	"US": USServerStartTimeMilli,
+	"JP": JPServerStartTimeMilli,
+	"KR": KRServerStartTimeMilli,
 }

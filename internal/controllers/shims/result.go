@@ -264,7 +264,7 @@ func (c *ResultController) applyShimForDropMatrixQuery(ctx *fiber.Ctx, server st
 			StartTime: el.TimeRange.StartTime.UnixMilli(),
 			EndTime:   &endTime,
 		}
-		if oneDropMatrixElement.EndTime.Int64 == constants.FAKE_END_TIME_MILLI {
+		if oneDropMatrixElement.EndTime.Int64 == constants.FakeEndTimeMilli {
 			oneDropMatrixElement.EndTime = nil
 		}
 		results.Matrix = append(results.Matrix, &oneDropMatrixElement)
@@ -317,7 +317,7 @@ func (c *ResultController) applyShimForPatternMatrixQuery(ctx *fiber.Ctx, queryR
 				EndTime:   &endTime,
 				Pattern:   &pattern,
 			}
-			if onePatternMatrixElement.EndTime.Int64 == constants.FAKE_END_TIME_MILLI {
+			if onePatternMatrixElement.EndTime.Int64 == constants.FakeEndTimeMilli {
 				onePatternMatrixElement.EndTime = nil
 			}
 			results.PatternMatrix = append(results.PatternMatrix, &onePatternMatrixElement)
@@ -374,14 +374,14 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 	}
 
 	// handle start time (might be null)
-	startTime_milli := constants.SERVER_START_TIME_MAP_MILLI[query.Server]
+	startTime_milli := constants.ServerStartTimeMapMilli[query.Server]
 	if query.StartTime != nil && query.StartTime.Valid {
 		startTime_milli = query.StartTime.Int64
 	}
 	startTime := time.UnixMilli(startTime_milli)
 
 	// handle end time (might be null)
-	endTime_milli := constants.FAKE_END_TIME_MILLI
+	endTime_milli := constants.FakeEndTimeMilli
 	if query.EndTime != nil && query.EndTime.Valid {
 		endTime_milli = query.EndTime.Int64
 	}
@@ -427,7 +427,7 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 			return nil, fmt.Errorf("interval length must be greater than 1 hour")
 		}
 		intervalNum := c.calcIntervalNum(startTime, endTime, intervalLength_hrs)
-		if intervalNum > constants.MAX_INTERVAL_NUM {
+		if intervalNum > constants.MaxIntervalNum {
 			return nil, fmt.Errorf("intervalNum too large")
 		}
 
