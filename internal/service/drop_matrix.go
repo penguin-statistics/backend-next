@@ -2,7 +2,6 @@ package service
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
@@ -78,7 +77,6 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 	for _, timeRange := range allTimeRanges {
 		limiter <- struct{}{}
 		go func(timeRange *models.TimeRange) {
-			fmt.Println("<   :", timeRange.RangeID)
 			startTime := time.Now()
 
 			timeRanges := []*models.TimeRange{timeRange}
@@ -91,7 +89,6 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 			<-limiter
 
 			usedTimeMap.Store(timeRange.RangeID, int(time.Since(startTime).Microseconds()))
-			fmt.Println("   > :", timeRange.RangeID, "@", time.Since(startTime))
 		}(timeRange)
 	}
 

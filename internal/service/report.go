@@ -17,6 +17,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/konst"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/utils"
 	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
 )
 
@@ -73,25 +74,21 @@ func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, itemRepo *repos.
 }
 
 func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingleReportRequest) error {
-	account, err := s.AccountService.GetAccountFromAuthHeader(ctx, ctx.Get("Authorization"))
-	if err != nil {
-		return err
-	}
-
-	idempotencyKey := ctx.Get("Idempotency-Key")
-
 	// if account is not found, create new account
 	var accountId int
-	if account == nil {
+	account, err := s.AccountService.GetAccountFromRequest(ctx)
+	if err != nil {
 		createdAccount, err := s.AccountService.CreateAccountWithRandomPenguinID(ctx)
 		if err != nil {
 			return err
 		}
 		accountId = createdAccount.AccountID
-		ctx.Set("X-Penguin-Set-PenguinID", createdAccount.PenguinID)
+		utils.SetPenguinIDToResponse(ctx, createdAccount.PenguinID)
 	} else {
 		accountId = account.AccountID
 	}
+
+	idempotencyKey := ctx.Get("Idempotency-Key", ctx.Locals("requestid").(string))
 
 	// merge drops with same (dropType, itemId) pair
 	req.Drops = reportutils.MergeDrops(req.Drops)
@@ -169,7 +166,7 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 
 	_, err := s.NatsJS.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.AckWait(time.Second*10), nats.MaxAckPending(128))
 	if err != nil {
-		fmt.Println("error subscribing:", err)
+		log.Err(err).Msg("failed to subscribe to REPORT.*")
 		return err
 	}
 
@@ -215,7 +212,7 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 		taskReliability = 1
 		log.Warn().Err(err).Msg("report task verification failed, marking task as unreliable")
 	}
-	fmt.Println("reportTask verified successfully")
+	log.Debug().Msg("report task verification finished")
 
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -235,7 +232,6 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 		if err != nil {
 			return err
 		}
-		fmt.Println("pattern ID:", dropPattern.PatternID)
 		if created {
 			_, err := s.DropPatternElementRepo.CreateDropPatternElements(ctx, tx, dropPattern.PatternID, report.Drops)
 			if err != nil {

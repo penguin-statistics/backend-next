@@ -86,7 +86,7 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 
 	accountId := null.NewInt(0, false)
 	if isPersonal {
-		account, err := c.AccountService.GetAccountFromAuthHeader(ctx, ctx.Get("Authorization"))
+		account, err := c.AccountService.GetAccountFromRequest(ctx)
 		if err != nil {
 			return err
 		}
@@ -127,7 +127,7 @@ func (c *ResultController) GetPatternMatrix(ctx *fiber.Ctx) error {
 
 	accountId := null.NewInt(0, false)
 	if isPersonal {
-		account, err := c.AccountService.GetAccountFromAuthHeader(ctx, ctx.Get("Authorization"))
+		account, err := c.AccountService.GetAccountFromRequest(ctx)
 		if err != nil {
 			return err
 		}
@@ -362,7 +362,7 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 	}
 	accountId := null.NewInt(0, false)
 	if isPersonal {
-		account, err := c.AccountService.GetAccountFromAuthHeader(ctx, ctx.Get("Authorization"))
+		account, err := c.AccountService.GetAccountFromRequest(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -374,7 +374,7 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 	}
 
 	// handle start time (might be null)
-	startTime_milli := constants.ServerStartTimeMapMilli[query.Server]
+	startTime_milli := constants.SERVER_START_TIME_MAP_MILLI[query.Server]
 	if query.StartTime != nil && query.StartTime.Valid {
 		startTime_milli = query.StartTime.Int64
 	}

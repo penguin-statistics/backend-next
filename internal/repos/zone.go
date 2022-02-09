@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -53,7 +54,7 @@ func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model
 		return nil, err
 	}
 
-	go cache.ZoneFromArkId.Set(arkZoneId, &zone, 24*60)
+	go cache.ZoneFromArkId.Set(arkZoneId, &zone, time.Hour*24)
 	return &zone, nil
 }
 

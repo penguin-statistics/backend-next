@@ -19,7 +19,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/gofiber/helmet/v2"
-	"github.com/gofiber/websocket/v2"
 	"github.com/penguin-statistics/fiberotel"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
@@ -123,12 +122,12 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 	app.Use(compress.New(compress.Config{
 		Level: compress.LevelBestSpeed,
 	}))
-	app.Use("/api/v3/live", func(c *fiber.Ctx) error {
-		if websocket.IsWebSocketUpgrade(c) {
-			return c.Next()
-		}
-		return fiber.ErrUpgradeRequired
-	})
+	// app.Use("/api/v3/live", func(c *fiber.Ctx) error {
+	// 	if websocket.IsWebSocketUpgrade(c) {
+	// 		return c.Next()
+	// 	}
+	// 	return fiber.ErrUpgradeRequired
+	// })
 	app.Use(func(c *fiber.Ctx) error {
 		set := func(trans ut.Translator) error {
 			c.Locals("T", trans)

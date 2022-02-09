@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"strconv"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -54,7 +55,7 @@ func (c *ItemRepo) GetItemById(ctx context.Context, itemId int) (*models.Item, e
 		return nil, err
 	}
 
-	go cache.ItemFromId.Set(strconv.Itoa(itemId), &item, 24*60)
+	go cache.ItemFromId.Set(strconv.Itoa(itemId), &item, time.Hour*24)
 	return &item, nil
 }
 
@@ -76,7 +77,7 @@ func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*model
 		return nil, err
 	}
 
-	go cache.ItemFromArkId.Set(arkItemId, &item, 24*60)
+	go cache.ItemFromArkId.Set(arkItemId, &item, time.Hour*24)
 	return &item, nil
 }
 

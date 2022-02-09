@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"strconv"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -92,6 +93,6 @@ func (r *DropPatternElementRepo) GetDropPatternElementsByPatternId(ctx context.C
 		return nil, err
 	}
 
-	go cache.DropPatternElementsFromId.Set(strconv.Itoa(patternId), &elements, 24*60)
+	go cache.DropPatternElementsFromId.Set(strconv.Itoa(patternId), &elements, time.Hour*24)
 	return elements, nil
 }

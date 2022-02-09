@@ -293,7 +293,6 @@ func (s *DropReportRepo) CalcTotalTimesForTrend(
 func (s *DropReportRepo) getGameDateStartTime(server string, t time.Time) time.Time {
 	loc := s.locMap[server]
 	t = t.In(loc)
-	fmt.Println(t)
 	if t.Hour() < 4 {
 		t = t.AddDate(0, 0, -1)
 	}

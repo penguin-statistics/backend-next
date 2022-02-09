@@ -51,48 +51,25 @@ func (s *DropPatternRepo) GetDropPatternByHash(ctx context.Context, hash string)
 }
 
 func (s *DropPatternRepo) GetOrCreateDropPatternByHash(ctx context.Context, tx bun.Tx, hash string) (*models.DropPattern, bool, error) {
-	var patternId int64
-	var created bool
-	// Yes, I, know. Raw SQL. I spend 7 hours trying to figure out how to do this with bun.
-	// This is what I come up with. I'm sorry.
-	// This however still is safe enough, since we are using '?' as placeholder. So overall not bad.
-	err := tx.QueryRow(`WITH new_row AS (
-INSERT INTO drop_patterns (hash)
-SELECT
-	?
-WHERE
-	NOT EXISTS (
-		SELECT
-			*
-		FROM
-			drop_patterns
-		WHERE
-			hash = ?)
-	RETURNING
-		pattern_id
-)
-SELECT
-	pattern_id,
-	TRUE
-FROM
-	new_row
-UNION
-SELECT
-	pattern_id,
-	FALSE
-FROM
-	drop_patterns
-WHERE
-	hash = ?;`, hash, hash, hash).Scan(&patternId, &created)
+	var dropPattern models.DropPattern
+	err := tx.NewSelect().
+		Model(&dropPattern).
+		Where("hash = ?", hash).
+		Scan(ctx)
 
-	if err == sql.ErrNoRows {
-		return nil, false, errors.ErrNotFound
-	} else if err != nil {
+	if err == nil {
+		return &dropPattern, false, nil
+	} else if err != nil && err != sql.ErrNoRows {
 		return nil, false, err
 	}
 
-	return &models.DropPattern{
-		PatternID: int(patternId),
-		Hash:      hash,
-	}, created, nil
+	_, err = tx.NewInsert().
+		Model(&dropPattern).
+		Set("hash", hash).
+		Exec(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return &dropPattern, true, nil
 }

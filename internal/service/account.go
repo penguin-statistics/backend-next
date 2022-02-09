@@ -1,12 +1,14 @@
 package service
 
 import (
-	"strings"
+	"errors"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
 type AccountService struct {
@@ -23,18 +25,18 @@ func (s *AccountService) GetAccountByPenguinId(ctx *fiber.Ctx, penguinId string)
 	return s.AccountRepo.GetAccountByPenguinId(ctx.Context(), penguinId)
 }
 
-func (s *AccountService) GetAccountFromAuthHeader(ctx *fiber.Ctx, authorization string) (*models.Account, error) {
+func (s *AccountService) GetAccountFromRequest(ctx *fiber.Ctx) (*models.Account, error) {
 	// get PenguinID from HTTP header in form of Authorization: PenguinID ########
-	penguinID := strings.TrimSpace(strings.TrimPrefix(authorization, "PenguinID"))
+	penguinId := utils.GetPenguinIDFromRequest(ctx)
+	if penguinId == "" {
+		return nil, errors.New("PenguinID not found in request")
+	}
 
 	// check PenguinID validity
-	var account *models.Account
-	var err error
-	if penguinID != "" {
-		account, err = s.GetAccountByPenguinId(ctx, penguinID)
-		if err != nil {
-			return nil, err
-		}
+	account, err := s.GetAccountByPenguinId(ctx, penguinId)
+	if err != nil {
+		log.Warn().Str("PenguinID", penguinId).Err(err).Msg("Failed to get account from request")
+		return nil, errors.New("PenguinID is invalid")
 	}
 	return account, nil
 }

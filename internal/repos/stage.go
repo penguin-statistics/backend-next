@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"strconv"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
@@ -55,7 +56,7 @@ func (c *StageRepo) GetStageById(ctx context.Context, stageId int) (*models.Stag
 		return nil, err
 	}
 
-	go cache.StageFromId.Set(strconv.Itoa(stageId), &stage, 24*60)
+	go cache.StageFromId.Set(strconv.Itoa(stageId), &stage, time.Hour*24)
 	return &stage, nil
 }
 
@@ -77,7 +78,7 @@ func (c *StageRepo) GetStageByArkId(ctx context.Context, stageArkId string) (*mo
 		return nil, err
 	}
 
-	go cache.StageFromArkId.Set(stageArkId, &stage, 24*60)
+	go cache.StageFromArkId.Set(stageArkId, &stage, time.Hour*24)
 	return &stage, nil
 }
 

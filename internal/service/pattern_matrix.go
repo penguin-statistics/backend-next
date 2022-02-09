@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -68,14 +67,14 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx *fiber.Ctx, s
 		}
 	}()
 
-	usedTimeMap := sync.Map{}
+	var usedTimeMap sync.Map
 
 	limiter := make(chan struct{}, 7)
 	wg.Add(len(stageIdsMap))
+
 	for rangeId, stageIds := range stageIdsMap {
 		limiter <- struct{}{}
 		go func(rangeId int, stageIds []int) {
-			fmt.Println("<   :", rangeId)
 			startTime := time.Now()
 
 			timeRanges := []*models.TimeRange{timeRangesMap[rangeId]}
@@ -88,7 +87,6 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx *fiber.Ctx, s
 			<-limiter
 
 			usedTimeMap.Store(rangeId, int(time.Since(startTime).Microseconds()))
-			fmt.Println("   > :", rangeId, "@", time.Since(startTime))
 		}(rangeId, stageIds)
 	}
 

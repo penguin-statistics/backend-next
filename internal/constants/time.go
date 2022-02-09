@@ -9,7 +9,7 @@ const (
 	KRServerStartTimeMilli int64 = 1579140000000
 )
 
-var ServerStartTimeMapMilli = map[string]int64{
+var SERVER_START_TIME_MAP_MILLI = map[string]int64{
 	"CN": CNServerStartTimeMilli,
 	"US": USServerStartTimeMilli,
 	"JP": JPServerStartTimeMilli,

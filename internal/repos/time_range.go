@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -43,6 +44,6 @@ func (c *TimeRangeRepo) GetTimeRangeById(ctx context.Context, rangeId int) (*mod
 		return nil, err
 	}
 
-	go cache.StageFromId.Set(strconv.Itoa(rangeId), &timeRange, 24*60)
+	go cache.StageFromId.Set(strconv.Itoa(rangeId), &timeRange, time.Hour*24)
 	return &timeRange, nil
 }

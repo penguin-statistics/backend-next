@@ -2,15 +2,13 @@ package shims
 
 import (
 	"encoding/json"
-	"net/url"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/service"
+	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
 type AccountController struct {
@@ -41,34 +39,19 @@ func (c *AccountController) Login(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	// we even got emojis in PenguinID for some of the internal testers :)
-	penguinId := url.QueryEscape(account.PenguinID)
-
-	// Populate cookie
-	ctx.Cookie(&fiber.Cookie{
-		Name:     "userID",
-		Value:    penguinId,
-		MaxAge:   constants.PenguinIDAuthMaxCookieAgeSec,
-		Path:     "/",
-		Expires:  time.Now().Add(time.Second * constants.PenguinIDAuthMaxCookieAgeSec),
-		Domain:   "." + ctx.Get("Origin"),
-		SameSite: "None",
-		Secure:   true,
-	})
-
-	// Sets the PenguinID in response header, used for scenarios
-	// where cookie is not able to be used, such as in the Capacitor client.
-	ctx.Set(constants.PenguinIDSetHeader, penguinId)
+	utils.SetPenguinIDToResponse(ctx, account.PenguinID)
 
 	// for some reasons the response for the login API is in format of
 	// text/plain so I'd have to manually convert it to JSON and use ctx#Send to respond
-	resp := shims.LoginResponse{
+	// to ensure compatibility
+	resp, err := json.Marshal(&shims.LoginResponse{
 		UserID: account.PenguinID,
-	}
-	respBytes, err := json.Marshal(resp)
+	})
 	if err != nil {
 		return err
 	}
 
-	return ctx.Send(respBytes)
+	utils.SetCtxNoCache(ctx)
+
+	return ctx.Send(resp)
 }
