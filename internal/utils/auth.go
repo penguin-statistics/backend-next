@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -22,7 +21,6 @@ func GetPenguinIDFromRequest(ctx *fiber.Ctx) string {
 }
 
 func SetPenguinIDToResponse(ctx *fiber.Ctx, penguinId string) {
-	spew.Dump(penguinId)
 	// we even got emojis in PenguinID for some of the internal testers :)
 	penguinId = url.QueryEscape(penguinId)
 
