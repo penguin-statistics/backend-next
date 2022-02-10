@@ -130,7 +130,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 		},
 		Reports:   []*types.SingleReport{singleReport},
 		AccountID: accountId,
-		IP:        ctx.IP(),
+		IP:        utils.ExtractIP(ctx),
 	}
 
 	reportTaskJson, err := json.Marshal(reportTask)
