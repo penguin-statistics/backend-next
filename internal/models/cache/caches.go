@@ -11,23 +11,19 @@ import (
 var (
 	ItemFromId    cache.Cache
 	ItemFromArkId cache.Cache
-)
 
-var (
 	StageFromId    cache.Cache
 	StageFromArkId cache.Cache
-)
 
-var (
 	ZoneFromId    cache.Cache
 	ZoneFromArkId cache.Cache
+
+	DropPatternElementsFromId cache.Cache
+
+	TimeRangeFromId cache.Cache
+
+	once sync.Once
 )
-
-var DropPatternElementsFromId cache.Cache
-
-var TimeRangeFromId cache.Cache
-
-var once sync.Once
 
 func Populate(client *redis.Client) {
 	once.Do(func() {
