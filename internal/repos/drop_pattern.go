@@ -51,25 +51,25 @@ func (s *DropPatternRepo) GetDropPatternByHash(ctx context.Context, hash string)
 }
 
 func (s *DropPatternRepo) GetOrCreateDropPatternByHash(ctx context.Context, tx bun.Tx, hash string) (*models.DropPattern, bool, error) {
-	var dropPattern models.DropPattern
+	dropPattern := &models.DropPattern{
+		Hash: hash,
+	}
 	err := tx.NewSelect().
-		Model(&dropPattern).
-		Where("hash = ?", hash).
+		Model(dropPattern).
 		Scan(ctx)
 
 	if err == nil {
-		return &dropPattern, false, nil
+		return dropPattern, false, nil
 	} else if err != nil && err != sql.ErrNoRows {
 		return nil, false, err
 	}
 
 	_, err = tx.NewInsert().
-		Model(&dropPattern).
-		Set("hash", hash).
+		Model(dropPattern).
 		Exec(ctx)
 	if err != nil {
 		return nil, false, err
 	}
 
-	return &dropPattern, true, nil
+	return dropPattern, true, nil
 }

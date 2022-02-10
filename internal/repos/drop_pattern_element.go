@@ -55,9 +55,9 @@ func (r *DropPatternElementRepo) GetDropPatternElementByHash(ctx context.Context
 }
 
 func (r *DropPatternElementRepo) CreateDropPatternElements(ctx context.Context, tx bun.Tx, patternId int, drops []*types.Drop) ([]*models.DropPatternElement, error) {
-	var elements []*models.DropPatternElement
+	elements := make([]models.DropPatternElement, 0, len(drops))
 	for _, drop := range drops {
-		element := &models.DropPatternElement{
+		element := models.DropPatternElement{
 			ItemID:        drop.ItemID,
 			Quantity:      drop.Quantity,
 			DropPatternID: patternId,
@@ -72,7 +72,12 @@ func (r *DropPatternElementRepo) CreateDropPatternElements(ctx context.Context, 
 		return nil, err
 	}
 
-	return elements, nil
+	ptrElements := make([]*models.DropPatternElement, 0, len(elements))
+	for _, element := range elements {
+		ptrElements = append(ptrElements, &element)
+	}
+
+	return ptrElements, nil
 }
 
 func (r *DropPatternElementRepo) GetDropPatternElementsByPatternId(ctx context.Context, patternId int) ([]*models.DropPatternElement, error) {

@@ -83,7 +83,6 @@ type DropInfoQuery struct {
 }
 
 // GetDropInfoByArkId returns a drop info by its ark id.
-// dropInfoTuples: [](drop_item_id, drop_item_type)
 func (s *DropInfoRepo) GetForCurrentTimeRange(ctx context.Context, query *DropInfoQuery) ([]*models.DropInfo, error) {
 	var dropInfo []*models.DropInfo
 	err := pquery.New(
@@ -93,14 +92,27 @@ func (s *DropInfoRepo) GetForCurrentTimeRange(ctx context.Context, query *DropIn
 			Where("st.ark_stage_id = ?", query.ArkStageId).
 			WhereGroup(" AND ", func(sq *bun.SelectQuery) *bun.SelectQuery {
 				return sq.
-					Where("(it.item_id, di.drop_type) IN (?)", bun.In(query.DropTuples)).
+					Apply(func(sq *bun.SelectQuery) *bun.SelectQuery {
+						if len(query.DropTuples) == 0 {
+							return sq
+						} else {
+							return sq.Where("(it.item_id, di.drop_type) IN (?)", bun.In(query.DropTuples))
+						}
+					}).
+					// Type Drop Infos
 					WhereGroup(" OR ", func(sq *bun.SelectQuery) *bun.SelectQuery {
 						if query.withDropTypes == nil {
 							return sq
 						}
 						return sq.
 							Where("di.item_id IS NULL").
-							Where("di.drop_type IN (?)", bun.In(*query.withDropTypes))
+							Apply(func(sq *bun.SelectQuery) *bun.SelectQuery {
+								if len(*query.withDropTypes) == 0 {
+									return sq
+								} else {
+									return sq.Where("di.drop_type IN (?)", bun.In(*query.withDropTypes))
+								}
+							})
 					})
 			}),
 	).
