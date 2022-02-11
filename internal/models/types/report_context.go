@@ -11,6 +11,7 @@ type SingleReport struct {
 }
 
 type ReportTask struct {
+	TaskID string `json:"taskId"`
 	FragmentReportCommon
 
 	Reports []*SingleReport `json:"report"`

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/rs/zerolog/log"
@@ -24,6 +25,7 @@ import (
 type ReportService struct {
 	DB                     *bun.DB
 	NatsJS                 nats.JetStreamContext
+	Redis                  *redis.Client
 	ItemRepo               *repos.ItemRepo
 	StageRepo              *repos.StageRepo
 	AccountService         *AccountService
@@ -35,10 +37,11 @@ type ReportService struct {
 	ReportVerifier         *reportutils.ReportVerifier
 }
 
-func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, itemRepo *repos.ItemRepo, stageRepo *repos.StageRepo, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
+func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, redis *redis.Client, itemRepo *repos.ItemRepo, stageRepo *repos.StageRepo, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
 	service := &ReportService{
 		DB:                     db,
 		NatsJS:                 natsJs,
+		Redis:                  redis,
 		ItemRepo:               itemRepo,
 		StageRepo:              stageRepo,
 		AccountService:         accountService,
@@ -88,7 +91,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 		accountId = account.AccountID
 	}
 
-	idempotencyKey := ctx.Get("Idempotency-Key", ctx.Locals("requestid").(string))
+	// idempotencyKey := ctx.Get("Idempotency-Key", ctx.Locals("requestid").(string))
 
 	// merge drops with same (dropType, itemId) pair
 	req.Drops = reportutils.MergeDrops(req.Drops)
@@ -121,8 +124,11 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 		reportutils.AggregateGachaBoxDrops(singleReport)
 	}
 
+	taskId := fmt.Sprintf("%s-%d", ctx.Locals("requestid").(string), accountId)
+
 	// construct ReportContext
 	reportTask := &types.ReportTask{
+		TaskID: taskId,
 		FragmentReportCommon: types.FragmentReportCommon{
 			Server:  req.Server,
 			Source:  req.Source,
@@ -138,7 +144,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 		return err
 	}
 
-	pub, err := s.NatsJS.PublishAsync("REPORT.SINGLE", reportTaskJson, nats.MsgId(idempotencyKey))
+	pub, err := s.NatsJS.PublishAsync("REPORT.SINGLE", reportTaskJson)
 	if err != nil {
 		return err
 	}
@@ -279,15 +285,12 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 		}); err != nil {
 			return err
 		}
+
+		s.Redis.Set(ctx, fmt.Sprintf("report:%s", reportTask.TaskID), fmt.Sprintf("%d", dropReport.ReportID), time.Hour*24)
 	}
 
 	intendedCommit = true
 	return tx.Commit()
-
-	// save to database
-	// if err := s.DropInfoRepo.SaveDrops(msg.Context(), reportTask.Reports); err != nil {
-	// 	continue
-	// }
 }
 
 // func (s *ReportService) VerifyAndSubmitBatchReport(ctx *fiber.Ctx, report *types.BatchReportRequest) error {

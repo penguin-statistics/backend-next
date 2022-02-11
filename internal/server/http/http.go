@@ -44,8 +44,13 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 		ReadTimeout:  time.Second * 20,
 		WriteTimeout: time.Second * 20,
 		// allow possibility for graceful shutdown, otherwise app#Shutdown() will block forever
-		IdleTimeout: config.HttpServerShutdownTimeout,
-		ProxyHeader: fiber.HeaderXForwardedFor,
+		IdleTimeout:             config.HttpServerShutdownTimeout,
+		ProxyHeader:             fiber.HeaderXForwardedFor,
+		EnableTrustedProxyCheck: true,
+		TrustedProxies: []string{
+			"::1",
+			"127.0.0.1",
+		},
 		ErrorHandler: func(ctx *fiber.Ctx, err error) error {
 			// Use custom error handler to return JSON error responses
 			if e, ok := err.(*errors.PenguinError); ok {
