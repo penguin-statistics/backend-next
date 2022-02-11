@@ -5,17 +5,17 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
-	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
+	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
 type StageController struct {
-	repo *repos.StageRepo
+	StageService *service.StageService
 }
 
-func RegisterStageController(v2 *server.V2, repo *repos.StageRepo) {
+func RegisterStageController(v2 *server.V2, stageService *service.StageService) {
 	c := &StageController{
-		repo: repo,
+		StageService: stageService,
 	}
 
 	v2.Get("/stages", c.GetStages)
@@ -50,7 +50,7 @@ func (c *StageController) applyShim(stage *shims.Stage) {
 func (c *StageController) GetStages(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 
-	items, err := c.repo.GetShimStages(ctx.Context(), server)
+	items, err := c.StageService.GetShimStages(ctx, server)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func (c *StageController) GetStageByArkId(ctx *fiber.Ctx) error {
 	stageId := ctx.Params("stageId")
 	server := ctx.Query("server", "CN")
 
-	item, err := c.repo.GetShimStageByArkId(ctx.Context(), stageId, server)
+	item, err := c.StageService.GetShimStageByArkId(ctx, stageId, server)
 	if err != nil {
 		return err
 	}

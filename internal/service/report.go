@@ -27,7 +27,7 @@ type ReportService struct {
 	NatsJS                 nats.JetStreamContext
 	Redis                  *redis.Client
 	ItemRepo               *repos.ItemRepo
-	StageRepo              *repos.StageRepo
+	StageService           *StageService
 	AccountService         *AccountService
 	DropInfoRepo           *repos.DropInfoRepo
 	DropReportRepo         *repos.DropReportRepo
@@ -37,13 +37,13 @@ type ReportService struct {
 	ReportVerifier         *reportutils.ReportVerifier
 }
 
-func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, redis *redis.Client, itemRepo *repos.ItemRepo, stageRepo *repos.StageRepo, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
+func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, redis *redis.Client, itemRepo *repos.ItemRepo, stageService *StageService, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
 	service := &ReportService{
 		DB:                     db,
 		NatsJS:                 natsJs,
 		Redis:                  redis,
 		ItemRepo:               itemRepo,
-		StageRepo:              stageRepo,
+		StageService:           stageService,
 		AccountService:         accountService,
 		DropInfoRepo:           dropInfoRepo,
 		DropReportRepo:         dropReportRepo,
@@ -116,7 +116,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 	}
 
 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
-	category, err := s.StageRepo.GetStageExtraProcessTypeByArkId(ctx.Context(), singleReport.StageID)
+	category, err := s.StageService.GetStageExtraProcessTypeByArkId(ctx, singleReport.StageID)
 	if err != nil {
 		return err
 	}
@@ -245,7 +245,8 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 			}
 		}
 
-		stage, err := s.StageRepo.GetStageByArkId(ctx, report.StageID)
+		// FIXME: the param is context.Context, so we have to use repo here, can we change it to use *fiber.Ctx?
+		stage, err := s.StageService.StageRepo.GetStageByArkId(ctx, report.StageID)
 		if err != nil {
 			return err
 		}

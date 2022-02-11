@@ -5,15 +5,15 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
+	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
 type StageController struct {
 	fx.In
 
-	Repo  *repos.StageRepo
-	Redis *redis.Client
+	StageService *service.StageService
+	Redis        *redis.Client
 }
 
 func RegisterStageController(v3 *server.V3, c StageController) {
@@ -28,7 +28,7 @@ func RegisterStageController(v3 *server.V3, c StageController) {
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/stages [GET]
 func (c *StageController) GetStages(ctx *fiber.Ctx) error {
-	stages, err := c.Repo.GetStages(ctx.Context())
+	stages, err := c.StageService.GetStages(ctx)
 	if err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func (c *StageController) GetStages(ctx *fiber.Ctx) error {
 func (c *StageController) GetStageById(ctx *fiber.Ctx) error {
 	stageId := ctx.Params("stageId")
 
-	stage, err := c.Repo.GetStageByArkId(ctx.Context(), stageId)
+	stage, err := c.StageService.GetStageByArkId(ctx, stageId)
 	if err != nil {
 		return err
 	}
