@@ -26,7 +26,7 @@ type ReportService struct {
 	DB                     *bun.DB
 	NatsJS                 nats.JetStreamContext
 	Redis                  *redis.Client
-	ItemRepo               *repos.ItemRepo
+	ItemService            *ItemService
 	StageService           *StageService
 	AccountService         *AccountService
 	DropInfoRepo           *repos.DropInfoRepo
@@ -37,12 +37,12 @@ type ReportService struct {
 	ReportVerifier         *reportutils.ReportVerifier
 }
 
-func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, redis *redis.Client, itemRepo *repos.ItemRepo, stageService *StageService, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
+func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, redis *redis.Client, itemService *ItemService, stageService *StageService, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
 	service := &ReportService{
 		DB:                     db,
 		NatsJS:                 natsJs,
 		Redis:                  redis,
-		ItemRepo:               itemRepo,
+		ItemService:            itemService,
 		StageService:           stageService,
 		AccountService:         accountService,
 		DropInfoRepo:           dropInfoRepo,
@@ -98,7 +98,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 
 	drops := make([]*types.Drop, 0, len(req.Drops))
 	for _, drop := range req.Drops {
-		item, err := s.ItemRepo.GetItemByArkId(ctx.Context(), drop.ItemID)
+		item, err := s.ItemService.GetItemByArkId(ctx, drop.ItemID)
 		if err != nil {
 			return err
 		}

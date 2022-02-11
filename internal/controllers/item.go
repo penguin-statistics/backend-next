@@ -8,16 +8,16 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
+	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
 type ItemController struct {
 	fx.In
 
-	Repo  *repos.ItemRepo
-	Redis *redis.Client
+	ItemService *service.ItemService
+	Redis       *redis.Client
 }
 
 func RegisterItemController(v3 *server.V3, c ItemController) {
@@ -46,7 +46,7 @@ func buildSanitizer(sanitizer ...func(string) bool) func(ctx *fiber.Ctx) error {
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/items [GET]
 func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
-	items, err := c.Repo.GetItems(ctx.Context())
+	items, err := c.ItemService.GetItems(ctx)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
 func (c *ItemController) GetItemById(ctx *fiber.Ctx) error {
 	itemId := ctx.Params("itemId")
 
-	item, err := c.Repo.GetItemByArkId(ctx.Context(), itemId)
+	item, err := c.ItemService.GetItemByArkId(ctx, itemId)
 	if err != nil {
 		return err
 	}

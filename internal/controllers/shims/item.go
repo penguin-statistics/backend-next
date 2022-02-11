@@ -10,18 +10,18 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
-	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
+	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
 type ItemController struct {
-	repo *repos.ItemRepo
+	ItemService *service.ItemService
 }
 
-func RegisterItemController(v2 *server.V2, repo *repos.ItemRepo) {
+func RegisterItemController(v2 *server.V2, itemService *service.ItemService) {
 	c := &ItemController{
-		repo: repo,
+		ItemService: itemService,
 	}
 
 	v2.Get("/items", c.GetItems)
@@ -64,7 +64,7 @@ func (c *ItemController) applyShim(item *shims.Item) {
 // @Router       /PenguinStats/api/v2/items [GET]
 // @Deprecated
 func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
-	items, err := c.repo.GetShimItems(ctx.Context())
+	items, err := c.ItemService.GetShimItems(ctx)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
 func (c *ItemController) GetItemByArkId(ctx *fiber.Ctx) error {
 	itemId := ctx.Params("itemId")
 
-	item, err := c.repo.GetShimItemByArkId(ctx.Context(), itemId)
+	item, err := c.ItemService.GetShimItemByArkId(ctx, itemId)
 	if err != nil {
 		return err
 	}
