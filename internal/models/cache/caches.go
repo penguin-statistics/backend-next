@@ -22,6 +22,8 @@ var (
 
 	TimeRangeFromId cache.Cache
 
+	Formula cache.Cache
+
 	once sync.Once
 )
 
@@ -39,5 +41,7 @@ func Populate(client *redis.Client) {
 		DropPatternElementsFromId = cache.New(client, "dropPatternElement#id")
 
 		TimeRangeFromId = cache.New(client, "timeRange#id")
+
+		Formula = cache.New(client, "formula")
 	})
 }
