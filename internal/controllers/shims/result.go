@@ -3,10 +3,8 @@ package shims
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/ahmetb/go-linq/v3"
 	"github.com/gofiber/fiber/v2"
 	"gopkg.in/guregu/null.v3"
 
@@ -17,17 +15,17 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
+	"github.com/penguin-statistics/backend-next/internal/utils/shimutils"
 )
 
 type ResultController struct {
-	DropMatrixService         *service.DropMatrixService
-	PatternMatrixService      *service.PatternMatrixService
-	TrendService              *service.TrendService
-	AccountService            *service.AccountService
-	DropInfoService           *service.DropInfoService
-	ItemService               *service.ItemService
-	StageService              *service.StageService
-	DropPatternElementService *service.DropPatternElementService
+	DropMatrixService    *service.DropMatrixService
+	PatternMatrixService *service.PatternMatrixService
+	TrendService         *service.TrendService
+	AccountService       *service.AccountService
+	ItemService          *service.ItemService
+	StageService         *service.StageService
+	ShimUtil             *shimutils.ShimUtil
 }
 
 func RegisterResultController(
@@ -36,20 +34,18 @@ func RegisterResultController(
 	patternMatrixService *service.PatternMatrixService,
 	trendService *service.TrendService,
 	accountService *service.AccountService,
-	dropInfoService *service.DropInfoService,
 	itemService *service.ItemService,
 	stageService *service.StageService,
-	dropPatternElementService *service.DropPatternElementService,
+	shimUtil *shimutils.ShimUtil,
 ) {
 	c := &ResultController{
-		DropMatrixService:         dropMatrixService,
-		PatternMatrixService:      patternMatrixService,
-		TrendService:              trendService,
-		AccountService:            accountService,
-		DropInfoService:           dropInfoService,
-		ItemService:               itemService,
-		StageService:              stageService,
-		DropPatternElementService: dropPatternElementService,
+		DropMatrixService:    dropMatrixService,
+		PatternMatrixService: patternMatrixService,
+		TrendService:         trendService,
+		AccountService:       accountService,
+		ItemService:          itemService,
+		StageService:         stageService,
+		ShimUtil:             shimUtil,
 	}
 
 	v2.Get("/result/matrix", c.GetDropMatrix)
@@ -101,7 +97,7 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	shimResult, err := c.applyShimForDropMatrixQuery(ctx, server, showClosedZones, stageFilterStr, itemFilterStr, queryResult)
+	shimResult, err := c.ShimUtil.ApplyShimForDropMatrixQuery(ctx, server, showClosedZones, stageFilterStr, itemFilterStr, queryResult)
 	if err != nil {
 		return err
 	}
@@ -142,7 +138,7 @@ func (c *ResultController) GetPatternMatrix(ctx *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	shimResult, err := c.applyShimForPatternMatrixQuery(ctx, queryResult)
+	shimResult, err := c.ShimUtil.ApplyShimForPatternMatrixQuery(ctx, queryResult)
 	if err != nil {
 		return err
 	}
@@ -165,7 +161,7 @@ func (c *ResultController) GetTrends(ctx *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	shimResult, err := c.applyShimForTrendQuery(ctx, queryResult)
+	shimResult, err := c.ShimUtil.ApplyShimForTrendQuery(ctx, queryResult)
 	if err != nil {
 		return err
 	}
@@ -194,164 +190,6 @@ func (c *ResultController) AdvancedQuery(ctx *fiber.Ctx) error {
 		result.AdvancedResults = append(result.AdvancedResults, oneResult)
 	}
 	return ctx.JSON(result)
-}
-
-func (c *ResultController) applyShimForDropMatrixQuery(ctx *fiber.Ctx, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, queryResult *models.DropMatrixQueryResult) (*shims.DropMatrixQueryResult, error) {
-	// get opening stages from dropinfos
-	var openingStageIds []int
-	if !showClosedZones {
-		currentDropInfos, err := c.DropInfoService.GetCurrentDropInfosByServer(ctx, server)
-		if err != nil {
-			return nil, err
-		}
-		linq.From(currentDropInfos).SelectT(func(el *models.DropInfo) int { return el.StageID }).Distinct().ToSlice(&openingStageIds)
-	}
-
-	// convert comma-splitted stage filter param to a hashset
-	stageFilter := make([]string, 0)
-	if stageFilterStr != "" {
-		stageFilter = strings.Split(stageFilterStr, ",")
-	}
-	stageFilterSet := make(map[string]struct{}, len(stageFilter))
-	for _, stageIdStr := range stageFilter {
-		stageFilterSet[stageIdStr] = struct{}{}
-	}
-
-	// convert comma-splitted item filter param to a hashset
-	itemFilter := make([]string, 0)
-	if itemFilterStr != "" {
-		itemFilter = strings.Split(itemFilterStr, ",")
-	}
-	itemFilterSet := make(map[string]struct{}, len(itemFilter))
-	for _, itemIdStr := range itemFilter {
-		itemFilterSet[itemIdStr] = struct{}{}
-	}
-
-	results := &shims.DropMatrixQueryResult{
-		Matrix: make([]*shims.OneDropMatrixElement, 0),
-	}
-	for _, el := range queryResult.Matrix {
-		if !showClosedZones && !linq.From(openingStageIds).Contains(el.StageID) {
-			continue
-		}
-
-		stage, err := c.StageService.GetStageById(ctx, el.StageID)
-		if err != nil {
-			return nil, err
-		}
-		if len(stageFilterSet) > 0 {
-			if _, ok := stageFilterSet[stage.ArkStageID]; !ok {
-				continue
-			}
-		}
-
-		item, err := c.ItemService.GetItemById(ctx, el.ItemID)
-		if err != nil {
-			return nil, err
-		}
-		if len(itemFilterSet) > 0 {
-			if _, ok := itemFilterSet[item.ArkItemID]; !ok {
-				continue
-			}
-		}
-
-		endTime := null.NewInt(el.TimeRange.EndTime.UnixMilli(), true)
-		oneDropMatrixElement := shims.OneDropMatrixElement{
-			StageID:   stage.ArkStageID,
-			ItemID:    item.ArkItemID,
-			Quantity:  el.Quantity,
-			Times:     el.Times,
-			StartTime: el.TimeRange.StartTime.UnixMilli(),
-			EndTime:   &endTime,
-		}
-		if oneDropMatrixElement.EndTime.Int64 == constants.FakeEndTimeMilli {
-			oneDropMatrixElement.EndTime = nil
-		}
-		results.Matrix = append(results.Matrix, &oneDropMatrixElement)
-	}
-	return results, nil
-}
-
-func (c *ResultController) applyShimForPatternMatrixQuery(ctx *fiber.Ctx, queryResult *models.DropPatternQueryResult) (*shims.PatternMatrixQueryResult, error) {
-	results := &shims.PatternMatrixQueryResult{
-		PatternMatrix: make([]*shims.OnePatternMatrixElement, 0),
-	}
-	var groupedResults []linq.Group
-	linq.From(queryResult.DropPatterns).
-		GroupByT(
-			func(el *models.OneDropPattern) int { return el.PatternID },
-			func(el *models.OneDropPattern) *models.OneDropPattern { return el },
-		).ToSlice(&groupedResults)
-	for _, group := range groupedResults {
-		patternId := group.Key.(int)
-		for _, el := range group.Group {
-			oneDropPattern := el.(*models.OneDropPattern)
-			stage, err := c.StageService.GetStageById(ctx, oneDropPattern.StageID)
-			if err != nil {
-				return nil, err
-			}
-			endTime := null.NewInt(oneDropPattern.TimeRange.EndTime.UnixMilli(), true)
-			dropPatternElements, err := c.DropPatternElementService.GetDropPatternElementsByPatternId(ctx, patternId)
-			if err != nil {
-				return nil, err
-			}
-			// create pattern object from dropPatternElements
-			pattern := shims.Pattern{
-				Drops: make([]*shims.OneDrop, 0),
-			}
-			for _, dropPatternElement := range dropPatternElements {
-				item, err := c.ItemService.GetItemById(ctx, dropPatternElement.ItemID)
-				if err != nil {
-					return nil, err
-				}
-				pattern.Drops = append(pattern.Drops, &shims.OneDrop{
-					ItemID:   item.ArkItemID,
-					Quantity: dropPatternElement.Quantity,
-				})
-			}
-			onePatternMatrixElement := shims.OnePatternMatrixElement{
-				StageID:   stage.ArkStageID,
-				Times:     oneDropPattern.Times,
-				Quantity:  oneDropPattern.Quantity,
-				StartTime: oneDropPattern.TimeRange.StartTime.UnixMilli(),
-				EndTime:   &endTime,
-				Pattern:   &pattern,
-			}
-			if onePatternMatrixElement.EndTime.Int64 == constants.FakeEndTimeMilli {
-				onePatternMatrixElement.EndTime = nil
-			}
-			results.PatternMatrix = append(results.PatternMatrix, &onePatternMatrixElement)
-		}
-	}
-	return results, nil
-}
-
-func (c *ResultController) applyShimForTrendQuery(ctx *fiber.Ctx, queryResult *models.TrendQueryResult) (*shims.TrendQueryResult, error) {
-	results := &shims.TrendQueryResult{
-		Trend: make(map[string]*shims.StageTrend),
-	}
-	for _, stageTrend := range queryResult.Trends {
-		stage, err := c.StageService.GetStageById(ctx, stageTrend.StageID)
-		if err != nil {
-			return nil, err
-		}
-		shimStageTrend := shims.StageTrend{
-			Results: make(map[string]*shims.OneItemTrend),
-		}
-		for _, itemTrend := range stageTrend.Results {
-			item, err := c.ItemService.GetItemById(ctx, itemTrend.ItemID)
-			if err != nil {
-				return nil, err
-			}
-			shimStageTrend.Results[item.ArkItemID] = &shims.OneItemTrend{
-				Quantity:  itemTrend.Quantity,
-				Times:     itemTrend.Times,
-				StartTime: itemTrend.StartTime.UnixMilli(),
-			}
-		}
-		results.Trend[stage.ArkStageID] = &shimStageTrend
-	}
-	return results, nil
 }
 
 func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery) (interface{}, error) {
@@ -416,7 +254,7 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 		if err != nil {
 			return nil, err
 		}
-		shimDropMatrixQueryResult, err := c.applyShimForDropMatrixQuery(ctx, query.Server, true, "", "", dropMatrixQueryResult)
+		shimDropMatrixQueryResult, err := c.ShimUtil.ApplyShimForDropMatrixQuery(ctx, query.Server, true, "", "", dropMatrixQueryResult)
 		if err != nil {
 			return nil, err
 		}
@@ -444,7 +282,7 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 		if err != nil {
 			return nil, err
 		}
-		shimTrendQueryResult, err := c.applyShimForTrendQuery(ctx, trendQueryResult)
+		shimTrendQueryResult, err := c.ShimUtil.ApplyShimForTrendQuery(ctx, trendQueryResult)
 		if err != nil {
 			return nil, err
 		}
