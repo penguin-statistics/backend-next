@@ -21,9 +21,15 @@ func NewZoneRepo(db *bun.DB) *ZoneRepo {
 	return &ZoneRepo{db: db}
 }
 
+// Cache: AllZones
 func (c *ZoneRepo) GetZones(ctx context.Context) ([]*models.Zone, error) {
 	var zones []*models.Zone
-	err := c.db.NewSelect().
+	err := cache.AllZones.Get("", &zones)
+	if err == nil {
+		return zones, nil
+	}
+
+	err = c.db.NewSelect().
 		Model(&zones).
 		Scan(ctx)
 
@@ -33,9 +39,11 @@ func (c *ZoneRepo) GetZones(ctx context.Context) ([]*models.Zone, error) {
 		return nil, err
 	}
 
+	go cache.AllZones.Set("", &zones, time.Hour*24)
 	return zones, nil
 }
 
+// Cache: ZoneFromArkId
 func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*models.Zone, error) {
 	var zone models.Zone
 	err := cache.ZoneFromArkId.Get(arkZoneId, &zone)

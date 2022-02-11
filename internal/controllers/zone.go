@@ -5,15 +5,15 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
+	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
 type ZoneController struct {
 	fx.In
 
-	Repo  *repos.ZoneRepo
-	Redis *redis.Client
+	ZoneService *service.ZoneService
+	Redis       *redis.Client
 }
 
 func RegisterZoneController(v3 *server.V3, c ZoneController) {
@@ -28,7 +28,7 @@ func RegisterZoneController(v3 *server.V3, c ZoneController) {
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/zones [GET]
 func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
-	zones, err := c.Repo.GetZones(ctx.Context())
+	zones, err := c.ZoneService.GetZones(ctx)
 	if err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
 func (c *ZoneController) GetZoneById(ctx *fiber.Ctx) error {
 	zoneId := ctx.Params("zoneId")
 
-	zone, err := c.Repo.GetZoneByArkId(ctx.Context(), zoneId)
+	zone, err := c.ZoneService.GetZoneByArkId(ctx, zoneId)
 	if err != nil {
 		return err
 	}

@@ -1,22 +1,21 @@
 package shims
 
 import (
-	"github.com/penguin-statistics/backend-next/internal/models/shims"
-	"github.com/penguin-statistics/backend-next/internal/repos"
-	"github.com/penguin-statistics/backend-next/internal/server"
-
+	"github.com/gofiber/fiber/v2"
 	"github.com/tidwall/gjson"
 
-	"github.com/gofiber/fiber/v2"
+	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	"github.com/penguin-statistics/backend-next/internal/server"
+	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
 type ZoneController struct {
-	repo *repos.ZoneRepo
+	ZoneService *service.ZoneService
 }
 
-func RegisterZoneController(v2 *server.V2, repo *repos.ZoneRepo) {
+func RegisterZoneController(v2 *server.V2, zoneService *service.ZoneService) {
 	c := &ZoneController{
-		repo: repo,
+		ZoneService: zoneService,
 	}
 
 	v2.Get("/zones", c.GetZones)
@@ -42,7 +41,7 @@ func (c *ZoneController) applyShim(zone *shims.Zone) {
 // @Router       /PenguinStats/api/v2/zones [GET]
 // @Deprecated
 func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
-	zones, err := c.repo.GetShimZones(ctx.Context())
+	zones, err := c.ZoneService.GetShimZones(ctx)
 	if err != nil {
 		return err
 	}
@@ -66,7 +65,7 @@ func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
 func (c *ZoneController) GetZoneByArkId(ctx *fiber.Ctx) error {
 	zoneId := ctx.Params("zoneId")
 
-	zone, err := c.repo.GetShimZoneByArkId(ctx.Context(), zoneId)
+	zone, err := c.ZoneService.GetShimZoneByArkId(ctx, zoneId)
 	if err != nil {
 		return err
 	}

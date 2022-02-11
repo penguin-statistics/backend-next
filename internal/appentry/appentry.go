@@ -51,6 +51,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(repos.NewPatternMatrixElementRepo),
 		fx.Provide(service.NewItemService),
 		fx.Provide(service.NewStageService),
+		fx.Provide(service.NewZoneService),
 		fx.Provide(service.NewTrendService),
 		fx.Provide(service.NewReportService),
 		fx.Provide(service.NewNoticeService),
