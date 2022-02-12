@@ -2,9 +2,7 @@ package shims
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/tidwall/gjson"
 
-	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
@@ -22,17 +20,6 @@ func RegisterZoneController(v2 *server.V2, zoneService *service.ZoneService) {
 	v2.Get("/zones/:zoneId", c.GetZoneByArkId)
 }
 
-func (c *ZoneController) applyShim(zone *shims.Zone) {
-	zoneNameI18n := gjson.ParseBytes(zone.ZoneNameI18n)
-	zone.ZoneName = zoneNameI18n.Map()["zh"].String()
-
-	if zone.Stages != nil {
-		for _, stage := range zone.Stages {
-			zone.StageIds = append(zone.StageIds, stage.ArkStageID)
-		}
-	}
-}
-
 // @Summary      Get All Zones
 // @Tags         Zone
 // @Produce      json
@@ -45,11 +32,6 @@ func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-
-	for _, i := range zones {
-		c.applyShim(i)
-	}
-
 	return ctx.JSON(zones)
 }
 
@@ -69,8 +51,5 @@ func (c *ZoneController) GetZoneByArkId(ctx *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-
-	c.applyShim(zone)
-
 	return ctx.JSON(zone)
 }
