@@ -93,15 +93,11 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	queryResult, err := c.DropMatrixService.GetSavedDropMatrixResults(ctx, server, &accountId)
+	shimQueryResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx, server, showClosedZones, stageFilterStr, itemFilterStr, &accountId)
 	if err != nil {
 		return err
 	}
-	shimResult, err := c.ShimUtil.ApplyShimForDropMatrixQuery(ctx, server, showClosedZones, stageFilterStr, itemFilterStr, queryResult)
-	if err != nil {
-		return err
-	}
-	return ctx.JSON(shimResult)
+	return ctx.JSON(shimQueryResult)
 }
 
 // @Summary      Get PatternMatrix
@@ -243,22 +239,11 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 
 	// if there is no interval, then do drop matrix query, otherwise do trend query
 	if query.Interval == nil || !query.Interval.Valid {
-		dropMatrixQueryResult, err := c.DropMatrixService.QueryDropMatrix(
-			ctx,
-			query.Server,
-			[]*models.TimeRange{{StartTime: &startTime, EndTime: &endTime}},
-			[]int{stage.StageID},
-			itemIds,
-			&accountId,
-		)
-		if err != nil {
-			return nil, err
+		timeRange := &models.TimeRange{
+			StartTime: &startTime,
+			EndTime:   &endTime,
 		}
-		shimDropMatrixQueryResult, err := c.ShimUtil.ApplyShimForDropMatrixQuery(ctx, query.Server, true, "", "", dropMatrixQueryResult)
-		if err != nil {
-			return nil, err
-		}
-		return shimDropMatrixQueryResult, nil
+		return c.DropMatrixService.GetShimCustomizedDropMatrixResults(ctx, query.Server, timeRange, []int{stage.StageID}, itemIds, &accountId)
 	} else {
 		intervalLength_hrs := int(query.Interval.Int64 / (1000 * 60 * 60))
 		if intervalLength_hrs == 0 {

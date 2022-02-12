@@ -1,8 +1,6 @@
 package shimutils
 
 import (
-	"strings"
-
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/gofiber/fiber/v2"
 	"gopkg.in/guregu/null.v3"
@@ -27,82 +25,6 @@ func NewShimsUtil(stageService *service.StageService, itemService *service.ItemS
 		DropInfoService:           dropInfoService,
 		DropPatternElementService: dropPatternElementService,
 	}
-}
-
-func (s *ShimUtil) ApplyShimForDropMatrixQuery(ctx *fiber.Ctx, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, queryResult *models.DropMatrixQueryResult) (*shims.DropMatrixQueryResult, error) {
-	// get opening stages from dropinfos
-	var openingStageIds []int
-	if !showClosedZones {
-		currentDropInfos, err := s.DropInfoService.GetCurrentDropInfosByServer(ctx, server)
-		if err != nil {
-			return nil, err
-		}
-		linq.From(currentDropInfos).SelectT(func(el *models.DropInfo) int { return el.StageID }).Distinct().ToSlice(&openingStageIds)
-	}
-
-	// convert comma-splitted stage filter param to a hashset
-	stageFilter := make([]string, 0)
-	if stageFilterStr != "" {
-		stageFilter = strings.Split(stageFilterStr, ",")
-	}
-	stageFilterSet := make(map[string]struct{}, len(stageFilter))
-	for _, stageIdStr := range stageFilter {
-		stageFilterSet[stageIdStr] = struct{}{}
-	}
-
-	// convert comma-splitted item filter param to a hashset
-	itemFilter := make([]string, 0)
-	if itemFilterStr != "" {
-		itemFilter = strings.Split(itemFilterStr, ",")
-	}
-	itemFilterSet := make(map[string]struct{}, len(itemFilter))
-	for _, itemIdStr := range itemFilter {
-		itemFilterSet[itemIdStr] = struct{}{}
-	}
-
-	results := &shims.DropMatrixQueryResult{
-		Matrix: make([]*shims.OneDropMatrixElement, 0),
-	}
-	for _, el := range queryResult.Matrix {
-		if !showClosedZones && !linq.From(openingStageIds).Contains(el.StageID) {
-			continue
-		}
-
-		stage, err := s.StageService.GetStageById(ctx, el.StageID)
-		if err != nil {
-			return nil, err
-		}
-		if len(stageFilterSet) > 0 {
-			if _, ok := stageFilterSet[stage.ArkStageID]; !ok {
-				continue
-			}
-		}
-
-		item, err := s.ItemService.GetItemById(ctx, el.ItemID)
-		if err != nil {
-			return nil, err
-		}
-		if len(itemFilterSet) > 0 {
-			if _, ok := itemFilterSet[item.ArkItemID]; !ok {
-				continue
-			}
-		}
-
-		endTime := null.NewInt(el.TimeRange.EndTime.UnixMilli(), true)
-		oneDropMatrixElement := shims.OneDropMatrixElement{
-			StageID:   stage.ArkStageID,
-			ItemID:    item.ArkItemID,
-			Quantity:  el.Quantity,
-			Times:     el.Times,
-			StartTime: el.TimeRange.StartTime.UnixMilli(),
-			EndTime:   &endTime,
-		}
-		if oneDropMatrixElement.EndTime.Int64 == constants.FakeEndTimeMilli {
-			oneDropMatrixElement.EndTime = nil
-		}
-		results.Matrix = append(results.Matrix, &oneDropMatrixElement)
-	}
-	return results, nil
 }
 
 func (s *ShimUtil) ApplyShimForPatternMatrixQuery(ctx *fiber.Ctx, queryResult *models.DropPatternQueryResult) (*shims.PatternMatrixQueryResult, error) {

@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -10,15 +11,42 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
+
+/*
+This service has four functions:
+
+	1. Get Global Drop Matrix
+		a. getDropMatrixElements() to get elements from DB
+		b. convertDropMatrixElementsToMaxAccumulableDropMatrixQueryResult() to combine elements based max accumulable timeranges and convert to DropMatrixQueryResult
+		c. apply shim for v2 (optional)
+
+	2. Get Personal Drop Matrix
+		a. calcDropMatrixForTimeRanges() to calc elements
+		b. convertDropMatrixElementsToMaxAccumulableDropMatrixQueryResult() to combine elements based max accumulable timeranges and convert to DropMatrixQueryResult
+		c. apply shim for v2 (optional)
+
+	3. Get Customized Drop Matrix
+		a. calcDropMatrixForTimeRanges() to calc elements
+		b. convertDropMatrixElementsToDropMatrixQueryResult() to convert elements to DropMatrixQueryResult
+		c. apply shim for v2 (optional)
+
+	4. Re-calculate Global Drop Matrix
+		a. calcDropMatrixForTimeRanges() for each timeRange
+		b. save elements into DB
+*/
 
 type DropMatrixService struct {
 	TimeRangeService         *TimeRangeService
 	DropReportService        *DropReportService
 	DropInfoService          *DropInfoService
 	DropMatrixElementService *DropMatrixElementService
+	StageService             *StageService
+	ItemService              *ItemService
 }
 
 func NewDropMatrixService(
@@ -26,31 +54,33 @@ func NewDropMatrixService(
 	dropReportService *DropReportService,
 	dropInfoService *DropInfoService,
 	dropMatrixElementService *DropMatrixElementService,
+	stageService *StageService,
+	itemService *ItemService,
 ) *DropMatrixService {
 	return &DropMatrixService{
 		TimeRangeService:         timeRangeService,
 		DropReportService:        dropReportService,
 		DropInfoService:          dropInfoService,
 		DropMatrixElementService: dropMatrixElementService,
+		StageService:             stageService,
+		ItemService:              itemService,
 	}
 }
 
-func (s *DropMatrixService) GetSavedDropMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*models.DropMatrixQueryResult, error) {
-	dropMatrixElements, err := s.getDropMatrixElements(ctx, server, accountId)
+func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx *fiber.Ctx, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId *null.Int) (*shims.DropMatrixQueryResult, error) {
+	savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId)
 	if err != nil {
 		return nil, err
 	}
-	return s.convertDropMatrixElementsToMaxAccumulableDropMatrixQueryResult(ctx, server, dropMatrixElements)
+	return s.applyShimForDropMatrixQuery(ctx, server, showClosedZones, stageFilterStr, itemFilterStr, savedDropMatrixResults)
 }
 
-func (s *DropMatrixService) QueryDropMatrix(
-	ctx *fiber.Ctx, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
-) (*models.DropMatrixQueryResult, error) {
-	dropMatrixElements, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, stageIdFilter, itemIdFilter, accountId)
+func (s *DropMatrixService) GetShimCustomizedDropMatrixResults(ctx *fiber.Ctx, server string, timeRange *models.TimeRange, stageIds []int, itemIds []int, accountId *null.Int) (*shims.DropMatrixQueryResult, error) {
+	customizedDropMatrixQueryResult, err := s.QueryDropMatrix(ctx, server, []*models.TimeRange{timeRange}, stageIds, itemIds, accountId)
 	if err != nil {
 		return nil, err
 	}
-	return s.convertDropMatrixElementsToDropMatrixQueryResult(ctx, server, dropMatrixElements)
+	return s.applyShimForDropMatrixQuery(ctx, server, true, "", "", customizedDropMatrixQueryResult)
 }
 
 func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server string) error {
@@ -98,6 +128,27 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 	return s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server)
 }
 
+// calc DropMatrixQueryResult for customized conditions
+func (s *DropMatrixService) QueryDropMatrix(
+	ctx *fiber.Ctx, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
+) (*models.DropMatrixQueryResult, error) {
+	dropMatrixElements, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, stageIdFilter, itemIdFilter, accountId)
+	if err != nil {
+		return nil, err
+	}
+	return s.convertDropMatrixElementsToDropMatrixQueryResult(ctx, server, dropMatrixElements)
+}
+
+// calc DropMatrixQueryResult for max accumulable timeranges
+func (s *DropMatrixService) getMaxAccumulableDropMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*models.DropMatrixQueryResult, error) {
+	dropMatrixElements, err := s.getDropMatrixElements(ctx, server, accountId)
+	if err != nil {
+		return nil, err
+	}
+	return s.convertDropMatrixElementsToMaxAccumulableDropMatrixQueryResult(ctx, server, dropMatrixElements)
+}
+
+// For global, get elements from DB; For personal, calc elements
 func (s *DropMatrixService) getDropMatrixElements(ctx *fiber.Ctx, server string, accountId *null.Int) ([]*models.DropMatrixElement, error) {
 	if accountId.Valid {
 		maxAccumulableTimeRanges, err := s.TimeRangeService.GetMaxAccumulableTimeRangesByServer(ctx, server)
@@ -391,4 +442,80 @@ func (s *DropMatrixService) convertDropMatrixElementsToDropMatrixQueryResult(ctx
 		}
 	}
 	return dropMatrixQueryResult, nil
+}
+
+func (s *DropMatrixService) applyShimForDropMatrixQuery(ctx *fiber.Ctx, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, queryResult *models.DropMatrixQueryResult) (*shims.DropMatrixQueryResult, error) {
+	// get opening stages from dropinfos
+	var openingStageIds []int
+	if !showClosedZones {
+		currentDropInfos, err := s.DropInfoService.GetCurrentDropInfosByServer(ctx, server)
+		if err != nil {
+			return nil, err
+		}
+		linq.From(currentDropInfos).SelectT(func(el *models.DropInfo) int { return el.StageID }).Distinct().ToSlice(&openingStageIds)
+	}
+
+	// convert comma-splitted stage filter param to a hashset
+	stageFilter := make([]string, 0)
+	if stageFilterStr != "" {
+		stageFilter = strings.Split(stageFilterStr, ",")
+	}
+	stageFilterSet := make(map[string]struct{}, len(stageFilter))
+	for _, stageIdStr := range stageFilter {
+		stageFilterSet[stageIdStr] = struct{}{}
+	}
+
+	// convert comma-splitted item filter param to a hashset
+	itemFilter := make([]string, 0)
+	if itemFilterStr != "" {
+		itemFilter = strings.Split(itemFilterStr, ",")
+	}
+	itemFilterSet := make(map[string]struct{}, len(itemFilter))
+	for _, itemIdStr := range itemFilter {
+		itemFilterSet[itemIdStr] = struct{}{}
+	}
+
+	results := &shims.DropMatrixQueryResult{
+		Matrix: make([]*shims.OneDropMatrixElement, 0),
+	}
+	for _, el := range queryResult.Matrix {
+		if !showClosedZones && !linq.From(openingStageIds).Contains(el.StageID) {
+			continue
+		}
+
+		stage, err := s.StageService.GetStageById(ctx, el.StageID)
+		if err != nil {
+			return nil, err
+		}
+		if len(stageFilterSet) > 0 {
+			if _, ok := stageFilterSet[stage.ArkStageID]; !ok {
+				continue
+			}
+		}
+
+		item, err := s.ItemService.GetItemById(ctx, el.ItemID)
+		if err != nil {
+			return nil, err
+		}
+		if len(itemFilterSet) > 0 {
+			if _, ok := itemFilterSet[item.ArkItemID]; !ok {
+				continue
+			}
+		}
+
+		endTime := null.NewInt(el.TimeRange.EndTime.UnixMilli(), true)
+		oneDropMatrixElement := shims.OneDropMatrixElement{
+			StageID:   stage.ArkStageID,
+			ItemID:    item.ArkItemID,
+			Quantity:  el.Quantity,
+			Times:     el.Times,
+			StartTime: el.TimeRange.StartTime.UnixMilli(),
+			EndTime:   &endTime,
+		}
+		if oneDropMatrixElement.EndTime.Int64 == constants.FakeEndTimeMilli {
+			oneDropMatrixElement.EndTime = nil
+		}
+		results.Matrix = append(results.Matrix, &oneDropMatrixElement)
+	}
+	return results, nil
 }
