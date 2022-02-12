@@ -11,6 +11,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
@@ -45,13 +46,24 @@ func NewPatternMatrixService(
 	}
 }
 
-// Cache: ShimLatestPatternMatrixResults#{server}, 24hrs
+// Cache: shimLatestPatternMatrixResults#server:{server}, 24hrs
 func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*shims.PatternMatrixQueryResult, error) {
+	var results *shims.PatternMatrixQueryResult
+	err := cache.ShimLatestPatternMatrixResults.Get(server, results)
+	if err == nil {
+		return results, nil
+	}
+
 	queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId)
 	if err != nil {
 		return nil, err
 	}
-	return s.applyShimForPatternMatrixQuery(ctx, queryResult)
+	results, err = s.applyShimForPatternMatrixQuery(ctx, queryResult)
+	if err != nil {
+		return nil, err
+	}
+	go cache.ShimLatestPatternMatrixResults.Set(server, results, 24*time.Hour)
+	return results, nil
 }
 
 func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx *fiber.Ctx, server string) error {

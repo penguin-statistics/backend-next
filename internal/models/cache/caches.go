@@ -26,6 +26,8 @@ var (
 
 	Notices cache.Cache
 
+	ShimLatestPatternMatrixResults cache.Cache
+
 	once sync.Once
 )
 
@@ -53,5 +55,8 @@ func Populate(client *redis.Client) {
 
 		// notice
 		Notices = cache.New(client, "notices")
+
+		// pattern_matrix
+		ShimLatestPatternMatrixResults = cache.New(client, "shimLatestPatternMatrixResults#server:")
 	})
 }
