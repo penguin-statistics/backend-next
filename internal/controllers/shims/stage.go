@@ -2,9 +2,7 @@ package shims
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/tidwall/gjson"
 
-	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
@@ -22,24 +20,6 @@ func RegisterStageController(v2 *server.V2, stageService *service.StageService) 
 	v2.Get("/stages/:stageId", c.GetStageByArkId)
 }
 
-func (c *StageController) applyShim(stage *shims.Stage) {
-	codeI18n := gjson.ParseBytes(stage.CodeI18n)
-	stage.Code = codeI18n.Map()["zh"].String()
-
-	if stage.Zone != nil {
-		stage.ArkZoneID = stage.Zone.ArkZoneID
-	}
-
-	for _, i := range stage.DropInfos {
-		if i.Item != nil {
-			i.ArkItemID = i.Item.ArkItemID
-		}
-		if i.Stage != nil {
-			i.ArkStageID = i.Stage.ArkStageID
-		}
-	}
-}
-
 // @Summary      Get All Stages
 // @Tags         Stage
 // @Produce      json
@@ -50,16 +30,11 @@ func (c *StageController) applyShim(stage *shims.Stage) {
 func (c *StageController) GetStages(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 
-	items, err := c.StageService.GetShimStages(ctx, server)
+	stages, err := c.StageService.GetShimStages(ctx, server)
 	if err != nil {
 		return err
 	}
-
-	for _, i := range items {
-		c.applyShim(i)
-	}
-
-	return ctx.JSON(items)
+	return ctx.JSON(stages)
 }
 
 // @Summary      Get an Stage with ID
@@ -75,12 +50,9 @@ func (c *StageController) GetStageByArkId(ctx *fiber.Ctx) error {
 	stageId := ctx.Params("stageId")
 	server := ctx.Query("server", "CN")
 
-	item, err := c.StageService.GetShimStageByArkId(ctx, stageId, server)
+	stage, err := c.StageService.GetShimStageByArkId(ctx, stageId, server)
 	if err != nil {
 		return err
 	}
-
-	c.applyShim(item)
-
-	return ctx.JSON(item)
+	return ctx.JSON(stage)
 }
