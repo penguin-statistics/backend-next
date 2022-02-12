@@ -64,6 +64,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(service.NewDropMatrixElementService),
 		fx.Provide(service.NewDropPatternElementService),
 		fx.Provide(service.NewPatternMatrixElementService),
+		fx.Provide(service.NewFormulaService),
 		fx.Provide(server.CreateVersioningEndpoints),
 		fx.Provide(utils.NewCrypto),
 		fx.Invoke(shims.RegisterItemController),
