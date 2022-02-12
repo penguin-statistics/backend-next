@@ -9,7 +9,9 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
@@ -19,6 +21,8 @@ type PatternMatrixService struct {
 	DropInfoService             *DropInfoService
 	PatternMatrixElementService *PatternMatrixElementService
 	DropPatternElementService   *DropPatternElementService
+	StageService                *StageService
+	ItemService                 *ItemService
 }
 
 func NewPatternMatrixService(
@@ -27,6 +31,8 @@ func NewPatternMatrixService(
 	dropInfoService *DropInfoService,
 	patternMatrixElementService *PatternMatrixElementService,
 	dropPatternElementService *DropPatternElementService,
+	stageService *StageService,
+	itemService *ItemService,
 ) *PatternMatrixService {
 	return &PatternMatrixService{
 		TimeRangeService:            timeRangeService,
@@ -34,15 +40,17 @@ func NewPatternMatrixService(
 		DropInfoService:             dropInfoService,
 		PatternMatrixElementService: patternMatrixElementService,
 		DropPatternElementService:   dropPatternElementService,
+		StageService:                stageService,
+		ItemService:                 itemService,
 	}
 }
 
-func (s *PatternMatrixService) GetSavedPatternMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*models.DropPatternQueryResult, error) {
-	patternMatrixElements, err := s.getLatestPatternMatrixElements(ctx, server, accountId)
+func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*shims.PatternMatrixQueryResult, error) {
+	queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId)
 	if err != nil {
 		return nil, err
 	}
-	return s.convertPatternMatrixElementsToDropPatternQueryResult(ctx, server, patternMatrixElements)
+	return s.applyShimForPatternMatrixQuery(ctx, queryResult)
 }
 
 func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx *fiber.Ctx, server string) error {
@@ -94,6 +102,14 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx *fiber.Ctx, s
 
 	log.Debug().Msgf("toSave length: %v", len(toSave))
 	return s.PatternMatrixElementService.BatchSaveElements(ctx, toSave, server)
+}
+
+func (s *PatternMatrixService) getLatestPatternMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*models.PatternMatrixQueryResult, error) {
+	patternMatrixElements, err := s.getLatestPatternMatrixElements(ctx, server, accountId)
+	if err != nil {
+		return nil, err
+	}
+	return s.convertPatternMatrixElementsToDropPatternQueryResult(ctx, server, patternMatrixElements)
 }
 
 func (s *PatternMatrixService) getLatestPatternMatrixElements(ctx *fiber.Ctx, server string, accountId *null.Int) ([]*models.PatternMatrixElement, error) {
@@ -216,18 +232,18 @@ func (s *PatternMatrixService) getStageIdsMapByTimeRange(timeRangesMap map[int]*
 
 func (s *PatternMatrixService) convertPatternMatrixElementsToDropPatternQueryResult(
 	ctx *fiber.Ctx, server string, patternMatrixElements []*models.PatternMatrixElement,
-) (*models.DropPatternQueryResult, error) {
+) (*models.PatternMatrixQueryResult, error) {
 	timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
 	if err != nil {
 		return nil, err
 	}
 
-	result := &models.DropPatternQueryResult{
-		DropPatterns: make([]*models.OneDropPattern, 0),
+	result := &models.PatternMatrixQueryResult{
+		PatternMatrix: make([]*models.OnePatternMatrixElement, 0),
 	}
 	for _, patternMatrixElement := range patternMatrixElements {
 		timeRange := timeRangesMap[patternMatrixElement.RangeID]
-		result.DropPatterns = append(result.DropPatterns, &models.OneDropPattern{
+		result.PatternMatrix = append(result.PatternMatrix, &models.OnePatternMatrixElement{
 			StageID:   patternMatrixElement.StageID,
 			PatternID: patternMatrixElement.PatternID,
 			Quantity:  patternMatrixElement.Quantity,
@@ -236,4 +252,58 @@ func (s *PatternMatrixService) convertPatternMatrixElementsToDropPatternQueryRes
 		})
 	}
 	return result, nil
+}
+
+func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx *fiber.Ctx, queryResult *models.PatternMatrixQueryResult) (*shims.PatternMatrixQueryResult, error) {
+	results := &shims.PatternMatrixQueryResult{
+		PatternMatrix: make([]*shims.OnePatternMatrixElement, 0),
+	}
+	var groupedResults []linq.Group
+	linq.From(queryResult.PatternMatrix).
+		GroupByT(
+			func(el *models.OnePatternMatrixElement) int { return el.PatternID },
+			func(el *models.OnePatternMatrixElement) *models.OnePatternMatrixElement { return el },
+		).ToSlice(&groupedResults)
+	for _, group := range groupedResults {
+		patternId := group.Key.(int)
+		for _, el := range group.Group {
+			oneDropPattern := el.(*models.OnePatternMatrixElement)
+			stage, err := s.StageService.GetStageById(ctx, oneDropPattern.StageID)
+			if err != nil {
+				return nil, err
+			}
+			endTime := null.NewInt(oneDropPattern.TimeRange.EndTime.UnixMilli(), true)
+			dropPatternElements, err := s.DropPatternElementService.GetDropPatternElementsByPatternId(ctx, patternId)
+			if err != nil {
+				return nil, err
+			}
+			// create pattern object from dropPatternElements
+			pattern := shims.Pattern{
+				Drops: make([]*shims.OneDrop, 0),
+			}
+			for _, dropPatternElement := range dropPatternElements {
+				item, err := s.ItemService.GetItemById(ctx, dropPatternElement.ItemID)
+				if err != nil {
+					return nil, err
+				}
+				pattern.Drops = append(pattern.Drops, &shims.OneDrop{
+					ItemID:   item.ArkItemID,
+					Quantity: dropPatternElement.Quantity,
+				})
+			}
+			onePatternMatrixElement := shims.OnePatternMatrixElement{
+				StageID:   stage.ArkStageID,
+				Times:     oneDropPattern.Times,
+				Quantity:  oneDropPattern.Quantity,
+				StartTime: oneDropPattern.TimeRange.StartTime.UnixMilli(),
+				EndTime:   &endTime,
+				Pattern:   &pattern,
+			}
+			if onePatternMatrixElement.EndTime.Int64 == constants.FakeEndTimeMilli {
+				onePatternMatrixElement.EndTime = nil
+			}
+			results.PatternMatrix = append(results.PatternMatrix, &onePatternMatrixElement)
+		}
+	}
+	return results, nil
 }

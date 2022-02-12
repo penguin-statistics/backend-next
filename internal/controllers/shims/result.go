@@ -15,7 +15,6 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
-	"github.com/penguin-statistics/backend-next/internal/utils/shimutils"
 )
 
 type ResultController struct {
@@ -25,7 +24,6 @@ type ResultController struct {
 	AccountService       *service.AccountService
 	ItemService          *service.ItemService
 	StageService         *service.StageService
-	ShimUtil             *shimutils.ShimUtil
 }
 
 func RegisterResultController(
@@ -36,7 +34,6 @@ func RegisterResultController(
 	accountService *service.AccountService,
 	itemService *service.ItemService,
 	stageService *service.StageService,
-	shimUtil *shimutils.ShimUtil,
 ) {
 	c := &ResultController{
 		DropMatrixService:    dropMatrixService,
@@ -45,7 +42,6 @@ func RegisterResultController(
 		AccountService:       accountService,
 		ItemService:          itemService,
 		StageService:         stageService,
-		ShimUtil:             shimUtil,
 	}
 
 	v2.Get("/result/matrix", c.GetDropMatrix)
@@ -130,11 +126,7 @@ func (c *ResultController) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	queryResult, err := c.PatternMatrixService.GetSavedPatternMatrixResults(ctx, server, &accountId)
-	if err != nil {
-		return err
-	}
-	shimResult, err := c.ShimUtil.ApplyShimForPatternMatrixQuery(ctx, queryResult)
+	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx, server, &accountId)
 	if err != nil {
 		return err
 	}

@@ -48,11 +48,11 @@ type CombinedResultForDropPattern struct {
 	Quantity  int `json:"quantity"`
 }
 
-type DropPatternQueryResult struct {
-	DropPatterns []*OneDropPattern `json:"dropPatterns"`
+type PatternMatrixQueryResult struct {
+	PatternMatrix []*OnePatternMatrixElement `json:"dropPatterns"`
 }
 
-type OneDropPattern struct {
+type OnePatternMatrixElement struct {
 	StageID   int        `json:"stageId"`
 	PatternID int        `json:"patternId"`
 	TimeRange *TimeRange `json:"timeRange"`

@@ -8,7 +8,6 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/utils/shimutils"
 )
 
 type PrivateController struct {
@@ -18,7 +17,6 @@ type PrivateController struct {
 	AccountService       *service.AccountService
 	ItemService          *service.ItemService
 	StageService         *service.StageService
-	ShimUtil             *shimutils.ShimUtil
 }
 
 func RegisterPrivateController(
@@ -29,7 +27,6 @@ func RegisterPrivateController(
 	accountService *service.AccountService,
 	itemService *service.ItemService,
 	stageService *service.StageService,
-	shimUtil *shimutils.ShimUtil,
 ) {
 	c := &PrivateController{
 		DropMatrixService:    dropMatrixService,
@@ -38,7 +35,6 @@ func RegisterPrivateController(
 		AccountService:       accountService,
 		ItemService:          itemService,
 		StageService:         stageService,
-		ShimUtil:             shimUtil,
 	}
 
 	v2.Get("/_private/result/matrix/:server/:source", c.GetDropMatrix)
@@ -107,11 +103,7 @@ func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	queryResult, err := c.PatternMatrixService.GetSavedPatternMatrixResults(ctx, server, &accountId)
-	if err != nil {
-		return err
-	}
-	shimResult, err := c.ShimUtil.ApplyShimForPatternMatrixQuery(ctx, queryResult)
+	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx, server, &accountId)
 	if err != nil {
 		return err
 	}

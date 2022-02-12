@@ -1,11 +1,8 @@
 package controllers
 
 import (
-	"strconv"
-
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
-	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/service"
@@ -23,8 +20,6 @@ func RegisterTestController(v3 *server.V3, c TestController) {
 	v3.Get("/refresh/matrix/:server", c.RefreshAllDropMatrixElements)
 
 	v3.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
-	v3.Get("/global/pattern/:server", c.GetGlobalPatternMatrix)
-	v3.Get("/personal/pattern/:server/:accountId", c.GetPersonalPatternMatrix)
 
 	v3.Get("/refresh/trend/:server", c.RefreshAllTrendElements)
 }
@@ -37,31 +32,6 @@ func (c *TestController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
 func (c *TestController) RefreshAllPatternMatrixElements(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	return c.PatternMatrixService.RefreshAllPatternMatrixElements(ctx, server)
-}
-
-func (c *TestController) GetGlobalPatternMatrix(ctx *fiber.Ctx) error {
-	server := ctx.Params("server")
-	accountId := null.NewInt(0, false)
-	globalPatternMatrix, err := c.PatternMatrixService.GetSavedPatternMatrixResults(ctx, server, &accountId)
-	if err != nil {
-		return err
-	}
-	return ctx.JSON(globalPatternMatrix)
-}
-
-func (c *TestController) GetPersonalPatternMatrix(ctx *fiber.Ctx) error {
-	server := ctx.Params("server")
-	accountIdStr := ctx.Params("accountId")
-	accountIdNum, err := strconv.Atoi(accountIdStr)
-	if err != nil {
-		return err
-	}
-	accountIdNull := null.IntFrom(int64(accountIdNum))
-	personalPatternMatrix, err := c.PatternMatrixService.GetSavedPatternMatrixResults(ctx, server, &accountIdNull)
-	if err != nil {
-		return err
-	}
-	return ctx.JSON(personalPatternMatrix)
 }
 
 func (c *TestController) RefreshAllTrendElements(ctx *fiber.Ctx) error {

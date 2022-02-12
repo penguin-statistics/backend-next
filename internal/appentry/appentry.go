@@ -17,7 +17,6 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
-	"github.com/penguin-statistics/backend-next/internal/utils/shimutils"
 )
 
 func ProvideOptions(includeSwagger bool) []fx.Option {
@@ -34,7 +33,6 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(reportutils.NewDropVerifier),
 		fx.Provide(reportutils.NewMD5Verifier),
 		fx.Provide(reportutils.NewReportVerifier),
-		fx.Provide(shimutils.NewShimsUtil),
 		fx.Provide(repos.NewItemRepo),
 		fx.Provide(repos.NewZoneRepo),
 		fx.Provide(repos.NewStageRepo),
