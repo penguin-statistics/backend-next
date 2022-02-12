@@ -9,6 +9,13 @@ import (
 )
 
 var (
+	Formula cache.Cache
+
+	AccountById        cache.Cache
+	AccountByPenguinId cache.Cache
+
+	// --------------------------------------------------
+
 	ItemFromId    cache.Cache
 	ItemFromArkId cache.Cache
 
@@ -23,13 +30,18 @@ var (
 
 	TimeRangeFromId cache.Cache
 
-	Formula cache.Cache
-
 	once sync.Once
 )
 
 func Populate(client *redis.Client) {
 	once.Do(func() {
+		Formula = cache.New(client, "formula")
+
+		AccountById = cache.New(client, "accountById#")
+		AccountByPenguinId = cache.New(client, "accountByPenguinId#")
+
+		// --------------------------------------------------
+
 		ItemFromId = cache.New(client, "item#id")
 		ItemFromArkId = cache.New(client, "item#arkId")
 
@@ -44,6 +56,5 @@ func Populate(client *redis.Client) {
 
 		TimeRangeFromId = cache.New(client, "timeRange#id")
 
-		Formula = cache.New(client, "formula")
 	})
 }

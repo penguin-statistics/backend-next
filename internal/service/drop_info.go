@@ -48,6 +48,9 @@ func (s *DropInfoService) GetCurrentDropInfosByServer(ctx *fiber.Ctx, server str
 		return nil, err
 	}
 	currentTimeRanges, err := s.TimeRangeService.GetCurrentTimeRangesByServer(ctx, server)
+	if err != nil {
+		return nil, err
+	}
 	currentTimeRangesMap := make(map[int]*models.TimeRange)
 	for _, timeRange := range currentTimeRanges {
 		currentTimeRangesMap[timeRange.RangeID] = timeRange
