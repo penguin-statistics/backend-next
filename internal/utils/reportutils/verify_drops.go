@@ -111,15 +111,15 @@ func (d *DropVerifier) verifyDropItem(ctx context.Context, report *types.SingleR
 		for _, drop := range report.Drops {
 			count := drop.Quantity
 			if dropInfo.Bounds.Lower > count {
-				return fmt.Errorf("drop item `%s`: expected at least %d, but got %d", drop.ItemID, dropInfo.Bounds.Lower, count)
+				return fmt.Errorf("drop item `%d`: expected at least %d, but got %d", drop.ItemID, dropInfo.Bounds.Lower, count)
 			} else if dropInfo.Bounds.Upper < count {
-				return fmt.Errorf("drop item `%s`: expected at most %d, but got %d", drop.ItemID, dropInfo.Bounds.Upper, count)
+				return fmt.Errorf("drop item `%d`: expected at most %d, but got %d", drop.ItemID, dropInfo.Bounds.Upper, count)
 			}
 			if dropInfo.Bounds.Exceptions != nil {
 				if linq.From(dropInfo.Bounds.Exceptions).AnyWithT(func(exception int) bool {
 					return exception == count
 				}) {
-					return fmt.Errorf("drop item `%s`: expected not to have %d", drop.ItemID, count)
+					return fmt.Errorf("drop item `%d`: expected not to have %d", drop.ItemID, count)
 				}
 			}
 		}

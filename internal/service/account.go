@@ -21,8 +21,20 @@ func NewAccountService(accountRepo *repos.AccountRepo) *AccountService {
 	}
 }
 
+func (s *AccountService) CreateAccountWithRandomPenguinID(ctx *fiber.Ctx) (*models.Account, error) {
+	return s.AccountRepo.CreateAccountWithRandomPenguinID(ctx.Context())
+}
+
+func (s *AccountService) GetAccountById(ctx *fiber.Ctx, accountId string) (*models.Account, error) {
+	return s.AccountRepo.GetAccountById(ctx.Context(), accountId)
+}
+
 func (s *AccountService) GetAccountByPenguinId(ctx *fiber.Ctx, penguinId string) (*models.Account, error) {
 	return s.AccountRepo.GetAccountByPenguinId(ctx.Context(), penguinId)
+}
+
+func (s *AccountService) IsAccountExistWithId(ctx *fiber.Ctx, accountId int) bool {
+	return s.AccountRepo.IsAccountExistWithId(ctx.Context(), accountId)
 }
 
 func (s *AccountService) GetAccountFromRequest(ctx *fiber.Ctx) (*models.Account, error) {
@@ -39,8 +51,4 @@ func (s *AccountService) GetAccountFromRequest(ctx *fiber.Ctx) (*models.Account,
 		return nil, errors.New("PenguinID is invalid")
 	}
 	return account, nil
-}
-
-func (s *AccountService) CreateAccountWithRandomPenguinID(ctx *fiber.Ctx) (*models.Account, error) {
-	return s.AccountRepo.CreateAccountWithRandomPenguinID(ctx.Context())
 }
