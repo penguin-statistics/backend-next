@@ -129,12 +129,7 @@ func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
 func (c *PrivateController) GetTrends(ctx *fiber.Ctx) error {
 	// TODO: the whole result should be cached, and populated when server starts
 	server := ctx.Params("server")
-
-	queryResult, err := c.TrendService.GetSavedTrendResults(ctx, server)
-	if err != nil {
-		return err
-	}
-	shimResult, err := c.ShimUtil.ApplyShimForTrendQuery(ctx, queryResult)
+	shimResult, err := c.TrendService.GetShimSavedTrendResults(ctx, server)
 	if err != nil {
 		return err
 	}

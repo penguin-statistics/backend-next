@@ -10,6 +10,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
@@ -20,6 +21,8 @@ type TrendService struct {
 	PatternMatrixElementService *PatternMatrixElementService
 	DropPatternElementService   *DropPatternElementService
 	TrendElementService         *TrendElementService
+	StageService                *StageService
+	ItemService                 *ItemService
 }
 
 func NewTrendService(
@@ -29,6 +32,8 @@ func NewTrendService(
 	patternMatrixElementService *PatternMatrixElementService,
 	dropPatternElementService *DropPatternElementService,
 	trendElementService *TrendElementService,
+	stageService *StageService,
+	itemService *ItemService,
 ) *TrendService {
 	return &TrendService{
 		TimeRangeService:            timeRangeService,
@@ -37,15 +42,29 @@ func NewTrendService(
 		PatternMatrixElementService: patternMatrixElementService,
 		DropPatternElementService:   dropPatternElementService,
 		TrendElementService:         trendElementService,
+		StageService:                stageService,
+		ItemService:                 itemService,
 	}
 }
 
-func (s *TrendService) GetSavedTrendResults(ctx *fiber.Ctx, server string) (*models.TrendQueryResult, error) {
-	trendElements, err := s.TrendElementService.GetElementsByServer(ctx, server)
+func (s *TrendService) GetShimSavedTrendResults(ctx *fiber.Ctx, server string) (*shims.TrendQueryResult, error) {
+	queryResult, err := s.getSavedTrendResults(ctx, server)
 	if err != nil {
 		return nil, err
 	}
-	return s.convertTrendElementsToTrendQueryResult(trendElements)
+	shimResult, err := s.applyShimForTrendQuery(ctx, queryResult)
+	if err != nil {
+		return nil, err
+	}
+	return shimResult, nil
+}
+
+func (s *TrendService) GetShimCustomizedTrendResults(ctx *fiber.Ctx, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIds []int, itemIds []int, accountId *null.Int) (*shims.TrendQueryResult, error) {
+	trendQueryResult, err := s.QueryTrend(ctx, server, startTime, intervalLength_hrs, intervalNum, stageIds, itemIds, accountId)
+	if err != nil {
+		return nil, err
+	}
+	return s.applyShimForTrendQuery(ctx, trendQueryResult)
 }
 
 func (s *TrendService) QueryTrend(
@@ -143,6 +162,14 @@ func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error
 
 	log.Debug().Msgf("toSave length: %v", len(toSave))
 	return s.TrendElementService.BatchSaveElements(ctx, toSave, server)
+}
+
+func (s *TrendService) getSavedTrendResults(ctx *fiber.Ctx, server string) (*models.TrendQueryResult, error) {
+	trendElements, err := s.TrendElementService.GetElementsByServer(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	return s.convertTrendElementsToTrendQueryResult(trendElements)
 }
 
 func (s *TrendService) calcTrend(
@@ -306,4 +333,32 @@ func (s *TrendService) convertTrendElementsToTrendQueryResult(trendElements []*m
 		trendQueryResult.Trends = append(trendQueryResult.Trends, stageTrend)
 	}
 	return trendQueryResult, nil
+}
+
+func (s *TrendService) applyShimForTrendQuery(ctx *fiber.Ctx, queryResult *models.TrendQueryResult) (*shims.TrendQueryResult, error) {
+	results := &shims.TrendQueryResult{
+		Trend: make(map[string]*shims.StageTrend),
+	}
+	for _, stageTrend := range queryResult.Trends {
+		stage, err := s.StageService.GetStageById(ctx, stageTrend.StageID)
+		if err != nil {
+			return nil, err
+		}
+		shimStageTrend := shims.StageTrend{
+			Results: make(map[string]*shims.OneItemTrend),
+		}
+		for _, itemTrend := range stageTrend.Results {
+			item, err := s.ItemService.GetItemById(ctx, itemTrend.ItemID)
+			if err != nil {
+				return nil, err
+			}
+			shimStageTrend.Results[item.ArkItemID] = &shims.OneItemTrend{
+				Quantity:  itemTrend.Quantity,
+				Times:     itemTrend.Times,
+				StartTime: itemTrend.StartTime.UnixMilli(),
+			}
+		}
+		results.Trend[stage.ArkStageID] = &shimStageTrend
+	}
+	return results, nil
 }

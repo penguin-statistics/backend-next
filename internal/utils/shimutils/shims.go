@@ -80,31 +80,3 @@ func (s *ShimUtil) ApplyShimForPatternMatrixQuery(ctx *fiber.Ctx, queryResult *m
 	}
 	return results, nil
 }
-
-func (s *ShimUtil) ApplyShimForTrendQuery(ctx *fiber.Ctx, queryResult *models.TrendQueryResult) (*shims.TrendQueryResult, error) {
-	results := &shims.TrendQueryResult{
-		Trend: make(map[string]*shims.StageTrend),
-	}
-	for _, stageTrend := range queryResult.Trends {
-		stage, err := s.StageService.GetStageById(ctx, stageTrend.StageID)
-		if err != nil {
-			return nil, err
-		}
-		shimStageTrend := shims.StageTrend{
-			Results: make(map[string]*shims.OneItemTrend),
-		}
-		for _, itemTrend := range stageTrend.Results {
-			item, err := s.ItemService.GetItemById(ctx, itemTrend.ItemID)
-			if err != nil {
-				return nil, err
-			}
-			shimStageTrend.Results[item.ArkItemID] = &shims.OneItemTrend{
-				Quantity:  itemTrend.Quantity,
-				Times:     itemTrend.Times,
-				StartTime: itemTrend.StartTime.UnixMilli(),
-			}
-		}
-		results.Trend[stage.ArkStageID] = &shimStageTrend
-	}
-	return results, nil
-}

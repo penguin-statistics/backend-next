@@ -153,11 +153,7 @@ func (c *ResultController) GetTrends(ctx *fiber.Ctx) error {
 	// TODO: the whole result should be cached, and populated when server starts
 	server := ctx.Query("server", "CN")
 
-	queryResult, err := c.TrendService.GetSavedTrendResults(ctx, server)
-	if err != nil {
-		return err
-	}
-	shimResult, err := c.ShimUtil.ApplyShimForTrendQuery(ctx, queryResult)
+	shimResult, err := c.TrendService.GetShimSavedTrendResults(ctx, server)
 	if err != nil {
 		return err
 	}
@@ -254,20 +250,7 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 			return nil, fmt.Errorf("intervalNum too large")
 		}
 
-		trendQueryResult, err := c.TrendService.QueryTrend(
-			ctx,
-			query.Server,
-			&startTime,
-			intervalLength_hrs,
-			intervalNum,
-			[]int{stage.StageID},
-			itemIds,
-			&accountId,
-		)
-		if err != nil {
-			return nil, err
-		}
-		shimTrendQueryResult, err := c.ShimUtil.ApplyShimForTrendQuery(ctx, trendQueryResult)
+		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx, query.Server, &startTime, intervalLength_hrs, intervalNum, []int{stage.StageID}, itemIds, &accountId)
 		if err != nil {
 			return nil, err
 		}
