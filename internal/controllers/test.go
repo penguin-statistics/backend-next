@@ -21,8 +21,6 @@ type TestController struct {
 
 func RegisterTestController(v3 *server.V3, c TestController) {
 	v3.Get("/refresh/matrix/:server", c.RefreshAllDropMatrixElements)
-	v3.Get("/global/matrix/:server", c.GetGlobalDropMatrix)
-	v3.Get("/personal/matrix/:server/:accountId", c.GetPersonalDropMatrix)
 
 	v3.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
 	v3.Get("/global/pattern/:server", c.GetGlobalPatternMatrix)
@@ -35,31 +33,6 @@ func RegisterTestController(v3 *server.V3, c TestController) {
 func (c *TestController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	return c.DropMatrixService.RefreshAllDropMatrixElements(ctx, server)
-}
-
-func (c *TestController) GetGlobalDropMatrix(ctx *fiber.Ctx) error {
-	server := ctx.Params("server")
-	accountId := null.NewInt(0, false)
-	globalDropMatrix, err := c.DropMatrixService.GetSavedDropMatrixResults(ctx, server, &accountId)
-	if err != nil {
-		return err
-	}
-	return ctx.JSON(globalDropMatrix)
-}
-
-func (c *TestController) GetPersonalDropMatrix(ctx *fiber.Ctx) error {
-	server := ctx.Params("server")
-	accountIdStr := ctx.Params("accountId")
-	accountIdNum, err := strconv.Atoi(accountIdStr)
-	if err != nil {
-		return err
-	}
-	accountIdNull := null.IntFrom(int64(accountIdNum))
-	personalDropMatrix, err := c.DropMatrixService.GetSavedDropMatrixResults(ctx, server, &accountIdNull)
-	if err != nil {
-		return err
-	}
-	return ctx.JSON(personalDropMatrix)
 }
 
 func (c *TestController) RefreshAllPatternMatrixElements(ctx *fiber.Ctx) error {

@@ -73,11 +73,7 @@ func (c *PrivateController) GetDropMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	queryResult, err := c.DropMatrixService.GetSavedDropMatrixResults(ctx, server, &accountId)
-	if err != nil {
-		return err
-	}
-	shimResult, err := c.ShimUtil.ApplyShimForDropMatrixQuery(ctx, server, true, "", "", queryResult)
+	shimResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx, server, true, "", "", &accountId)
 	if err != nil {
 		return err
 	}
