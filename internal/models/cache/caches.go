@@ -24,6 +24,8 @@ var (
 	ShimItems       cache.Cache
 	ShimItemByArkId cache.Cache
 
+	Notices cache.Cache
+
 	once sync.Once
 )
 
@@ -48,5 +50,8 @@ func Populate(client *redis.Client) {
 		ItemByArkId = cache.New(client, "item#arkItemId:")
 		ShimItems = cache.New(client, "shimItems")
 		ShimItemByArkId = cache.New(client, "shimItem#arkItemId:")
+
+		// notice
+		Notices = cache.New(client, "notices")
 	})
 }
