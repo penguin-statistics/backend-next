@@ -28,6 +28,8 @@ var (
 
 	ShimLatestPatternMatrixResults cache.Cache
 
+	ShimSiteStats cache.Cache
+
 	once sync.Once
 )
 
@@ -58,5 +60,8 @@ func Populate(client *redis.Client) {
 
 		// pattern_matrix
 		ShimLatestPatternMatrixResults = cache.New(client, "shimLatestPatternMatrixResults#server:")
+
+		// site_stats
+		ShimSiteStats = cache.New(client, "shimSiteStats#server:")
 	})
 }
