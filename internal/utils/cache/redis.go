@@ -2,12 +2,12 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"sync"
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/goccy/go-json"
 )
 
 func New(client *redis.Client, prefix string) Cache {
@@ -84,6 +84,15 @@ func (c *redisCache) slowMutexGetSet(key string, dest interface{}, valueFunc fun
 	return nil
 }
 
-func (c *redisCache) Delete(key string) {
-	c.client.Del(context.Background(), c.prefix+key)
+func (c *redisCache) Delete(key string) error {
+	return c.client.Del(context.Background(), c.prefix+key).Err()
+}
+
+func (c *redisCache) Clear() error {
+	script := redis.NewScript(`local keys = redis.call('keys', ARGV[1])
+		for i=1,#keys,5000 do
+			redis.call('del', unpack(keys, i, math.min(i+4999, #keys)))
+		end
+	return keys`)
+	return script.Eval(context.Background(), c.client, []string{}, []string{c.prefix + "*"}).Err()
 }
