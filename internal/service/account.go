@@ -27,7 +27,7 @@ func (s *AccountService) CreateAccountWithRandomPenguinID(ctx *fiber.Ctx) (*mode
 	return s.AccountRepo.CreateAccountWithRandomPenguinID(ctx.Context())
 }
 
-// Cache: AccountById#accountId, 24hrs
+// Cache: account#accountId:{accountId}, 24hrs
 func (s *AccountService) GetAccountById(ctx *fiber.Ctx, accountId string) (*models.Account, error) {
 	var account *models.Account
 	err := cache.AccountById.Get(accountId, account)
@@ -43,7 +43,7 @@ func (s *AccountService) GetAccountById(ctx *fiber.Ctx, accountId string) (*mode
 	return account, nil
 }
 
-// Cache: AccountByPenguinId#penguinId, 24hrs
+// Cache: account#penguinId:{penguinId}, 24hrs
 func (s *AccountService) GetAccountByPenguinId(ctx *fiber.Ctx, penguinId string) (*models.Account, error) {
 	var account *models.Account
 	err := cache.AccountByPenguinId.Get(penguinId, account)

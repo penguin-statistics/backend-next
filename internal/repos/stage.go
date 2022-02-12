@@ -3,14 +3,11 @@ package repos
 import (
 	"context"
 	"database/sql"
-	"strconv"
-	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 )
@@ -40,12 +37,7 @@ func (c *StageRepo) GetStages(ctx context.Context) ([]*models.Stage, error) {
 
 func (c *StageRepo) GetStageById(ctx context.Context, stageId int) (*models.Stage, error) {
 	var stage models.Stage
-	err := cache.StageFromId.Get(strconv.Itoa(stageId), &stage)
-	if err == nil {
-		return &stage, nil
-	}
-
-	err = c.db.NewSelect().
+	err := c.db.NewSelect().
 		Model(&stage).
 		Where("stage_id = ?", stageId).
 		Scan(ctx)
@@ -56,18 +48,12 @@ func (c *StageRepo) GetStageById(ctx context.Context, stageId int) (*models.Stag
 		return nil, err
 	}
 
-	go cache.StageFromId.Set(strconv.Itoa(stageId), &stage, time.Hour*24)
 	return &stage, nil
 }
 
 func (c *StageRepo) GetStageByArkId(ctx context.Context, stageArkId string) (*models.Stage, error) {
 	var stage models.Stage
-	err := cache.StageFromArkId.Get(stageArkId, &stage)
-	if err == nil {
-		return &stage, nil
-	}
-
-	err = c.db.NewSelect().
+	err := c.db.NewSelect().
 		Model(&stage).
 		Where("ark_stage_id = ?", stageArkId).
 		Scan(ctx)
@@ -78,7 +64,6 @@ func (c *StageRepo) GetStageByArkId(ctx context.Context, stageArkId string) (*mo
 		return nil, err
 	}
 
-	go cache.StageFromArkId.Set(stageArkId, &stage, time.Hour*24)
 	return &stage, nil
 }
 

@@ -3,13 +3,10 @@ package repos
 import (
 	"context"
 	"database/sql"
-	"strconv"
-	"time"
 
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 )
@@ -39,12 +36,7 @@ func (c *ItemRepo) GetItems(ctx context.Context) ([]*models.Item, error) {
 
 func (c *ItemRepo) GetItemById(ctx context.Context, itemId int) (*models.Item, error) {
 	var item models.Item
-	err := cache.ItemFromId.Get(strconv.Itoa(itemId), &item)
-	if err == nil {
-		return &item, nil
-	}
-
-	err = c.DB.NewSelect().
+	err := c.DB.NewSelect().
 		Model(&item).
 		Where("item_id = ?", itemId).
 		Scan(ctx)
@@ -55,18 +47,12 @@ func (c *ItemRepo) GetItemById(ctx context.Context, itemId int) (*models.Item, e
 		return nil, err
 	}
 
-	go cache.ItemFromId.Set(strconv.Itoa(itemId), &item, time.Hour*24)
 	return &item, nil
 }
 
 func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*models.Item, error) {
 	var item models.Item
-	err := cache.ItemFromArkId.Get(arkItemId, &item)
-	if err == nil {
-		return &item, nil
-	}
-
-	err = c.DB.NewSelect().
+	err := c.DB.NewSelect().
 		Model(&item).
 		Where("ark_item_id = ?", arkItemId).
 		Scan(ctx)
@@ -77,7 +63,6 @@ func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*model
 		return nil, err
 	}
 
-	go cache.ItemFromArkId.Set(arkItemId, &item, time.Hour*24)
 	return &item, nil
 }
 

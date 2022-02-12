@@ -19,14 +19,17 @@ func NewZoneService(zoneRepo *repos.ZoneRepo) *ZoneService {
 	}
 }
 
+// Cache: Zones, 24hrs
 func (s *ZoneService) GetZones(ctx *fiber.Ctx) ([]*models.Zone, error) {
 	return s.ZoneRepo.GetZones(ctx.Context())
 }
 
+// Cache: ZoneByArkId#{arkZoneId}, 24hrs
 func (s *ZoneService) GetZoneByArkId(ctx *fiber.Ctx, arkZoneId string) (*models.Zone, error) {
 	return s.ZoneRepo.GetZoneByArkId(ctx.Context(), arkZoneId)
 }
 
+// Cache: ShimZones, 24hrs
 func (s *ZoneService) GetShimZones(ctx *fiber.Ctx) ([]*shims.Zone, error) {
 	zones, err := s.ZoneRepo.GetShimZones(ctx.Context())
 	if err != nil {
@@ -38,6 +41,7 @@ func (s *ZoneService) GetShimZones(ctx *fiber.Ctx) ([]*shims.Zone, error) {
 	return zones, nil
 }
 
+// Cache: ShimZoneByArkId#{zoneId}, 24hrs
 func (s *ZoneService) GetShimZoneByArkId(ctx *fiber.Ctx, zoneId string) (*shims.Zone, error) {
 	zone, err := s.ZoneRepo.GetShimZoneByArkId(ctx.Context(), zoneId)
 	if err != nil {

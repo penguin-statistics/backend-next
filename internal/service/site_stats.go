@@ -17,6 +17,7 @@ func NewSiteStatsService(dropReportRepo *repos.DropReportRepo) *SiteStatsService
 	}
 }
 
+// Cache: ShimSiteStats#{server}, 24hrs
 func (s *SiteStatsService) GetShimSiteStats(ctx context.Context, server string) (*shims.SiteStats, error) {
 	stageTimes, err := s.DropReportRepo.CalcTotalStageQuantityForShimSiteStats(ctx, server, false)
 	if err != nil {

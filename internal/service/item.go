@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/gofiber/fiber/v2"
 	"github.com/tidwall/gjson"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/utils"
@@ -25,35 +27,87 @@ func NewItemService(itemRepo *repos.ItemRepo) *ItemService {
 	}
 }
 
+// Cache: items, 24hrs
 func (s *ItemService) GetItems(ctx *fiber.Ctx) ([]*models.Item, error) {
-	return s.ItemRepo.GetItems(ctx.Context())
+	var items []*models.Item
+	err := cache.Items.Get("", items)
+	if err == nil {
+		return items, nil
+	}
+
+	items, err = s.ItemRepo.GetItems(ctx.Context())
+	if err != nil {
+		return nil, err
+	}
+	go cache.Items.Set("", items, 24*time.Hour)
+	return items, nil
 }
 
+// Cache: item#itemId:{itemId}, 24hrs
 func (s *ItemService) GetItemById(ctx *fiber.Ctx, itemId int) (*models.Item, error) {
-	return s.ItemRepo.GetItemById(ctx.Context(), itemId)
+	var item *models.Item
+	err := cache.ItemById.Get(strconv.Itoa(itemId), item)
+	if err == nil {
+		return item, nil
+	}
+
+	item, err = s.ItemRepo.GetItemById(ctx.Context(), itemId)
+	if err != nil {
+		return nil, err
+	}
+	go cache.ItemById.Set(strconv.Itoa(itemId), item, 24*time.Hour)
+	return item, nil
 }
 
+// Cache: item#arkItemId:{arkItemId}, 24hrs
 func (s *ItemService) GetItemByArkId(ctx *fiber.Ctx, arkItemId string) (*models.Item, error) {
-	return s.ItemRepo.GetItemByArkId(ctx.Context(), arkItemId)
+	var item *models.Item
+	err := cache.ItemByArkId.Get(arkItemId, item)
+	if err == nil {
+		return item, nil
+	}
+
+	item, err = s.ItemRepo.GetItemByArkId(ctx.Context(), arkItemId)
+	if err != nil {
+		return nil, err
+	}
+	go cache.ItemByArkId.Set(arkItemId, item, 24*time.Hour)
+	return item, nil
 }
 
+// Cache: shimItems, 24hrs
 func (s *ItemService) GetShimItems(ctx *fiber.Ctx) ([]*shims.Item, error) {
-	items, err := s.ItemRepo.GetShimItems(ctx.Context())
+	var items []*shims.Item
+	err := cache.ShimItems.Get("", items)
+	if err == nil {
+		return items, nil
+	}
+
+	items, err = s.ItemRepo.GetShimItems(ctx.Context())
 	if err != nil {
 		return nil, err
 	}
 	for _, i := range items {
 		s.applyShim(i)
 	}
+	go cache.ShimItems.Set("", items, 24*time.Hour)
 	return items, nil
 }
 
-func (s *ItemService) GetShimItemByArkId(ctx *fiber.Ctx, itemId string) (*shims.Item, error) {
-	item, err := s.ItemRepo.GetShimItemByArkId(ctx.Context(), itemId)
+// Cache: shimItem#arkItemId:{arkItemId}, 24hrs
+func (s *ItemService) GetShimItemByArkId(ctx *fiber.Ctx, arkItemId string) (*shims.Item, error) {
+	var item *shims.Item
+	err := cache.ShimItemByArkId.Get(arkItemId, item)
+	if err == nil {
+		return item, nil
+	}
+
+	item, err = s.ItemRepo.GetShimItemByArkId(ctx.Context(), arkItemId)
 	if err != nil {
 		return nil, err
 	}
 	s.applyShim(item)
+	go cache.ShimItemByArkId.Set(arkItemId, item, 24*time.Hour)
 	return item, nil
 }
 

@@ -47,6 +47,7 @@ func NewTrendService(
 	}
 }
 
+// Cache: ShimSavedTrendResults#{server}, 24hrs
 func (s *TrendService) GetShimSavedTrendResults(ctx *fiber.Ctx, server string) (*shims.TrendQueryResult, error) {
 	queryResult, err := s.getSavedTrendResults(ctx, server)
 	if err != nil {

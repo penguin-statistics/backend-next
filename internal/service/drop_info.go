@@ -1,10 +1,15 @@
 package service
 
 import (
+	"strconv"
+	"time"
+
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/gofiber/fiber/v2"
 
+	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
 
@@ -28,11 +33,25 @@ func (s *DropInfoService) GetDropInfosWithFilters(ctx *fiber.Ctx, server string,
 	return s.DropInfoRepo.GetDropInfosWithFilters(ctx.Context(), server, timeRanges, stageIdFilter, itemIdFilter)
 }
 
+// Cache: itemDropSet#server|stageId|rangeId:{server}|{stageId}|{rangeId}, 24 hrs
 func (s *DropInfoService) GetItemDropSetByStageIdAndRangeId(ctx *fiber.Ctx, server string, stageId int, rangeId int) ([]int, error) {
-	return s.DropInfoRepo.GetItemDropSetByStageIdAndRangeId(ctx.Context(), server, stageId, rangeId)
+	var itemDropSet []int
+	key := server + constants.RedisSeparator + strconv.Itoa(stageId) + constants.RedisSeparator + strconv.Itoa(rangeId)
+	err := cache.ItemDropSetByStageIdAndRangeId.Get(key, itemDropSet)
+	if err == nil {
+		return itemDropSet, nil
+	}
+
+	itemDropSet, err = s.DropInfoRepo.GetItemDropSetByStageIdAndRangeId(ctx.Context(), server, stageId, rangeId)
+	if err != nil {
+		return nil, err
+	}
+
+	go cache.ItemDropSetByStageIdAndRangeId.Set(key, itemDropSet, 24*time.Hour)
+	return itemDropSet, nil
 }
 
-func (s *DropInfoService) GetStageIdsByServer(ctx *fiber.Ctx, server string) ([]int, error) {
+func (s *DropInfoService) GetAppearStageIdsByServer(ctx *fiber.Ctx, server string) ([]int, error) {
 	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx.Context(), server)
 	if err != nil {
 		return nil, err

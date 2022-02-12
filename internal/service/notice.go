@@ -17,6 +17,7 @@ func NewNoticeService(noticeRepo *repos.NoticeRepo) *NoticeService {
 	}
 }
 
+// Cache: Notices, 24hrs
 func (s *NoticeService) GetNotices(ctx *fiber.Ctx) ([]*models.Notice, error) {
 	return s.NoticeRepo.GetNotices(ctx.Context())
 }

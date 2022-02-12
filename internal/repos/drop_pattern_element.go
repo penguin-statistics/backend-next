@@ -3,13 +3,10 @@ package repos
 import (
 	"context"
 	"database/sql"
-	"strconv"
-	"time"
 
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 )
@@ -82,12 +79,7 @@ func (r *DropPatternElementRepo) CreateDropPatternElements(ctx context.Context, 
 
 func (r *DropPatternElementRepo) GetDropPatternElementsByPatternId(ctx context.Context, patternId int) ([]*models.DropPatternElement, error) {
 	var elements []*models.DropPatternElement
-	err := cache.DropPatternElementsFromId.Get(strconv.Itoa(patternId), &elements)
-	if err == nil {
-		return elements, nil
-	}
-
-	err = r.DB.NewSelect().
+	err := r.DB.NewSelect().
 		Model(&elements).
 		Where("drop_pattern_id = ?", patternId).
 		Scan(ctx)
@@ -97,7 +89,5 @@ func (r *DropPatternElementRepo) GetDropPatternElementsByPatternId(ctx context.C
 	} else if err != nil {
 		return nil, err
 	}
-
-	go cache.DropPatternElementsFromId.Set(strconv.Itoa(patternId), &elements, time.Hour*24)
 	return elements, nil
 }

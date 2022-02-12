@@ -19,18 +19,22 @@ func NewStageService(stageRepo *repos.StageRepo) *StageService {
 	}
 }
 
+// Cache: Stages, 24hrs
 func (s *StageService) GetStages(ctx *fiber.Ctx) ([]*models.Stage, error) {
 	return s.StageRepo.GetStages(ctx.Context())
 }
 
+// Cache: StageById#{stageId}, 24hrs
 func (s *StageService) GetStageById(ctx *fiber.Ctx, stageId int) (*models.Stage, error) {
 	return s.StageRepo.GetStageById(ctx.Context(), stageId)
 }
 
+// Cache: StageByArkId#{stageArkId}, 24hrs
 func (s *StageService) GetStageByArkId(ctx *fiber.Ctx, stageArkId string) (*models.Stage, error) {
 	return s.StageRepo.GetStageByArkId(ctx.Context(), stageArkId)
 }
 
+// Cache: ShimStages#{server}, 24hrs
 func (s *StageService) GetShimStages(ctx *fiber.Ctx, server string) ([]*shims.Stage, error) {
 	stages, err := s.StageRepo.GetShimStages(ctx.Context(), server)
 	if err != nil {
@@ -42,6 +46,7 @@ func (s *StageService) GetShimStages(ctx *fiber.Ctx, server string) ([]*shims.St
 	return stages, nil
 }
 
+// Cache: ShimStageByArkId#{server}|{stageId}, 24hrs
 func (s *StageService) GetShimStageByArkId(ctx *fiber.Ctx, stageId string, server string) (*shims.Stage, error) {
 	stage, err := s.StageRepo.GetShimStageByArkId(ctx.Context(), stageId, server)
 	if err != nil {

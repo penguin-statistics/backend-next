@@ -3,12 +3,10 @@ package repos
 import (
 	"context"
 	"database/sql"
-	"time"
 
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 )
@@ -24,12 +22,7 @@ func NewZoneRepo(db *bun.DB) *ZoneRepo {
 // Cache: AllZones
 func (c *ZoneRepo) GetZones(ctx context.Context) ([]*models.Zone, error) {
 	var zones []*models.Zone
-	err := cache.AllZones.Get("", &zones)
-	if err == nil {
-		return zones, nil
-	}
-
-	err = c.db.NewSelect().
+	err := c.db.NewSelect().
 		Model(&zones).
 		Scan(ctx)
 
@@ -39,19 +32,13 @@ func (c *ZoneRepo) GetZones(ctx context.Context) ([]*models.Zone, error) {
 		return nil, err
 	}
 
-	go cache.AllZones.Set("", &zones, time.Hour*24)
 	return zones, nil
 }
 
 // Cache: ZoneFromArkId
 func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*models.Zone, error) {
 	var zone models.Zone
-	err := cache.ZoneFromArkId.Get(arkZoneId, &zone)
-	if err == nil {
-		return &zone, nil
-	}
-
-	err = c.db.NewSelect().
+	err := c.db.NewSelect().
 		Model(&zone).
 		Where("ark_zone_id = ?", arkZoneId).
 		Scan(ctx)
@@ -62,7 +49,6 @@ func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model
 		return nil, err
 	}
 
-	go cache.ZoneFromArkId.Set(arkZoneId, &zone, time.Hour*24)
 	return &zone, nil
 }
 

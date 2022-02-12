@@ -9,52 +9,44 @@ import (
 )
 
 var (
-	Formula cache.Cache
-
 	AccountById        cache.Cache
 	AccountByPenguinId cache.Cache
 
-	// --------------------------------------------------
+	ItemDropSetByStageIdAndRangeId cache.Cache
 
-	ItemFromId    cache.Cache
-	ItemFromArkId cache.Cache
+	ShimMaxAccumulableDropMatrixResults cache.Cache
 
-	StageFromId    cache.Cache
-	StageFromArkId cache.Cache
+	Formula cache.Cache
 
-	ZoneFromId    cache.Cache
-	ZoneFromArkId cache.Cache
-	AllZones      cache.Cache
-
-	DropPatternElementsFromId cache.Cache
-
-	TimeRangeFromId cache.Cache
+	Items           cache.Cache
+	ItemById        cache.Cache
+	ItemByArkId     cache.Cache
+	ShimItems       cache.Cache
+	ShimItemByArkId cache.Cache
 
 	once sync.Once
 )
 
 func Populate(client *redis.Client) {
 	once.Do(func() {
+		// account
+		AccountById = cache.New(client, "account#accountId:")
+		AccountByPenguinId = cache.New(client, "account#penguinId:")
+
+		// drop_info
+		ItemDropSetByStageIdAndRangeId = cache.New(client, "itemDropSet#server|stageId|rangeId:")
+
+		// drop_matrix
+		ShimMaxAccumulableDropMatrixResults = cache.New(client, "shimMaxAccumulableDropMatrixResults#server|showClosedZoned:")
+
+		// formula
 		Formula = cache.New(client, "formula")
 
-		AccountById = cache.New(client, "accountById#")
-		AccountByPenguinId = cache.New(client, "accountByPenguinId#")
-
-		// --------------------------------------------------
-
-		ItemFromId = cache.New(client, "item#id")
-		ItemFromArkId = cache.New(client, "item#arkId")
-
-		StageFromId = cache.New(client, "stage#id")
-		StageFromArkId = cache.New(client, "stage#arkId")
-
-		ZoneFromId = cache.New(client, "zone#id")
-		ZoneFromArkId = cache.New(client, "zone#arkId")
-		AllZones = cache.New(client, "zone#all")
-
-		DropPatternElementsFromId = cache.New(client, "dropPatternElement#id")
-
-		TimeRangeFromId = cache.New(client, "timeRange#id")
-
+		// item
+		Items = cache.New(client, "items")
+		ItemById = cache.New(client, "item#itemId:")
+		ItemByArkId = cache.New(client, "item#arkItemId:")
+		ShimItems = cache.New(client, "shimItems")
+		ShimItemByArkId = cache.New(client, "shimItem#arkItemId:")
 	})
 }

@@ -45,6 +45,7 @@ func NewPatternMatrixService(
 	}
 }
 
+// Cache: ShimLatestPatternMatrixResults#{server}, 24hrs
 func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*shims.PatternMatrixQueryResult, error) {
 	queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId)
 	if err != nil {

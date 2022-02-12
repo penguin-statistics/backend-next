@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
@@ -67,12 +69,25 @@ func NewDropMatrixService(
 	}
 }
 
+// Cache: shimMaxAccumulableDropMatrixResults#server|showClosedZoned:{server}|{showClosedZones}, 24 hrs
 func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx *fiber.Ctx, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId *null.Int) (*shims.DropMatrixQueryResult, error) {
+	var results *shims.DropMatrixQueryResult
+	key := server + constants.RedisSeparator + strconv.FormatBool(showClosedZones)
+	err := cache.ShimMaxAccumulableDropMatrixResults.Get(key, results)
+	if err == nil {
+		return results, nil
+	}
+
 	savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId)
 	if err != nil {
 		return nil, err
 	}
-	return s.applyShimForDropMatrixQuery(ctx, server, showClosedZones, stageFilterStr, itemFilterStr, savedDropMatrixResults)
+	results, err = s.applyShimForDropMatrixQuery(ctx, server, showClosedZones, stageFilterStr, itemFilterStr, savedDropMatrixResults)
+	if err != nil {
+		return nil, err
+	}
+	go cache.ShimMaxAccumulableDropMatrixResults.Set(key, results, time.Hour*24)
+	return results, nil
 }
 
 func (s *DropMatrixService) GetShimCustomizedDropMatrixResults(ctx *fiber.Ctx, server string, timeRange *models.TimeRange, stageIds []int, itemIds []int, accountId *null.Int) (*shims.DropMatrixQueryResult, error) {
