@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/dchest/uniuri"
 	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
 	"github.com/nats-io/nats.go"
@@ -16,11 +17,15 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
+	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
 )
+
+var ErrReportNotFound = errors.ErrInvalidRequest.WithMessage("report not found")
 
 type ReportService struct {
 	DB                     *bun.DB
@@ -76,14 +81,15 @@ func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, redis *redis.Cli
 	return service
 }
 
-func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingleReportRequest) error {
+// returns TaskID and error, if any
+func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingleReportRequest) (taskId string, err error) {
 	// if account is not found, create new account
 	var accountId int
 	account, err := s.AccountService.GetAccountFromRequest(ctx)
 	if err != nil {
 		createdAccount, err := s.AccountService.CreateAccountWithRandomPenguinID(ctx)
 		if err != nil {
-			return err
+			return "", err
 		}
 		accountId = createdAccount.AccountID
 		utils.SetPenguinIDToResponse(ctx, createdAccount.PenguinID)
@@ -100,7 +106,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 	for _, drop := range req.Drops {
 		item, err := s.ItemService.GetItemByArkId(ctx, drop.ItemID)
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		drops = append(drops, &types.Drop{
@@ -118,13 +124,13 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
 	category, err := s.StageService.GetStageExtraProcessTypeByArkId(ctx, singleReport.StageID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if category == constants.ExtraProcessTypeGachaBox {
 		reportutils.AggregateGachaBoxDrops(singleReport)
 	}
 
-	taskId := fmt.Sprintf("%s-%d", ctx.Locals("requestid").(string), accountId)
+	taskId = ctx.Locals("requestid").(string) + "-" + uniuri.NewLen(32)
 
 	// construct ReportContext
 	reportTask := &types.ReportTask{
@@ -141,30 +147,43 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 
 	reportTaskJson, err := json.Marshal(reportTask)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	pub, err := s.NatsJS.PublishAsync("REPORT.SINGLE", reportTaskJson)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	select {
 	case err := <-pub.Err():
-		return err
+		return "", err
 	case <-pub.Ok():
-		return nil
+		return taskId, nil
 	case <-ctx.Context().Done():
-		return ctx.Context().Err()
-	case <-time.After(time.Second * 2):
-		return fmt.Errorf("timeout waiting for NATS response")
+		return "", ctx.Context().Err()
+	case <-time.After(time.Second * 15):
+		return "", fmt.Errorf("timeout waiting for NATS response")
+	}
+}
+
+func (s *ReportService) RecallSingularReport(ctx *fiber.Ctx, req *types.SingleReportRecallRequest) error {
+	var reportId int
+	err := cache.RecentReports.Get(req.ReportHash, &reportId)
+	if err == redis.Nil {
+		return ErrReportNotFound
+	} else if err != nil {
+		return err
 	}
 
-	// if err := s.ReportVerifier.Verify(ctx.Context(), reportTask); err != nil {
-	// 	return err
-	// }
+	err = s.DropReportRepo.DeleteDropReport(ctx.Context(), reportId)
+	if err != nil {
+		return err
+	}
 
-	// return ctx.SendStatus(fiber.StatusAccepted)
+	cache.RecentReports.Delete(req.ReportHash)
+
+	return nil
 }
 
 func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) error {
@@ -287,7 +306,7 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 			return err
 		}
 
-		s.Redis.Set(ctx, fmt.Sprintf("report:%s", reportTask.TaskID), fmt.Sprintf("%d", dropReport.ReportID), time.Hour*24)
+		cache.RecentReports.Set(reportTask.TaskID, dropReport.ReportID, 24*time.Hour)
 	}
 
 	intendedCommit = true

@@ -4,7 +4,7 @@ import "gopkg.in/guregu/null.v3"
 
 type ArkDrop struct {
 	DropType string `json:"dropType" validate:"required,oneof=REGULAR_DROP NORMAL_DROP SPECIAL_DROP EXTRA_DROP"`
-	ItemID   string `json:"itemId" validate:"required"`
+	ItemID   string `json:"itemId" validate:"required,printascii"`
 	Quantity int    `json:"quantity" validate:"required,lte=1000"`
 }
 
@@ -21,9 +21,13 @@ type SingleReportRequest struct {
 	Drops []ArkDrop `json:"drops" validate:"dive"`
 }
 
+type SingleReportRecallRequest struct {
+	ReportHash string `json:"reportHash" validate:"required,printascii"`
+}
+
 type BatchReportDrop struct {
 	Drops    []ArkDrop             `json:"drops"`
-	StageID  string                `json:"stageId"`
+	StageID  string                `json:"stageId,printascii"`
 	Metadata ReportRequestMetadata `json:"metadata" validate:"dive"`
 }
 

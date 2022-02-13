@@ -48,11 +48,12 @@ func (e PenguinError) WithExtras(extras Extras) *PenguinError {
 }
 
 func NewInvalidViolations(violations interface{}) *PenguinError {
-	e := ErrInvalidRequest
+	// copy ErrInvalidRequest as e
+	e := *ErrInvalidRequest
 	e.Extras = &Extras{
 		"violations": violations,
 	}
-	return e
+	return &e
 }
 
 func (e *PenguinError) Error() string {

@@ -45,6 +45,8 @@ var (
 
 	ShimSavedTrendResults *cache.Set
 
+	RecentReports *cache.Set
+
 	Zones           *cache.Singular
 	ZoneByArkId     *cache.Set
 	ShimZones       *cache.Singular
@@ -109,6 +111,9 @@ func initializeCaches(client *redis.Client) {
 
 	// trend
 	ShimSavedTrendResults = cache.NewSet(client, "shimSavedTrendResults#server")
+
+	// report
+	RecentReports = cache.NewSet(client, "recentReports#recallId")
 
 	// zone
 	Zones = cache.NewSingular(client, "zones")

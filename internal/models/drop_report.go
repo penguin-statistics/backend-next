@@ -14,7 +14,7 @@ type DropReport struct {
 	PatternID   int        `json:"patternId"`
 	Times       int        `json:"times"`
 	CreatedAt   *time.Time `json:"createdAt"`
-	Reliability int        `json:"reliable"`
+	Reliability int        `json:"reliability"`
 	Server      string     `json:"server"`
 	AccountID   int        `json:"accountId"`
 }

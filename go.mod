@@ -28,6 +28,7 @@ require (
 
 require (
 	github.com/alvaroloes/enumer v1.1.2 // indirect
+	github.com/dchest/uniuri v0.0.0-20200228104902-7aecb25e1fe5 // indirect
 	github.com/go-logr/logr v1.2.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-redis/cache/v8 v8.4.3 // indirect

@@ -40,6 +40,15 @@ func (s *DropReportRepo) CreateDropReport(ctx context.Context, tx bun.Tx, dropRe
 	return err
 }
 
+func (s *DropReportRepo) DeleteDropReport(ctx context.Context, reportId int) error {
+	_, err := s.DB.NewUpdate().
+		Model((*models.DropReport)(nil)).
+		Set("reliability = ?", -1).
+		Where("report_id = ?", reportId).
+		Exec(ctx)
+	return err
+}
+
 func (s *DropReportRepo) CalcTotalQuantityForDropMatrix(
 	ctx context.Context, server string, timeRange *models.TimeRange, stageIdItemIdMap map[int][]int, accountId *null.Int,
 ) ([]*models.TotalQuantityResultForDropMatrix, error) {
