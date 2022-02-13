@@ -27,7 +27,7 @@ func NewTimeRangeService(timeRangeRepo *repos.TimeRangeRepo, dropInfoRepo *repos
 // Cache: timeRanges#server:{server}, 24hrs
 func (s *TimeRangeService) GetTimeRangesByServer(ctx *fiber.Ctx, server string) ([]*models.TimeRange, error) {
 	var timeRanges []*models.TimeRange
-	err := cache.TimeRanges.Get(server, timeRanges)
+	err := cache.TimeRanges.Get(server, &timeRanges)
 	if err == nil {
 		return timeRanges, nil
 	}
@@ -69,7 +69,7 @@ func (s *TimeRangeService) GetCurrentTimeRangesByServer(ctx *fiber.Ctx, server s
 // Cache: timeRangesMap#server:{server}, 24hrs
 func (s *TimeRangeService) GetTimeRangesMap(ctx *fiber.Ctx, server string) (map[int]*models.TimeRange, error) {
 	var timeRangesMap map[int]*models.TimeRange
-	err := cache.TimeRangesMap.Get(server, timeRangesMap)
+	err := cache.TimeRangesMap.Get(server, &timeRangesMap)
 	if err == nil {
 		return timeRangesMap, nil
 	}
@@ -91,7 +91,7 @@ func (s *TimeRangeService) GetTimeRangesMap(ctx *fiber.Ctx, server string) (map[
 // Cache: maxAccumulableTimeRanges#server:{server}, 24hrs
 func (s *TimeRangeService) GetMaxAccumulableTimeRangesByServer(ctx *fiber.Ctx, server string) (map[int]map[int][]*models.TimeRange, error) {
 	var maxAccumulableTimeRanges map[int]map[int][]*models.TimeRange
-	err := cache.MaxAccumulableTimeRanges.Get(server, maxAccumulableTimeRanges)
+	err := cache.MaxAccumulableTimeRanges.Get(server, &maxAccumulableTimeRanges)
 	if err == nil {
 		return maxAccumulableTimeRanges, nil
 	}

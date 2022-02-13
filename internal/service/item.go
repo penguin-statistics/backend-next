@@ -30,7 +30,7 @@ func NewItemService(itemRepo *repos.ItemRepo) *ItemService {
 // Cache: items, 24hrs
 func (s *ItemService) GetItems(ctx *fiber.Ctx) ([]*models.Item, error) {
 	var items []*models.Item
-	err := cache.Items.Get(items)
+	err := cache.Items.Get(&items)
 	if err == nil {
 		return items, nil
 	}

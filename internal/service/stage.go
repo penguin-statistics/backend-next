@@ -26,7 +26,7 @@ func NewStageService(stageRepo *repos.StageRepo) *StageService {
 // Cache: (singular) stages, 24hrs
 func (s *StageService) GetStages(ctx *fiber.Ctx) ([]*models.Stage, error) {
 	var stages []*models.Stage
-	err := cache.Stages.Get(stages)
+	err := cache.Stages.Get(&stages)
 	if err == nil {
 		return stages, nil
 	}
@@ -65,7 +65,7 @@ func (s *StageService) GetStageByArkId(ctx *fiber.Ctx, arkStageId string) (*mode
 // Cache: shimStages#server:{server}, 24hrs
 func (s *StageService) GetShimStages(ctx *fiber.Ctx, server string) ([]*shims.Stage, error) {
 	var stages []*shims.Stage
-	err := cache.ShimStages.Get(server, stages)
+	err := cache.ShimStages.Get(server, &stages)
 	if err == nil {
 		return stages, nil
 	}

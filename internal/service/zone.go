@@ -25,7 +25,7 @@ func NewZoneService(zoneRepo *repos.ZoneRepo) *ZoneService {
 // Cache: (singular) zones, 24hrs
 func (s *ZoneService) GetZones(ctx *fiber.Ctx) ([]*models.Zone, error) {
 	var zones []*models.Zone
-	err := cache.Zones.Get(zones)
+	err := cache.Zones.Get(&zones)
 	if err == nil {
 		return zones, nil
 	}
@@ -51,7 +51,7 @@ func (s *ZoneService) GetZoneByArkId(ctx *fiber.Ctx, arkZoneId string) (*models.
 // Cache: (singular) shimZones, 24hrs
 func (s *ZoneService) GetShimZones(ctx *fiber.Ctx) ([]*shims.Zone, error) {
 	var zones []*shims.Zone
-	err := cache.ShimZones.Get(zones)
+	err := cache.ShimZones.Get(&zones)
 	if err == nil {
 		return zones, nil
 	}
