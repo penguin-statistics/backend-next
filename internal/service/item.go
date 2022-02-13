@@ -31,7 +31,7 @@ func NewItemService(itemRepo *repos.ItemRepo) *ItemService {
 // Cache: items, 24hrs
 func (s *ItemService) GetItems(ctx *fiber.Ctx) ([]*models.Item, error) {
 	var items []*models.Item
-	err := cache.Items.Get("", items)
+	err := cache.Items.Get(items)
 	if err == nil {
 		return items, nil
 	}
@@ -40,7 +40,7 @@ func (s *ItemService) GetItems(ctx *fiber.Ctx) ([]*models.Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	go cache.Items.Set("", items, 24*time.Hour)
+	go cache.Items.Set(items, 24*time.Hour)
 	return items, nil
 }
 
@@ -78,10 +78,10 @@ func (s *ItemService) GetItemByArkId(ctx *fiber.Ctx, arkItemId string) (*models.
 	return item, nil
 }
 
-// Cache: shimItems, 24hrs, record last modified time
+// Cache: (singular) shimItems, 24hrs; records last modified time
 func (s *ItemService) GetShimItems(ctx *fiber.Ctx) ([]*shims.Item, error) {
 	var items []*shims.Item
-	err := cache.ShimItems.Get("", items)
+	err := cache.ShimItems.Get(items)
 	if err == nil {
 		return items, nil
 	}
@@ -93,8 +93,11 @@ func (s *ItemService) GetShimItems(ctx *fiber.Ctx) ([]*shims.Item, error) {
 	for _, i := range items {
 		s.applyShim(i)
 	}
-	go cache.ShimItems.Set("", items, 24*time.Hour)
-	go cache.LastModifiedTime.Set("[shimItems]", time.Now().UnixMilli(), 0)
+	go func() {
+		if err := cache.ShimItems.Set(items, 24*time.Hour); err != nil {
+			cache.LastModifiedTime.Set("[shimItems]", time.Now().UnixMilli(), 0)
+		}
+	}()
 	return items, nil
 }
 

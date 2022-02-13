@@ -23,16 +23,16 @@ func NewStageService(stageRepo *repos.StageRepo) *StageService {
 	}
 }
 
-// Cache: stages, 24hrs
+// Cache: (singular) stages, 24hrs
 func (s *StageService) GetStages(ctx *fiber.Ctx) ([]*models.Stage, error) {
 	var stages []*models.Stage
-	err := cache.Stages.Get("", stages)
+	err := cache.Stages.Get(stages)
 	if err == nil {
 		return stages, nil
 	}
 
 	stages, err = s.StageRepo.GetStages(ctx.Context())
-	go cache.Stages.Set("", stages, 24*time.Hour)
+	go cache.Stages.Set(stages, 24*time.Hour)
 	return stages, err
 }
 

@@ -20,7 +20,7 @@ func NewFormulaService() *FormulaService {
 // Cache: formula, 24hrs
 func (s *FormulaService) GetFormula() (interface{}, error) {
 	var formula interface{}
-	err := cache.Formula.Get("formula", &formula)
+	err := cache.Formula.Get(&formula)
 	if err == nil {
 		return formula, nil
 	}
@@ -42,7 +42,7 @@ func (s *FormulaService) GetFormula() (interface{}, error) {
 	}
 
 	json.Unmarshal([]byte(body), &formula)
-	cache.Formula.Set("", formula, 24*time.Hour)
+	cache.Formula.Set(formula, 24*time.Hour)
 
 	return formula, nil
 }

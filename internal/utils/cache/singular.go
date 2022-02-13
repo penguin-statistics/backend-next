@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/rs/zerolog/log"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
@@ -28,17 +29,31 @@ type Singular struct {
 func (c *Singular) Get(dest interface{}) error {
 	resp, err := c.client.Get(context.Background(), c.key).Bytes()
 	if err != nil {
+		if err != redis.Nil {
+			log.Error().Err(err).Str("key", c.key).Msg("failed to get value from redis")
+		}
 		return err
 	}
-	return msgpack.Unmarshal(resp, dest)
+	err = msgpack.Unmarshal(resp, dest)
+	if err != nil {
+		log.Error().Err(err).Str("key", c.key).Msg("failed to unmarshal value from msgpack from redis")
+		return err
+	}
+	return nil
 }
 
 func (c *Singular) Set(value interface{}, expire time.Duration) error {
 	b, err := msgpack.Marshal(value)
 	if err != nil {
+		log.Error().Err(err).Str("key", c.key).Msg("failed to marshal value with msgpack")
 		return err
 	}
-	return c.client.Set(context.Background(), c.key, b, expire).Err()
+	err = c.client.Set(context.Background(), c.key, b, expire).Err()
+	if err != nil {
+		log.Error().Err(err).Str("key", c.key).Msg("failed to set value to redis")
+		return err
+	}
+	return nil
 }
 
 // MutexGetSet gets value from cache and writes to dest, or if the key does not exists, it executes valueFunc
@@ -49,6 +64,7 @@ func (c *Singular) MutexGetSet(dest interface{}, valueFunc func() (interface{}, 
 	if err == nil {
 		return nil
 	} else if err != redis.Nil {
+		log.Error().Err(err).Str("key", c.key).Msg("failed to get value from redis in MutexGetSet")
 		return err
 	}
 	// onwards, cache key does not exist
@@ -64,16 +80,19 @@ func (c *Singular) slowMutexGetSet(dest interface{}, valueFunc func() (interface
 	if err == nil {
 		return nil
 	} else if err != redis.Nil {
+		log.Error().Err(err).Str("key", c.key).Msg("failed to get value from redis in MutexGetSet inner check")
 		return err
 	}
 
 	value, err := valueFunc()
 	if err != nil {
+		log.Error().Err(err).Str("key", c.key).Msg("failed to get value from valueFunc() in MutexGetSet")
 		return err
 	}
 
 	err = c.Set(value, expire)
 	if err != nil {
+		log.Error().Err(err).Str("key", c.key).Msg("failed to set value to redis in MutexGetSet")
 		return err
 	}
 
@@ -84,9 +103,9 @@ func (c *Singular) slowMutexGetSet(dest interface{}, valueFunc func() (interface
 }
 
 func (c *Singular) Delete() error {
-	return c.client.Del(context.Background(), c.key).Err()
-}
-
-func (c *Singular) Clear() error {
-	return c.client.Del(context.Background(), c.key).Err()
+	if err := c.client.Del(context.Background(), c.key).Err(); err != nil {
+		log.Error().Err(err).Str("key", c.key).Msg("failed to delete value from redis")
+		return err
+	}
+	return nil
 }
