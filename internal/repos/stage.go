@@ -51,11 +51,11 @@ func (c *StageRepo) GetStageById(ctx context.Context, stageId int) (*models.Stag
 	return &stage, nil
 }
 
-func (c *StageRepo) GetStageByArkId(ctx context.Context, stageArkId string) (*models.Stage, error) {
+func (c *StageRepo) GetStageByArkId(ctx context.Context, arkStageId string) (*models.Stage, error) {
 	var stage models.Stage
 	err := c.db.NewSelect().
 		Model(&stage).
-		Where("ark_stage_id = ?", stageArkId).
+		Where("ark_stage_id = ?", arkStageId).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
@@ -96,7 +96,7 @@ func (c *StageRepo) GetShimStages(ctx context.Context, server string) ([]*shims.
 	return stages, nil
 }
 
-func (c *StageRepo) GetShimStageByArkId(ctx context.Context, stageId string, server string) (*shims.Stage, error) {
+func (c *StageRepo) GetShimStageByArkId(ctx context.Context, arkStageId string, server string) (*shims.Stage, error) {
 	var stage shims.Stage
 	err := c.db.NewSelect().
 		Model(&stage).
@@ -113,14 +113,14 @@ func (c *StageRepo) GetShimStageByArkId(ctx context.Context, stageId string, ser
 				}).
 				Where("server = ?", server)
 		}).
-		Where("ark_stage_id = ?", stageId).
+		Where("ark_stage_id = ?", arkStageId).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
 		return nil, errors.ErrNotFound
 	} else if err != nil {
 		log.Error().
-			Str("stageId", stageId).
+			Str("stageId", arkStageId).
 			Err(err).
 			Msg("failed to get shim stage")
 		return nil, err

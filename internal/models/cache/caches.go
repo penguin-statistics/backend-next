@@ -30,6 +30,12 @@ var (
 
 	ShimSiteStats cache.Cache
 
+	Stages       cache.Cache
+	StageById    cache.Cache
+	StageByArkId cache.Cache
+	ShimStages   cache.Cache
+	ShimStage    cache.Cache
+
 	once sync.Once
 )
 
@@ -63,5 +69,12 @@ func Populate(client *redis.Client) {
 
 		// site_stats
 		ShimSiteStats = cache.New(client, "shimSiteStats#server:")
+
+		// stage
+		Stages = cache.New(client, "stages")
+		StageById = cache.New(client, "stage#stageId:")
+		StageByArkId = cache.New(client, "stage#arkStageId:")
+		ShimStages = cache.New(client, "shimStages#server:")
+		ShimStage = cache.New(client, "shimStage#server|arkStageId:")
 	})
 }

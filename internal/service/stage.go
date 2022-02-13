@@ -1,10 +1,14 @@
 package service
 
 import (
+	"strconv"
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/tidwall/gjson"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
@@ -19,40 +23,78 @@ func NewStageService(stageRepo *repos.StageRepo) *StageService {
 	}
 }
 
-// Cache: Stages, 24hrs
+// Cache: stages, 24hrs
 func (s *StageService) GetStages(ctx *fiber.Ctx) ([]*models.Stage, error) {
-	return s.StageRepo.GetStages(ctx.Context())
+	var stages []*models.Stage
+	err := cache.Stages.Get("", stages)
+	if err == nil {
+		return stages, nil
+	}
+
+	stages, err = s.StageRepo.GetStages(ctx.Context())
+	go cache.Stages.Set("", stages, 24*time.Hour)
+	return stages, err
 }
 
-// Cache: StageById#{stageId}, 24hrs
+// Cache: stage#stageId:{stageId}, 24hrs
 func (s *StageService) GetStageById(ctx *fiber.Ctx, stageId int) (*models.Stage, error) {
-	return s.StageRepo.GetStageById(ctx.Context(), stageId)
+	var stage *models.Stage
+	err := cache.StageById.Get(strconv.Itoa(stageId), stage)
+	if err == nil {
+		return stage, nil
+	}
+
+	stage, err = s.StageRepo.GetStageById(ctx.Context(), stageId)
+	go cache.StageById.Set(strconv.Itoa(stageId), stage, 24*time.Hour)
+	return stage, err
 }
 
-// Cache: StageByArkId#{stageArkId}, 24hrs
-func (s *StageService) GetStageByArkId(ctx *fiber.Ctx, stageArkId string) (*models.Stage, error) {
-	return s.StageRepo.GetStageByArkId(ctx.Context(), stageArkId)
+// Cache: stage#arkStageId:{arkStageId}, 24hrs
+func (s *StageService) GetStageByArkId(ctx *fiber.Ctx, arkStageId string) (*models.Stage, error) {
+	var stage *models.Stage
+	err := cache.StageByArkId.Get(arkStageId, stage)
+	if err == nil {
+		return stage, nil
+	}
+
+	stage, err = s.StageRepo.GetStageByArkId(ctx.Context(), arkStageId)
+	go cache.StageByArkId.Set(arkStageId, stage, 24*time.Hour)
+	return stage, err
 }
 
-// Cache: ShimStages#{server}, 24hrs
+// Cache: shimStages#server:{server}, 24hrs
 func (s *StageService) GetShimStages(ctx *fiber.Ctx, server string) ([]*shims.Stage, error) {
-	stages, err := s.StageRepo.GetShimStages(ctx.Context(), server)
+	var stages []*shims.Stage
+	err := cache.ShimStages.Get(server, stages)
+	if err == nil {
+		return stages, nil
+	}
+
+	stages, err = s.StageRepo.GetShimStages(ctx.Context(), server)
 	if err != nil {
 		return nil, err
 	}
 	for _, i := range stages {
 		s.applyShim(i)
 	}
+	go cache.ShimStages.Set(server, stages, 24*time.Hour)
 	return stages, nil
 }
 
-// Cache: ShimStageByArkId#{server}|{stageId}, 24hrs
-func (s *StageService) GetShimStageByArkId(ctx *fiber.Ctx, stageId string, server string) (*shims.Stage, error) {
-	stage, err := s.StageRepo.GetShimStageByArkId(ctx.Context(), stageId, server)
+// Cache: shimStage#server|arkStageId:{server}|{arkStageId}, 24hrs
+func (s *StageService) GetShimStageByArkId(ctx *fiber.Ctx, arkStageId string, server string) (*shims.Stage, error) {
+	var stage *shims.Stage
+	err := cache.ShimItemByArkId.Get(arkStageId, stage)
+	if err == nil {
+		return stage, nil
+	}
+
+	stage, err = s.StageRepo.GetShimStageByArkId(ctx.Context(), arkStageId, server)
 	if err != nil {
 		return nil, err
 	}
 	s.applyShim(stage)
+	go cache.ShimItemByArkId.Set(arkStageId, stage, 24*time.Hour)
 	return stage, nil
 }
 
