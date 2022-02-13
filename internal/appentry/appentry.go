@@ -82,7 +82,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Invoke(controllers.RegisterStageController),
 		fx.Invoke(controllers.RegisterIndexController),
 		fx.Invoke(controllers.RegisterReportController),
-		fx.Invoke(controllers.RegisterSiteStatsController),
+		// fx.Invoke(controllers.RegisterSiteStatsController),
 		// fx.Invoke(controllers.RegisterLiveController),
 		fx.StartTimeout(1 * time.Second),
 		// StopTimeout is not typically needed, since we're using fiber's Shutdown(),
