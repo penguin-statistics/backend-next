@@ -8,7 +8,6 @@ import (
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/gofiber/fiber/v2"
-	"github.com/rs/zerolog/log"
 	"github.com/tidwall/gjson"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
@@ -49,10 +48,8 @@ func (s *ItemService) GetItemById(ctx *fiber.Ctx, itemId int) (*models.Item, err
 	var item models.Item
 	err := cache.ItemById.Get(strconv.Itoa(itemId), &item)
 	if err == nil {
-		log.Debug().Msgf("got cache content from cache for %d", itemId)
 		return &item, nil
 	}
-	log.Debug().Err(err).Msgf("no cache content for %d", itemId)
 
 	dbItem, err := s.ItemRepo.GetItemById(ctx.Context(), itemId)
 	if err != nil {
@@ -64,24 +61,24 @@ func (s *ItemService) GetItemById(ctx *fiber.Ctx, itemId int) (*models.Item, err
 
 // Cache: item#arkItemId:{arkItemId}, 24hrs
 func (s *ItemService) GetItemByArkId(ctx *fiber.Ctx, arkItemId string) (*models.Item, error) {
-	var item *models.Item
-	err := cache.ItemByArkId.Get(arkItemId, item)
+	var item models.Item
+	err := cache.ItemByArkId.Get(arkItemId, &item)
 	if err == nil {
-		return item, nil
+		return &item, nil
 	}
 
-	item, err = s.ItemRepo.GetItemByArkId(ctx.Context(), arkItemId)
+	dbItem, err := s.ItemRepo.GetItemByArkId(ctx.Context(), arkItemId)
 	if err != nil {
 		return nil, err
 	}
-	go cache.ItemByArkId.Set(arkItemId, item, 24*time.Hour)
-	return item, nil
+	go cache.ItemByArkId.Set(arkItemId, dbItem, 24*time.Hour)
+	return dbItem, nil
 }
 
 // Cache: (singular) shimItems, 24hrs; records last modified time
 func (s *ItemService) GetShimItems(ctx *fiber.Ctx) ([]*shims.Item, error) {
 	var items []*shims.Item
-	err := cache.ShimItems.Get(items)
+	err := cache.ShimItems.Get(&items)
 	if err == nil {
 		return items, nil
 	}
@@ -103,19 +100,19 @@ func (s *ItemService) GetShimItems(ctx *fiber.Ctx) ([]*shims.Item, error) {
 
 // Cache: shimItem#arkItemId:{arkItemId}, 24hrs
 func (s *ItemService) GetShimItemByArkId(ctx *fiber.Ctx, arkItemId string) (*shims.Item, error) {
-	var item *shims.Item
-	err := cache.ShimItemByArkId.Get(arkItemId, item)
+	var item shims.Item
+	err := cache.ShimItemByArkId.Get(arkItemId, &item)
 	if err == nil {
-		return item, nil
+		return &item, nil
 	}
 
-	item, err = s.ItemRepo.GetShimItemByArkId(ctx.Context(), arkItemId)
+	dbItem, err := s.ItemRepo.GetShimItemByArkId(ctx.Context(), arkItemId)
 	if err != nil {
 		return nil, err
 	}
-	s.applyShim(item)
-	go cache.ShimItemByArkId.Set(arkItemId, item, 24*time.Hour)
-	return item, nil
+	s.applyShim(dbItem)
+	go cache.ShimItemByArkId.Set(arkItemId, dbItem, 24*time.Hour)
+	return dbItem, nil
 }
 
 func (s *ItemService) applyShim(item *shims.Item) {

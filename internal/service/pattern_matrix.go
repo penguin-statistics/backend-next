@@ -48,22 +48,22 @@ func NewPatternMatrixService(
 
 // Cache: shimLatestPatternMatrixResults#server:{server}, 24hrs
 func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*shims.PatternMatrixQueryResult, error) {
-	var results *shims.PatternMatrixQueryResult
-	err := cache.ShimLatestPatternMatrixResults.Get(server, results)
+	var results shims.PatternMatrixQueryResult
+	err := cache.ShimLatestPatternMatrixResults.Get(server, &results)
 	if err == nil {
-		return results, nil
+		return &results, nil
 	}
 
 	queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId)
 	if err != nil {
 		return nil, err
 	}
-	results, err = s.applyShimForPatternMatrixQuery(ctx, queryResult)
+	slowResults, err := s.applyShimForPatternMatrixQuery(ctx, queryResult)
 	if err != nil {
 		return nil, err
 	}
-	go cache.ShimLatestPatternMatrixResults.Set(server, results, 24*time.Hour)
-	return results, nil
+	go cache.ShimLatestPatternMatrixResults.Set(server, slowResults, 24*time.Hour)
+	return slowResults, nil
 }
 
 func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx *fiber.Ctx, server string) error {

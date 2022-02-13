@@ -29,34 +29,34 @@ func (s *AccountService) CreateAccountWithRandomPenguinID(ctx *fiber.Ctx) (*mode
 
 // Cache: account#accountId:{accountId}, 24hrs
 func (s *AccountService) GetAccountById(ctx *fiber.Ctx, accountId string) (*models.Account, error) {
-	var account *models.Account
-	err := cache.AccountById.Get(accountId, account)
+	var account models.Account
+	err := cache.AccountById.Get(accountId, &account)
 	if err == nil {
-		return account, nil
+		return &account, nil
 	}
 
-	account, err = s.AccountRepo.GetAccountById(ctx.Context(), accountId)
+	dbAccount, err := s.AccountRepo.GetAccountById(ctx.Context(), accountId)
 	if err != nil {
 		return nil, err
 	}
-	go cache.AccountById.Set(accountId, account, time.Hour*24)
-	return account, nil
+	go cache.AccountById.Set(accountId, dbAccount, time.Hour*24)
+	return dbAccount, nil
 }
 
 // Cache: account#penguinId:{penguinId}, 24hrs
 func (s *AccountService) GetAccountByPenguinId(ctx *fiber.Ctx, penguinId string) (*models.Account, error) {
-	var account *models.Account
-	err := cache.AccountByPenguinId.Get(penguinId, account)
+	var account models.Account
+	err := cache.AccountByPenguinId.Get(penguinId, &account)
 	if err == nil {
-		return account, nil
+		return &account, nil
 	}
 
-	account, err = s.AccountRepo.GetAccountByPenguinId(ctx.Context(), penguinId)
+	dbAccount, err := s.AccountRepo.GetAccountByPenguinId(ctx.Context(), penguinId)
 	if err != nil {
 		return nil, err
 	}
-	go cache.AccountByPenguinId.Set(penguinId, account, time.Hour*24)
-	return account, nil
+	go cache.AccountByPenguinId.Set(penguinId, dbAccount, time.Hour*24)
+	return dbAccount, nil
 }
 
 func (s *AccountService) IsAccountExistWithId(ctx *fiber.Ctx, accountId int) bool {

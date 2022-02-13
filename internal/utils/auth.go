@@ -26,11 +26,12 @@ func SetPenguinIDToResponse(ctx *fiber.Ctx, penguinId string) {
 
 	// Populate cookie
 	ctx.Cookie(&fiber.Cookie{
-		Name:     constants.PenguinIDCookieKey,
-		Value:    penguinId,
-		MaxAge:   constants.PenguinIDAuthMaxCookieAgeSec,
-		Path:     "/",
-		Expires:  time.Now().Add(time.Second * constants.PenguinIDAuthMaxCookieAgeSec),
+		Name:    constants.PenguinIDCookieKey,
+		Value:   penguinId,
+		MaxAge:  constants.PenguinIDAuthMaxCookieAgeSec,
+		Path:    "/",
+		Expires: time.Now().Add(time.Second * constants.PenguinIDAuthMaxCookieAgeSec),
+		// TODO: make this configurable and use better source rather than Host header
 		Domain:   "." + ctx.Get("Host", constants.DefaultHost),
 		SameSite: "None",
 		Secure:   true,

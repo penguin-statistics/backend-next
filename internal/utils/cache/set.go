@@ -45,6 +45,7 @@ func (c *Set) Get(key string, dest interface{}) error {
 		log.Error().Err(err).Str("key", key).Msg("failed to unmarshal value from msgpack from redis")
 		return err
 	}
+	log.Debug().Str("key", key).Msg("got value from redis")
 	return nil
 }
 

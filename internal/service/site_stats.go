@@ -19,14 +19,14 @@ func NewSiteStatsService(dropReportRepo *repos.DropReportRepo) *SiteStatsService
 	}
 }
 
-// TODO: need to implment refresh site stats
+// TODO: need to implement refresh site stats
 
 // Cache: shimSiteStats#server:{server}, 24hrs
 func (s *SiteStatsService) GetShimSiteStats(ctx context.Context, server string) (*shims.SiteStats, error) {
-	var results *shims.SiteStats
-	err := cache.ShimSiteStats.Get(server, results)
+	var results shims.SiteStats
+	err := cache.ShimSiteStats.Get(server, &results)
 	if err == nil {
-		return results, nil
+		return &results, nil
 	}
 
 	stageTimes, err := s.DropReportRepo.CalcTotalStageQuantityForShimSiteStats(ctx, server, false)
@@ -49,12 +49,12 @@ func (s *SiteStatsService) GetShimSiteStats(ctx context.Context, server string) 
 		return nil, err
 	}
 
-	results = &shims.SiteStats{
+	slowResults := &shims.SiteStats{
 		TotalStageTimes:     stageTimes,
 		TotalStageTimes24H:  stageTimes24h,
 		TotalItemQuantities: itemQuantity,
 		TotalSanityCost:     sanity,
 	}
-	go cache.ShimSiteStats.Set(server, results, 24*time.Hour)
-	return results, nil
+	go cache.ShimSiteStats.Set(server, slowResults, 24*time.Hour)
+	return slowResults, nil
 }

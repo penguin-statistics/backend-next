@@ -50,22 +50,22 @@ func NewTrendService(
 
 // Cache: shimSavedTrendResults#server:{server}, 24hrs
 func (s *TrendService) GetShimSavedTrendResults(ctx *fiber.Ctx, server string) (*shims.TrendQueryResult, error) {
-	var shimResult *shims.TrendQueryResult
-	err := cache.ShimSavedTrendResults.Get(server, shimResult)
+	var shimResult shims.TrendQueryResult
+	err := cache.ShimSavedTrendResults.Get(server, &shimResult)
 	if err == nil {
-		return shimResult, nil
+		return &shimResult, nil
 	}
 
 	queryResult, err := s.getSavedTrendResults(ctx, server)
 	if err != nil {
 		return nil, err
 	}
-	shimResult, err = s.applyShimForTrendQuery(ctx, queryResult)
+	slowShimResult, err := s.applyShimForTrendQuery(ctx, queryResult)
 	if err != nil {
 		return nil, err
 	}
-	go cache.ShimSavedTrendResults.Set(server, shimResult, 24*time.Hour)
-	return shimResult, nil
+	go cache.ShimSavedTrendResults.Set(server, slowShimResult, 24*time.Hour)
+	return slowShimResult, nil
 }
 
 func (s *TrendService) GetShimCustomizedTrendResults(ctx *fiber.Ctx, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIds []int, itemIds []int, accountId *null.Int) (*shims.TrendQueryResult, error) {

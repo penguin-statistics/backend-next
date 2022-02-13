@@ -37,7 +37,7 @@ func (s *DropInfoService) GetDropInfosWithFilters(ctx *fiber.Ctx, server string,
 func (s *DropInfoService) GetItemDropSetByStageIdAndRangeId(ctx *fiber.Ctx, server string, stageId int, rangeId int) ([]int, error) {
 	var itemDropSet []int
 	key := server + constants.RedisSeparator + strconv.Itoa(stageId) + constants.RedisSeparator + strconv.Itoa(rangeId)
-	err := cache.ItemDropSetByStageIdAndRangeId.Get(key, itemDropSet)
+	err := cache.ItemDropSetByStageIdAndRangeId.Get(key, &itemDropSet)
 	if err == nil {
 		return itemDropSet, nil
 	}

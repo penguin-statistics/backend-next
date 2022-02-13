@@ -38,28 +38,28 @@ func (s *StageService) GetStages(ctx *fiber.Ctx) ([]*models.Stage, error) {
 
 // Cache: stage#stageId:{stageId}, 24hrs
 func (s *StageService) GetStageById(ctx *fiber.Ctx, stageId int) (*models.Stage, error) {
-	var stage *models.Stage
-	err := cache.StageById.Get(strconv.Itoa(stageId), stage)
+	var stage models.Stage
+	err := cache.StageById.Get(strconv.Itoa(stageId), &stage)
 	if err == nil {
-		return stage, nil
+		return &stage, nil
 	}
 
-	stage, err = s.StageRepo.GetStageById(ctx.Context(), stageId)
-	go cache.StageById.Set(strconv.Itoa(stageId), stage, 24*time.Hour)
-	return stage, err
+	dbStage, err := s.StageRepo.GetStageById(ctx.Context(), stageId)
+	go cache.StageById.Set(strconv.Itoa(stageId), dbStage, 24*time.Hour)
+	return dbStage, err
 }
 
 // Cache: stage#arkStageId:{arkStageId}, 24hrs
 func (s *StageService) GetStageByArkId(ctx *fiber.Ctx, arkStageId string) (*models.Stage, error) {
-	var stage *models.Stage
-	err := cache.StageByArkId.Get(arkStageId, stage)
+	var stage models.Stage
+	err := cache.StageByArkId.Get(arkStageId, &stage)
 	if err == nil {
-		return stage, nil
+		return &stage, nil
 	}
 
-	stage, err = s.StageRepo.GetStageByArkId(ctx.Context(), arkStageId)
-	go cache.StageByArkId.Set(arkStageId, stage, 24*time.Hour)
-	return stage, err
+	dbStage, err := s.StageRepo.GetStageByArkId(ctx.Context(), arkStageId)
+	go cache.StageByArkId.Set(arkStageId, dbStage, 24*time.Hour)
+	return dbStage, err
 }
 
 // Cache: shimStages#server:{server}, 24hrs
@@ -83,19 +83,19 @@ func (s *StageService) GetShimStages(ctx *fiber.Ctx, server string) ([]*shims.St
 
 // Cache: shimStage#server|arkStageId:{server}|{arkStageId}, 24hrs
 func (s *StageService) GetShimStageByArkId(ctx *fiber.Ctx, arkStageId string, server string) (*shims.Stage, error) {
-	var stage *shims.Stage
-	err := cache.ShimStageByArkId.Get(arkStageId, stage)
+	var stage shims.Stage
+	err := cache.ShimStageByArkId.Get(arkStageId, &stage)
 	if err == nil {
-		return stage, nil
+		return &stage, nil
 	}
 
-	stage, err = s.StageRepo.GetShimStageByArkId(ctx.Context(), arkStageId, server)
+	dbStage, err := s.StageRepo.GetShimStageByArkId(ctx.Context(), arkStageId, server)
 	if err != nil {
 		return nil, err
 	}
-	s.applyShim(stage)
-	go cache.ShimStageByArkId.Set(arkStageId, stage, 24*time.Hour)
-	return stage, nil
+	s.applyShim(dbStage)
+	go cache.ShimStageByArkId.Set(arkStageId, dbStage, 24*time.Hour)
+	return dbStage, nil
 }
 
 func (s *StageService) GetStageExtraProcessTypeByArkId(ctx *fiber.Ctx, arkStageId string) (string, error) {

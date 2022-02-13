@@ -27,7 +27,7 @@ func RegisterFormulaController(v2 *server.V2, formulaService *service.FormulaSer
 // @Router       /PenguinStats/api/v2/formula [GET]
 // @Deprecated
 func (c *FormulaController) GetFormula(ctx *fiber.Ctx) error {
-	formula, err := c.FormulaService.GetFormula()
+	formula, err := c.FormulaService.GetFormula(ctx.Context())
 	if err != nil {
 		return err
 	}

@@ -42,15 +42,15 @@ func (s *TimeRangeService) GetTimeRangesByServer(ctx *fiber.Ctx, server string) 
 
 // Cache: timeRange#rangeId:{rangeId}, 24hrs
 func (s *TimeRangeService) GetTimeRangeById(ctx *fiber.Ctx, rangeId int) (*models.TimeRange, error) {
-	var timeRange *models.TimeRange
-	err := cache.TimeRangeById.Get(strconv.Itoa(rangeId), timeRange)
+	var timeRange models.TimeRange
+	err := cache.TimeRangeById.Get(strconv.Itoa(rangeId), &timeRange)
 	if err == nil {
-		return timeRange, nil
+		return &timeRange, nil
 	}
 
-	timeRange, err = s.TimeRangeRepo.GetTimeRangeById(ctx.Context(), rangeId)
-	go cache.TimeRangeById.Set(strconv.Itoa(rangeId), timeRange, 24*time.Hour)
-	return timeRange, err
+	slowTimeRange, err := s.TimeRangeRepo.GetTimeRangeById(ctx.Context(), rangeId)
+	go cache.TimeRangeById.Set(strconv.Itoa(rangeId), slowTimeRange, 24*time.Hour)
+	return slowTimeRange, err
 }
 
 func (s *TimeRangeService) GetCurrentTimeRangesByServer(ctx *fiber.Ctx, server string) ([]*models.TimeRange, error) {
@@ -104,7 +104,7 @@ func (s *TimeRangeService) GetMaxAccumulableTimeRangesByServer(ctx *fiber.Ctx, s
 	if err != nil {
 		return nil, err
 	}
-	maxAccumulableTimeRanges = make(map[int]map[int][]*models.TimeRange, 0)
+	maxAccumulableTimeRanges = make(map[int]map[int][]*models.TimeRange)
 	var groupedResults []linq.Group
 	linq.From(dropInfos).
 		WhereT(func(dropInfo *models.DropInfo) bool { return dropInfo.ItemID.Valid }).

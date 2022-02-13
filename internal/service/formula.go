@@ -1,48 +1,40 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"net/http"
 	"time"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
+	"github.com/penguin-statistics/backend-next/internal/repos"
 )
 
-type FormulaService struct{}
+type FormulaService struct {
+	PropertyRepo *repos.PropertyRepo
+}
 
-func NewFormulaService() *FormulaService {
-	return &FormulaService{}
+func NewFormulaService(propertyRepo *repos.PropertyRepo) *FormulaService {
+	return &FormulaService{
+		PropertyRepo: propertyRepo,
+	}
 }
 
 // Cache: formula, 24hrs
-func (s *FormulaService) GetFormula() (interface{}, error) {
-	var formula interface{}
+func (s *FormulaService) GetFormula(ctx context.Context) (json.RawMessage, error) {
+	var formula json.RawMessage
 	err := cache.Formula.Get(&formula)
 	if err == nil {
 		return formula, nil
 	}
 
-	// TODO: get formula from DB (properties) when it's ready
-	res, err := http.Get(constants.FormulaFilePath)
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get formula")
-	}
-
-	defer res.Body.Close()
-
-	body, err := ioutil.ReadAll(res.Body)
+	property, err := s.PropertyRepo.GetPropertyByKey(ctx, constants.FormulaPropertyKey)
 	if err != nil {
 		return nil, err
 	}
 
-	json.Unmarshal([]byte(body), &formula)
-	cache.Formula.Set(formula, 24*time.Hour)
+	msg := json.RawMessage([]byte(property.Value))
+	go cache.Formula.Set(msg, 24*time.Hour)
 
-	return formula, nil
+	return msg, nil
 }
