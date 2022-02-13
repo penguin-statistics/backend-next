@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -45,11 +46,14 @@ func (s *ItemService) GetItems(ctx *fiber.Ctx) ([]*models.Item, error) {
 
 // Cache: item#itemId:{itemId}, 24hrs
 func (s *ItemService) GetItemById(ctx *fiber.Ctx, itemId int) (*models.Item, error) {
+	fmt.Printf("GetItemById for %d\n", itemId)
 	var item *models.Item
 	err := cache.ItemById.Get(strconv.Itoa(itemId), item)
 	if err == nil {
+		fmt.Println("found in cache")
 		return item, nil
 	}
+	fmt.Println("not found in cache")
 
 	item, err = s.ItemRepo.GetItemById(ctx.Context(), itemId)
 	if err != nil {
@@ -75,7 +79,7 @@ func (s *ItemService) GetItemByArkId(ctx *fiber.Ctx, arkItemId string) (*models.
 	return item, nil
 }
 
-// Cache: shimItems, 24hrs
+// Cache: shimItems, 24hrs, record last modified time
 func (s *ItemService) GetShimItems(ctx *fiber.Ctx) ([]*shims.Item, error) {
 	var items []*shims.Item
 	err := cache.ShimItems.Get("", items)
@@ -91,6 +95,7 @@ func (s *ItemService) GetShimItems(ctx *fiber.Ctx) ([]*shims.Item, error) {
 		s.applyShim(i)
 	}
 	go cache.ShimItems.Set("", items, 24*time.Hour)
+	go cache.LastModifiedTime.Set("[shimItems]", time.Now().UnixMilli(), 0)
 	return items, nil
 }
 

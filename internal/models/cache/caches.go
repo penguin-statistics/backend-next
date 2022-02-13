@@ -48,6 +48,8 @@ var (
 	ShimZones       cache.Cache
 	ShimZoneByArkId cache.Cache
 
+	LastModifiedTime cache.Cache
+
 	once sync.Once
 )
 
@@ -103,5 +105,8 @@ func Populate(client *redis.Client) {
 		ZoneByArkId = cache.New(client, "zone#arkZoneId:")
 		ShimZones = cache.New(client, "shimZones")
 		ShimZoneByArkId = cache.New(client, "shimZone#arkZoneId:")
+
+		// others
+		LastModifiedTime = cache.New(client, "lastModifiedTime#key:")
 	})
 }
