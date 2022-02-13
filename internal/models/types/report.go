@@ -26,8 +26,8 @@ type SingleReportRecallRequest struct {
 }
 
 type BatchReportDrop struct {
-	Drops    []ArkDrop             `json:"drops"`
-	StageID  string                `json:"stageId,printascii"`
+	Drops    []ArkDrop             `json:"drops" validate:"dive"`
+	StageID  string                `json:"stageId" validate:"required,printascii"`
 	Metadata ReportRequestMetadata `json:"metadata" validate:"dive"`
 }
 
@@ -42,5 +42,5 @@ type BatchReportRequest struct {
 	FragmentStageID
 	FragmentReportCommon
 
-	BatchDrops []BatchReportDrop `json:"batchDrops"`
+	BatchDrops []BatchReportDrop `json:"batchDrops" validate:"dive"`
 }
