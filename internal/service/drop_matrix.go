@@ -100,7 +100,7 @@ func (s *DropMatrixService) GetShimCustomizedDropMatrixResults(ctx *fiber.Ctx, s
 
 func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server string) error {
 	toSave := []*models.DropMatrixElement{}
-	allTimeRanges, err := s.TimeRangeService.GetAllTimeRangesByServer(ctx, server)
+	allTimeRanges, err := s.TimeRangeService.GetTimeRangesByServer(ctx, server)
 	if err != nil {
 		return err
 	}

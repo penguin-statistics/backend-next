@@ -30,11 +30,16 @@ var (
 
 	ShimSiteStats cache.Cache
 
-	Stages       cache.Cache
-	StageById    cache.Cache
-	StageByArkId cache.Cache
-	ShimStages   cache.Cache
-	ShimStage    cache.Cache
+	Stages           cache.Cache
+	StageById        cache.Cache
+	StageByArkId     cache.Cache
+	ShimStages       cache.Cache
+	ShimStageByArkId cache.Cache
+
+	TimeRanges               cache.Cache
+	TimeRangeById            cache.Cache
+	TimeRangesMap            cache.Cache
+	MaxAccumulableTimeRanges cache.Cache
 
 	once sync.Once
 )
@@ -75,6 +80,12 @@ func Populate(client *redis.Client) {
 		StageById = cache.New(client, "stage#stageId:")
 		StageByArkId = cache.New(client, "stage#arkStageId:")
 		ShimStages = cache.New(client, "shimStages#server:")
-		ShimStage = cache.New(client, "shimStage#server|arkStageId:")
+		ShimStageByArkId = cache.New(client, "shimStage#server|arkStageId:")
+
+		// time_range
+		TimeRanges = cache.New(client, "timeRanges#server:")
+		TimeRangeById = cache.New(client, "timeRange#rangeId:")
+		TimeRangesMap = cache.New(client, "timeRangesMap#server:")
+		MaxAccumulableTimeRanges = cache.New(client, "maxAccumulableTimeRanges#server:")
 	})
 }

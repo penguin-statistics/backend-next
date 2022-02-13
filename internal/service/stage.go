@@ -84,7 +84,7 @@ func (s *StageService) GetShimStages(ctx *fiber.Ctx, server string) ([]*shims.St
 // Cache: shimStage#server|arkStageId:{server}|{arkStageId}, 24hrs
 func (s *StageService) GetShimStageByArkId(ctx *fiber.Ctx, arkStageId string, server string) (*shims.Stage, error) {
 	var stage *shims.Stage
-	err := cache.ShimItemByArkId.Get(arkStageId, stage)
+	err := cache.ShimStageByArkId.Get(arkStageId, stage)
 	if err == nil {
 		return stage, nil
 	}
@@ -94,7 +94,7 @@ func (s *StageService) GetShimStageByArkId(ctx *fiber.Ctx, arkStageId string, se
 		return nil, err
 	}
 	s.applyShim(stage)
-	go cache.ShimItemByArkId.Set(arkStageId, stage, 24*time.Hour)
+	go cache.ShimStageByArkId.Set(arkStageId, stage, 24*time.Hour)
 	return stage, nil
 }
 

@@ -1,12 +1,14 @@
 package service
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
 
@@ -22,18 +24,33 @@ func NewTimeRangeService(timeRangeRepo *repos.TimeRangeRepo, dropInfoRepo *repos
 	}
 }
 
-// Cache: AllTimeRangesByServer#{server}, 24hrs
-func (s *TimeRangeService) GetAllTimeRangesByServer(ctx *fiber.Ctx, server string) ([]*models.TimeRange, error) {
-	timeRanges, err := s.TimeRangeRepo.GetTimeRangesByServer(ctx.Context(), server)
+// Cache: timeRanges#server:{server}, 24hrs
+func (s *TimeRangeService) GetTimeRangesByServer(ctx *fiber.Ctx, server string) ([]*models.TimeRange, error) {
+	var timeRanges []*models.TimeRange
+	err := cache.TimeRanges.Get(server, timeRanges)
+	if err == nil {
+		return timeRanges, nil
+	}
+
+	timeRanges, err = s.TimeRangeRepo.GetTimeRangesByServer(ctx.Context(), server)
 	if err != nil {
 		return nil, err
 	}
+	go cache.TimeRanges.Set(server, timeRanges, 24*time.Hour)
 	return timeRanges, nil
 }
 
-// Cache: TimeRangeById#{rangeId}, 24hrs
+// Cache: timeRange#rangeId:{rangeId}, 24hrs
 func (s *TimeRangeService) GetTimeRangeById(ctx *fiber.Ctx, rangeId int) (*models.TimeRange, error) {
-	return s.TimeRangeRepo.GetTimeRangeById(ctx.Context(), rangeId)
+	var timeRange *models.TimeRange
+	err := cache.TimeRangeById.Get(strconv.Itoa(rangeId), timeRange)
+	if err == nil {
+		return timeRange, nil
+	}
+
+	timeRange, err = s.TimeRangeRepo.GetTimeRangeById(ctx.Context(), rangeId)
+	go cache.TimeRangeById.Set(strconv.Itoa(rangeId), timeRange, 24*time.Hour)
+	return timeRange, err
 }
 
 func (s *TimeRangeService) GetCurrentTimeRangesByServer(ctx *fiber.Ctx, server string) ([]*models.TimeRange, error) {
@@ -49,23 +66,36 @@ func (s *TimeRangeService) GetCurrentTimeRangesByServer(ctx *fiber.Ctx, server s
 	return timeRanges, nil
 }
 
-// Cache: TimeRangesMap#{server}, 24hrs
+// Cache: timeRangesMap#server:{server}, 24hrs
 func (s *TimeRangeService) GetTimeRangesMap(ctx *fiber.Ctx, server string) (map[int]*models.TimeRange, error) {
+	var timeRangesMap map[int]*models.TimeRange
+	err := cache.TimeRangesMap.Get(server, timeRangesMap)
+	if err == nil {
+		return timeRangesMap, nil
+	}
+
 	timeRanges, err := s.TimeRangeRepo.GetTimeRangesByServer(ctx.Context(), server)
 	if err != nil {
 		return nil, err
 	}
-	timeRangesMap := make(map[int]*models.TimeRange)
+	timeRangesMap = make(map[int]*models.TimeRange)
 	linq.From(timeRanges).
 		ToMapByT(
 			&timeRangesMap,
 			func(timeRange *models.TimeRange) int { return timeRange.RangeID },
 			func(timeRange *models.TimeRange) *models.TimeRange { return timeRange })
+	go cache.TimeRangesMap.Set(server, timeRangesMap, 24*time.Hour)
 	return timeRangesMap, nil
 }
 
-// Cache: MaxAccumulableTimeRangesByServer#{server}, 24hrs
+// Cache: maxAccumulableTimeRanges#server:{server}, 24hrs
 func (s *TimeRangeService) GetMaxAccumulableTimeRangesByServer(ctx *fiber.Ctx, server string) (map[int]map[int][]*models.TimeRange, error) {
+	var maxAccumulableTimeRanges map[int]map[int][]*models.TimeRange
+	err := cache.MaxAccumulableTimeRanges.Get(server, maxAccumulableTimeRanges)
+	if err == nil {
+		return maxAccumulableTimeRanges, nil
+	}
+
 	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx.Context(), server)
 	if err != nil {
 		return nil, err
@@ -74,7 +104,7 @@ func (s *TimeRangeService) GetMaxAccumulableTimeRangesByServer(ctx *fiber.Ctx, s
 	if err != nil {
 		return nil, err
 	}
-	maxAccumulableTimeRanges := make(map[int]map[int][]*models.TimeRange, 0)
+	maxAccumulableTimeRanges = make(map[int]map[int][]*models.TimeRange, 0)
 	var groupedResults []linq.Group
 	linq.From(dropInfos).
 		WhereT(func(dropInfo *models.DropInfo) bool { return dropInfo.ItemID.Valid }).
@@ -126,6 +156,7 @@ func (s *TimeRangeService) GetMaxAccumulableTimeRangesByServer(ctx *fiber.Ctx, s
 			maxAccumulableTimeRanges[stageId] = maxAccumulableTimeRangesForOneStage
 		}
 	}
+	go cache.MaxAccumulableTimeRanges.Set(server, maxAccumulableTimeRanges, 24*time.Hour)
 	return maxAccumulableTimeRanges, nil
 }
 
