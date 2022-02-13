@@ -32,6 +32,7 @@ func (c *Set) key(key string) string {
 
 func (c *Set) Get(key string, dest interface{}) error {
 	key = c.key(key)
+	log.Debug().Str("key", key).Msg("getting value from redis")
 	resp, err := c.client.Get(context.Background(), key).Bytes()
 	if err != nil {
 		if err != redis.Nil {
@@ -54,7 +55,7 @@ func (c *Set) Set(key string, value interface{}, expire time.Duration) error {
 		log.Error().Err(err).Str("key", key).Msg("failed to marshal value with msgpack")
 		return err
 	}
-	err = c.client.Set(context.Background(), c.key(key), b, expire).Err()
+	err = c.client.Set(context.Background(), key, b, expire).Err()
 	if err != nil {
 		log.Error().Err(err).Str("key", key).Msg("failed to set value to redis")
 		return err
@@ -109,7 +110,8 @@ func (c *Set) slowMutexGetSet(key string, dest interface{}, valueFunc func() (in
 }
 
 func (c *Set) Delete(key string) error {
-	if err := c.client.Del(context.Background(), c.key(key)).Err(); err != nil {
+	key = c.key(key)
+	if err := c.client.Del(context.Background(), key).Err(); err != nil {
 		log.Error().Err(err).Str("key", key).Msg("failed to delete value from redis")
 		return err
 	}
