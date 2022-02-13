@@ -74,7 +74,7 @@ func (c *ZoneRepo) GetShimZones(ctx context.Context) ([]*shims.Zone, error) {
 	return zones, nil
 }
 
-func (c *ZoneRepo) GetShimZoneByArkId(ctx context.Context, zoneId string) (*shims.Zone, error) {
+func (c *ZoneRepo) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*shims.Zone, error) {
 	var zone shims.Zone
 	err := c.db.NewSelect().
 		Model(&zone).
@@ -83,7 +83,7 @@ func (c *ZoneRepo) GetShimZoneByArkId(ctx context.Context, zoneId string) (*shim
 			// see https://github.com/go-pg/pg/issues/1315
 			return q.Column("ark_stage_id", "zone_id")
 		}).
-		Where("ark_zone_id = ?", zoneId).
+		Where("ark_zone_id = ?", arkZoneId).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {

@@ -43,6 +43,11 @@ var (
 
 	ShimSavedTrendResults cache.Cache
 
+	Zones           cache.Cache
+	ZoneByArkId     cache.Cache
+	ShimZones       cache.Cache
+	ShimZoneByArkId cache.Cache
+
 	once sync.Once
 )
 
@@ -94,5 +99,9 @@ func Populate(client *redis.Client) {
 		ShimSavedTrendResults = cache.New(client, "shimSavedTrendResults#server:")
 
 		// zone
+		Zones = cache.New(client, "zones")
+		ZoneByArkId = cache.New(client, "zone#arkZoneId:")
+		ShimZones = cache.New(client, "shimZones")
+		ShimZoneByArkId = cache.New(client, "shimZone#arkZoneId:")
 	})
 }
