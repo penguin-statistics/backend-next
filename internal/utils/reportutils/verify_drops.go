@@ -7,8 +7,8 @@ import (
 
 	"github.com/ahmetb/go-linq/v3"
 
+	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/konst"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
@@ -29,9 +29,9 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, r
 	var err error
 	linq.From(drops).
 		SelectT(func(drop *types.Drop) []string {
-			mappedDropType, have := konst.DropTypeMap[drop.DropType]
+			mappedDropType, have := constants.DropTypeMap[drop.DropType]
 			if !have {
-				err = fmt.Errorf("invalid drop type: expected one of %v, but got `%s`", konst.DropTypeMapKeys, drop.DropType)
+				err = fmt.Errorf("invalid drop type: expected one of %v, but got `%s`", constants.DropTypeMapKeys, drop.DropType)
 				return []string{}
 			}
 			return []string{

@@ -1,6 +1,9 @@
-package konst
+package constants
 
 const (
+	FurnitureArkItemID       = "furni"
+	ExtraProcessTypeGachaBox = "GACHABOX"
+
 	DropTypeRegular = "REGULAR"
 	DropTypeSpecial = "SPECIAL"
 	DropTypeExtra   = "EXTRA"

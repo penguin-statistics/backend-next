@@ -14,6 +14,7 @@ import (
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/konst"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
@@ -120,7 +121,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 	if err != nil {
 		return err
 	}
-	if category == konst.ExtraProcessTypeGachaBox {
+	if category == constants.ExtraProcessTypeGachaBox {
 		reportutils.AggregateGachaBoxDrops(singleReport)
 	}
 
@@ -327,7 +328,7 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 // 		if err != nil {
 // 			return err
 // 		}
-// 		if category == konst.ExtraProcessTypeGachaBox {
+// 		if category == constants.ExtraProcessTypeGachaBox {
 // 			reportutils.AggregateGachaBoxDrops(report)
 // 		}
 // 	}
