@@ -9,46 +9,46 @@ import (
 )
 
 var (
-	AccountById        cache.Cache
-	AccountByPenguinId cache.Cache
+	AccountById        *cache.Set
+	AccountByPenguinId *cache.Set
 
-	ItemDropSetByStageIdAndRangeId cache.Cache
+	ItemDropSetByStageIdAndRangeId *cache.Set
 
-	ShimMaxAccumulableDropMatrixResults cache.Cache
+	ShimMaxAccumulableDropMatrixResults *cache.Set
 
-	Formula cache.Cache
+	Formula *cache.Singular
 
-	Items           cache.Cache
-	ItemById        cache.Cache
-	ItemByArkId     cache.Cache
-	ShimItems       cache.Cache
-	ShimItemByArkId cache.Cache
+	Items           *cache.Singular
+	ItemById        *cache.Set
+	ItemByArkId     *cache.Set
+	ShimItems       *cache.Singular
+	ShimItemByArkId *cache.Set
 
-	Notices cache.Cache
+	Notices *cache.Singular
 
-	ShimLatestPatternMatrixResults cache.Cache
+	ShimLatestPatternMatrixResults *cache.Set
 
-	ShimSiteStats cache.Cache
+	ShimSiteStats *cache.Set
 
-	Stages           cache.Cache
-	StageById        cache.Cache
-	StageByArkId     cache.Cache
-	ShimStages       cache.Cache
-	ShimStageByArkId cache.Cache
+	Stages           *cache.Singular
+	StageById        *cache.Set
+	StageByArkId     *cache.Set
+	ShimStages       *cache.Set
+	ShimStageByArkId *cache.Set
 
-	TimeRanges               cache.Cache
-	TimeRangeById            cache.Cache
-	TimeRangesMap            cache.Cache
-	MaxAccumulableTimeRanges cache.Cache
+	TimeRanges               *cache.Set
+	TimeRangeById            *cache.Set
+	TimeRangesMap            *cache.Set
+	MaxAccumulableTimeRanges *cache.Set
 
-	ShimSavedTrendResults cache.Cache
+	ShimSavedTrendResults *cache.Set
 
-	Zones           cache.Cache
-	ZoneByArkId     cache.Cache
-	ShimZones       cache.Cache
-	ShimZoneByArkId cache.Cache
+	Zones           *cache.Singular
+	ZoneByArkId     *cache.Set
+	ShimZones       *cache.Singular
+	ShimZoneByArkId *cache.Set
 
-	LastModifiedTime cache.Cache
+	LastModifiedTime *cache.Set
 
 	once sync.Once
 )
@@ -56,57 +56,57 @@ var (
 func Populate(client *redis.Client) {
 	once.Do(func() {
 		// account
-		AccountById = cache.New(client, "account#accountId:")
-		AccountByPenguinId = cache.New(client, "account#penguinId:")
+		AccountById = cache.NewSet(client, "account#accountId")
+		AccountByPenguinId = cache.NewSet(client, "account#penguinId")
 
 		// drop_info
-		ItemDropSetByStageIdAndRangeId = cache.New(client, "itemDropSet#server|stageId|rangeId:")
+		ItemDropSetByStageIdAndRangeId = cache.NewSet(client, "itemDropSet#server|stageId|rangeId")
 
 		// drop_matrix
-		ShimMaxAccumulableDropMatrixResults = cache.New(client, "shimMaxAccumulableDropMatrixResults#server|showClosedZoned:")
+		ShimMaxAccumulableDropMatrixResults = cache.NewSet(client, "shimMaxAccumulableDropMatrixResults#server|showClosedZoned")
 
 		// formula
-		Formula = cache.New(client, "formula")
+		Formula = cache.NewSingular(client, "formula")
 
 		// item
-		Items = cache.New(client, "items")
-		ItemById = cache.New(client, "item#itemId:")
-		ItemByArkId = cache.New(client, "item#arkItemId:")
-		ShimItems = cache.New(client, "shimItems")
-		ShimItemByArkId = cache.New(client, "shimItem#arkItemId:")
+		Items = cache.NewSingular(client, "items")
+		ItemById = cache.NewSet(client, "item#itemId")
+		ItemByArkId = cache.NewSet(client, "item#arkItemId")
+		ShimItems = cache.NewSingular(client, "shimItems")
+		ShimItemByArkId = cache.NewSet(client, "shimItem#arkItemId")
 
 		// notice
-		Notices = cache.New(client, "notices")
+		Notices = cache.NewSingular(client, "notices")
 
 		// pattern_matrix
-		ShimLatestPatternMatrixResults = cache.New(client, "shimLatestPatternMatrixResults#server:")
+		ShimLatestPatternMatrixResults = cache.NewSet(client, "shimLatestPatternMatrixResults#server")
 
 		// site_stats
-		ShimSiteStats = cache.New(client, "shimSiteStats#server:")
+		ShimSiteStats = cache.NewSet(client, "shimSiteStats#server")
 
 		// stage
-		Stages = cache.New(client, "stages")
-		StageById = cache.New(client, "stage#stageId:")
-		StageByArkId = cache.New(client, "stage#arkStageId:")
-		ShimStages = cache.New(client, "shimStages#server:")
-		ShimStageByArkId = cache.New(client, "shimStage#server|arkStageId:")
+		Stages = cache.NewSingular(client, "stages")
+		StageById = cache.NewSet(client, "stage#stageId")
+		StageByArkId = cache.NewSet(client, "stage#arkStageId")
+		ShimStages = cache.NewSet(client, "shimStages#server")
+		ShimStageByArkId = cache.NewSet(client, "shimStage#server|arkStageId")
 
 		// time_range
-		TimeRanges = cache.New(client, "timeRanges#server:")
-		TimeRangeById = cache.New(client, "timeRange#rangeId:")
-		TimeRangesMap = cache.New(client, "timeRangesMap#server:")
-		MaxAccumulableTimeRanges = cache.New(client, "maxAccumulableTimeRanges#server:")
+		TimeRanges = cache.NewSet(client, "timeRanges#server")
+		TimeRangeById = cache.NewSet(client, "timeRange#rangeId")
+		TimeRangesMap = cache.NewSet(client, "timeRangesMap#server")
+		MaxAccumulableTimeRanges = cache.NewSet(client, "maxAccumulableTimeRanges#server")
 
 		// trend
-		ShimSavedTrendResults = cache.New(client, "shimSavedTrendResults#server:")
+		ShimSavedTrendResults = cache.NewSet(client, "shimSavedTrendResults#server")
 
 		// zone
-		Zones = cache.New(client, "zones")
-		ZoneByArkId = cache.New(client, "zone#arkZoneId:")
-		ShimZones = cache.New(client, "shimZones")
-		ShimZoneByArkId = cache.New(client, "shimZone#arkZoneId:")
+		Zones = cache.NewSingular(client, "zones")
+		ZoneByArkId = cache.NewSet(client, "zone#arkZoneId")
+		ShimZones = cache.NewSingular(client, "shimZones")
+		ShimZoneByArkId = cache.NewSet(client, "shimZone#arkZoneId")
 
 		// others
-		LastModifiedTime = cache.New(client, "lastModifiedTime#key:")
+		LastModifiedTime = cache.NewSet(client, "lastModifiedTime#key")
 	})
 }

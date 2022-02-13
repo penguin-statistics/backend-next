@@ -10,11 +10,12 @@ import (
 
 	gojson "github.com/goccy/go-json"
 	"github.com/uptrace/bun"
+	"github.com/vmihailenco/msgpack/v5"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 )
 
-func BenchmarkJsonOrGobEncoding(b *testing.B) {
+func BenchmarkJsonOrGobOrMsgpackEncoding(b *testing.B) {
 	var db *bun.DB
 	populate(&db)
 	var stage models.Stage
@@ -81,9 +82,28 @@ func BenchmarkJsonOrGobEncoding(b *testing.B) {
 			}
 		}
 	})
+
+	msgpackEncoder := msgpack.NewEncoder(ioutil.Discard)
+	b.Run("msgpackWithStaticEncoder", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			err := msgpackEncoder.Encode(stage)
+			if err != nil {
+				b.Error(err)
+			}
+		}
+	})
+
+	b.Run("msgpackWithoutStaticEncoder", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			_, err := msgpack.Marshal(stage)
+			if err != nil {
+				b.Error(err)
+			}
+		}
+	})
 }
 
-func BenchmarkJsonOrGobDecoding(b *testing.B) {
+func BenchmarkJsonOrGobOrMsgpackDecoding(b *testing.B) {
 	var db *bun.DB
 	populate(&db)
 	var stage models.Stage
@@ -125,6 +145,32 @@ func BenchmarkJsonOrGobDecoding(b *testing.B) {
 				b.Error(err)
 			}
 			reader.Seek(0, 0)
+		}
+	})
+
+	var buf2 bytes.Buffer
+	_ = msgpack.NewEncoder(&buf2).Encode(stage)
+	reader2 := bytes.NewReader(buf2.Bytes())
+
+	msgpackDecoder := msgpack.NewDecoder(reader2)
+
+	b.Run("msgpackWithStaticDecoder", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			err := msgpackDecoder.Decode(&stage)
+			if err != nil {
+				b.Error(err)
+			}
+			reader2.Seek(0, 0)
+		}
+	})
+
+	b.Run("msgpackWithoutStaticDecoder", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			err := msgpack.NewDecoder(reader2).Decode(&stage)
+			if err != nil {
+				b.Error(err)
+			}
+			reader2.Seek(0, 0)
 		}
 	})
 }
