@@ -28,7 +28,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(infra.ProvideNats),
 		fx.Provide(infra.ProvideRedis),
 		fx.Provide(infra.ProvidePostgres),
-		fx.Invoke(cache.Populate),
+		fx.Invoke(cache.Initialize),
 		fx.Provide(reportutils.NewMD5Verifier),
 		fx.Provide(reportutils.NewUserVerifier),
 		fx.Provide(reportutils.NewDropVerifier),
