@@ -10,6 +10,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
@@ -47,16 +48,23 @@ func NewTrendService(
 	}
 }
 
-// Cache: ShimSavedTrendResults#{server}, 24hrs
+// Cache: shimSavedTrendResults#server:{server}, 24hrs
 func (s *TrendService) GetShimSavedTrendResults(ctx *fiber.Ctx, server string) (*shims.TrendQueryResult, error) {
+	var shimResult *shims.TrendQueryResult
+	err := cache.ShimSavedTrendResults.Get(server, shimResult)
+	if err == nil {
+		return shimResult, nil
+	}
+
 	queryResult, err := s.getSavedTrendResults(ctx, server)
 	if err != nil {
 		return nil, err
 	}
-	shimResult, err := s.applyShimForTrendQuery(ctx, queryResult)
+	shimResult, err = s.applyShimForTrendQuery(ctx, queryResult)
 	if err != nil {
 		return nil, err
 	}
+	go cache.ShimSavedTrendResults.Set(server, shimResult, 24*time.Hour)
 	return shimResult, nil
 }
 

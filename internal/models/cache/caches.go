@@ -41,6 +41,8 @@ var (
 	TimeRangesMap            cache.Cache
 	MaxAccumulableTimeRanges cache.Cache
 
+	ShimSavedTrendResults cache.Cache
+
 	once sync.Once
 )
 
@@ -87,5 +89,10 @@ func Populate(client *redis.Client) {
 		TimeRangeById = cache.New(client, "timeRange#rangeId:")
 		TimeRangesMap = cache.New(client, "timeRangesMap#server:")
 		MaxAccumulableTimeRanges = cache.New(client, "maxAccumulableTimeRanges#server:")
+
+		// trend
+		ShimSavedTrendResults = cache.New(client, "shimSavedTrendResults#server:")
+
+		// zone
 	})
 }
