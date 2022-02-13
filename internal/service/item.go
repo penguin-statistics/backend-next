@@ -2,13 +2,13 @@ package service
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
 	"github.com/tidwall/gjson"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
@@ -46,21 +46,20 @@ func (s *ItemService) GetItems(ctx *fiber.Ctx) ([]*models.Item, error) {
 
 // Cache: item#itemId:{itemId}, 24hrs
 func (s *ItemService) GetItemById(ctx *fiber.Ctx, itemId int) (*models.Item, error) {
-	fmt.Printf("GetItemById for %d\n", itemId)
-	var item *models.Item
-	err := cache.ItemById.Get(strconv.Itoa(itemId), item)
+	var item models.Item
+	err := cache.ItemById.Get(strconv.Itoa(itemId), &item)
 	if err == nil {
-		fmt.Println("found in cache")
-		return item, nil
+		log.Debug().Msgf("got cache content from cache for %d", itemId)
+		return &item, nil
 	}
-	fmt.Println("not found in cache")
+	log.Debug().Err(err).Msgf("no cache content for %d", itemId)
 
-	item, err = s.ItemRepo.GetItemById(ctx.Context(), itemId)
+	dbItem, err := s.ItemRepo.GetItemById(ctx.Context(), itemId)
 	if err != nil {
 		return nil, err
 	}
 	go cache.ItemById.Set(strconv.Itoa(itemId), item, 24*time.Hour)
-	return item, nil
+	return dbItem, nil
 }
 
 // Cache: item#arkItemId:{arkItemId}, 24hrs

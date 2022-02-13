@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/rs/zerolog/log"
 )
 
 func New(client *redis.Client, prefix string) Cache {
@@ -31,7 +30,7 @@ func (c *redisCache) Get(key string, dest interface{}) error {
 	if err != nil {
 		return ErrNoKey
 	}
-	log.Debug().Str("key", c.prefix+key).Msg("get key")
+	// log.Debug().Str("key", c.prefix+key).Msg("get key")
 	return json.Unmarshal(resp, dest)
 }
 
@@ -40,11 +39,7 @@ func (c *redisCache) Set(key string, value interface{}, expire time.Duration) er
 	if err != nil {
 		return err
 	}
-	err = c.client.Set(context.Background(), c.prefix+key, b, expire).Err()
-	if err == nil {
-		log.Debug().Str("key", c.prefix+key).Msg("set key")
-	}
-	return err
+	return c.client.Set(context.Background(), c.prefix+key, b, expire).Err()
 }
 
 // MutexGetSet gets value from cache and writes to dest, or if the key does not exists, it executes valueFunc
