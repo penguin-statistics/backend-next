@@ -174,7 +174,11 @@ func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error
 	wg.Wait()
 
 	log.Debug().Msgf("toSave length: %v", len(toSave))
-	return s.TrendElementService.BatchSaveElements(ctx, toSave, server)
+	err = s.TrendElementService.BatchSaveElements(ctx, toSave, server)
+	if err != nil {
+		return err
+	}
+	return cache.ShimSavedTrendResults.Clear()
 }
 
 func (s *TrendService) getSavedTrendResults(ctx *fiber.Ctx, server string) (*models.TrendQueryResult, error) {
