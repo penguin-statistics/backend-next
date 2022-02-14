@@ -71,7 +71,6 @@ func NewDropMatrixService(
 
 // Cache: shimMaxAccumulableDropMatrixResults#server|showClosedZoned:{server}|{showClosedZones}, 24 hrs
 func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx *fiber.Ctx, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId *null.Int) (*shims.DropMatrixQueryResult, error) {
-	var results shims.DropMatrixQueryResult
 	valueFunc := func() (interface{}, error) {
 		savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId)
 		if err != nil {
@@ -84,6 +83,7 @@ func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx *fiber.Ct
 		return *slowResults, nil
 	}
 
+	var results shims.DropMatrixQueryResult
 	if !accountId.Valid && stageFilterStr == "" && itemFilterStr == "" {
 		key := server + constants.RedisSeparator + strconv.FormatBool(showClosedZones)
 		calculated, err := cache.ShimMaxAccumulableDropMatrixResults.MutexGetSet(key, &results, valueFunc, 24*time.Hour)

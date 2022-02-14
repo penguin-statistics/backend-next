@@ -50,24 +50,26 @@ func NewTrendService(
 
 // Cache: shimSavedTrendResults#server:{server}, 24hrs
 func (s *TrendService) GetShimSavedTrendResults(ctx *fiber.Ctx, server string) (*shims.TrendQueryResult, error) {
-	var shimResult shims.TrendQueryResult
-	err := cache.ShimSavedTrendResults.Get(server, &shimResult)
-	if err == nil {
-		return &shimResult, nil
+	valueFunc := func() (interface{}, error) {
+		queryResult, err := s.getSavedTrendResults(ctx, server)
+		if err != nil {
+			return nil, err
+		}
+		slowShimResult, err := s.applyShimForTrendQuery(ctx, queryResult)
+		if err != nil {
+			return nil, err
+		}
+		return *slowShimResult, nil
 	}
 
-	queryResult, err := s.getSavedTrendResults(ctx, server)
+	var shimResult shims.TrendQueryResult
+	calculated, err := cache.ShimSavedTrendResults.MutexGetSet(server, &shimResult, valueFunc, 24*time.Hour)
 	if err != nil {
 		return nil, err
-	}
-	slowShimResult, err := s.applyShimForTrendQuery(ctx, queryResult)
-	if err != nil {
-		return nil, err
-	}
-	if err := cache.ShimSavedTrendResults.Set(server, slowShimResult, 24*time.Hour); err == nil {
+	} else if calculated {
 		cache.LastModifiedTime.Set("[shimSavedTrendResults#server:"+server+"]", time.Now(), 0)
 	}
-	return slowShimResult, nil
+	return &shimResult, nil
 }
 
 func (s *TrendService) GetShimCustomizedTrendResults(ctx *fiber.Ctx, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIds []int, itemIds []int, accountId *null.Int) (*shims.TrendQueryResult, error) {
