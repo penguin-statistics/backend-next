@@ -72,30 +72,35 @@ func NewDropMatrixService(
 // Cache: shimMaxAccumulableDropMatrixResults#server|showClosedZoned:{server}|{showClosedZones}, 24 hrs
 func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx *fiber.Ctx, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId *null.Int) (*shims.DropMatrixQueryResult, error) {
 	var results shims.DropMatrixQueryResult
-	useCache := !accountId.Valid && stageFilterStr == "" && itemFilterStr == ""
-	var key string
-	if useCache {
-		key = server + constants.RedisSeparator + strconv.FormatBool(showClosedZones)
-		err := cache.ShimMaxAccumulableDropMatrixResults.Get(key, &results)
-		if err == nil {
-			return &results, nil
+	valueFunc := func() (interface{}, error) {
+		savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId)
+		if err != nil {
+			return nil, err
 		}
+		slowResults, err := s.applyShimForDropMatrixQuery(ctx, server, showClosedZones, stageFilterStr, itemFilterStr, savedDropMatrixResults)
+		if err != nil {
+			return nil, err
+		}
+		return *slowResults, nil
 	}
 
-	savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId)
-	if err != nil {
-		return nil, err
-	}
-	slowResults, err := s.applyShimForDropMatrixQuery(ctx, server, showClosedZones, stageFilterStr, itemFilterStr, savedDropMatrixResults)
-	if err != nil {
-		return nil, err
-	}
-	if useCache {
-		if err := cache.ShimMaxAccumulableDropMatrixResults.Set(key, slowResults, time.Hour*24); err == nil {
+	if !accountId.Valid && stageFilterStr == "" && itemFilterStr == "" {
+		key := server + constants.RedisSeparator + strconv.FormatBool(showClosedZones)
+		calculated, err := cache.ShimMaxAccumulableDropMatrixResults.MutexGetSet(key, &results, valueFunc, 24*time.Hour)
+		if err != nil {
+			return nil, err
+		} else if calculated {
 			cache.LastModifiedTime.Set("[shimMaxAccumulableDropMatrixResults#server|showClosedZoned:"+key+"]", time.Now(), 0)
 		}
+		return &results, nil
+	} else {
+		r, err := valueFunc()
+		if err != nil {
+			return nil, err
+		}
+		results = r.(shims.DropMatrixQueryResult)
+		return &results, nil
 	}
-	return slowResults, nil
 }
 
 func (s *DropMatrixService) GetShimCustomizedDropMatrixResults(ctx *fiber.Ctx, server string, timeRange *models.TimeRange, stageIds []int, itemIds []int, accountId *null.Int) (*shims.DropMatrixQueryResult, error) {
@@ -148,7 +153,11 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 	wg.Wait()
 
 	log.Debug().Msgf("toSave length: %v", len(toSave))
-	return s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server)
+	err = s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server)
+	if err != nil {
+		return err
+	}
+	return cache.ShimMaxAccumulableDropMatrixResults.Clear()
 }
 
 // calc DropMatrixQueryResult for customized conditions

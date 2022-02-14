@@ -51,6 +51,7 @@ func (c *Set) Get(key string, dest interface{}) error {
 
 func (c *Set) Set(key string, value interface{}, expire time.Duration) error {
 	key = c.key(key)
+	log.Debug().Str("key", key).Msg("setting value to redis")
 	b, err := msgpack.Marshal(value)
 	if err != nil {
 		log.Error().Err(err).Str("key", key).Msg("failed to marshal value with msgpack")
@@ -61,23 +62,25 @@ func (c *Set) Set(key string, value interface{}, expire time.Duration) error {
 		log.Error().Err(err).Str("key", key).Msg("failed to set value to redis")
 		return err
 	}
+	log.Debug().Str("key", key).Msg("finish setting value to redis")
 	return nil
 }
 
 // MutexGetSet gets value from cache and writes to dest, or if the key does not exists, it executes valueFunc
 // to get cache value if the key still not exists when serially dispatched, sets value to cache and
 // writes value to dest.
-func (c *Set) MutexGetSet(key string, dest interface{}, valueFunc func() (interface{}, error), expire time.Duration) error {
+// The first return value means whether the value is got from cache or not. True means calculated; False means getting from redis.
+func (c *Set) MutexGetSet(key string, dest interface{}, valueFunc func() (interface{}, error), expire time.Duration) (bool, error) {
 	err := c.Get(key, dest)
 	if err == nil {
-		return nil
+		return false, nil
 	} else if err != redis.Nil {
 		log.Error().Err(err).Str("key", key).Msg("failed to get value from redis in MutexGetSet")
-		return err
+		return false, err
 	}
 	// onwards, cache key does not exist
 
-	return c.slowMutexGetSet(key, dest, valueFunc, expire)
+	return true, c.slowMutexGetSet(key, dest, valueFunc, expire)
 }
 
 func (c *Set) slowMutexGetSet(key string, dest interface{}, valueFunc func() (interface{}, error), expire time.Duration) error {
