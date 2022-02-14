@@ -48,30 +48,35 @@ func NewPatternMatrixService(
 
 // Cache: shimLatestPatternMatrixResults#server:{server}, 24hrs
 func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*shims.PatternMatrixQueryResult, error) {
+	valueFunc := func() (interface{}, error) {
+		queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId)
+		if err != nil {
+			return nil, err
+		}
+		slowResults, err := s.applyShimForPatternMatrixQuery(ctx, queryResult)
+		if err != nil {
+			return nil, err
+		}
+		return *slowResults, nil
+	}
+
 	var results shims.PatternMatrixQueryResult
 	if !accountId.Valid {
-		err := cache.ShimLatestPatternMatrixResults.Get(server, &results)
-		if err == nil {
-			return &results, nil
-		}
-	}
-
-	queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId)
-	if err != nil {
-		return nil, err
-	}
-	slowResults, err := s.applyShimForPatternMatrixQuery(ctx, queryResult)
-	if err != nil {
-		return nil, err
-	}
-
-	if !accountId.Valid {
-		if err := cache.ShimLatestPatternMatrixResults.Set(server, slowResults, 24*time.Hour); err == nil {
+		calculated, err := cache.ShimLatestPatternMatrixResults.MutexGetSet(server, &results, valueFunc, 24*time.Hour)
+		if err != nil {
+			return nil, err
+		} else if calculated {
 			cache.LastModifiedTime.Set("[shimLatestPatternMatrixResults#server:"+server+"]", time.Now(), 0)
 		}
+		return &results, nil
+	} else {
+		r, err := valueFunc()
+		if err != nil {
+			return nil, err
+		}
+		results = r.(shims.PatternMatrixQueryResult)
+		return &results, nil
 	}
-
-	return slowResults, nil
 }
 
 func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx *fiber.Ctx, server string) error {
@@ -122,7 +127,11 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx *fiber.Ctx, s
 	wg.Wait()
 
 	log.Debug().Msgf("toSave length: %v", len(toSave))
-	return s.PatternMatrixElementService.BatchSaveElements(ctx, toSave, server)
+
+	if err := s.PatternMatrixElementService.BatchSaveElements(ctx, toSave, server); err != nil {
+		return err
+	}
+	return cache.ShimLatestPatternMatrixResults.Delete(server)
 }
 
 func (s *PatternMatrixService) getLatestPatternMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*models.PatternMatrixQueryResult, error) {

@@ -153,11 +153,17 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 	wg.Wait()
 
 	log.Debug().Msgf("toSave length: %v", len(toSave))
-	err = s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server)
-	if err != nil {
+
+	if err := s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server); err != nil {
 		return err
 	}
-	return cache.ShimMaxAccumulableDropMatrixResults.Clear()
+	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constants.RedisSeparator + "true"); err != nil {
+		return err
+	}
+	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constants.RedisSeparator + "false"); err != nil {
+		return err
+	}
+	return nil
 }
 
 // calc DropMatrixQueryResult for customized conditions
