@@ -20,7 +20,7 @@ func NewNoticeService(noticeRepo *repos.NoticeRepo) *NoticeService {
 	}
 }
 
-// Cache: (singular) notices, 24hrs
+// Cache: (singular) notices, 24hrs; records last modified time
 func (s *NoticeService) GetNotices(ctx *fiber.Ctx) ([]*models.Notice, error) {
 	var notices []*models.Notice
 	err := cache.Notices.Get(notices)
@@ -29,6 +29,8 @@ func (s *NoticeService) GetNotices(ctx *fiber.Ctx) ([]*models.Notice, error) {
 	}
 
 	notices, err = s.NoticeRepo.GetNotices(ctx.Context())
-	go cache.Notices.Set(notices, 24*time.Hour)
+	if err := cache.Notices.Set(notices, 24*time.Hour); err == nil {
+		cache.LastModifiedTime.Set("[notices]", time.Now(), 0)
+	}
 	return notices, err
 }

@@ -64,7 +64,9 @@ func (s *TrendService) GetShimSavedTrendResults(ctx *fiber.Ctx, server string) (
 	if err != nil {
 		return nil, err
 	}
-	go cache.ShimSavedTrendResults.Set(server, slowShimResult, 24*time.Hour)
+	if err := cache.ShimSavedTrendResults.Set(server, slowShimResult, 24*time.Hour); err == nil {
+		cache.LastModifiedTime.Set("[shimSavedTrendResults#server:"+server+"]", time.Now(), 0)
+	}
 	return slowShimResult, nil
 }
 

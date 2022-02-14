@@ -2,10 +2,13 @@ package shims
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
@@ -52,7 +55,6 @@ func RegisterPrivateController(
 // @Router       /PenguinStats/api/v2/_private/result/matrix/{server}/{source} [GET]
 // @Deprecated
 func (c *PrivateController) GetDropMatrix(ctx *fiber.Ctx) error {
-	// TODO: the whole result should be cached, and populated when server starts
 	server := ctx.Params("server")
 	isPersonal := ctx.Params("source") == "personal"
 
@@ -73,6 +75,16 @@ func (c *PrivateController) GetDropMatrix(ctx *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+
+	if !accountId.Valid {
+		key := server + constants.RedisSeparator + "true"
+		var lastModifiedTime time.Time
+		if err := cache.LastModifiedTime.Get("[shimMaxAccumulableDropMatrixResults#server|showClosedZoned:"+key+"]", &lastModifiedTime); err != nil {
+			lastModifiedTime = time.Now()
+		}
+		ctx.Response().Header.SetLastModified(lastModifiedTime)
+	}
+
 	return ctx.JSON(shimResult)
 }
 
@@ -86,7 +98,6 @@ func (c *PrivateController) GetDropMatrix(ctx *fiber.Ctx) error {
 // @Router       /PenguinStats/api/v2/_private/result/pattern/{server}/{source} [GET]
 // @Deprecated
 func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
-	// TODO: the whole result should be cached, and populated when server starts
 	server := ctx.Params("server")
 	isPersonal := ctx.Params("source") == "personal"
 
@@ -107,6 +118,15 @@ func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+
+	if !accountId.Valid {
+		var lastModifiedTime time.Time
+		if err := cache.LastModifiedTime.Get("[shimLatestPatternMatrixResults#server:"+server+"]", &lastModifiedTime); err != nil {
+			lastModifiedTime = time.Now()
+		}
+		ctx.Response().Header.SetLastModified(lastModifiedTime)
+	}
+
 	return ctx.JSON(shimResult)
 }
 
@@ -119,11 +139,17 @@ func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
 // @Router       /PenguinStats/api/v2/_private/result/trend/{server} [GET]
 // @Deprecated
 func (c *PrivateController) GetTrends(ctx *fiber.Ctx) error {
-	// TODO: the whole result should be cached, and populated when server starts
 	server := ctx.Params("server")
 	shimResult, err := c.TrendService.GetShimSavedTrendResults(ctx, server)
 	if err != nil {
 		return err
 	}
+
+	var lastModifiedTime time.Time
+	if err := cache.LastModifiedTime.Get("[shimSavedTrendResults#server:"+server+"]", &lastModifiedTime); err != nil {
+		lastModifiedTime = time.Now()
+	}
+	ctx.Response().Header.SetLastModified(lastModifiedTime)
+
 	return ctx.JSON(shimResult)
 }

@@ -62,7 +62,7 @@ func (s *StageService) GetStageByArkId(ctx *fiber.Ctx, arkStageId string) (*mode
 	return dbStage, err
 }
 
-// Cache: shimStages#server:{server}, 24hrs
+// Cache: shimStages#server:{server}, 24hrs; records last modified time
 func (s *StageService) GetShimStages(ctx *fiber.Ctx, server string) ([]*shims.Stage, error) {
 	var stages []*shims.Stage
 	err := cache.ShimStages.Get(server, &stages)
@@ -77,7 +77,9 @@ func (s *StageService) GetShimStages(ctx *fiber.Ctx, server string) ([]*shims.St
 	for _, i := range stages {
 		s.applyShim(i)
 	}
-	go cache.ShimStages.Set(server, stages, 24*time.Hour)
+	if err := cache.ShimStages.Set(server, stages, 24*time.Hour); err == nil {
+		cache.LastModifiedTime.Set("[shimStages#server:"+server+"]", time.Now(), 0)
+	}
 	return stages, nil
 }
 

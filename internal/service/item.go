@@ -90,11 +90,9 @@ func (s *ItemService) GetShimItems(ctx *fiber.Ctx) ([]*shims.Item, error) {
 	for _, i := range items {
 		s.applyShim(i)
 	}
-	go func() {
-		if err := cache.ShimItems.Set(items, 24*time.Hour); err != nil {
-			cache.LastModifiedTime.Set("[shimItems]", time.Now().UnixMilli(), 0)
-		}
-	}()
+	if err := cache.ShimItems.Set(items, 24*time.Hour); err == nil {
+		cache.LastModifiedTime.Set("[shimItems]", time.Now(), 0)
+	}
 	return items, nil
 }
 

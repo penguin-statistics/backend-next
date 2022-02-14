@@ -72,10 +72,14 @@ func NewDropMatrixService(
 // Cache: shimMaxAccumulableDropMatrixResults#server|showClosedZoned:{server}|{showClosedZones}, 24 hrs
 func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx *fiber.Ctx, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId *null.Int) (*shims.DropMatrixQueryResult, error) {
 	var results shims.DropMatrixQueryResult
-	key := server + constants.RedisSeparator + strconv.FormatBool(showClosedZones)
-	err := cache.ShimMaxAccumulableDropMatrixResults.Get(key, &results)
-	if err == nil {
-		return &results, nil
+	useCache := !accountId.Valid && stageFilterStr == "" && itemFilterStr == ""
+	var key string
+	if useCache {
+		key = server + constants.RedisSeparator + strconv.FormatBool(showClosedZones)
+		err := cache.ShimMaxAccumulableDropMatrixResults.Get(key, &results)
+		if err == nil {
+			return &results, nil
+		}
 	}
 
 	savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId)
@@ -86,7 +90,11 @@ func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx *fiber.Ct
 	if err != nil {
 		return nil, err
 	}
-	go cache.ShimMaxAccumulableDropMatrixResults.Set(key, slowResults, time.Hour*24)
+	if useCache {
+		if err := cache.ShimMaxAccumulableDropMatrixResults.Set(key, slowResults, time.Hour*24); err == nil {
+			cache.LastModifiedTime.Set("[shimMaxAccumulableDropMatrixResults#server|showClosedZoned:"+key+"]", time.Now(), 0)
+		}
+	}
 	return slowResults, nil
 }
 

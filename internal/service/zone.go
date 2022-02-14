@@ -48,7 +48,7 @@ func (s *ZoneService) GetZoneByArkId(ctx *fiber.Ctx, arkZoneId string) (*models.
 	return dbZone, err
 }
 
-// Cache: (singular) shimZones, 24hrs
+// Cache: (singular) shimZones, 24hrs; records last modified time
 func (s *ZoneService) GetShimZones(ctx *fiber.Ctx) ([]*shims.Zone, error) {
 	var zones []*shims.Zone
 	err := cache.ShimZones.Get(&zones)
@@ -63,7 +63,9 @@ func (s *ZoneService) GetShimZones(ctx *fiber.Ctx) ([]*shims.Zone, error) {
 	for _, i := range zones {
 		s.applyShim(i)
 	}
-	go cache.ShimZones.Set(zones, 24*time.Hour)
+	if err := cache.ShimZones.Set(zones, 24*time.Hour); err == nil {
+		cache.LastModifiedTime.Set("[shimZones]", time.Now(), 0)
+	}
 	return zones, nil
 }
 
