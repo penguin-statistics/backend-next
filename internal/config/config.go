@@ -51,6 +51,9 @@ type Config struct {
 
 	// HttpServerShutdownTimeout is the timeout for the HTTP server to shutdown gracefully.
 	HttpServerShutdownTimeout time.Duration `required:"true" split_words:"true" default:"60s"`
+
+	// GeoIPDBPath is the path to the GeoIP2 database.
+	GeoIPDBPath string `required:"true" split_words:"true" default:"vendors/maxmind/assets/geolite2/GeoLite2-Country.mmdb"`
 }
 
 func Parse() (*Config, error) {

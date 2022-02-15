@@ -35,6 +35,10 @@ func (s *ZoneService) GetZones(ctx *fiber.Ctx) ([]*models.Zone, error) {
 	return zones, err
 }
 
+func (s *ZoneService) GetZoneById(ctx *fiber.Ctx, id int) (*models.Zone, error) {
+	return s.ZoneRepo.GetZoneById(ctx.Context(), id)
+}
+
 // Cache: zone#arkZoneId:{arkZoneId}, 24hrs
 func (s *ZoneService) GetZoneByArkId(ctx *fiber.Ctx, arkZoneId string) (*models.Zone, error) {
 	var zone models.Zone

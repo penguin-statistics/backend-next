@@ -97,3 +97,19 @@ func (c *ItemRepo) GetShimItemByArkId(ctx context.Context, itemId string) (*shim
 
 	return &item, nil
 }
+
+func (c *ItemRepo) SearchItemByName(ctx context.Context, name string) (*models.Item, error) {
+	var item models.Item
+	err := c.DB.NewSelect().
+		Model(&item).
+		Where("\"name\"::TEXT ILIKE ?", "%"+name+"%").
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return &item, nil
+}

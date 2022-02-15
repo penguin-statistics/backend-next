@@ -35,6 +35,22 @@ func (c *ZoneRepo) GetZones(ctx context.Context) ([]*models.Zone, error) {
 	return zones, nil
 }
 
+func (c *ZoneRepo) GetZoneById(ctx context.Context, id int) (*models.Zone, error) {
+	var zone models.Zone
+	err := c.db.NewSelect().
+		Model(&zone).
+		Where("zone_id = ?", id).
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return &zone, nil
+}
+
 // Cache: ZoneFromArkId
 func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*models.Zone, error) {
 	var zone models.Zone

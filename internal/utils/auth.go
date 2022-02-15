@@ -32,7 +32,7 @@ func SetPenguinIDToResponse(ctx *fiber.Ctx, penguinId string) {
 		Path:    "/",
 		Expires: time.Now().Add(time.Second * constants.PenguinIDAuthMaxCookieAgeSec),
 		// TODO: make this configurable and use better source rather than Host header
-		Domain:   "." + ctx.Get("Host", constants.DefaultHost),
+		Domain:   "." + ctx.Get("Host", constants.SiteDefaultHost),
 		SameSite: "None",
 		Secure:   true,
 	})

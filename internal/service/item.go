@@ -75,6 +75,10 @@ func (s *ItemService) GetItemByArkId(ctx *fiber.Ctx, arkItemId string) (*models.
 	return dbItem, nil
 }
 
+func (s *ItemService) SearchItemByName(ctx *fiber.Ctx, name string) (*models.Item, error) {
+	return s.ItemRepo.SearchItemByName(ctx.Context(), name)
+}
+
 // Cache: (singular) shimItems, 24hrs; records last modified time
 func (s *ItemService) GetShimItems(ctx *fiber.Ctx) ([]*shims.Item, error) {
 	var items []*shims.Item

@@ -145,3 +145,19 @@ func (c *StageRepo) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStag
 
 	return stage.ExtraProcessType, nil
 }
+
+func (c *StageRepo) SearchStageByCode(ctx context.Context, code string) (*models.Stage, error) {
+	var stage models.Stage
+	err := c.db.NewSelect().
+		Model(&stage).
+		Where("\"code\"::TEXT ILIKE ?", "%"+code+"%").
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return &stage, nil
+}

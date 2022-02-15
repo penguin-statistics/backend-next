@@ -30,6 +30,8 @@ require (
 require (
 	github.com/go-logr/logr v1.2.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/oschwald/geoip2-golang v1.6.1 // indirect
+	github.com/oschwald/maxminddb-golang v1.8.0 // indirect
 	github.com/stretchr/objx v0.1.1 // indirect
 	github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.7 // indirect
 	go.opentelemetry.io/otel/internal/metric v0.26.0 // indirect
