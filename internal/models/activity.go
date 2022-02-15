@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
-	"gopkg.in/guregu/null.v3"
 )
 
 type Activity struct {
@@ -13,7 +12,7 @@ type Activity struct {
 
 	ActivityID int             `bun:",pk" json:"id"`
 	StartTime  *time.Time      `json:"startTime"`
-	EndTime    null.Time       `json:"endTime"`
-	Name       string          `json:"name"`
+	EndTime    *time.Time      `json:"endTime"`
+	Name       json.RawMessage `json:"name"`
 	Existence  json.RawMessage `json:"existence"`
 }

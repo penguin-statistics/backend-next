@@ -28,6 +28,9 @@ var (
 
 	Notices *cache.Singular
 
+	Activities     *cache.Singular
+	ShimActivities *cache.Singular
+
 	ShimLatestPatternMatrixResults *cache.Set
 
 	ShimSiteStats *cache.Set
@@ -89,6 +92,10 @@ func initializeCaches(client *redis.Client) {
 
 	// notice
 	Notices = cache.NewSingular(client, "notices")
+
+	// activity
+	Activities = cache.NewSingular(client, "activities")
+	ShimActivities = cache.NewSingular(client, "shimActivities")
 
 	// pattern_matrix
 	ShimLatestPatternMatrixResults = cache.NewSet(client, "shimLatestPatternMatrixResults#server")

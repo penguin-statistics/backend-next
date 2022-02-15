@@ -23,7 +23,7 @@ func RegisterNoticeController(v2 *server.V2, service *service.NoticeService) {
 }
 
 // @Summary      Get All Notices
-// @Tags         Item
+// @Tags         Notice
 // @Produce      json
 // @Success      200     {array}  models.Notice
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
