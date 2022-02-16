@@ -55,7 +55,7 @@ func (s *ItemService) GetItemById(ctx *fiber.Ctx, itemId int) (*models.Item, err
 	if err != nil {
 		return nil, err
 	}
-	go cache.ItemById.Set(strconv.Itoa(itemId), item, 24*time.Hour)
+	go cache.ItemById.Set(strconv.Itoa(itemId), dbItem, 24*time.Hour)
 	return dbItem, nil
 }
 
