@@ -1,7 +1,6 @@
 package service
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -36,17 +35,16 @@ func (s *StageService) GetStages(ctx *fiber.Ctx) ([]*models.Stage, error) {
 	return stages, err
 }
 
-// Cache: stage#stageId:{stageId}, 24hrs
 func (s *StageService) GetStageById(ctx *fiber.Ctx, stageId int) (*models.Stage, error) {
-	var stage models.Stage
-	err := cache.StageById.Get(strconv.Itoa(stageId), &stage)
-	if err == nil {
-		return &stage, nil
+	stagesMapById, err := s.GetStagesMapById(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	dbStage, err := s.StageRepo.GetStageById(ctx.Context(), stageId)
-	go cache.StageById.Set(strconv.Itoa(stageId), dbStage, 24*time.Hour)
-	return dbStage, err
+	stage, ok := stagesMapById[stageId]
+	if !ok {
+		return nil, nil
+	}
+	return stage, nil
 }
 
 // Cache: stage#arkStageId:{arkStageId}, 24hrs
@@ -106,6 +104,40 @@ func (s *StageService) GetShimStageByArkId(ctx *fiber.Ctx, arkStageId string, se
 
 func (s *StageService) GetStageExtraProcessTypeByArkId(ctx *fiber.Ctx, arkStageId string) (string, error) {
 	return s.StageRepo.GetStageExtraProcessTypeByArkId(ctx.Context(), arkStageId)
+}
+
+// Cache: (singular) stagesMapById, 24hrs
+func (s *StageService) GetStagesMapById(ctx *fiber.Ctx) (map[int]*models.Stage, error) {
+	var stagesMapById map[int]*models.Stage
+	cache.StagesMapById.MutexGetSet(&stagesMapById, func() (interface{}, error) {
+		stages, err := s.GetStages(ctx)
+		if err != nil {
+			return nil, err
+		}
+		stagesMapById := make(map[int]*models.Stage)
+		for _, stage := range stages {
+			stagesMapById[stage.StageID] = stage
+		}
+		return stagesMapById, nil
+	}, 24*time.Hour)
+	return stagesMapById, nil
+}
+
+// Cache: (singular) stagesMapByArkId, 24hrs
+func (s *StageService) GetStagesMapByArkId(ctx *fiber.Ctx) (map[string]*models.Stage, error) {
+	var stagesMapByArkId map[string]*models.Stage
+	cache.StagesMapByArkId.MutexGetSet(&stagesMapByArkId, func() (interface{}, error) {
+		stages, err := s.GetStages(ctx)
+		if err != nil {
+			return nil, err
+		}
+		stagesMapByArkId := make(map[string]*models.Stage)
+		for _, stage := range stages {
+			stagesMapByArkId[stage.ArkStageID] = stage
+		}
+		return stagesMapByArkId, nil
+	}, 24*time.Hour)
+	return stagesMapByArkId, nil
 }
 
 func (s *StageService) applyShim(stage *shims.Stage) {

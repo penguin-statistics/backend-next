@@ -22,10 +22,11 @@ var (
 	Formula *cache.Singular
 
 	Items           *cache.Singular
-	ItemById        *cache.Set
 	ItemByArkId     *cache.Set
 	ShimItems       *cache.Singular
 	ShimItemByArkId *cache.Set
+	ItemsMapById    *cache.Singular
+	ItemsMapByArkId *cache.Singular
 
 	Notices *cache.Singular
 
@@ -37,10 +38,11 @@ var (
 	ShimSiteStats *cache.Set
 
 	Stages           *cache.Singular
-	StageById        *cache.Set
 	StageByArkId     *cache.Set
 	ShimStages       *cache.Set
 	ShimStageByArkId *cache.Set
+	StagesMapById    *cache.Singular
+	StagesMapByArkId *cache.Singular
 
 	TimeRanges               *cache.Set
 	TimeRangeById            *cache.Set
@@ -87,10 +89,11 @@ func initializeCaches(client *redis.Client) {
 
 	// item
 	Items = cache.NewSingular(client, "items")
-	ItemById = cache.NewSet(client, "item#itemId")
 	ItemByArkId = cache.NewSet(client, "item#arkItemId")
 	ShimItems = cache.NewSingular(client, "shimItems")
 	ShimItemByArkId = cache.NewSet(client, "shimItem#arkItemId")
+	ItemsMapById = cache.NewSingular(client, "itemsMapById")
+	ItemsMapByArkId = cache.NewSingular(client, "itemsMapByArkId")
 
 	// notice
 	Notices = cache.NewSingular(client, "notices")
@@ -107,10 +110,11 @@ func initializeCaches(client *redis.Client) {
 
 	// stage
 	Stages = cache.NewSingular(client, "stages")
-	StageById = cache.NewSet(client, "stage#stageId")
 	StageByArkId = cache.NewSet(client, "stage#arkStageId")
 	ShimStages = cache.NewSet(client, "shimStages#server")
 	ShimStageByArkId = cache.NewSet(client, "shimStage#server|arkStageId")
+	StagesMapById = cache.NewSingular(client, "stagesMapById")
+	StagesMapByArkId = cache.NewSingular(client, "stagesMapByArkId")
 
 	// time_range
 	TimeRanges = cache.NewSet(client, "timeRanges#server")

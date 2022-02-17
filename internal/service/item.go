@@ -43,20 +43,16 @@ func (s *ItemService) GetItems(ctx *fiber.Ctx) ([]*models.Item, error) {
 	return items, nil
 }
 
-// Cache: item#itemId:{itemId}, 24hrs
 func (s *ItemService) GetItemById(ctx *fiber.Ctx, itemId int) (*models.Item, error) {
-	var item models.Item
-	err := cache.ItemById.Get(strconv.Itoa(itemId), &item)
-	if err == nil {
-		return &item, nil
-	}
-
-	dbItem, err := s.ItemRepo.GetItemById(ctx.Context(), itemId)
+	itemsMapById, err := s.GetItemsMapById(ctx)
 	if err != nil {
 		return nil, err
 	}
-	go cache.ItemById.Set(strconv.Itoa(itemId), dbItem, 24*time.Hour)
-	return dbItem, nil
+	item, ok := itemsMapById[itemId]
+	if !ok {
+		return nil, nil
+	}
+	return item, nil
 }
 
 // Cache: item#arkItemId:{arkItemId}, 24hrs
@@ -115,6 +111,40 @@ func (s *ItemService) GetShimItemByArkId(ctx *fiber.Ctx, arkItemId string) (*shi
 	s.applyShim(dbItem)
 	go cache.ShimItemByArkId.Set(arkItemId, dbItem, 24*time.Hour)
 	return dbItem, nil
+}
+
+// Cache: (singular) itemsMapById, 24hrs
+func (s *ItemService) GetItemsMapById(ctx *fiber.Ctx) (map[int]*models.Item, error) {
+	var itemsMapById map[int]*models.Item
+	cache.ItemsMapById.MutexGetSet(&itemsMapById, func() (interface{}, error) {
+		items, err := s.GetItems(ctx)
+		if err != nil {
+			return nil, err
+		}
+		itemsMapById := make(map[int]*models.Item)
+		for _, item := range items {
+			itemsMapById[item.ItemID] = item
+		}
+		return itemsMapById, nil
+	}, 24*time.Hour)
+	return itemsMapById, nil
+}
+
+// Cache: (singular) itemsMapByArkId, 24hrs
+func (s *ItemService) GetItemsMapByArkId(ctx *fiber.Ctx) (map[string]*models.Item, error) {
+	var itemsMapByArkId map[string]*models.Item
+	cache.ItemsMapByArkId.MutexGetSet(&itemsMapByArkId, func() (interface{}, error) {
+		items, err := s.GetItems(ctx)
+		if err != nil {
+			return nil, err
+		}
+		itemsMapByArkId := make(map[string]*models.Item)
+		for _, item := range items {
+			itemsMapByArkId[item.ArkItemID] = item
+		}
+		return itemsMapByArkId, nil
+	}, 24*time.Hour)
+	return itemsMapByArkId, nil
 }
 
 func (s *ItemService) applyShim(item *shims.Item) {

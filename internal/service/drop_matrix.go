@@ -6,10 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
@@ -70,7 +69,7 @@ func NewDropMatrixService(
 	}
 }
 
-// Cache: shimMaxAccumulableDropMatrixResults#server|showClosedZoned:{server}|{showClosedZones}, 24 hrs
+// Cache: shimMaxAccumulableDropMatrixResults#server|showClosedZoned:{server}|{showClosedZones}, 24 hrs, records last modified time
 func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx *fiber.Ctx, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId *null.Int) (*shims.DropMatrixQueryResult, error) {
 	valueFunc := func() (interface{}, error) {
 		savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId)
@@ -484,6 +483,16 @@ func (s *DropMatrixService) convertDropMatrixElementsToDropMatrixQueryResult(ctx
 }
 
 func (s *DropMatrixService) applyShimForDropMatrixQuery(ctx *fiber.Ctx, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, queryResult *models.DropMatrixQueryResult) (*shims.DropMatrixQueryResult, error) {
+	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stagesMapById, err := s.StageService.GetStagesMapById(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	// get opening stages from dropinfos
 	var openingStageIds []int
 	if !showClosedZones {
@@ -522,20 +531,14 @@ func (s *DropMatrixService) applyShimForDropMatrixQuery(ctx *fiber.Ctx, server s
 			continue
 		}
 
-		stage, err := s.StageService.GetStageById(ctx, el.StageID)
-		if err != nil {
-			return nil, err
-		}
+		stage := stagesMapById[el.StageID]
 		if len(stageFilterSet) > 0 {
 			if _, ok := stageFilterSet[stage.ArkStageID]; !ok {
 				continue
 			}
 		}
 
-		item, err := s.ItemService.GetItemById(ctx, el.ItemID)
-		if err != nil {
-			return nil, err
-		}
+		item := itemsMapById[el.ItemID]
 		if len(itemFilterSet) > 0 {
 			if _, ok := itemFilterSet[item.ArkItemID]; !ok {
 				continue

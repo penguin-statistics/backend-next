@@ -46,7 +46,7 @@ func NewPatternMatrixService(
 	}
 }
 
-// Cache: shimLatestPatternMatrixResults#server:{server}, 24hrs
+// Cache: shimLatestPatternMatrixResults#server:{server}, 24hrs, records last modified time
 func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*shims.PatternMatrixQueryResult, error) {
 	valueFunc := func() (interface{}, error) {
 		queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId)
@@ -288,7 +288,17 @@ func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx *fiber.Ctx, qu
 	results := &shims.PatternMatrixQueryResult{
 		PatternMatrix: make([]*shims.OnePatternMatrixElement, 0),
 	}
-	itemMap := make(map[string]*models.Item)
+
+	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stagesMapById, err := s.StageService.GetStagesMapById(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var groupedResults []linq.Group
 	linq.From(queryResult.PatternMatrix).
 		GroupByT(
@@ -299,10 +309,7 @@ func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx *fiber.Ctx, qu
 		patternId := group.Key.(int)
 		for _, el := range group.Group {
 			oneDropPattern := el.(*models.OnePatternMatrixElement)
-			stage, err := s.StageService.GetStageById(ctx, oneDropPattern.StageID)
-			if err != nil {
-				return nil, err
-			}
+			stage := stagesMapById[oneDropPattern.StageID]
 			endTime := null.NewInt(oneDropPattern.TimeRange.EndTime.UnixMilli(), true)
 			dropPatternElements, err := s.DropPatternElementService.GetDropPatternElementsByPatternId(ctx, patternId)
 			if err != nil {
@@ -312,24 +319,18 @@ func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx *fiber.Ctx, qu
 			pattern := shims.Pattern{
 				Drops: make([]*shims.OneDrop, 0),
 			}
+			linq.From(dropPatternElements).SortT(func(el1, el2 *models.DropPatternElement) bool {
+				item1 := itemsMapById[el1.ItemID]
+				item2 := itemsMapById[el2.ItemID]
+				return item1.SortID < item2.SortID
+			}).ToSlice(&dropPatternElements)
 			for _, dropPatternElement := range dropPatternElements {
-				item, err := s.ItemService.GetItemById(ctx, dropPatternElement.ItemID)
-				if _, ok := itemMap[item.ArkItemID]; !ok {
-					itemMap[item.ArkItemID] = item
-				}
-				if err != nil {
-					return nil, err
-				}
+				item := itemsMapById[dropPatternElement.ItemID]
 				pattern.Drops = append(pattern.Drops, &shims.OneDrop{
 					ItemID:   item.ArkItemID,
 					Quantity: dropPatternElement.Quantity,
 				})
 			}
-			linq.From(pattern.Drops).SortT(func(a, b *shims.OneDrop) bool {
-				itemA := itemMap[a.ItemID]
-				itemB := itemMap[b.ItemID]
-				return itemA.SortID < itemB.SortID
-			}).ToSlice(&pattern.Drops)
 			onePatternMatrixElement := shims.OnePatternMatrixElement{
 				StageID:   stage.ArkStageID,
 				Times:     oneDropPattern.Times,

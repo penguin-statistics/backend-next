@@ -49,7 +49,7 @@ func NewTrendService(
 	}
 }
 
-// Cache: shimSavedTrendResults#server:{server}, 24hrs
+// Cache: shimSavedTrendResults#server:{server}, 24hrs, records last modified time
 func (s *TrendService) GetShimSavedTrendResults(ctx *fiber.Ctx, server string) (*shims.TrendQueryResult, error) {
 	valueFunc := func() (interface{}, error) {
 		queryResult, err := s.getSavedTrendResults(ctx, server)
@@ -368,14 +368,21 @@ func (s *TrendService) applyShimForTrendQuery(ctx *fiber.Ctx, server string, que
 	shimMinStartTime := utils.GetGameDayEndTime(server, time.Now()).Add(-1 * constants.DefaultIntervalNum * 24 * time.Hour)
 	currentGameDayEndTime := utils.GetGameDayEndTime(server, time.Now())
 
+	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stagesMapById, err := s.StageService.GetStagesMapById(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	results := &shims.TrendQueryResult{
 		Trend: make(map[string]*shims.StageTrend),
 	}
 	for _, stageTrend := range queryResult.Trends {
-		stage, err := s.StageService.GetStageById(ctx, stageTrend.StageID)
-		if err != nil {
-			return nil, err
-		}
+		stage := stagesMapById[stageTrend.StageID]
 		shimStageTrend := shims.StageTrend{
 			Results: make(map[string]*shims.OneItemTrend),
 		}
@@ -401,10 +408,7 @@ func (s *TrendService) applyShimForTrendQuery(ctx *fiber.Ctx, server string, que
 		}
 
 		for _, itemTrend := range stageTrend.Results {
-			item, err := s.ItemService.GetItemById(ctx, itemTrend.ItemID)
-			if err != nil {
-				return nil, err
-			}
+			item := itemsMapById[itemTrend.ItemID]
 
 			itemStartTime := itemTrend.StartTime.Add((-1) * time.Duration(itemTrend.MinGroupID) * 24 * time.Hour)
 			dayNum := len(itemTrend.Quantity)
