@@ -152,7 +152,7 @@ func (s *DropReportRepo) CalcTotalTimes(
 	query := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
 		Column("dr.stage_id").
-		ColumnExpr("COUNT(*) AS total_times")
+		ColumnExpr("SUM(dr.times) AS total_times")
 	if accountId.Valid {
 		query = query.Where("dr.reliability >= 0 AND dr.account_id = ?", accountId.Int64)
 	} else {
