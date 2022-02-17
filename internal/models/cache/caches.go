@@ -58,6 +58,8 @@ var (
 	ShimZones       *cache.Singular
 	ShimZoneByArkId *cache.Set
 
+	DropPatternElementsByPatternId *cache.Set
+
 	LastModifiedTime *cache.Set
 
 	Properties map[string]string
@@ -133,6 +135,9 @@ func initializeCaches(client *redis.Client) {
 	ZoneByArkId = cache.NewSet(client, "zone#arkZoneId")
 	ShimZones = cache.NewSingular(client, "shimZones")
 	ShimZoneByArkId = cache.NewSet(client, "shimZone#arkZoneId")
+
+	// drop_pattern_elements
+	DropPatternElementsByPatternId = cache.NewSet(client, "dropPatternElements#patternId")
 
 	// others
 	LastModifiedTime = cache.NewSet(client, "lastModifiedTime#key")

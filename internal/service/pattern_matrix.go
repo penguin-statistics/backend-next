@@ -90,6 +90,26 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx *fiber.Ctx, s
 		return err
 	}
 	stageIdsMap := s.getStageIdsMapByTimeRange(allTimeRanges)
+
+	// exclude gacha box stages
+	gachaboxStages, err := s.StageService.GetGachaBoxStages(ctx)
+	if err != nil {
+		return err
+	}
+	excludeStageIdsSet := make(map[int]struct{}, len(gachaboxStages))
+	for _, stage := range gachaboxStages {
+		excludeStageIdsSet[stage.StageID] = struct{}{}
+	}
+	for rangeId, stageIds := range stageIdsMap {
+		linq.From(stageIds).WhereT(func(stageId int) bool {
+			_, ok := excludeStageIdsSet[stageId]
+			return !ok
+		}).ToSlice(&stageIds)
+		if len(stageIds) == 0 {
+			delete(stageIdsMap, rangeId)
+		}
+	}
+
 	ch := make(chan []*models.PatternMatrixElement, 15)
 	var wg sync.WaitGroup
 

@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 
+	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
@@ -160,4 +161,20 @@ func (c *StageRepo) SearchStageByCode(ctx context.Context, code string) (*models
 	}
 
 	return &stage, nil
+}
+
+func (c *StageRepo) GetGachaBoxStages(ctx context.Context) ([]*models.Stage, error) {
+	var stages []*models.Stage
+	err := c.db.NewSelect().
+		Model(&stages).
+		Where("extra_process_type = ?", constants.ExtraProcessTypeGachaBox).
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return stages, nil
 }

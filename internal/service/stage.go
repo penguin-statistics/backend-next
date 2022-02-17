@@ -9,6 +9,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
 
@@ -138,6 +139,16 @@ func (s *StageService) GetStagesMapByArkId(ctx *fiber.Ctx) (map[string]*models.S
 		return stagesMapByArkId, nil
 	}, 24*time.Hour)
 	return stagesMapByArkId, nil
+}
+
+func (s *StageService) GetGachaBoxStages(ctx *fiber.Ctx) ([]*models.Stage, error) {
+	stages, err := s.StageRepo.GetGachaBoxStages(ctx.Context())
+	if err == errors.ErrNotFound {
+		return make([]*models.Stage, 0), nil
+	} else if err != nil {
+		return nil, err
+	}
+	return stages, nil
 }
 
 func (s *StageService) applyShim(stage *shims.Stage) {
