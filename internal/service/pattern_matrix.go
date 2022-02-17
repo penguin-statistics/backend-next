@@ -288,6 +288,7 @@ func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx *fiber.Ctx, qu
 	results := &shims.PatternMatrixQueryResult{
 		PatternMatrix: make([]*shims.OnePatternMatrixElement, 0),
 	}
+	itemMap := make(map[string]*models.Item)
 	var groupedResults []linq.Group
 	linq.From(queryResult.PatternMatrix).
 		GroupByT(
@@ -313,6 +314,9 @@ func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx *fiber.Ctx, qu
 			}
 			for _, dropPatternElement := range dropPatternElements {
 				item, err := s.ItemService.GetItemById(ctx, dropPatternElement.ItemID)
+				if _, ok := itemMap[item.ArkItemID]; !ok {
+					itemMap[item.ArkItemID] = item
+				}
 				if err != nil {
 					return nil, err
 				}
@@ -321,6 +325,11 @@ func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx *fiber.Ctx, qu
 					Quantity: dropPatternElement.Quantity,
 				})
 			}
+			linq.From(pattern.Drops).SortT(func(a, b *shims.OneDrop) bool {
+				itemA := itemMap[a.ItemID]
+				itemB := itemMap[b.ItemID]
+				return itemA.SortID < itemB.SortID
+			}).ToSlice(&pattern.Drops)
 			onePatternMatrixElement := shims.OnePatternMatrixElement{
 				StageID:   stage.ArkStageID,
 				Times:     oneDropPattern.Times,
