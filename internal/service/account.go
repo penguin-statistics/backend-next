@@ -9,8 +9,8 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 	"github.com/penguin-statistics/backend-next/internal/repos"
-	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
 type AccountService struct {
@@ -23,8 +23,8 @@ func NewAccountService(accountRepo *repos.AccountRepo) *AccountService {
 	}
 }
 
-func (s *AccountService) CreateAccountWithRandomPenguinID(ctx *fiber.Ctx) (*models.Account, error) {
-	return s.AccountRepo.CreateAccountWithRandomPenguinID(ctx.Context())
+func (s *AccountService) CreateAccountWithRandomPenguinId(ctx *fiber.Ctx) (*models.Account, error) {
+	return s.AccountRepo.CreateAccountWithRandomPenguinId(ctx.Context())
 }
 
 // Cache: account#accountId:{accountId}, 24hrs
@@ -65,7 +65,7 @@ func (s *AccountService) IsAccountExistWithId(ctx *fiber.Ctx, accountId int) boo
 
 func (s *AccountService) GetAccountFromRequest(ctx *fiber.Ctx) (*models.Account, error) {
 	// get PenguinID from HTTP header in form of Authorization: PenguinID ########
-	penguinId := utils.GetPenguinIDFromRequest(ctx)
+	penguinId := pgid.Extract(ctx)
 	if penguinId == "" {
 		return nil, errors.New("PenguinID not found in request")
 	}

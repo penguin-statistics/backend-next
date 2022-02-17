@@ -93,10 +93,7 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 				Int("status", code).
 				Msg("Internal Server Error")
 
-			return ctx.Status(code).JSON(fiber.Map{
-				"code":    errors.CodeInternalError,
-				"message": err.Error(),
-			})
+			return ctx.Status(code).JSON(errors.ErrInternalError)
 		},
 	})
 

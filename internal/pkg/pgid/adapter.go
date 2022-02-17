@@ -1,4 +1,4 @@
-package utils
+package pgid
 
 import (
 	"net/url"
@@ -10,7 +10,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/constants"
 )
 
-func GetPenguinIDFromRequest(ctx *fiber.Ctx) string {
+func Extract(ctx *fiber.Ctx) string {
 	penguinId := strings.TrimSpace(strings.TrimPrefix(ctx.Get(fiber.HeaderAuthorization), constants.PenguinIDAuthorizationRealm))
 
 	if penguinId == "" {
@@ -20,7 +20,7 @@ func GetPenguinIDFromRequest(ctx *fiber.Ctx) string {
 	return penguinId
 }
 
-func SetPenguinIDToResponse(ctx *fiber.Ctx, penguinId string) {
+func Inject(ctx *fiber.Ctx, penguinId string) {
 	// we even got emojis in PenguinID for some of the internal testers :)
 	penguinId = url.QueryEscape(penguinId)
 

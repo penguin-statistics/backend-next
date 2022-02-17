@@ -13,7 +13,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
-	"github.com/penguin-statistics/backend-next/internal/utils/pquery"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgqry"
 )
 
 type DropInfoRepo struct {
@@ -85,7 +85,7 @@ type DropInfoQuery struct {
 // GetDropInfoByArkId returns a drop info by its ark id.
 func (s *DropInfoRepo) GetForCurrentTimeRange(ctx context.Context, query *DropInfoQuery) ([]*models.DropInfo, error) {
 	var dropInfo []*models.DropInfo
-	err := pquery.New(
+	err := pgqry.New(
 		s.DB.NewSelect().
 			Model(&dropInfo).
 			Where("di.server = ?", query.Server).
@@ -133,7 +133,7 @@ func (s *DropInfoRepo) GetForCurrentTimeRange(ctx context.Context, query *DropIn
 
 func (s *DropInfoRepo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server string, stageId int, rangeId int) ([]int, error) {
 	var results []interface{}
-	err := pquery.New(
+	err := pgqry.New(
 		s.DB.NewSelect().
 			Column("di.item_id").
 			Model((*models.DropInfo)(nil)).

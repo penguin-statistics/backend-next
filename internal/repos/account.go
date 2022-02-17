@@ -3,7 +3,6 @@ package repos
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -11,7 +10,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	penguinerrors "github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 )
 
 const ACCOUNT_MAX_RETRY = 100
@@ -30,7 +29,7 @@ func generateRandomPenguinId() string {
 	return fmt.Sprintf("%08d", rand.Intn(1e8))
 }
 
-func (c *AccountRepo) CreateAccountWithRandomPenguinID(ctx context.Context) (*models.Account, error) {
+func (c *AccountRepo) CreateAccountWithRandomPenguinId(ctx context.Context) (*models.Account, error) {
 	// retry if account already exists
 	for i := 0; i < ACCOUNT_MAX_RETRY; i++ {
 		account := &models.Account{
@@ -46,7 +45,7 @@ func (c *AccountRepo) CreateAccountWithRandomPenguinID(ctx context.Context) (*mo
 		return account, nil
 	}
 
-	return nil, errors.New("failed to create account")
+	return nil, errors.ErrInvalidRequest.WithMessage("failed to create account")
 }
 
 func (c *AccountRepo) GetAccountById(ctx context.Context, accountId string) (*models.Account, error) {
@@ -58,7 +57,7 @@ func (c *AccountRepo) GetAccountById(ctx context.Context, accountId string) (*mo
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, penguinerrors.ErrNotFound
+		return nil, errors.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -75,7 +74,7 @@ func (c *AccountRepo) GetAccountByPenguinId(ctx context.Context, penguinId strin
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, penguinerrors.ErrNotFound
+		return nil, errors.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}

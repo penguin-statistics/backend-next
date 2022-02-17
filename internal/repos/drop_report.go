@@ -12,8 +12,8 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgqry"
 	"github.com/penguin-statistics/backend-next/internal/utils"
-	"github.com/penguin-statistics/backend-next/internal/utils/pquery"
 )
 
 type DropReportRepo struct {
@@ -294,7 +294,7 @@ func (s *DropReportRepo) CalcTotalTimesForTrend(
 }
 
 func (s *DropReportRepo) CalcTotalSanityCostForShimSiteStats(ctx context.Context, server string) (sanity int, err error) {
-	err = pquery.New(
+	err = pgqry.New(
 		s.DB.NewSelect().
 			TableExpr("drop_reports AS dr").
 			ColumnExpr("SUM(st.sanity * dr.times)").
@@ -308,7 +308,7 @@ func (s *DropReportRepo) CalcTotalSanityCostForShimSiteStats(ctx context.Context
 func (s *DropReportRepo) CalcTotalStageQuantityForShimSiteStats(ctx context.Context, server string, isRecent24h bool) ([]*shims.TotalStageTime, error) {
 	results := make([]*shims.TotalStageTime, 0)
 
-	err := pquery.New(
+	err := pgqry.New(
 		s.DB.NewSelect().
 			TableExpr("drop_reports AS dr").
 			Column("st.ark_stage_id").
@@ -334,7 +334,7 @@ func (s *DropReportRepo) CalcTotalStageQuantityForShimSiteStats(ctx context.Cont
 func (s *DropReportRepo) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, server string) ([]*shims.TotalItemQuantity, error) {
 	results := make([]*shims.TotalItemQuantity, 0)
 
-	err := pquery.New(
+	err := pgqry.New(
 		s.DB.NewSelect().
 			TableExpr("drop_reports AS dr").
 			Column("it.ark_item_id").

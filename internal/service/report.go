@@ -20,6 +20,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
@@ -87,12 +88,12 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 	var accountId int
 	account, err := s.AccountService.GetAccountFromRequest(ctx)
 	if err != nil {
-		createdAccount, err := s.AccountService.CreateAccountWithRandomPenguinID(ctx)
+		createdAccount, err := s.AccountService.CreateAccountWithRandomPenguinId(ctx)
 		if err != nil {
 			return "", err
 		}
 		accountId = createdAccount.AccountID
-		utils.SetPenguinIDToResponse(ctx, createdAccount.PenguinID)
+		pgid.Inject(ctx, createdAccount.PenguinID)
 	} else {
 		accountId = account.AccountID
 	}
@@ -324,7 +325,7 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 // 	}
 // 	var accountId int
 // 	if account == nil {
-// 		createdAccount, err := s.AccountRepo.CreateAccountWithRandomPenguinID(ctx.Context())
+// 		createdAccount, err := s.AccountRepo.CreateAccountWithRandomPenguinId(ctx.Context())
 // 		if err != nil {
 // 			return err
 // 		}

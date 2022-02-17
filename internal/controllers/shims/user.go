@@ -6,9 +6,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
 type AccountController struct {
@@ -39,7 +40,7 @@ func (c *AccountController) Login(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	utils.SetPenguinIDToResponse(ctx, account.PenguinID)
+	pgid.Inject(ctx, account.PenguinID)
 
 	// for some reasons the response for the login API is in format of
 	// text/plain so I'd have to manually convert it to JSON and use ctx#Send to respond
@@ -51,7 +52,7 @@ func (c *AccountController) Login(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	utils.SetCtxNoCache(ctx)
+	cachectrl.OptOut(ctx)
 
 	return ctx.Send(resp)
 }

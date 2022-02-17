@@ -18,6 +18,9 @@ var (
 
 	// ErrInvalidRequest is returned when a request is invalid.
 	ErrInvalidRequest = New(fiber.StatusBadRequest, CodeInvalidRequest, "invalid request: some or all request parameters are invalid")
+
+	// ErrInternalError is returned when an internal error occurs.
+	ErrInternalError = New(fiber.StatusInternalServerError, CodeInternalError, "internal server error occurred")
 )
 
 type Extras map[string]interface{}

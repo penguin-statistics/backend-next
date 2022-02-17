@@ -6,8 +6,8 @@ import (
 
 	"github.com/go-redis/redis/v8"
 
+	"github.com/penguin-statistics/backend-next/internal/pkg/cache"
 	"github.com/penguin-statistics/backend-next/internal/repos"
-	"github.com/penguin-statistics/backend-next/internal/utils/cache"
 )
 
 var (
