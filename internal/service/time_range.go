@@ -127,7 +127,9 @@ func (s *TimeRangeService) GetMaxAccumulableTimeRangesByServer(ctx *fiber.Ctx, s
 			itemId := el.Key.(int)
 			var sortedDropInfos []*models.DropInfo
 			linq.From(el.Group).
-				Distinct().
+				DistinctByT(
+					func(dropInfo *models.DropInfo) int { return dropInfo.RangeID },
+				).
 				SortT(
 					func(a, b *models.DropInfo) bool {
 						return timeRangesMap[a.RangeID].StartTime.After(*timeRangesMap[b.RangeID].StartTime)
