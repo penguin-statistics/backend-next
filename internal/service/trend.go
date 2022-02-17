@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
@@ -55,7 +56,7 @@ func (s *TrendService) GetShimSavedTrendResults(ctx *fiber.Ctx, server string) (
 		if err != nil {
 			return nil, err
 		}
-		slowShimResult, err := s.applyShimForTrendQuery(ctx, queryResult)
+		slowShimResult, err := s.applyShimForTrendQuery(ctx, server, queryResult)
 		if err != nil {
 			return nil, err
 		}
@@ -77,7 +78,7 @@ func (s *TrendService) GetShimCustomizedTrendResults(ctx *fiber.Ctx, server stri
 	if err != nil {
 		return nil, err
 	}
-	return s.applyShimForTrendQuery(ctx, trendQueryResult)
+	return s.applyShimForTrendQuery(ctx, server, trendQueryResult)
 }
 
 func (s *TrendService) QueryTrend(
@@ -122,15 +123,23 @@ func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error
 				endTime = time.Now()
 			}
 
+			// if start/end time is not a starting time of its game day, we need to adjust it
+			if !utils.IsGameDayStartTime(server, startTime) {
+				startTime = utils.GetGameDayStartTime(server, startTime)
+			}
+			if !utils.IsGameDayStartTime(server, endTime) {
+				endTime = utils.GetGameDayEndTime(server, endTime)
+			}
+
 			diff := int(endTime.Sub(startTime).Hours())
 			intervalNum := diff / 24
-			if diff%24 != 0 {
+			if diff%24 != 0 { // shouldn't happen actually
 				intervalNum++
 			}
 
-			if intervalNum > 60 {
-				intervalNum = 60
-				startTime = endTime.Add(time.Hour * time.Duration((-1)*24*(intervalNum+1)))
+			if intervalNum > constants.DefaultIntervalNum {
+				intervalNum = constants.DefaultIntervalNum
+				startTime = endTime.Add(time.Hour * time.Duration((-1)*24*intervalNum))
 			}
 
 			toCalc = append(toCalc, map[string]interface{}{
@@ -282,9 +291,9 @@ func (s *TrendService) combineQuantityAndTimesResults(
 			resultsMap := quantityResultsMapForOneGroup[stageId]
 			for _, el := range secondGroupElements.Group {
 				times := el.(*models.TotalTimesResultForTrend).TotalTimes
+				startTime := el.(*models.TotalTimesResultForTrend).IntervalStart
+				endTime := el.(*models.TotalTimesResultForTrend).IntervalEnd
 				for itemId, quantity := range resultsMap {
-					startTime := el.(*models.TotalTimesResultForTrend).IntervalStart
-					endTime := el.(*models.TotalTimesResultForTrend).IntervalEnd
 					combinedResults = append(combinedResults, &models.CombinedResultForTrend{
 						GroupID:   groupId,
 						StageID:   stageId,
@@ -333,6 +342,7 @@ func (s *TrendService) convertTrendElementsToTrendQueryResult(trendElements []*m
 				SortT(func(el1, el2 *models.TrendElement) bool { return el1.GroupID < el2.GroupID }).
 				ToSlice(&sortedElements)
 			startTime = sortedElements[0].StartTime
+			minGroupId := linq.From(sortedElements).SelectT(func(el *models.TrendElement) int { return el.GroupID }).Min().(int)
 			maxGroupId := linq.From(sortedElements).SelectT(func(el *models.TrendElement) int { return el.GroupID }).Max().(int)
 			timesArray := make([]int, maxGroupId+1)
 			quantityArray := make([]int, maxGroupId+1)
@@ -341,10 +351,12 @@ func (s *TrendService) convertTrendElementsToTrendQueryResult(trendElements []*m
 				quantityArray[el3.GroupID] = el3.Quantity
 			}
 			stageTrend.Results = append(stageTrend.Results, &models.ItemTrend{
-				ItemID:    itemId,
-				Times:     timesArray,
-				Quantity:  quantityArray,
-				StartTime: startTime,
+				ItemID:     itemId,
+				Times:      timesArray,
+				Quantity:   quantityArray,
+				StartTime:  startTime,
+				MinGroupID: minGroupId,
+				MaxGroupID: maxGroupId,
 			})
 		}
 		trendQueryResult.Trends = append(trendQueryResult.Trends, stageTrend)
@@ -352,7 +364,10 @@ func (s *TrendService) convertTrendElementsToTrendQueryResult(trendElements []*m
 	return trendQueryResult, nil
 }
 
-func (s *TrendService) applyShimForTrendQuery(ctx *fiber.Ctx, queryResult *models.TrendQueryResult) (*shims.TrendQueryResult, error) {
+func (s *TrendService) applyShimForTrendQuery(ctx *fiber.Ctx, server string, queryResult *models.TrendQueryResult) (*shims.TrendQueryResult, error) {
+	shimMinStartTime := utils.GetGameDayEndTime(server, time.Now()).Add(-1 * constants.DefaultIntervalNum * 24 * time.Hour)
+	currentGameDayEndTime := utils.GetGameDayEndTime(server, time.Now())
+
 	results := &shims.TrendQueryResult{
 		Trend: make(map[string]*shims.StageTrend),
 	}
@@ -364,18 +379,63 @@ func (s *TrendService) applyShimForTrendQuery(ctx *fiber.Ctx, queryResult *model
 		shimStageTrend := shims.StageTrend{
 			Results: make(map[string]*shims.OneItemTrend),
 		}
+		var stageTrendStartTime *time.Time
+
+		// calc stage trend start time
+		for _, itemTrend := range stageTrend.Results {
+			itemStartTime := itemTrend.StartTime.Add((-1) * time.Duration(itemTrend.MinGroupID) * 24 * time.Hour)
+			// if the end time of this item is before the global trend start time (now - 60d), then we don't show it
+			dayNum := len(itemTrend.Quantity)
+			itemEndTime := itemStartTime.Add(time.Duration(dayNum) * 24 * time.Hour)
+			if itemEndTime.Before(shimMinStartTime) {
+				continue
+			}
+			// adjust stage trend start time
+			if stageTrendStartTime == nil || !stageTrendStartTime.Equal(shimMinStartTime) && itemStartTime.Before(*stageTrendStartTime) {
+				if !itemTrend.StartTime.After(shimMinStartTime) {
+					stageTrendStartTime = &shimMinStartTime
+				} else {
+					stageTrendStartTime = &itemStartTime
+				}
+			}
+		}
+
 		for _, itemTrend := range stageTrend.Results {
 			item, err := s.ItemService.GetItemById(ctx, itemTrend.ItemID)
 			if err != nil {
 				return nil, err
 			}
+
+			itemStartTime := itemTrend.StartTime.Add((-1) * time.Duration(itemTrend.MinGroupID) * 24 * time.Hour)
+			dayNum := len(itemTrend.Quantity)
+			itemEndTime := itemStartTime.Add(time.Duration(dayNum) * 24 * time.Hour)
+			if itemEndTime.Before(shimMinStartTime) {
+				continue
+			}
+
+			// add 0s to the head of quantity and times arrays according to itemStartTime
+			headZeroNum := int(itemStartTime.Sub(*stageTrendStartTime).Hours() / 24)
+			if headZeroNum > 0 {
+				itemTrend.Quantity = append(make([]int, headZeroNum), itemTrend.Quantity...)
+				itemTrend.Times = append(make([]int, headZeroNum), itemTrend.Times...)
+			}
+
+			// add 0s to the tail of quantity and times arrays according to itemEndTime
+			tailZeroNum := int(currentGameDayEndTime.Sub(itemEndTime).Hours() / 24)
+			if tailZeroNum > 0 {
+				itemTrend.Quantity = append(itemTrend.Quantity, make([]int, tailZeroNum)...)
+				itemTrend.Times = append(itemTrend.Times, make([]int, tailZeroNum)...)
+			}
+
 			shimStageTrend.Results[item.ArkItemID] = &shims.OneItemTrend{
-				Quantity:  itemTrend.Quantity,
-				Times:     itemTrend.Times,
-				StartTime: itemTrend.StartTime.UnixMilli(),
+				Quantity: itemTrend.Quantity,
+				Times:    itemTrend.Times,
 			}
 		}
-		results.Trend[stage.ArkStageID] = &shimStageTrend
+		if len(shimStageTrend.Results) > 0 {
+			shimStageTrend.StartTime = stageTrendStartTime.UnixMilli()
+			results.Trend[stage.ArkStageID] = &shimStageTrend
+		}
 	}
 	return results, nil
 }

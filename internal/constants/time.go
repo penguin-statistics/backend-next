@@ -7,6 +7,11 @@ const (
 	USServerStartTimeMilli int64 = 1579190400000
 	JPServerStartTimeMilli int64 = 1579140000000
 	KRServerStartTimeMilli int64 = 1579140000000
+
+	GameDayStartHour   int = 4
+	GameDayStartMinute int = 0
+	GameDayStartSecond int = 0
+	GameDayStartNano   int = 0
 )
 
 var SERVER_START_TIME_MAP_MILLI = map[string]int64{

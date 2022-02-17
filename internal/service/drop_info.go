@@ -6,6 +6,7 @@ import (
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/gofiber/fiber/v2"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
@@ -48,6 +49,34 @@ func (s *DropInfoService) GetItemDropSetByStageIdAndRangeId(ctx *fiber.Ctx, serv
 	}
 
 	go cache.ItemDropSetByStageIdAndRangeId.Set(key, itemDropSet, 24*time.Hour)
+	return itemDropSet, nil
+}
+
+// Cache: itemDropSet#server|stageId|startTime|endTime:{server}|{stageId}|{startTime}|{endTime}, 24 hrs
+func (s *DropInfoService) GetItemDropSetByStageIdAndTimeRange(ctx *fiber.Ctx, server string, stageId int, startTime *time.Time, endTime *time.Time) ([]int, error) {
+	var itemDropSet []int
+	key := server + constants.RedisSeparator + strconv.Itoa(stageId) + constants.RedisSeparator + strconv.Itoa(int(startTime.UnixMilli())) + constants.RedisSeparator + strconv.Itoa(int(endTime.UnixMilli()))
+	err := cache.ItemDropSetByStageIdAndTimeRange.Get(key, &itemDropSet)
+	if err == nil {
+		return itemDropSet, nil
+	}
+
+	timeRange := &models.TimeRange{
+		StartTime: startTime,
+		EndTime:   endTime,
+	}
+	dropInfos, err := s.DropInfoRepo.GetDropInfosWithFilters(ctx.Context(), server, []*models.TimeRange{timeRange}, []int{stageId}, nil)
+	if err != nil {
+		return nil, err
+	}
+	linq.From(dropInfos).
+		SelectT(func(dropInfo *models.DropInfo) null.Int { return dropInfo.ItemID }).
+		WhereT(func(itemID null.Int) bool { return itemID.Valid }).
+		SelectT(func(itemID null.Int) int { return int(itemID.Int64) }).
+		Distinct().
+		ToSlice(&itemDropSet)
+
+	go cache.ItemDropSetByStageIdAndTimeRange.Set(key, itemDropSet, 24*time.Hour)
 	return itemDropSet, nil
 }
 

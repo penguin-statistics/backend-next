@@ -45,13 +45,13 @@ type TrendQueryResult struct {
 }
 
 type StageTrend struct {
-	Results map[string]*OneItemTrend `json:"results"`
+	Results   map[string]*OneItemTrend `json:"results"`
+	StartTime int64                    `json:"startTime"`
 }
 
 type OneItemTrend struct {
-	Quantity  []int `json:"quantity"`
-	Times     []int `json:"times"`
-	StartTime int64 `json:"startTime"`
+	Quantity []int `json:"quantity"`
+	Times    []int `json:"times"`
 }
 
 // Advanced Query

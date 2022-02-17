@@ -14,7 +14,8 @@ var (
 	AccountById        *cache.Set
 	AccountByPenguinId *cache.Set
 
-	ItemDropSetByStageIdAndRangeId *cache.Set
+	ItemDropSetByStageIdAndRangeId   *cache.Set
+	ItemDropSetByStageIdAndTimeRange *cache.Set
 
 	ShimMaxAccumulableDropMatrixResults *cache.Set
 
@@ -76,6 +77,7 @@ func initializeCaches(client *redis.Client) {
 
 	// drop_info
 	ItemDropSetByStageIdAndRangeId = cache.NewSet(client, "itemDropSet#server|stageId|rangeId")
+	ItemDropSetByStageIdAndTimeRange = cache.NewSet(client, "itemDropSet#server|stageId|startTime|endTime")
 
 	// drop_matrix
 	ShimMaxAccumulableDropMatrixResults = cache.NewSet(client, "shimMaxAccumulableDropMatrixResults#server|showClosedZoned")

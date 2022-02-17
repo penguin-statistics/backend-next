@@ -1,3 +1,6 @@
 package constants
 
-const MaxIntervalNum = 180
+const (
+	MaxIntervalNum     = 180
+	DefaultIntervalNum = 60
+)

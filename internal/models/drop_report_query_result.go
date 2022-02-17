@@ -98,8 +98,10 @@ type StageTrend struct {
 }
 
 type ItemTrend struct {
-	ItemID    int        `json:"itemId"`
-	StartTime *time.Time `json:"startTime"`
-	Times     []int      `json:"times"`
-	Quantity  []int      `json:"quantity"`
+	ItemID     int        `json:"itemId"`
+	StartTime  *time.Time `json:"startTime"`
+	Times      []int      `json:"times"`
+	Quantity   []int      `json:"quantity"`
+	MinGroupID int        `json:"-"`
+	MaxGroupID int        `json:"-"`
 }

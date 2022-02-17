@@ -12,23 +12,17 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	"github.com/penguin-statistics/backend-next/internal/utils"
 	"github.com/penguin-statistics/backend-next/internal/utils/pquery"
 )
 
 type DropReportRepo struct {
-	DB     *bun.DB
-	locMap map[string]*time.Location
+	DB *bun.DB
 }
 
 func NewDropReportRepo(db *bun.DB) *DropReportRepo {
 	return &DropReportRepo{
 		DB: db,
-		locMap: map[string]*time.Location{
-			"CN": time.FixedZone("UTC+8", +8*60*60),
-			"US": time.FixedZone("UTC-7", -7*60*60),
-			"JP": time.FixedZone("UTC+9", +9*60*60),
-			"KR": time.FixedZone("UTC+9", +9*60*60),
-		},
 	}
 }
 
@@ -184,7 +178,7 @@ func (s *DropReportRepo) CalcTotalQuantityForTrend(
 		return results, nil
 	}
 
-	gameDayStart := s.getGameDateStartTime(server, *startTime)
+	gameDayStart := utils.GetGameDayStartTime(server, *startTime)
 	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(intervalLength_hrs*(intervalNum+1)))
 
 	var b strings.Builder
@@ -249,7 +243,7 @@ func (s *DropReportRepo) CalcTotalTimesForTrend(
 		return results, nil
 	}
 
-	gameDayStart := s.getGameDateStartTime(server, *startTime)
+	gameDayStart := utils.GetGameDayStartTime(server, *startTime)
 	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(intervalLength_hrs*(intervalNum+1)))
 
 	var b strings.Builder
@@ -297,16 +291,6 @@ func (s *DropReportRepo) CalcTotalTimesForTrend(
 		return nil, err
 	}
 	return results, nil
-}
-
-func (s *DropReportRepo) getGameDateStartTime(server string, t time.Time) time.Time {
-	loc := s.locMap[server]
-	t = t.In(loc)
-	if t.Hour() < 4 {
-		t = t.AddDate(0, 0, -1)
-	}
-	newT := time.Date(t.Year(), t.Month(), t.Day(), 4, 0, 0, 0, loc)
-	return newT
 }
 
 func (s *DropReportRepo) CalcTotalSanityCostForShimSiteStats(ctx context.Context, server string) (sanity int, err error) {
