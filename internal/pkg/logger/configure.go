@@ -2,6 +2,7 @@ package logger
 
 import (
 	"os"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -11,26 +12,33 @@ import (
 )
 
 func Configure(config *config.Config) {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 
 	_ = os.Mkdir("logs", os.ModePerm)
 
 	logFile, err := os.OpenFile("logs/app.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o644)
 	if err != nil {
-		log.Panic().Err(err).Msg("Failed to open log file")
+		log.Panic().Err(err).Msg("failed to open log file")
 	}
 
+	var level zerolog.Level
 	if config.DevMode {
-		zerolog.SetGlobalLevel(zerolog.TraceLevel)
+		level = zerolog.TraceLevel
 	} else {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		level = zerolog.InfoLevel
 	}
 
 	writer := zerolog.MultiLevelWriter(
 		logFile,
-		zerolog.ConsoleWriter{Out: os.Stdout},
+		zerolog.ConsoleWriter{
+			Out:        os.Stdout,
+			TimeFormat: time.RFC3339Nano,
+		},
 	)
 
-	log.Logger = zerolog.New(writer).With().Timestamp().Logger()
+	log.Logger = zerolog.New(writer).
+		With().
+		Timestamp().
+		Logger().
+		Level(level)
 }

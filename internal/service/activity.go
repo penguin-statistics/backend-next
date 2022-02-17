@@ -66,7 +66,7 @@ func (s *ActivityService) applyShim(activity *models.Activity) *shims.Activity {
 		LabelI18n: activity.Name,
 		Start:     activity.StartTime.UnixMilli(),
 	}
-	if activity.EndTime.UnixMilli() != constants.FakeEndTimeMilli {
+	if activity.EndTime != nil && activity.EndTime.UnixMilli() != constants.FakeEndTimeMilli {
 		endTime := null.NewInt(activity.EndTime.UnixMilli(), true)
 		shimActivity.End = &endTime
 	}

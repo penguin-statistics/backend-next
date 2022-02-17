@@ -1,8 +1,9 @@
 package service
 
 import (
-	"errors"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
@@ -73,7 +74,7 @@ func (s *AccountService) GetAccountFromRequest(ctx *fiber.Ctx) (*models.Account,
 	// check PenguinID validity
 	account, err := s.GetAccountByPenguinId(ctx, penguinId)
 	if err != nil {
-		log.Warn().Str("PenguinID", penguinId).Err(err).Msg("Failed to get account from request")
+		log.Warn().Str("PenguinID", penguinId).Err(err).Msg("failed to get account from request")
 		return nil, errors.New("PenguinID is invalid")
 	}
 	return account, nil

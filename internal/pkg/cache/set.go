@@ -32,7 +32,9 @@ func (c *Set) key(key string) string {
 
 func (c *Set) Get(key string, dest interface{}) error {
 	key = c.key(key)
-	log.Debug().Str("key", key).Msg("getting value from redis")
+	if l := log.Trace(); l.Enabled() {
+		l.Str("key", key).Msg("getting value from redis")
+	}
 	resp, err := c.client.Get(context.Background(), key).Bytes()
 	if err != nil {
 		if err != redis.Nil {
@@ -45,13 +47,17 @@ func (c *Set) Get(key string, dest interface{}) error {
 		log.Error().Err(err).Str("key", key).Msg("failed to unmarshal value from msgpack from redis")
 		return err
 	}
-	log.Debug().Str("key", key).Msg("got value from redis")
+	if l := log.Trace(); l.Enabled() {
+		l.Str("key", key).Msg("got value from redis")
+	}
 	return nil
 }
 
 func (c *Set) Set(key string, value interface{}, expire time.Duration) error {
 	key = c.key(key)
-	log.Debug().Str("key", key).Msg("setting value to redis")
+	if l := log.Trace(); l.Enabled() {
+		l.Str("key", key).Msg("setting value to redis")
+	}
 	b, err := msgpack.Marshal(value)
 	if err != nil {
 		log.Error().Err(err).Str("key", key).Msg("failed to marshal value with msgpack")
@@ -62,7 +68,9 @@ func (c *Set) Set(key string, value interface{}, expire time.Duration) error {
 		log.Error().Err(err).Str("key", key).Msg("failed to set value to redis")
 		return err
 	}
-	log.Debug().Str("key", key).Msg("finish setting value to redis")
+	if l := log.Trace(); l.Enabled() {
+		l.Str("key", key).Msg("finish setting value to redis")
+	}
 	return nil
 }
 

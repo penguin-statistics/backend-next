@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"runtime/debug"
+	"runtime"
 	"strings"
 	"time"
 
@@ -21,6 +21,7 @@ import (
 	"github.com/gofiber/helmet/v2"
 	"github.com/penguin-statistics/fiberotel"
 	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog/pkgerrors"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
@@ -86,15 +87,21 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 				code = e.Code
 			}
 
+			e := pkgerrors.MarshalStack(err)
+
 			log.Error().
 				Stack().
 				Err(err).
 				Str("method", ctx.Method()).
 				Str("path", ctx.Path()).
+				Interface("stackE", e).
 				Int("status", code).
 				Msg("Internal Server Error")
 
-			return ctx.Status(code).JSON(errors.ErrInternalError)
+			return ctx.Status(code).JSON(fiber.Map{
+				"code":    errors.CodeInternalError,
+				"message": "internal server error",
+			})
 		},
 	})
 
@@ -152,21 +159,22 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 
 		return set(trans)
 	})
+	app.Use(recover.New(recover.Config{
+		EnableStackTrace: true,
+		StackTraceHandler: func(c *fiber.Ctx, e interface{}) {
+			buf := make([]byte, 4096)
+			buf = buf[:runtime.Stack(buf, false)]
+			log.Error().Msgf("panic: %v\n%s\n", e, buf)
+		},
+	}))
 	if config.DevMode {
 		fmt.Println("Running in DEV mode")
 		app.Use(pprof.New())
 
 		app.Use(logger.New(logger.Config{
-			Format:     "${pid} ${ip} ${locals:requestid} ${status} ${latency} - ${method} ${path}\n",
+			Format:     "${pid} ${locals:requestid} ${status} ${latency}\t${ip}\t- ${method} ${url}\n",
 			TimeFormat: time.RFC3339,
 			Output:     os.Stdout,
-		}))
-
-		app.Use(recover.New(recover.Config{
-			EnableStackTrace: true,
-			StackTraceHandler: func(c *fiber.Ctx, e interface{}) {
-				os.Stderr.WriteString(fmt.Sprintf("panic: %v\n%s\n", e, string(debug.Stack())))
-			},
 		}))
 
 		exporter, err := jaeger.New(jaeger.WithCollectorEndpoint())
@@ -208,7 +216,11 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 		// 	},
 		// }))
 	} else {
-		app.Use(recover.New())
+		app.Use(logger.New(logger.Config{
+			Format:     "${pid} ${locals:requestid} ${status} ${latency}\t${ip}\t- ${method} ${url}\n",
+			TimeFormat: time.RFC3339,
+			Output:     log.Logger,
+		}))
 	}
 
 	return app

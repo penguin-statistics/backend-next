@@ -1,4 +1,4 @@
-package controllers
+package shims
 
 import (
 	"strings"
@@ -90,7 +90,7 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 	if err := rekuest.Validate.Var(segments, "len=2"); err != nil {
 		log.Warn().
 			Err(err).
-			Msg("Failed to decrypt recognition request")
+			Msg("failed to decrypt recognition request")
 		return errors.ErrInvalidRequest
 	}
 
@@ -101,7 +101,7 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 	if err != nil {
 		log.Warn().
 			Err(err).
-			Msg("Failed to decrypt recognition request")
+			Msg("failed to decrypt recognition request")
 		return errors.ErrInvalidRequest
 	}
 

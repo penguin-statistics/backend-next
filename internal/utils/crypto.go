@@ -9,7 +9,8 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
-	"errors"
+
+	"github.com/pkg/errors"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
 	"github.com/rs/zerolog/log"
@@ -38,7 +39,7 @@ func NewCrypto(config *config.Config) *Crypto {
 	if err != nil {
 		log.Warn().
 			Err(err).
-			Msg("Failed to parse private key. This is not a fatal error, but recognition API will not work.")
+			Msg("failed to parse private key. This is not a fatal error, but recognition API will not work.")
 
 		return &Crypto{}
 	}

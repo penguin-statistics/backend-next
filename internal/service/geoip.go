@@ -1,10 +1,10 @@
 package service
 
 import (
-	"errors"
 	"net"
 
 	"github.com/oschwald/geoip2-golang"
+	"github.com/pkg/errors"
 )
 
 type GeoIPService struct {
