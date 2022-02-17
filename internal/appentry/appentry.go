@@ -1,9 +1,11 @@
 package appentry
 
 import (
+	"os"
 	"time"
 
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxevent"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
 	"github.com/penguin-statistics/backend-next/internal/controllers"
@@ -11,6 +13,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/infra"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/flake"
+	"github.com/penguin-statistics/backend-next/internal/pkg/logger"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	httpserver "github.com/penguin-statistics/backend-next/internal/server/http"
@@ -72,7 +75,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(server.CreateVersioningEndpoints),
 		fx.Provide(utils.NewCrypto),
 		fx.Invoke(cache.Initialize),
-		fx.Invoke(utils.ConfigureLogger),
+		fx.Invoke(logger.Configure),
 		fx.Invoke(shims.RegisterItemController),
 		fx.Invoke(shims.RegisterZoneController),
 		fx.Invoke(shims.RegisterStageController),
@@ -83,20 +86,19 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Invoke(shims.RegisterFormulaController),
 		fx.Invoke(shims.RegisterPrivateController),
 		fx.Invoke(shims.RegisterSiteStatsController),
-		fx.Invoke(controllers.RegisterTestController),
-		fx.Invoke(controllers.RegisterItemController),
-		fx.Invoke(controllers.RegisterZoneController),
-		fx.Invoke(controllers.RegisterStageController),
-		fx.Invoke(controllers.RegisterIndexController),
-		fx.Invoke(controllers.RegisterReportController),
-		fx.Invoke(controllers.RegisterShortURLController),
-		// fx.Invoke(controllers.RegisterSiteStatsController),
-		// fx.Invoke(controllers.RegisterLiveController),
+		fx.Invoke(controllers.RegisterMetaController),
 		fx.StartTimeout(1 * time.Second),
 		// StopTimeout is not typically needed, since we're using fiber's Shutdown(),
 		// in which fiber has its own IdleTimeout for controlling the shutdown timeout.
 		// It acts as a countermeasure in case the fiber app is not properly shutting down.
 		fx.StopTimeout(5 * time.Minute),
+		fx.WithLogger(func(config *config.Config) fxevent.Logger {
+			if config.DevMode {
+				return &fxevent.ConsoleLogger{W: os.Stdout}
+			} else {
+				return fxevent.NopLogger
+			}
+		}),
 	}
 
 	if includeSwagger {

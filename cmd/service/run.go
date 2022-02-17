@@ -4,9 +4,9 @@ import (
 	"context"
 	"net"
 
-	"go.uber.org/fx"
-	// "github.com/davecgh/go-spew/spew"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
+	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
 )
@@ -20,7 +20,9 @@ func run(app *fiber.App, config *config.Config, lc fx.Lifecycle) {
 			}
 
 			go func() {
-				app.Listener(ln)
+				if err := app.Listener(ln); err != nil {
+					log.Error().Err(err).Msg("server terminated unexpectedly")
+				}
 			}()
 
 			return nil

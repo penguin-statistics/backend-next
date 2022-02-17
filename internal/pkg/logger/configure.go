@@ -1,4 +1,4 @@
-package utils
+package logger
 
 import (
 	"os"
@@ -10,7 +10,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/config"
 )
 
-func ConfigureLogger(config *config.Config) {
+func Configure(config *config.Config) {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 
