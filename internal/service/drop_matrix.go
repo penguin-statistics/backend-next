@@ -230,7 +230,8 @@ func (s *DropMatrixService) calcDropMatrixForTimeRanges(
 		if err != nil {
 			return nil, err
 		}
-		combinedResults = s.combineQuantityAndTimesResults(quantityResults, timesResults, timeRange)
+		oneBatch := s.combineQuantityAndTimesResults(quantityResults, timesResults, timeRange)
+		combinedResults = append(combinedResults, oneBatch...)
 	}
 
 	// save stage times for later use

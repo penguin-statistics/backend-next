@@ -91,25 +91,6 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx *fiber.Ctx, s
 	}
 	stageIdsMap := s.getStageIdsMapByTimeRange(allTimeRanges)
 
-	// exclude gacha box stages
-	gachaboxStages, err := s.StageService.GetGachaBoxStages(ctx)
-	if err != nil {
-		return err
-	}
-	excludeStageIdsSet := make(map[int]struct{}, len(gachaboxStages))
-	for _, stage := range gachaboxStages {
-		excludeStageIdsSet[stage.StageID] = struct{}{}
-	}
-	for rangeId, stageIds := range stageIdsMap {
-		linq.From(stageIds).WhereT(func(stageId int) bool {
-			_, ok := excludeStageIdsSet[stageId]
-			return !ok
-		}).ToSlice(&stageIds)
-		if len(stageIds) == 0 {
-			delete(stageIdsMap, rangeId)
-		}
-	}
-
 	ch := make(chan []*models.PatternMatrixElement, 15)
 	var wg sync.WaitGroup
 
@@ -191,13 +172,32 @@ func (s *PatternMatrixService) getLatestPatternMatrixElements(ctx *fiber.Ctx, se
 func (s *PatternMatrixService) calcPatternMatrixForTimeRanges(
 	ctx *fiber.Ctx, server string, timeRanges []*models.TimeRange, stageIdFilter []int, accountId *null.Int,
 ) ([]*models.PatternMatrixElement, error) {
+	results := make([]*models.PatternMatrixElement, 0)
+
 	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	stageIds := utils.GetStageIdsFromDropInfos(dropInfos)
-	results := make([]*models.PatternMatrixElement, 0)
+
+	// exclude gacha box stages
+	gachaboxStages, err := s.StageService.GetGachaBoxStages(ctx)
+	if err != nil {
+		return nil, err
+	}
+	excludeStageIdsSet := make(map[int]struct{}, len(gachaboxStages))
+	for _, stage := range gachaboxStages {
+		excludeStageIdsSet[stage.StageID] = struct{}{}
+	}
+	linq.From(stageIds).WhereT(func(stageId int) bool {
+		_, ok := excludeStageIdsSet[stageId]
+		return !ok
+	}).ToSlice(&stageIds)
+	if len(stageIds) == 0 {
+		return results, nil
+	}
+
 	for _, timeRange := range timeRanges {
 		quantityResults, err := s.DropReportService.CalcTotalQuantityForPatternMatrix(ctx, server, timeRange, stageIds, accountId)
 		if err != nil {
