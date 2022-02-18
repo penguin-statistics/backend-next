@@ -10,6 +10,7 @@ import (
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgqry"
@@ -334,13 +335,14 @@ func (s *DropReportRepo) CalcTotalStageQuantityForShimSiteStats(ctx context.Cont
 func (s *DropReportRepo) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, server string) ([]*shims.TotalItemQuantity, error) {
 	results := make([]*shims.TotalItemQuantity, 0)
 
+	types := []string{constants.ItemTypeMaterial, constants.ItemTypeFurniture, constants.ItemTypeChip}
 	err := pgqry.New(
 		s.DB.NewSelect().
 			TableExpr("drop_reports AS dr").
 			Column("it.ark_item_id").
 			ColumnExpr("SUM(dpe.quantity) AS total_quantity").
 			Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id").
-			Where("dr.reliability = 0 AND dr.server = ?", server).
+			Where("dr.reliability = 0 AND dr.server = ? AND it.type IN (?)", server, bun.In(types)).
 			Group("it.ark_item_id"),
 	).
 		UseItemById("dpe.item_id").
