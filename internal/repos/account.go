@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
@@ -40,12 +41,18 @@ func (c *AccountRepo) CreateAccountWithRandomPenguinId(ctx context.Context) (*mo
 			Returning("account_id").
 			Exec(ctx)
 		if err != nil {
+			log.Debug().Err(err).Int("retry", i).Msg("failed to create account. retrying...")
 			continue
+		} else if i > 0 {
+			log.Info().
+				Int("retry", i).
+				Str("finalizedPenguinID", account.PenguinID).
+				Msg("successfully created account after retry")
 		}
 		return account, nil
 	}
 
-	return nil, errors.ErrInvalidRequest.WithMessage("failed to create account")
+	return nil, errors.ErrInternalError.WithMessage("failed to create account")
 }
 
 func (c *AccountRepo) GetAccountById(ctx context.Context, accountId string) (*models.Account, error) {
@@ -53,6 +60,7 @@ func (c *AccountRepo) GetAccountById(ctx context.Context, accountId string) (*mo
 
 	err := c.db.NewSelect().
 		Model(&account).
+		Column("account_id").
 		Where("account_id = ?", accountId).
 		Scan(ctx)
 

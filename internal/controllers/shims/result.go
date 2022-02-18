@@ -73,8 +73,8 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	stageFilterStr := ctx.Query("stageFilter", "")
-	itemFilterStr := ctx.Query("itemFilter", "")
+	stageFilterStr := ctx.Query("stageFilter")
+	itemFilterStr := ctx.Query("itemFilter")
 
 	accountId := null.NewInt(0, false)
 	if isPersonal {

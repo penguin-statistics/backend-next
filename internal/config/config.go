@@ -14,15 +14,10 @@ type Config struct {
 	// DevMode to indicate development mode. When true, the program would spin up utilities for debugging and
 	// provide a more contextual message when encountered a panic. See internal/server/http/http.go for the
 	// actual implementation details.
-	//
-	// Notice if you see lines such as
-	// `Post "http://localhost:14268/api/traces": dial tcp [::1]:14268: connect: connection refused`
-	// shown in your console, it is actually the opentelemetry module doing its job to report a span and your local
-	// machine is not running a Jaeger instance on the Jaeger default log collection port (14268). If you don't need
-	// Jaeger tracing, you can safely ignore this error as it will have no meaningful effect on the behavior
-	// of the service. However, in case when you do need Jaeger tracing, follow the official guide at
-	// https://www.jaegertracing.io/docs/1.29/getting-started/#all-in-one to setup a Jaeger instance with Docker.
 	DevMode bool `split_words:"true"`
+
+	// EnableTracing to indicate whether to enable OpenTelemetry tracing.
+	EnableTracing bool `split_words:"true"`
 
 	// infrastructure components connection instructions
 

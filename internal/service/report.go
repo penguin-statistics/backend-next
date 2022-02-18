@@ -220,9 +220,16 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 
 				err = s.consumeReportTask(taskCtx, reportTask)
 				if err != nil {
+					log.Error().
+						Err(err).
+						Str("taskId", reportTask.TaskID).
+						Str("reportTask", spew.Sdump(reportTask)).
+						Msg("failed to consume report task")
 					ch <- err
 					return
 				}
+
+				log.Debug().Str("taskId", reportTask.TaskID).Msg("report task processed successfully")
 			}()
 		case <-ctx.Done():
 			return ctx.Err()
@@ -231,14 +238,13 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 }
 
 func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types.ReportTask) error {
-	log.Debug().Msg("now processing new report task")
+	log.Debug().Str("taskId", reportTask.TaskID).Msg("now processing new report task")
 	taskReliability := 0
 	if err := s.ReportVerifier.Verify(ctx, reportTask); err != nil {
 		// TODO: use different error code for different types of error
 		taskReliability = 1
 		log.Warn().Err(err).Msg("report task verification failed, marking task as unreliable")
 	}
-	log.Debug().Msg("report task verification finished")
 
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {

@@ -47,9 +47,6 @@ func (c *Set) Get(key string, dest interface{}) error {
 		log.Error().Err(err).Str("key", key).Msg("failed to unmarshal value from msgpack from redis")
 		return err
 	}
-	if l := log.Trace(); l.Enabled() {
-		l.Str("key", key).Msg("got value from redis")
-	}
 	return nil
 }
 
@@ -67,9 +64,6 @@ func (c *Set) Set(key string, value interface{}, expire time.Duration) error {
 	if err != nil {
 		log.Error().Err(err).Str("key", key).Msg("failed to set value to redis")
 		return err
-	}
-	if l := log.Trace(); l.Enabled() {
-		l.Str("key", key).Msg("finish setting value to redis")
 	}
 	return nil
 }

@@ -167,16 +167,7 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 			log.Error().Msgf("panic: %v\n%s\n", e, buf)
 		},
 	}))
-	if config.DevMode {
-		fmt.Println("Running in DEV mode")
-		app.Use(pprof.New())
-
-		app.Use(logger.New(logger.Config{
-			Format:     "${pid} ${locals:requestid} ${status} ${latency}\t${ip}\t- ${method} ${url}\n",
-			TimeFormat: time.RFC3339,
-			Output:     os.Stdout,
-		}))
-
+	if config.EnableTracing {
 		exporter, err := jaeger.New(jaeger.WithCollectorEndpoint())
 		if err != nil {
 			panic(err)
@@ -195,26 +186,19 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 			Tracer:   tracerProvider.Tracer("backendv3"),
 			SpanName: "HTTP {{ .Method }} {{ .Path }}",
 		}))
+	}
+	if config.DevMode {
+		log.Info().Msg("Running in DEV mode")
+		app.Use(pprof.New())
 
-		// fjaeger.New(fjaeger.Config{
-		// 	ServiceName: "backendv3",
-		// })
+		app.Use(logger.New(logger.Config{
+			Format:     "${pid} ${locals:requestid} ${status} ${latency}\t${ip}\t- ${method} ${url}\n",
+			TimeFormat: time.RFC3339,
+			Output:     os.Stdout,
+		}))
 
-		// app.Use(fibertracing.New(fibertracing.Config{
-		// 	Tracer: opentracing.GlobalTracer(),
-		// 	OperationName: func(ctx *fiber.Ctx) string {
-		// 		return ctx.Method() + " " + ctx.Path()
-		// 	},
-		// 	Modify: func(ctx *fiber.Ctx, span opentracing.Span) {
-		// 		span.SetTag("http.method", ctx.Method()) // GET, POST
-		// 		span.SetTag("http.remote_address", ctx.IP())
-		// 		span.SetTag("http.path", ctx.Path())
-		// 		span.SetTag("http.host", ctx.Hostname())
-		// 		span.SetTag("http.url", ctx.OriginalURL())
-
-		// 		ctx.SetUserContext(opentracing.ContextWithSpan(ctx.Context(), span))
-		// 	},
-		// }))
+		runtime.SetBlockProfileRate(1)
+		runtime.SetMutexProfileFraction(1)
 	} else {
 		app.Use(logger.New(logger.Config{
 			Format:     "${pid} ${locals:requestid} ${status} ${latency}\t${ip}\t- ${method} ${url}\n",

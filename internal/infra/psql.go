@@ -3,6 +3,7 @@ package infra
 import (
 	"context"
 	"database/sql"
+	"runtime"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -31,6 +32,10 @@ func ProvidePostgres(config *config.Config) (*bun.DB, error) {
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
 	}
+
+	pgdb.SetMaxOpenConns(runtime.NumCPU() * 8)
+	pgdb.SetMaxIdleConns(runtime.NumCPU() * 2)
+	pgdb.SetConnMaxIdleTime(time.Minute * 5)
 
 	return db, nil
 }

@@ -12,6 +12,7 @@ import (
 )
 
 func Configure(config *config.Config) {
+	zerolog.TimeFieldFormat = time.RFC3339Nano
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 
 	_ = os.Mkdir("logs", os.ModePerm)
@@ -25,7 +26,7 @@ func Configure(config *config.Config) {
 	if config.DevMode {
 		level = zerolog.TraceLevel
 	} else {
-		level = zerolog.InfoLevel
+		level = zerolog.DebugLevel
 	}
 
 	writer := zerolog.MultiLevelWriter(
