@@ -1,7 +1,6 @@
 package shims
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -64,9 +63,6 @@ func (c *PrivateController) GetDropMatrix(ctx *fiber.Ctx) error {
 		if err != nil {
 			return err
 		}
-		if account == nil {
-			return fmt.Errorf("account not found")
-		}
 		accountId.Int64 = int64(account.AccountID)
 		accountId.Valid = true
 	}
@@ -106,9 +102,6 @@ func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
 		account, err := c.AccountService.GetAccountFromRequest(ctx)
 		if err != nil {
 			return err
-		}
-		if account == nil {
-			return fmt.Errorf("account not found")
 		}
 		accountId.Int64 = int64(account.AccountID)
 		accountId.Valid = true

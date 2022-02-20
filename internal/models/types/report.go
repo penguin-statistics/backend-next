@@ -26,8 +26,9 @@ type SingleReportRecallRequest struct {
 }
 
 type BatchReportDrop struct {
+	FragmentStageID
+
 	Drops    []ArkDrop             `json:"drops" validate:"dive"`
-	StageID  string                `json:"stageId" validate:"required,printascii"`
 	Metadata ReportRequestMetadata `json:"metadata" validate:"dive"`
 }
 
@@ -39,8 +40,12 @@ type ReportRequestMetadata struct {
 }
 
 type BatchReportRequest struct {
-	FragmentStageID
 	FragmentReportCommon
 
 	BatchDrops []BatchReportDrop `json:"batchDrops" validate:"dive"`
+}
+
+type BatchReportError struct {
+	Index  int    `json:"index"`
+	Reason string `json:"reason,omitempty"`
 }

@@ -1,6 +1,7 @@
 package shims
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -105,5 +106,23 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 		return errors.ErrInvalidRequest
 	}
 
-	return ctx.Send(decrypted)
+	var request types.BatchReportRequest
+	if err = json.Unmarshal(decrypted, &request); err != nil {
+		log.Warn().
+			Err(err).
+			Msg("failed to unmarshal recognition request")
+		return errors.ErrInvalidRequest
+	}
+
+	if e := log.Trace(); e.Enabled() {
+		e.Str("request", string(decrypted)).
+			Msg("received recognition report request")
+	}
+
+	_, err = c.ReportService.PreprocessAndQueueBatchReport(ctx, &request)
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(request)
 }

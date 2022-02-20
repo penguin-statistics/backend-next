@@ -82,9 +82,6 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 		if err != nil {
 			return err
 		}
-		if account == nil {
-			return fmt.Errorf("account not found")
-		}
 		accountId.Int64 = int64(account.AccountID)
 		accountId.Valid = true
 	}
@@ -128,9 +125,6 @@ func (c *ResultController) GetPatternMatrix(ctx *fiber.Ctx) error {
 		account, err := c.AccountService.GetAccountFromRequest(ctx)
 		if err != nil {
 			return err
-		}
-		if account == nil {
-			return fmt.Errorf("account not found")
 		}
 		accountId.Int64 = int64(account.AccountID)
 		accountId.Valid = true
@@ -212,9 +206,6 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 		account, err := c.AccountService.GetAccountFromRequest(ctx)
 		if err != nil {
 			return nil, err
-		}
-		if account == nil {
-			return nil, fmt.Errorf("account not found")
 		}
 		accountId.Int64 = int64(account.AccountID)
 		accountId.Valid = true

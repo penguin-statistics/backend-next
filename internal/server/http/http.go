@@ -11,7 +11,6 @@ import (
 	"github.com/bwmarrin/snowflake"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -21,7 +20,6 @@ import (
 	"github.com/gofiber/helmet/v2"
 	"github.com/penguin-statistics/fiberotel"
 	"github.com/rs/zerolog/log"
-	"github.com/rs/zerolog/pkgerrors"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
@@ -36,7 +34,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/utils/i18n"
 )
 
-func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
+func Create(config *config.Config, flake *snowflake.Node) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName: "Penguin Stats Backend v3",
 		// TODO: use managed version value
@@ -87,14 +85,11 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 				code = e.Code
 			}
 
-			e := pkgerrors.MarshalStack(err)
-
 			log.Error().
 				Stack().
 				Err(err).
 				Str("method", ctx.Method()).
 				Str("path", ctx.Path()).
-				Interface("stackE", e).
 				Int("status", code).
 				Msg("Internal Server Error")
 
@@ -126,11 +121,8 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 		HSTSMaxAge:         31356000,
 		HSTSPreloadEnabled: true,
 		ReferrerPolicy:     "strict-origin-when-cross-origin",
+		PermissionPolicy:   "interest-cohort=()",
 		// ContentSecurityPolicy: "default-src 'none'; script-src 'none'; worker-src 'none'; frame-ancestors 'none'; sandbox",
-		PermissionPolicy: "interest-cohort=()",
-	}))
-	app.Use(compress.New(compress.Config{
-		Level: compress.LevelBestSpeed,
 	}))
 	// app.Use("/api/v3/live", func(c *fiber.Ctx) error {
 	// 	if websocket.IsWebSocketUpgrade(c) {
@@ -196,9 +188,6 @@ func CreateServer(config *config.Config, flake *snowflake.Node) *fiber.App {
 			TimeFormat: time.RFC3339,
 			Output:     os.Stdout,
 		}))
-
-		runtime.SetBlockProfileRate(1)
-		runtime.SetMutexProfileFraction(1)
 	} else {
 		app.Use(logger.New(logger.Config{
 			Format:     "${pid} ${locals:requestid} ${status} ${latency}\t${ip}\t- ${method} ${url}\n",

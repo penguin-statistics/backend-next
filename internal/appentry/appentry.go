@@ -26,7 +26,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 	opts := []fx.Option{
 		fx.Provide(config.Parse),
 		fx.Provide(flake.NewSnowflake),
-		fx.Provide(httpserver.CreateServer),
+		fx.Provide(httpserver.Create),
 		fx.Provide(infra.ProvideNats),
 		fx.Provide(infra.ProvideRedis),
 		fx.Provide(infra.ProvidePostgres),

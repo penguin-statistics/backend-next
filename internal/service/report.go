@@ -82,15 +82,12 @@ func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, redis *redis.Cli
 	return service
 }
 
-// returns TaskID and error, if any
-func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingleReportRequest) (taskId string, err error) {
-	// if account is not found, create new account
-	var accountId int
+func (s *ReportService) pipelineAccount(ctx *fiber.Ctx) (accountId int, err error) {
 	account, err := s.AccountService.GetAccountFromRequest(ctx)
 	if err != nil {
 		createdAccount, err := s.AccountService.CreateAccountWithRandomPenguinId(ctx)
 		if err != nil {
-			return "", err
+			return 0, err
 		}
 		accountId = createdAccount.AccountID
 		pgid.Inject(ctx, createdAccount.PenguinID)
@@ -98,23 +95,68 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 		accountId = account.AccountID
 	}
 
-	// idempotencyKey := ctx.Get("Idempotency-Key", ctx.Locals("requestid").(string))
+	return accountId, nil
+}
 
-	// merge drops with same (dropType, itemId) pair
-	req.Drops = reportutils.MergeDrops(req.Drops)
+func (s *ReportService) pipelineMergeDrops(ctx *fiber.Ctx, drops []types.ArkDrop) ([]*types.Drop, error) {
+	drops = reportutils.MergeDrops(drops)
 
-	drops := make([]*types.Drop, 0, len(req.Drops))
-	for _, drop := range req.Drops {
+	convertedDrops := make([]*types.Drop, 0, len(drops))
+	for _, drop := range drops {
 		item, err := s.ItemService.GetItemByArkId(ctx, drop.ItemID)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
-		drops = append(drops, &types.Drop{
+		convertedDrops = append(convertedDrops, &types.Drop{
 			DropType: drop.DropType,
 			ItemID:   item.ItemID,
 			Quantity: drop.Quantity,
 		})
+	}
+
+	return convertedDrops, nil
+}
+
+func (s *ReportService) pipelineTaskId(ctx *fiber.Ctx) string {
+	return ctx.Locals("requestid").(string) + "-" + uniuri.NewLen(32)
+}
+
+func (s *ReportService) commitReportTask(ctx *fiber.Ctx, subject string, task *types.ReportTask) (taskId string, err error) {
+	reportTaskJson, err := json.Marshal(task)
+	if err != nil {
+		return "", err
+	}
+
+	pub, err := s.NatsJS.PublishAsync(subject, reportTaskJson)
+	if err != nil {
+		return "", err
+	}
+
+	select {
+	case err := <-pub.Err():
+		return "", err
+	case <-pub.Ok():
+		return taskId, nil
+	case <-ctx.Context().Done():
+		return "", ctx.Context().Err()
+	case <-time.After(time.Second * 15):
+		return "", fmt.Errorf("timeout waiting for NATS response")
+	}
+}
+
+// returns TaskID and error, if any
+func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingleReportRequest) (taskId string, err error) {
+	// if account is not found, create new account
+	accountId, err := s.pipelineAccount(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// merge drops with same (dropType, itemId) pair
+	drops, err := s.pipelineMergeDrops(ctx, req.Drops)
+	if err != nil {
+		return "", err
 	}
 
 	singleReport := &types.SingleReport{
@@ -131,7 +173,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 		reportutils.AggregateGachaBoxDrops(singleReport)
 	}
 
-	taskId = ctx.Locals("requestid").(string) + "-" + uniuri.NewLen(32)
+	taskId = s.pipelineTaskId(ctx)
 
 	// construct ReportContext
 	reportTask := &types.ReportTask{
@@ -146,26 +188,48 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 		IP:        utils.ExtractIP(ctx),
 	}
 
-	reportTaskJson, err := json.Marshal(reportTask)
+	return s.commitReportTask(ctx, "REPORT.SINGLE", reportTask)
+}
+
+func (s *ReportService) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchReportRequest) (taskId string, err error) {
+	// if account is not found, create new account
+	accountId, err := s.pipelineAccount(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	pub, err := s.NatsJS.PublishAsync("REPORT.SINGLE", reportTaskJson)
-	if err != nil {
-		return "", err
+	reports := make([]*types.SingleReport, 0, len(req.BatchDrops))
+
+	for i, drop := range req.BatchDrops {
+		// merge drops with same (dropType, itemId) pair
+		drops, err := s.pipelineMergeDrops(ctx, drop.Drops)
+		if err != nil {
+			return "", err
+		}
+
+		reports[i] = &types.SingleReport{
+			FragmentStageID: drop.FragmentStageID,
+			Drops:           drops,
+			Metadata:        &drop.Metadata,
+		}
 	}
 
-	select {
-	case err := <-pub.Err():
-		return "", err
-	case <-pub.Ok():
-		return taskId, nil
-	case <-ctx.Context().Done():
-		return "", ctx.Context().Err()
-	case <-time.After(time.Second * 15):
-		return "", fmt.Errorf("timeout waiting for NATS response")
+	taskId = s.pipelineTaskId(ctx)
+
+	// construct ReportContext
+	reportTask := &types.ReportTask{
+		TaskID: taskId,
+		FragmentReportCommon: types.FragmentReportCommon{
+			Server:  req.Server,
+			Source:  req.Source,
+			Version: req.Version,
+		},
+		Reports:   reports,
+		AccountID: accountId,
+		IP:        utils.ExtractIP(ctx),
 	}
+
+	return s.commitReportTask(ctx, "REPORT.BATCH", reportTask)
 }
 
 func (s *ReportService) RecallSingularReport(ctx *fiber.Ctx, req *types.SingleReportRecallRequest) error {
