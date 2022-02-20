@@ -6,6 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/tidwall/gjson"
 
+	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
@@ -166,5 +167,6 @@ func (s *StageService) applyShim(stage *shims.Stage) {
 		if i.Stage != nil {
 			i.ArkStageID = i.Stage.ArkStageID
 		}
+		i.DropType = constants.DropTypeReversedMap[i.DropType]
 	}
 }

@@ -20,6 +20,12 @@ var DropTypeMap = map[string]string{
 	"EXTRA_DROP":   "EXTRA",
 }
 
+var DropTypeReversedMap = map[string]string{
+	"REGULAR": "NORMAL_DROP",
+	"SPECIAL": "SPECIAL_DROP",
+	"EXTRA":   "EXTRA_DROP",
+}
+
 var DropTypeMapKeys = []string{
 	"NORMAL_DROP",
 	"SPECIAL_DROP",
