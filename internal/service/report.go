@@ -26,7 +26,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
 )
 
-var ErrReportNotFound = errors.ErrInvalidRequest.WithMessage("report not found")
+var ErrReportNotFound = errors.ErrInvalidRequest.WithMessage("report not existed or has already been recalled")
 
 type ReportService struct {
 	DB                     *bun.DB
@@ -123,6 +123,9 @@ func (s *ReportService) pipelineTaskId(ctx *fiber.Ctx) string {
 }
 
 func (s *ReportService) commitReportTask(ctx *fiber.Ctx, subject string, task *types.ReportTask) (taskId string, err error) {
+	taskId = s.pipelineTaskId(ctx)
+	task.TaskID = taskId
+
 	reportTaskJson, err := json.Marshal(task)
 	if err != nil {
 		return "", err
@@ -173,11 +176,8 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 		reportutils.AggregateGachaBoxDrops(singleReport)
 	}
 
-	taskId = s.pipelineTaskId(ctx)
-
 	// construct ReportContext
 	reportTask := &types.ReportTask{
-		TaskID: taskId,
 		FragmentReportCommon: types.FragmentReportCommon{
 			Server:  req.Server,
 			Source:  req.Source,
@@ -214,11 +214,8 @@ func (s *ReportService) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types
 		}
 	}
 
-	taskId = s.pipelineTaskId(ctx)
-
 	// construct ReportContext
 	reportTask := &types.ReportTask{
-		TaskID: taskId,
 		FragmentReportCommon: types.FragmentReportCommon{
 			Server:  req.Server,
 			Source:  req.Source,

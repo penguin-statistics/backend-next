@@ -18,6 +18,7 @@ var DropTypeMap = map[string]string{
 	"NORMAL_DROP":  "REGULAR",
 	"SPECIAL_DROP": "SPECIAL",
 	"EXTRA_DROP":   "EXTRA",
+	"FURNITURE":    "FURNITURE",
 }
 
 var DropTypeReversedMap = map[string]string{
