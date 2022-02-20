@@ -198,7 +198,7 @@ func (s *ReportService) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types
 		return "", err
 	}
 
-	reports := make([]*types.SingleReport, 0, len(req.BatchDrops))
+	reports := make([]*types.SingleReport, len(req.BatchDrops))
 
 	for i, drop := range req.BatchDrops {
 		// merge drops with same (dropType, itemId) pair

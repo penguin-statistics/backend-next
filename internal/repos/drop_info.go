@@ -11,6 +11,7 @@ import (
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/uptrace/bun"
 
+	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgqry"
@@ -184,7 +185,7 @@ func (s *DropInfoRepo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, 
 	var itemDropInfos []*models.DropInfo
 	var typeDropInfos []*models.DropInfo
 	for _, dropInfo := range allDropInfos {
-		if dropInfo.ItemID.Valid {
+		if dropInfo.ItemID.Valid && dropInfo.DropType != constants.DropTypeRecognitionOnly {
 			itemDropInfos = append(itemDropInfos, dropInfo)
 		} else {
 			typeDropInfos = append(typeDropInfos, dropInfo)
@@ -235,7 +236,7 @@ func (s *DropInfoRepo) GetDropInfosWithFilters(ctx context.Context, server strin
 		}
 	}
 	if err := s.DB.NewSelect().TableExpr("drop_infos as di").Column("di.stage_id", "di.item_id", "di.accumulable").
-		Where(whereBuilder.String(), server, "RECOGNITION_ONLY", bun.In(stageIdFilter), bun.In(itemIdFilter)).
+		Where(whereBuilder.String(), server, constants.DropTypeRecognitionOnly, bun.In(stageIdFilter), bun.In(itemIdFilter)).
 		Join("JOIN time_ranges AS tr ON tr.range_id = di.range_id").
 		Scan(ctx, &results); err != nil {
 		return nil, err

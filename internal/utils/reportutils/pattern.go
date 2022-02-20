@@ -12,10 +12,10 @@ import (
 )
 
 func CalculateDropPatternHash(drops []*types.Drop) string {
-	segments := make([]string, 0, len(drops))
+	segments := make([]string, len(drops))
 
-	for _, drop := range drops {
-		segments = append(segments, fmt.Sprintf("%d:%d", drop.ItemID, drop.Quantity))
+	for i, drop := range drops {
+		segments[i] = fmt.Sprintf("%d:%d", drop.ItemID, drop.Quantity)
 	}
 
 	sort.Strings(segments)

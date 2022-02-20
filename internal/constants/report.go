@@ -5,9 +5,10 @@ const (
 
 	ExtraProcessTypeGachaBox = "GACHABOX"
 
-	DropTypeRegular = "REGULAR"
-	DropTypeSpecial = "SPECIAL"
-	DropTypeExtra   = "EXTRA"
+	DropTypeRegular         = "REGULAR"
+	DropTypeSpecial         = "SPECIAL"
+	DropTypeExtra           = "EXTRA"
+	DropTypeRecognitionOnly = "RECOGNITION_ONLY"
 )
 
 // DropTypeMap maps an API drop type to a database drop type.
