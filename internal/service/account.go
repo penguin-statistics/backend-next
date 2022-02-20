@@ -4,11 +4,11 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
+	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
@@ -67,14 +67,14 @@ func (s *AccountService) GetAccountFromRequest(ctx *fiber.Ctx) (*models.Account,
 	// get PenguinID from HTTP header in form of Authorization: PenguinID ########
 	penguinId := pgid.Extract(ctx)
 	if penguinId == "" {
-		return nil, errors.New("PenguinID not found in request")
+		return nil, errors.ErrInvalidReq.Msg("PenguinID not found in request")
 	}
 
 	// check PenguinID validity
 	account, err := s.GetAccountByPenguinId(ctx, penguinId)
 	if err != nil {
 		log.Warn().Str("penguinId", penguinId).Err(err).Msg("failed to get account from request")
-		return nil, errors.New("PenguinID is invalid")
+		return nil, errors.ErrInvalidReq.Msg("PenguinID is invalid")
 	}
 	return account, nil
 }

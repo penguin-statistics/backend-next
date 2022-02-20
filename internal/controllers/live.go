@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"github.com/gofiber/fiber/v2"
+
 	"github.com/penguin-statistics/backend-next/internal/server"
 )
 

@@ -14,7 +14,7 @@ func Accepts(mimes ...string) func(ctx *fiber.Ctx) error {
 			return nil
 		}
 
-		return errors.ErrInvalidRequest.WithMessage("Invalid or missing Accept header. Accepts: %s", strings.Join(mimes, ", "))
+		return errors.ErrInvalidReq.Msg("Invalid or missing Accept header. Accepts: %s", strings.Join(mimes, ", "))
 	}
 }
 

@@ -52,7 +52,7 @@ func (c *AccountRepo) CreateAccountWithRandomPenguinId(ctx context.Context) (*mo
 		return account, nil
 	}
 
-	return nil, errors.ErrInternalError.WithMessage("failed to create account")
+	return nil, errors.ErrInternalError.Msg("failed to create account")
 }
 
 func (c *AccountRepo) GetAccountById(ctx context.Context, accountId string) (*models.Account, error) {

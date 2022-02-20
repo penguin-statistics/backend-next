@@ -92,7 +92,7 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 		log.Warn().
 			Err(err).
 			Msg("failed to decrypt recognition request")
-		return errors.ErrInvalidRequest
+		return errors.ErrInvalidReq
 	}
 
 	privateKey := segments[0]
@@ -103,7 +103,7 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 		log.Warn().
 			Err(err).
 			Msg("failed to decrypt recognition request")
-		return errors.ErrInvalidRequest
+		return errors.ErrInvalidReq
 	}
 
 	var request types.BatchReportRequest
@@ -111,7 +111,7 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 		log.Warn().
 			Err(err).
 			Msg("failed to unmarshal recognition request")
-		return errors.ErrInvalidRequest
+		return errors.ErrInvalidReq
 	}
 
 	if e := log.Trace(); e.Enabled() {

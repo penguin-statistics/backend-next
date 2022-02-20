@@ -26,7 +26,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
 )
 
-var ErrReportNotFound = errors.ErrInvalidRequest.WithMessage("report not existed or has already been recalled")
+var ErrReportNotFound = errors.ErrInvalidReq.Msg("report not existed or has already been recalled")
 
 type ReportService struct {
 	DB                     *bun.DB

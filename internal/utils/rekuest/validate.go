@@ -115,7 +115,7 @@ func validateStruct(ctx *fiber.Ctx, s interface{}) []*ErrorResponse {
 // always be a pointer.
 func ValidBody(ctx *fiber.Ctx, dest interface{}) error {
 	if err := ctx.BodyParser(dest); err != nil {
-		return errors.ErrInvalidRequest.WithMessage("invalid request: %s", err)
+		return errors.ErrInvalidReq.Msg("invalid request: %s", err)
 	}
 
 	if err := validateStruct(ctx, dest); err != nil {
