@@ -70,7 +70,7 @@ func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, redis *redis.Cli
 			}
 		}()
 
-		for i := 0; i < 5; i++ {
+		for i := 0; i < 3; i++ {
 			go func() {
 				err := service.ReportConsumeWorker(context.Background(), ch)
 				if err != nil {
@@ -333,6 +333,8 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 		}
 
 		// FIXME: the param is context.Context, so we have to use repo here, can we change it to use *fiber.Ctx?
+		// unable: consumer workers are not able to use *fiber.Ctx as ops here are not initiated due to a fiber request,
+		// but rather a message dispatch
 		stage, err := s.StageService.StageRepo.GetStageByArkId(ctx, report.StageID)
 		if err != nil {
 			return err
@@ -358,14 +360,13 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 		if report.Metadata != nil {
 			md5 = report.Metadata.MD5
 		}
-		ip := reportTask.IP
-		if ip == "" {
+		if reportTask.IP == "" {
 			// FIXME: temporary hack; find why ip is empty
-			ip = "127.0.0.1"
+			reportTask.IP = "127.0.0.1"
 		}
 		if err = s.DropReportExtraRepo.CreateDropReportExtra(ctx, tx, &models.DropReportExtra{
 			ReportID: dropReport.ReportID,
-			IP:       ip,
+			IP:       reportTask.IP,
 			Source:   reportTask.Source,
 			Version:  reportTask.Version,
 			Metadata: report.Metadata,
