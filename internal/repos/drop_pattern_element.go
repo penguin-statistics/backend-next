@@ -62,7 +62,7 @@ func (r *DropPatternElementRepo) CreateDropPatternElements(ctx context.Context, 
 		elements = append(elements, element)
 	}
 
-	_, err := r.DB.NewInsert().
+	_, err := tx.NewInsert().
 		Model(&elements).
 		Exec(ctx)
 	if err != nil {

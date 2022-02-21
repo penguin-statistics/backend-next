@@ -50,7 +50,7 @@ func (c *DropReportExtraRepo) IsDropReportExtraMD5Exist(ctx context.Context, md5
 }
 
 func (c *DropReportExtraRepo) CreateDropReportExtra(ctx context.Context, tx bun.Tx, report *models.DropReportExtra) error {
-	_, err := c.DB.NewInsert().
+	_, err := tx.NewInsert().
 		Model(report).
 		Exec(ctx)
 
