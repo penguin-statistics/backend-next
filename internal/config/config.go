@@ -51,7 +51,7 @@ type Config struct {
 	GeoIPDBPath string `required:"true" split_words:"true" default:"vendors/maxmind/assets/geolite2/GeoLite2-Country.mmdb"`
 
 	// WorkerInterval describes the interval in-between different batches of job running
-	WorkerInterval time.Duration `required:"true" split_words:"true" default:"1m"`
+	WorkerInterval time.Duration `required:"true" split_words:"true" default:"3m"`
 
 	// WorkerSeparation describes the separation time in-between different jobs
 	WorkerSeparation time.Duration `required:"true" split_words:"true" default:"3s"`
