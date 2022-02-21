@@ -18,7 +18,8 @@ type SingleReportRequest struct {
 	FragmentStageID
 	FragmentReportCommon
 
-	Drops []ArkDrop `json:"drops" validate:"dive"`
+	Drops     []ArkDrop `json:"drops" validate:"dive"`
+	PenguinID string    `json:"-"`
 }
 
 type SingleReportRecallRequest struct {

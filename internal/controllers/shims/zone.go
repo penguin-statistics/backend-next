@@ -31,7 +31,7 @@ func RegisterZoneController(v2 *server.V2, zoneService *service.ZoneService) {
 // @Router       /PenguinStats/api/v2/zones [GET]
 // @Deprecated
 func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
-	zones, err := c.ZoneService.GetShimZones(ctx)
+	zones, err := c.ZoneService.GetShimZones(ctx.Context())
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
 func (c *ZoneController) GetZoneByArkId(ctx *fiber.Ctx) error {
 	zoneId := ctx.Params("zoneId")
 
-	zone, err := c.ZoneService.GetShimZoneByArkId(ctx, zoneId)
+	zone, err := c.ZoneService.GetShimZoneByArkId(ctx.Context(), zoneId)
 	if err != nil {
 		return err
 	}

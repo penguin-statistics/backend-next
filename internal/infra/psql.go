@@ -33,9 +33,9 @@ func ProvidePostgres(config *config.Config) (*bun.DB, error) {
 		return nil, err
 	}
 
-	pgdb.SetMaxOpenConns(runtime.NumCPU() * 8)
-	pgdb.SetMaxIdleConns(runtime.NumCPU() * 2)
-	pgdb.SetConnMaxIdleTime(time.Minute * 5)
+	pgdb.SetMaxOpenConns(runtime.NumCPU() * 16)
+	pgdb.SetMaxIdleConns(runtime.NumCPU() * 4)
+	pgdb.SetConnMaxIdleTime(time.Minute * 10)
 
 	return db, nil
 }

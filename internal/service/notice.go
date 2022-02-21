@@ -1,9 +1,8 @@
 package service
 
 import (
+	"context"
 	"time"
-
-	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
@@ -21,14 +20,14 @@ func NewNoticeService(noticeRepo *repos.NoticeRepo) *NoticeService {
 }
 
 // Cache: (singular) notices, 24hrs; records last modified time
-func (s *NoticeService) GetNotices(ctx *fiber.Ctx) ([]*models.Notice, error) {
+func (s *NoticeService) GetNotices(ctx context.Context) ([]*models.Notice, error) {
 	var noticesFromCache []*models.Notice
 	err := cache.Notices.Get(&noticesFromCache)
 	if err == nil {
 		return noticesFromCache, nil
 	}
 
-	notices, err := s.NoticeRepo.GetNotices(ctx.Context())
+	notices, err := s.NoticeRepo.GetNotices(ctx)
 	if err != nil {
 		return nil, err
 	}

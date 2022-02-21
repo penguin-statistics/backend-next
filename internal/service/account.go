@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -23,19 +24,19 @@ func NewAccountService(accountRepo *repos.AccountRepo) *AccountService {
 	}
 }
 
-func (s *AccountService) CreateAccountWithRandomPenguinId(ctx *fiber.Ctx) (*models.Account, error) {
-	return s.AccountRepo.CreateAccountWithRandomPenguinId(ctx.Context())
+func (s *AccountService) CreateAccountWithRandomPenguinId(ctx context.Context) (*models.Account, error) {
+	return s.AccountRepo.CreateAccountWithRandomPenguinId(ctx)
 }
 
 // Cache: account#accountId:{accountId}, 24hrs
-func (s *AccountService) GetAccountById(ctx *fiber.Ctx, accountId string) (*models.Account, error) {
+func (s *AccountService) GetAccountById(ctx context.Context, accountId string) (*models.Account, error) {
 	var account models.Account
 	err := cache.AccountById.Get(accountId, &account)
 	if err == nil {
 		return &account, nil
 	}
 
-	dbAccount, err := s.AccountRepo.GetAccountById(ctx.Context(), accountId)
+	dbAccount, err := s.AccountRepo.GetAccountById(ctx, accountId)
 	if err != nil {
 		return nil, err
 	}
@@ -44,14 +45,14 @@ func (s *AccountService) GetAccountById(ctx *fiber.Ctx, accountId string) (*mode
 }
 
 // Cache: account#penguinId:{penguinId}, 24hrs
-func (s *AccountService) GetAccountByPenguinId(ctx *fiber.Ctx, penguinId string) (*models.Account, error) {
+func (s *AccountService) GetAccountByPenguinId(ctx context.Context, penguinId string) (*models.Account, error) {
 	var account models.Account
 	err := cache.AccountByPenguinId.Get(penguinId, &account)
 	if err == nil {
 		return &account, nil
 	}
 
-	dbAccount, err := s.AccountRepo.GetAccountByPenguinId(ctx.Context(), penguinId)
+	dbAccount, err := s.AccountRepo.GetAccountByPenguinId(ctx, penguinId)
 	if err != nil {
 		return nil, err
 	}
@@ -59,8 +60,8 @@ func (s *AccountService) GetAccountByPenguinId(ctx *fiber.Ctx, penguinId string)
 	return dbAccount, nil
 }
 
-func (s *AccountService) IsAccountExistWithId(ctx *fiber.Ctx, accountId int) bool {
-	return s.AccountRepo.IsAccountExistWithId(ctx.Context(), accountId)
+func (s *AccountService) IsAccountExistWithId(ctx context.Context, accountId int) bool {
+	return s.AccountRepo.IsAccountExistWithId(ctx, accountId)
 }
 
 func (s *AccountService) GetAccountFromRequest(ctx *fiber.Ctx) (*models.Account, error) {
@@ -71,7 +72,7 @@ func (s *AccountService) GetAccountFromRequest(ctx *fiber.Ctx) (*models.Account,
 	}
 
 	// check PenguinID validity
-	account, err := s.GetAccountByPenguinId(ctx, penguinId)
+	account, err := s.GetAccountByPenguinId(ctx.Context(), penguinId)
 	if err != nil {
 		log.Warn().Str("penguinId", penguinId).Err(err).Msg("failed to get account from request")
 		return nil, errors.ErrInvalidReq.Msg("PenguinID is invalid")

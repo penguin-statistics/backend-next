@@ -14,3 +14,10 @@ var SiteHosts = []string{
 	SiteGlobalMirrorHost,
 	SiteChinaMainlandMirrorHost,
 }
+
+var Servers = []string{
+	"CN",
+	"US",
+	"JP",
+	"KR",
+}

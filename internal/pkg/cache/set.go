@@ -32,9 +32,6 @@ func (c *Set) key(key string) string {
 
 func (c *Set) Get(key string, dest interface{}) error {
 	key = c.key(key)
-	if l := log.Trace(); l.Enabled() {
-		l.Str("key", key).Msg("getting value from redis")
-	}
 	resp, err := c.client.Get(context.Background(), key).Bytes()
 	if err != nil {
 		if err != redis.Nil {

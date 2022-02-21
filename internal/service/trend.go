@@ -1,12 +1,11 @@
 package service
 
 import (
+	"context"
 	"sync"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
-	"github.com/gofiber/fiber/v2"
-	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -50,7 +49,7 @@ func NewTrendService(
 }
 
 // Cache: shimSavedTrendResults#server:{server}, 24hrs, records last modified time
-func (s *TrendService) GetShimSavedTrendResults(ctx *fiber.Ctx, server string) (*shims.TrendQueryResult, error) {
+func (s *TrendService) GetShimSavedTrendResults(ctx context.Context, server string) (*shims.TrendQueryResult, error) {
 	valueFunc := func() (interface{}, error) {
 		queryResult, err := s.getSavedTrendResults(ctx, server)
 		if err != nil {
@@ -73,7 +72,7 @@ func (s *TrendService) GetShimSavedTrendResults(ctx *fiber.Ctx, server string) (
 	return &shimResult, nil
 }
 
-func (s *TrendService) GetShimCustomizedTrendResults(ctx *fiber.Ctx, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIds []int, itemIds []int, accountId *null.Int) (*shims.TrendQueryResult, error) {
+func (s *TrendService) GetShimCustomizedTrendResults(ctx context.Context, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIds []int, itemIds []int, accountId *null.Int) (*shims.TrendQueryResult, error) {
 	trendQueryResult, err := s.QueryTrend(ctx, server, startTime, intervalLength_hrs, intervalNum, stageIds, itemIds, accountId)
 	if err != nil {
 		return nil, err
@@ -82,7 +81,7 @@ func (s *TrendService) GetShimCustomizedTrendResults(ctx *fiber.Ctx, server stri
 }
 
 func (s *TrendService) QueryTrend(
-	ctx *fiber.Ctx, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
+	ctx context.Context, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
 ) (*models.TrendQueryResult, error) {
 	trendElements, err := s.calcTrend(ctx, server, startTime, intervalLength_hrs, intervalNum, stageIdFilter, itemIdFilter, accountId)
 	if err != nil {
@@ -91,7 +90,7 @@ func (s *TrendService) QueryTrend(
 	return s.convertTrendElementsToTrendQueryResult(trendElements)
 }
 
-func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error {
+func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) error {
 	maxAccumulableTimeRanges, err := s.TimeRangeService.GetMaxAccumulableTimeRangesByServer(ctx, server)
 	if err != nil {
 		return err
@@ -182,15 +181,13 @@ func (s *TrendService) RefreshTrendElements(ctx *fiber.Ctx, server string) error
 	}
 	wg.Wait()
 
-	log.Debug().Msgf("toSave length: %v", len(toSave))
-
 	if err := s.TrendElementService.BatchSaveElements(ctx, toSave, server); err != nil {
 		return err
 	}
 	return cache.ShimSavedTrendResults.Delete(server)
 }
 
-func (s *TrendService) getSavedTrendResults(ctx *fiber.Ctx, server string) (*models.TrendQueryResult, error) {
+func (s *TrendService) getSavedTrendResults(ctx context.Context, server string) (*models.TrendQueryResult, error) {
 	trendElements, err := s.TrendElementService.GetElementsByServer(ctx, server)
 	if err != nil {
 		return nil, err
@@ -199,7 +196,7 @@ func (s *TrendService) getSavedTrendResults(ctx *fiber.Ctx, server string) (*mod
 }
 
 func (s *TrendService) calcTrend(
-	ctx *fiber.Ctx, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
+	ctx context.Context, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
 ) ([]*models.TrendElement, error) {
 	endTime := startTime.Add(time.Hour * time.Duration(intervalLength_hrs*intervalNum))
 	timeRange := models.TimeRange{
@@ -364,7 +361,7 @@ func (s *TrendService) convertTrendElementsToTrendQueryResult(trendElements []*m
 	return trendQueryResult, nil
 }
 
-func (s *TrendService) applyShimForTrendQuery(ctx *fiber.Ctx, server string, queryResult *models.TrendQueryResult) (*shims.TrendQueryResult, error) {
+func (s *TrendService) applyShimForTrendQuery(ctx context.Context, server string, queryResult *models.TrendQueryResult) (*shims.TrendQueryResult, error) {
 	shimMinStartTime := utils.GetGameDayEndTime(server, time.Now()).Add(-1 * constants.DefaultIntervalNum * 24 * time.Hour)
 	currentGameDayEndTime := utils.GetGameDayEndTime(server, time.Now())
 

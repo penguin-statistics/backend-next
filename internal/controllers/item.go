@@ -46,7 +46,7 @@ func buildSanitizer(sanitizer ...func(string) bool) func(ctx *fiber.Ctx) error {
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/items [GET]
 func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
-	items, err := c.ItemService.GetItems(ctx)
+	items, err := c.ItemService.GetItems(ctx.Context())
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
 func (c *ItemController) GetItemById(ctx *fiber.Ctx) error {
 	itemId := ctx.Params("itemId")
 
-	item, err := c.ItemService.GetItemByArkId(ctx, itemId)
+	item, err := c.ItemService.GetItemByArkId(ctx.Context(), itemId)
 	if err != nil {
 		return err
 	}

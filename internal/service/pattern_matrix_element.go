@@ -1,7 +1,7 @@
 package service
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"context"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/repos"
@@ -17,14 +17,14 @@ func NewPatternMatrixElementService(patternMatrixElementRepo *repos.PatternMatri
 	}
 }
 
-func (s *PatternMatrixElementService) BatchSaveElements(ctx *fiber.Ctx, elements []*models.PatternMatrixElement, server string) error {
-	return s.PatternMatrixElementRepo.BatchSaveElements(ctx.Context(), elements, server)
+func (s *PatternMatrixElementService) BatchSaveElements(ctx context.Context, elements []*models.PatternMatrixElement, server string) error {
+	return s.PatternMatrixElementRepo.BatchSaveElements(ctx, elements, server)
 }
 
-func (s *PatternMatrixElementService) DeleteByServer(ctx *fiber.Ctx, server string) error {
-	return s.PatternMatrixElementRepo.DeleteByServer(ctx.Context(), server)
+func (s *PatternMatrixElementService) DeleteByServer(ctx context.Context, server string) error {
+	return s.PatternMatrixElementRepo.DeleteByServer(ctx, server)
 }
 
-func (s *PatternMatrixElementService) GetElementsByServer(ctx *fiber.Ctx, server string) ([]*models.PatternMatrixElement, error) {
-	return s.PatternMatrixElementRepo.GetElementsByServer(ctx.Context(), server)
+func (s *PatternMatrixElementService) GetElementsByServer(ctx context.Context, server string) ([]*models.PatternMatrixElement, error) {
+	return s.PatternMatrixElementRepo.GetElementsByServer(ctx, server)
 }

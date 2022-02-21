@@ -11,12 +11,12 @@ import (
 )
 
 type NoticeController struct {
-	service *service.NoticeService
+	NoticeService *service.NoticeService
 }
 
 func RegisterNoticeController(v2 *server.V2, service *service.NoticeService) {
 	c := &NoticeController{
-		service: service,
+		NoticeService: service,
 	}
 
 	v2.Get("/notice", c.GetNotices)
@@ -30,7 +30,7 @@ func RegisterNoticeController(v2 *server.V2, service *service.NoticeService) {
 // @Router       /PenguinStats/api/v2/notice [GET]
 // @Deprecated
 func (c *NoticeController) GetNotices(ctx *fiber.Ctx) error {
-	notices, err := c.service.GetNotices(ctx)
+	notices, err := c.NoticeService.GetNotices(ctx.Context())
 	if err != nil {
 		return err
 	}

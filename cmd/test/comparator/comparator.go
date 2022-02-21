@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 
 	"github.com/pkg/errors"
-
 	"github.com/tidwall/gjson"
 )
 

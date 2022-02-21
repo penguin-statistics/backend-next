@@ -1,11 +1,11 @@
 package service
 
 import (
+	"context"
 	"strconv"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
-	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
@@ -25,14 +25,14 @@ func NewTimeRangeService(timeRangeRepo *repos.TimeRangeRepo, dropInfoRepo *repos
 }
 
 // Cache: timeRanges#server:{server}, 24hrs
-func (s *TimeRangeService) GetTimeRangesByServer(ctx *fiber.Ctx, server string) ([]*models.TimeRange, error) {
+func (s *TimeRangeService) GetTimeRangesByServer(ctx context.Context, server string) ([]*models.TimeRange, error) {
 	var timeRanges []*models.TimeRange
 	err := cache.TimeRanges.Get(server, &timeRanges)
 	if err == nil {
 		return timeRanges, nil
 	}
 
-	timeRanges, err = s.TimeRangeRepo.GetTimeRangesByServer(ctx.Context(), server)
+	timeRanges, err = s.TimeRangeRepo.GetTimeRangesByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
@@ -41,20 +41,20 @@ func (s *TimeRangeService) GetTimeRangesByServer(ctx *fiber.Ctx, server string) 
 }
 
 // Cache: timeRange#rangeId:{rangeId}, 24hrs
-func (s *TimeRangeService) GetTimeRangeById(ctx *fiber.Ctx, rangeId int) (*models.TimeRange, error) {
+func (s *TimeRangeService) GetTimeRangeById(ctx context.Context, rangeId int) (*models.TimeRange, error) {
 	var timeRange models.TimeRange
 	err := cache.TimeRangeById.Get(strconv.Itoa(rangeId), &timeRange)
 	if err == nil {
 		return &timeRange, nil
 	}
 
-	slowTimeRange, err := s.TimeRangeRepo.GetTimeRangeById(ctx.Context(), rangeId)
+	slowTimeRange, err := s.TimeRangeRepo.GetTimeRangeById(ctx, rangeId)
 	go cache.TimeRangeById.Set(strconv.Itoa(rangeId), slowTimeRange, 24*time.Hour)
 	return slowTimeRange, err
 }
 
-func (s *TimeRangeService) GetCurrentTimeRangesByServer(ctx *fiber.Ctx, server string) ([]*models.TimeRange, error) {
-	timeRanges, err := s.TimeRangeRepo.GetTimeRangesByServer(ctx.Context(), server)
+func (s *TimeRangeService) GetCurrentTimeRangesByServer(ctx context.Context, server string) ([]*models.TimeRange, error) {
+	timeRanges, err := s.TimeRangeRepo.GetTimeRangesByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
@@ -67,14 +67,14 @@ func (s *TimeRangeService) GetCurrentTimeRangesByServer(ctx *fiber.Ctx, server s
 }
 
 // Cache: timeRangesMap#server:{server}, 24hrs
-func (s *TimeRangeService) GetTimeRangesMap(ctx *fiber.Ctx, server string) (map[int]*models.TimeRange, error) {
+func (s *TimeRangeService) GetTimeRangesMap(ctx context.Context, server string) (map[int]*models.TimeRange, error) {
 	var timeRangesMap map[int]*models.TimeRange
 	err := cache.TimeRangesMap.Get(server, &timeRangesMap)
 	if err == nil {
 		return timeRangesMap, nil
 	}
 
-	timeRanges, err := s.TimeRangeRepo.GetTimeRangesByServer(ctx.Context(), server)
+	timeRanges, err := s.TimeRangeRepo.GetTimeRangesByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
@@ -89,14 +89,14 @@ func (s *TimeRangeService) GetTimeRangesMap(ctx *fiber.Ctx, server string) (map[
 }
 
 // Cache: maxAccumulableTimeRanges#server:{server}, 24hrs
-func (s *TimeRangeService) GetMaxAccumulableTimeRangesByServer(ctx *fiber.Ctx, server string) (map[int]map[int][]*models.TimeRange, error) {
+func (s *TimeRangeService) GetMaxAccumulableTimeRangesByServer(ctx context.Context, server string) (map[int]map[int][]*models.TimeRange, error) {
 	var maxAccumulableTimeRanges map[int]map[int][]*models.TimeRange
 	err := cache.MaxAccumulableTimeRanges.Get(server, &maxAccumulableTimeRanges)
 	if err == nil {
 		return maxAccumulableTimeRanges, nil
 	}
 
-	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx.Context(), server)
+	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
@@ -162,8 +162,8 @@ func (s *TimeRangeService) GetMaxAccumulableTimeRangesByServer(ctx *fiber.Ctx, s
 	return maxAccumulableTimeRanges, nil
 }
 
-func (s *TimeRangeService) GetLatestTimeRangesByServer(ctx *fiber.Ctx, server string) (map[int]*models.TimeRange, error) {
-	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx.Context(), server)
+func (s *TimeRangeService) GetLatestTimeRangesByServer(ctx context.Context, server string) (map[int]*models.TimeRange, error) {
+	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}

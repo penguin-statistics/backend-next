@@ -20,6 +20,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
+	"github.com/penguin-statistics/backend-next/internal/workers/calcwkr"
 )
 
 func ProvideOptions(includeSwagger bool) []fx.Option {
@@ -89,6 +90,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Invoke(shims.RegisterEventPeriodController),
 		fx.Invoke(shims.RegisterTestController),
 		fx.Invoke(controllers.RegisterMetaController),
+		fx.Invoke(calcwkr.Start),
 		fx.StartTimeout(1 * time.Second),
 		// StopTimeout is not typically needed, since we're using fiber's Shutdown(),
 		// in which fiber has its own IdleTimeout for controlling the shutdown timeout.
