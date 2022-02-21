@@ -56,6 +56,7 @@ func (s *DropPatternRepo) GetOrCreateDropPatternByHash(ctx context.Context, tx b
 	}
 	err := tx.NewSelect().
 		Model(dropPattern).
+		Where("hash = ?", hash).
 		Scan(ctx)
 
 	if err == nil {
