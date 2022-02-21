@@ -16,6 +16,8 @@ type Stage struct {
 	ArkStageID string `json:"stageId"`
 	// ZoneID is the numerical ID of the zone the stage is in.
 	ZoneID int `json:"zoneId"`
+	// StageType is the type of the stage, e.g. "MAIN", "SUB", "ACTIVITY" and "DAILY".
+	StageType string `json:"stageType"`
 	// ExtraProcessType is the type of extra process that is used in the stage, e.g. "GACHABOX".
 	ExtraProcessType string `json:"extraProcessType"`
 	// Code is a map with language code as key and the code of the stage in that language as value.

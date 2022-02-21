@@ -16,6 +16,7 @@ type Stage struct {
 	ArkStageID      string          `json:"stageId"`
 	ZoneID          int             `json:"-"`
 	ArkZoneID       string          `bun:"-" json:"zoneId"`
+	StageType       string          `json:"stageType"`
 	Code            string          `bun:"-" json:"code"`
 	CodeI18n        json.RawMessage `bun:"code" json:"code_i18n"`
 	Sanity          null.Int        `json:"apCost" swaggertype:"number"`
