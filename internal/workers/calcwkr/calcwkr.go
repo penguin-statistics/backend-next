@@ -35,7 +35,7 @@ type Worker struct {
 }
 
 func Start(config *config.Config, deps WorkerDeps) {
-	if config.EnableWorker {
+	if config.WorkerEnabled {
 		(&Worker{
 			sep:        config.WorkerSeparation,
 			interval:   config.WorkerInterval,

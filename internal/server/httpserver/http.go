@@ -158,7 +158,7 @@ func Create(config *config.Config, flake *snowflake.Node) *fiber.App {
 			log.Error().Msgf("panic: %v\n%s\n", e, buf)
 		},
 	}))
-	if config.EnableTracing {
+	if config.TracingEnabled {
 		exporter, err := jaeger.New(jaeger.WithCollectorEndpoint())
 		if err != nil {
 			panic(err)

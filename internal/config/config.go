@@ -16,8 +16,8 @@ type Config struct {
 	// actual implementation details.
 	DevMode bool `split_words:"true"`
 
-	// EnableTracing to indicate whether to enable OpenTelemetry tracing.
-	EnableTracing bool `split_words:"true"`
+	// TracingEnabled to indicate whether to enable OpenTelemetry tracing.
+	TracingEnabled bool `split_words:"true"`
 
 	// infrastructure components connection instructions
 
@@ -56,8 +56,8 @@ type Config struct {
 	// WorkerSeparation describes the separation time in-between different jobs
 	WorkerSeparation time.Duration `required:"true" split_words:"true" default:"3s"`
 
-	// EnableWorker is a flag to indicate whether to enable the worker.
-	EnableWorker bool `split_words:"true"`
+	// WorkerEnabled is a flag to indicate whether to enable the worker.
+	WorkerEnabled bool `split_words:"true"`
 }
 
 func Parse() (*Config, error) {
