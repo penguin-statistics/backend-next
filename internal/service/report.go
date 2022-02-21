@@ -320,8 +320,7 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 
 	// calculate drop pattern hash for each report
 	for _, report := range reportTask.Reports {
-		dropPatternHash := reportutils.CalculateDropPatternHash(report.Drops)
-		dropPattern, created, err := s.DropPatternRepo.GetOrCreateDropPatternByHash(ctx, tx, dropPatternHash)
+		dropPattern, created, err := s.DropPatternRepo.GetOrCreateDropPatternFromDrops(ctx, tx, report.Drops)
 		if err != nil {
 			return err
 		}

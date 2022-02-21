@@ -3,10 +3,16 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/uptrace/bun"
+	"github.com/zeebo/xxh3"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 )
 
@@ -50,9 +56,11 @@ func (s *DropPatternRepo) GetDropPatternByHash(ctx context.Context, hash string)
 	return &dropPattern, nil
 }
 
-func (s *DropPatternRepo) GetOrCreateDropPatternByHash(ctx context.Context, tx bun.Tx, hash string) (*models.DropPattern, bool, error) {
+func (s *DropPatternRepo) GetOrCreateDropPatternFromDrops(ctx context.Context, tx bun.Tx, drops []*types.Drop) (*models.DropPattern, bool, error) {
+	originalFingerprint, hash := s.calculateDropPatternHash(drops)
 	dropPattern := &models.DropPattern{
-		Hash: hash,
+		Hash:                hash,
+		OriginalFingerprint: originalFingerprint,
 	}
 	err := tx.NewSelect().
 		Model(dropPattern).
@@ -73,4 +81,18 @@ func (s *DropPatternRepo) GetOrCreateDropPatternByHash(ctx context.Context, tx b
 	}
 
 	return dropPattern, true, nil
+}
+
+func (s *DropPatternRepo) calculateDropPatternHash(drops []*types.Drop) (string, string) {
+	segments := make([]string, len(drops))
+
+	for i, drop := range drops {
+		segments[i] = fmt.Sprintf("%d:%d", drop.ItemID, drop.Quantity)
+	}
+
+	sort.Strings(segments)
+
+	originalFingerprint := strings.Join(segments, "|")
+	hash := xxh3.HashStringSeed(originalFingerprint, 0)
+	return originalFingerprint, strconv.FormatUint(hash, 16)
 }
