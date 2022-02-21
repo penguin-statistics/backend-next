@@ -48,6 +48,6 @@ func (pq *pq) UseTimeRange(onColumn string) *pq {
 }
 
 func (pq *pq) DoFilterCurrentTimeRange() *pq {
-	pq.Q = pq.Q.Where("tr.start_time <= NOW() AND tr.end_time >= NOW()")
+	pq.Q = pq.Q.Where("tr.start_time <= NOW() AND tr.end_time > NOW()")
 	return pq
 }

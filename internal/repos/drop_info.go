@@ -185,10 +185,12 @@ func (s *DropInfoRepo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, 
 	var itemDropInfos []*models.DropInfo
 	var typeDropInfos []*models.DropInfo
 	for _, dropInfo := range allDropInfos {
-		if dropInfo.ItemID.Valid && dropInfo.DropType != constants.DropTypeRecognitionOnly {
-			itemDropInfos = append(itemDropInfos, dropInfo)
-		} else {
-			typeDropInfos = append(typeDropInfos, dropInfo)
+		if dropInfo.DropType != constants.DropTypeRecognitionOnly {
+			if dropInfo.ItemID.Valid {
+				itemDropInfos = append(itemDropInfos, dropInfo)
+			} else {
+				typeDropInfos = append(typeDropInfos, dropInfo)
+			}
 		}
 	}
 

@@ -81,24 +81,23 @@ func (d *DropVerifier) verifyDropType(ctx context.Context, report *types.SingleR
 			return dropType
 		}).
 		ToMapByT(&dropTypeAmountMap, func(dropTypeGroup linq.Group) string {
-			return dropTypeGroup.Key.(string)
+			return constants.DropTypeMap[dropTypeGroup.Key.(string)]
 		}, func(dropTypeGroup linq.Group) int {
 			return len(dropTypeGroup.Group)
 		})
 
 	for _, dropInfo := range dropInfos {
-		for dropType, count := range dropTypeAmountMap {
-			if dropInfo.Bounds.Lower > count {
-				return fmt.Errorf("drop type `%s`: expected at least %d, but got %d", dropType, dropInfo.Bounds.Lower, count)
-			} else if dropInfo.Bounds.Upper < count {
-				return fmt.Errorf("drop type `%s`: expected at most %d, but got %d", dropType, dropInfo.Bounds.Upper, count)
-			}
-			if dropInfo.Bounds.Exceptions != nil {
-				if linq.From(dropInfo.Bounds.Exceptions).AnyWithT(func(exception int) bool {
-					return exception == count
-				}) {
-					return fmt.Errorf("drop type `%s`: expected not to have %d", dropType, count)
-				}
+		count := dropTypeAmountMap[dropInfo.DropType]
+		if dropInfo.Bounds.Lower > count {
+			return fmt.Errorf("drop type `%s`: expected at least %d, but got %d", dropInfo.DropType, dropInfo.Bounds.Lower, count)
+		} else if dropInfo.Bounds.Upper < count {
+			return fmt.Errorf("drop type `%s`: expected at most %d, but got %d", dropInfo.DropType, dropInfo.Bounds.Upper, count)
+		}
+		if dropInfo.Bounds.Exceptions != nil {
+			if linq.From(dropInfo.Bounds.Exceptions).AnyWithT(func(exception int) bool {
+				return exception == count
+			}) {
+				return fmt.Errorf("drop type `%s`: expected not to have %d", dropInfo.DropType, count)
 			}
 		}
 	}
@@ -109,6 +108,9 @@ func (d *DropVerifier) verifyDropType(ctx context.Context, report *types.SingleR
 func (d *DropVerifier) verifyDropItem(ctx context.Context, report *types.SingleReport, dropInfos []*models.DropInfo) error {
 	for _, dropInfo := range dropInfos {
 		for _, drop := range report.Drops {
+			if drop.DropType != dropInfo.DropType || drop.ItemID != int(dropInfo.ItemID.Int64) {
+				continue
+			}
 			count := drop.Quantity
 			if dropInfo.Bounds.Lower > count {
 				return fmt.Errorf("drop item `%d`: expected at least %d, but got %d", drop.ItemID, dropInfo.Bounds.Lower, count)
