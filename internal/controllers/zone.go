@@ -28,7 +28,7 @@ func RegisterZoneController(v3 *server.V3, c ZoneController) {
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/zones [GET]
 func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
-	zones, err := c.ZoneService.GetZones(ctx)
+	zones, err := c.ZoneService.GetZones(ctx.Context())
 	if err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
 func (c *ZoneController) GetZoneById(ctx *fiber.Ctx) error {
 	zoneId := ctx.Params("zoneId")
 
-	zone, err := c.ZoneService.GetZoneByArkId(ctx, zoneId)
+	zone, err := c.ZoneService.GetZoneByArkId(ctx.Context(), zoneId)
 	if err != nil {
 		return err
 	}

@@ -1,9 +1,8 @@
 package service
 
 import (
+	"context"
 	"time"
-
-	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
@@ -21,7 +20,7 @@ func NewSiteStatsService(dropReportRepo *repos.DropReportRepo) *SiteStatsService
 }
 
 // Cache: shimSiteStats#server:{server}, 24hrs
-func (s *SiteStatsService) GetShimSiteStats(ctx *fiber.Ctx, server string) (*shims.SiteStats, error) {
+func (s *SiteStatsService) GetShimSiteStats(ctx context.Context, server string) (*shims.SiteStats, error) {
 	var results shims.SiteStats
 	err := cache.ShimSiteStats.Get(server, &results)
 	if err == nil {
@@ -31,37 +30,41 @@ func (s *SiteStatsService) GetShimSiteStats(ctx *fiber.Ctx, server string) (*shi
 	return s.RefreshShimSiteStats(ctx, server)
 }
 
-func (s *SiteStatsService) RefreshShimSiteStats(ctx *fiber.Ctx, server string) (*shims.SiteStats, error) {
-	stageTimes, err := s.DropReportRepo.CalcTotalStageQuantityForShimSiteStats(ctx.Context(), server, false)
-	if err != nil {
-		return nil, err
+func (s *SiteStatsService) RefreshShimSiteStats(ctx context.Context, server string) (*shims.SiteStats, error) {
+	valueFunc := func() (interface{}, error) {
+		stageTimes, err := s.DropReportRepo.CalcTotalStageQuantityForShimSiteStats(ctx, server, false)
+		if err != nil {
+			return nil, err
+		}
+
+		stageTimes24h, err := s.DropReportRepo.CalcTotalStageQuantityForShimSiteStats(ctx, server, true)
+		if err != nil {
+			return nil, err
+		}
+
+		itemQuantity, err := s.DropReportRepo.CalcTotalItemQuantityForShimSiteStats(ctx, server)
+		if err != nil {
+			return nil, err
+		}
+
+		sanity, err := s.DropReportRepo.CalcTotalSanityCostForShimSiteStats(ctx, server)
+		if err != nil {
+			return nil, err
+		}
+
+		return shims.SiteStats{
+			TotalStageTimes:     stageTimes,
+			TotalStageTimes24H:  stageTimes24h,
+			TotalItemQuantities: itemQuantity,
+			TotalSanityCost:     sanity,
+		}, nil
 	}
 
-	stageTimes24h, err := s.DropReportRepo.CalcTotalStageQuantityForShimSiteStats(ctx.Context(), server, true)
-	if err != nil {
-		return nil, err
-	}
-
-	itemQuantity, err := s.DropReportRepo.CalcTotalItemQuantityForShimSiteStats(ctx.Context(), server)
-	if err != nil {
-		return nil, err
-	}
-
-	sanity, err := s.DropReportRepo.CalcTotalSanityCostForShimSiteStats(ctx.Context(), server)
-	if err != nil {
-		return nil, err
-	}
-
-	slowResults := &shims.SiteStats{
-		TotalStageTimes:     stageTimes,
-		TotalStageTimes24H:  stageTimes24h,
-		TotalItemQuantities: itemQuantity,
-		TotalSanityCost:     sanity,
-	}
-	err = cache.ShimSiteStats.Set(server, slowResults, 24*time.Hour)
+	var results shims.SiteStats
+	_, err := cache.ShimSiteStats.MutexGetSet(server, &results, valueFunc, 24*time.Hour)
 	if err != nil {
 		return nil, err
 	}
 	cache.LastModifiedTime.Set("[shimSiteStats#server:"+server+"]", time.Now(), 0)
-	return slowResults, nil
+	return &results, nil
 }

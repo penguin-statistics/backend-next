@@ -1,13 +1,13 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
-	"github.com/gofiber/fiber/v2"
 	"github.com/tidwall/gjson"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
@@ -28,14 +28,14 @@ func NewItemService(itemRepo *repos.ItemRepo) *ItemService {
 }
 
 // Cache: items, 24hrs
-func (s *ItemService) GetItems(ctx *fiber.Ctx) ([]*models.Item, error) {
+func (s *ItemService) GetItems(ctx context.Context) ([]*models.Item, error) {
 	var items []*models.Item
 	err := cache.Items.Get(&items)
 	if err == nil {
 		return items, nil
 	}
 
-	items, err = s.ItemRepo.GetItems(ctx.Context())
+	items, err = s.ItemRepo.GetItems(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (s *ItemService) GetItems(ctx *fiber.Ctx) ([]*models.Item, error) {
 	return items, nil
 }
 
-func (s *ItemService) GetItemById(ctx *fiber.Ctx, itemId int) (*models.Item, error) {
+func (s *ItemService) GetItemById(ctx context.Context, itemId int) (*models.Item, error) {
 	itemsMapById, err := s.GetItemsMapById(ctx)
 	if err != nil {
 		return nil, err
@@ -56,14 +56,14 @@ func (s *ItemService) GetItemById(ctx *fiber.Ctx, itemId int) (*models.Item, err
 }
 
 // Cache: item#arkItemId:{arkItemId}, 24hrs
-func (s *ItemService) GetItemByArkId(ctx *fiber.Ctx, arkItemId string) (*models.Item, error) {
+func (s *ItemService) GetItemByArkId(ctx context.Context, arkItemId string) (*models.Item, error) {
 	var item models.Item
 	err := cache.ItemByArkId.Get(arkItemId, &item)
 	if err == nil {
 		return &item, nil
 	}
 
-	dbItem, err := s.ItemRepo.GetItemByArkId(ctx.Context(), arkItemId)
+	dbItem, err := s.ItemRepo.GetItemByArkId(ctx, arkItemId)
 	if err != nil {
 		return nil, err
 	}
@@ -71,19 +71,19 @@ func (s *ItemService) GetItemByArkId(ctx *fiber.Ctx, arkItemId string) (*models.
 	return dbItem, nil
 }
 
-func (s *ItemService) SearchItemByName(ctx *fiber.Ctx, name string) (*models.Item, error) {
-	return s.ItemRepo.SearchItemByName(ctx.Context(), name)
+func (s *ItemService) SearchItemByName(ctx context.Context, name string) (*models.Item, error) {
+	return s.ItemRepo.SearchItemByName(ctx, name)
 }
 
 // Cache: (singular) shimItems, 24hrs; records last modified time
-func (s *ItemService) GetShimItems(ctx *fiber.Ctx) ([]*shims.Item, error) {
+func (s *ItemService) GetShimItems(ctx context.Context) ([]*shims.Item, error) {
 	var items []*shims.Item
 	err := cache.ShimItems.Get(&items)
 	if err == nil {
 		return items, nil
 	}
 
-	items, err = s.ItemRepo.GetShimItems(ctx.Context())
+	items, err = s.ItemRepo.GetShimItems(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -97,14 +97,14 @@ func (s *ItemService) GetShimItems(ctx *fiber.Ctx) ([]*shims.Item, error) {
 }
 
 // Cache: shimItem#arkItemId:{arkItemId}, 24hrs
-func (s *ItemService) GetShimItemByArkId(ctx *fiber.Ctx, arkItemId string) (*shims.Item, error) {
+func (s *ItemService) GetShimItemByArkId(ctx context.Context, arkItemId string) (*shims.Item, error) {
 	var item shims.Item
 	err := cache.ShimItemByArkId.Get(arkItemId, &item)
 	if err == nil {
 		return &item, nil
 	}
 
-	dbItem, err := s.ItemRepo.GetShimItemByArkId(ctx.Context(), arkItemId)
+	dbItem, err := s.ItemRepo.GetShimItemByArkId(ctx, arkItemId)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +114,7 @@ func (s *ItemService) GetShimItemByArkId(ctx *fiber.Ctx, arkItemId string) (*shi
 }
 
 // Cache: (singular) itemsMapById, 24hrs
-func (s *ItemService) GetItemsMapById(ctx *fiber.Ctx) (map[int]*models.Item, error) {
+func (s *ItemService) GetItemsMapById(ctx context.Context) (map[int]*models.Item, error) {
 	var itemsMapById map[int]*models.Item
 	cache.ItemsMapById.MutexGetSet(&itemsMapById, func() (interface{}, error) {
 		items, err := s.GetItems(ctx)
@@ -131,7 +131,7 @@ func (s *ItemService) GetItemsMapById(ctx *fiber.Ctx) (map[int]*models.Item, err
 }
 
 // Cache: (singular) itemsMapByArkId, 24hrs
-func (s *ItemService) GetItemsMapByArkId(ctx *fiber.Ctx) (map[string]*models.Item, error) {
+func (s *ItemService) GetItemsMapByArkId(ctx context.Context) (map[string]*models.Item, error) {
 	var itemsMapByArkId map[string]*models.Item
 	cache.ItemsMapByArkId.MutexGetSet(&itemsMapByArkId, func() (interface{}, error) {
 		items, err := s.GetItems(ctx)

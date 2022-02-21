@@ -1,9 +1,9 @@
 package service
 
 import (
+	"context"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/tidwall/gjson"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
@@ -23,44 +23,44 @@ func NewZoneService(zoneRepo *repos.ZoneRepo) *ZoneService {
 }
 
 // Cache: (singular) zones, 24hrs
-func (s *ZoneService) GetZones(ctx *fiber.Ctx) ([]*models.Zone, error) {
+func (s *ZoneService) GetZones(ctx context.Context) ([]*models.Zone, error) {
 	var zones []*models.Zone
 	err := cache.Zones.Get(&zones)
 	if err == nil {
 		return zones, nil
 	}
 
-	zones, err = s.ZoneRepo.GetZones(ctx.Context())
+	zones, err = s.ZoneRepo.GetZones(ctx)
 	go cache.Zones.Set(zones, 24*time.Hour)
 	return zones, err
 }
 
-func (s *ZoneService) GetZoneById(ctx *fiber.Ctx, id int) (*models.Zone, error) {
-	return s.ZoneRepo.GetZoneById(ctx.Context(), id)
+func (s *ZoneService) GetZoneById(ctx context.Context, id int) (*models.Zone, error) {
+	return s.ZoneRepo.GetZoneById(ctx, id)
 }
 
 // Cache: zone#arkZoneId:{arkZoneId}, 24hrs
-func (s *ZoneService) GetZoneByArkId(ctx *fiber.Ctx, arkZoneId string) (*models.Zone, error) {
+func (s *ZoneService) GetZoneByArkId(ctx context.Context, arkZoneId string) (*models.Zone, error) {
 	var zone models.Zone
 	err := cache.ZoneByArkId.Get(arkZoneId, &zone)
 	if err == nil {
 		return &zone, nil
 	}
 
-	dbZone, err := s.ZoneRepo.GetZoneByArkId(ctx.Context(), arkZoneId)
+	dbZone, err := s.ZoneRepo.GetZoneByArkId(ctx, arkZoneId)
 	go cache.ZoneByArkId.Set(arkZoneId, dbZone, 24*time.Hour)
 	return dbZone, err
 }
 
 // Cache: (singular) shimZones, 24hrs; records last modified time
-func (s *ZoneService) GetShimZones(ctx *fiber.Ctx) ([]*shims.Zone, error) {
+func (s *ZoneService) GetShimZones(ctx context.Context) ([]*shims.Zone, error) {
 	var zones []*shims.Zone
 	err := cache.ShimZones.Get(&zones)
 	if err == nil {
 		return zones, nil
 	}
 
-	zones, err = s.ZoneRepo.GetShimZones(ctx.Context())
+	zones, err = s.ZoneRepo.GetShimZones(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -74,14 +74,14 @@ func (s *ZoneService) GetShimZones(ctx *fiber.Ctx) ([]*shims.Zone, error) {
 }
 
 // Cache: shimZone#arkZoneId:{arkZoneId}, 24hrs
-func (s *ZoneService) GetShimZoneByArkId(ctx *fiber.Ctx, arkZoneId string) (*shims.Zone, error) {
+func (s *ZoneService) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*shims.Zone, error) {
 	var zone shims.Zone
 	err := cache.ShimItemByArkId.Get(arkZoneId, &zone)
 	if err == nil {
 		return &zone, nil
 	}
 
-	dbZone, err := s.ZoneRepo.GetShimZoneByArkId(ctx.Context(), arkZoneId)
+	dbZone, err := s.ZoneRepo.GetShimZoneByArkId(ctx, arkZoneId)
 	if err != nil {
 		return nil, err
 	}

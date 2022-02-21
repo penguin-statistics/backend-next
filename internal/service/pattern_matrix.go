@@ -1,12 +1,11 @@
 package service
 
 import (
+	"context"
 	"sync"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
-	"github.com/gofiber/fiber/v2"
-	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -47,7 +46,7 @@ func NewPatternMatrixService(
 }
 
 // Cache: shimLatestPatternMatrixResults#server:{server}, 24hrs, records last modified time
-func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*shims.PatternMatrixQueryResult, error) {
+func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx context.Context, server string, accountId *null.Int) (*shims.PatternMatrixQueryResult, error) {
 	valueFunc := func() (interface{}, error) {
 		queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId)
 		if err != nil {
@@ -79,7 +78,7 @@ func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx *fiber.Ctx,
 	}
 }
 
-func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx *fiber.Ctx, server string) error {
+func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx context.Context, server string) error {
 	toSave := []*models.PatternMatrixElement{}
 	timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
 	if err != nil {
@@ -127,15 +126,13 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx *fiber.Ctx, s
 
 	wg.Wait()
 
-	log.Debug().Msgf("toSave length: %v", len(toSave))
-
 	if err := s.PatternMatrixElementService.BatchSaveElements(ctx, toSave, server); err != nil {
 		return err
 	}
 	return cache.ShimLatestPatternMatrixResults.Delete(server)
 }
 
-func (s *PatternMatrixService) getLatestPatternMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*models.PatternMatrixQueryResult, error) {
+func (s *PatternMatrixService) getLatestPatternMatrixResults(ctx context.Context, server string, accountId *null.Int) (*models.PatternMatrixQueryResult, error) {
 	patternMatrixElements, err := s.getLatestPatternMatrixElements(ctx, server, accountId)
 	if err != nil {
 		return nil, err
@@ -143,7 +140,7 @@ func (s *PatternMatrixService) getLatestPatternMatrixResults(ctx *fiber.Ctx, ser
 	return s.convertPatternMatrixElementsToDropPatternQueryResult(ctx, server, patternMatrixElements)
 }
 
-func (s *PatternMatrixService) getLatestPatternMatrixElements(ctx *fiber.Ctx, server string, accountId *null.Int) ([]*models.PatternMatrixElement, error) {
+func (s *PatternMatrixService) getLatestPatternMatrixElements(ctx context.Context, server string, accountId *null.Int) ([]*models.PatternMatrixElement, error) {
 	if accountId.Valid {
 		timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
 		if err != nil {
@@ -170,7 +167,7 @@ func (s *PatternMatrixService) getLatestPatternMatrixElements(ctx *fiber.Ctx, se
 }
 
 func (s *PatternMatrixService) calcPatternMatrixForTimeRanges(
-	ctx *fiber.Ctx, server string, timeRanges []*models.TimeRange, stageIdFilter []int, accountId *null.Int,
+	ctx context.Context, server string, timeRanges []*models.TimeRange, stageIdFilter []int, accountId *null.Int,
 ) ([]*models.PatternMatrixElement, error) {
 	results := make([]*models.PatternMatrixElement, 0)
 
@@ -281,7 +278,7 @@ func (s *PatternMatrixService) getStageIdsMapByTimeRange(timeRangesMap map[int]*
 }
 
 func (s *PatternMatrixService) convertPatternMatrixElementsToDropPatternQueryResult(
-	ctx *fiber.Ctx, server string, patternMatrixElements []*models.PatternMatrixElement,
+	ctx context.Context, server string, patternMatrixElements []*models.PatternMatrixElement,
 ) (*models.PatternMatrixQueryResult, error) {
 	timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
 	if err != nil {
@@ -304,7 +301,7 @@ func (s *PatternMatrixService) convertPatternMatrixElementsToDropPatternQueryRes
 	return result, nil
 }
 
-func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx *fiber.Ctx, queryResult *models.PatternMatrixQueryResult) (*shims.PatternMatrixQueryResult, error) {
+func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx context.Context, queryResult *models.PatternMatrixQueryResult) (*shims.PatternMatrixQueryResult, error) {
 	results := &shims.PatternMatrixQueryResult{
 		PatternMatrix: make([]*shims.OnePatternMatrixElement, 0),
 	}

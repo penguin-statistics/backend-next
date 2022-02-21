@@ -67,7 +67,7 @@ func (c *PrivateController) GetDropMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx, server, true, "", "", &accountId)
+	shimResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx.Context(), server, true, "", "", &accountId)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx, server, &accountId)
+	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.Context(), server, &accountId)
 	if err != nil {
 		return err
 	}
@@ -133,7 +133,7 @@ func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
 // @Deprecated
 func (c *PrivateController) GetTrends(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
-	shimResult, err := c.TrendService.GetShimSavedTrendResults(ctx, server)
+	shimResult, err := c.TrendService.GetShimSavedTrendResults(ctx.Context(), server)
 	if err != nil {
 		return err
 	}

@@ -1,15 +1,14 @@
 package service
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
-	"github.com/gofiber/fiber/v2"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -70,7 +69,7 @@ func NewDropMatrixService(
 }
 
 // Cache: shimMaxAccumulableDropMatrixResults#server|showClosedZoned:{server}|{showClosedZones}, 24 hrs, records last modified time
-func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx *fiber.Ctx, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId *null.Int) (*shims.DropMatrixQueryResult, error) {
+func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId *null.Int) (*shims.DropMatrixQueryResult, error) {
 	valueFunc := func() (interface{}, error) {
 		savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId)
 		if err != nil {
@@ -103,7 +102,7 @@ func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx *fiber.Ct
 	}
 }
 
-func (s *DropMatrixService) GetShimCustomizedDropMatrixResults(ctx *fiber.Ctx, server string, timeRange *models.TimeRange, stageIds []int, itemIds []int, accountId *null.Int) (*shims.DropMatrixQueryResult, error) {
+func (s *DropMatrixService) GetShimCustomizedDropMatrixResults(ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, itemIds []int, accountId *null.Int) (*shims.DropMatrixQueryResult, error) {
 	customizedDropMatrixQueryResult, err := s.QueryDropMatrix(ctx, server, []*models.TimeRange{timeRange}, stageIds, itemIds, accountId)
 	if err != nil {
 		return nil, err
@@ -111,7 +110,7 @@ func (s *DropMatrixService) GetShimCustomizedDropMatrixResults(ctx *fiber.Ctx, s
 	return s.applyShimForDropMatrixQuery(ctx, server, true, "", "", customizedDropMatrixQueryResult)
 }
 
-func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server string) error {
+func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx context.Context, server string) error {
 	toSave := []*models.DropMatrixElement{}
 	allTimeRanges, err := s.TimeRangeService.GetTimeRangesByServer(ctx, server)
 	if err != nil {
@@ -152,8 +151,6 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 
 	wg.Wait()
 
-	log.Debug().Msgf("toSave length: %v", len(toSave))
-
 	if err := s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server); err != nil {
 		return err
 	}
@@ -168,7 +165,7 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx *fiber.Ctx, server 
 
 // calc DropMatrixQueryResult for customized conditions
 func (s *DropMatrixService) QueryDropMatrix(
-	ctx *fiber.Ctx, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
+	ctx context.Context, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
 ) (*models.DropMatrixQueryResult, error) {
 	dropMatrixElements, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, stageIdFilter, itemIdFilter, accountId)
 	if err != nil {
@@ -178,7 +175,7 @@ func (s *DropMatrixService) QueryDropMatrix(
 }
 
 // calc DropMatrixQueryResult for max accumulable timeranges
-func (s *DropMatrixService) getMaxAccumulableDropMatrixResults(ctx *fiber.Ctx, server string, accountId *null.Int) (*models.DropMatrixQueryResult, error) {
+func (s *DropMatrixService) getMaxAccumulableDropMatrixResults(ctx context.Context, server string, accountId *null.Int) (*models.DropMatrixQueryResult, error) {
 	dropMatrixElements, err := s.getDropMatrixElements(ctx, server, accountId)
 	if err != nil {
 		return nil, err
@@ -187,7 +184,7 @@ func (s *DropMatrixService) getMaxAccumulableDropMatrixResults(ctx *fiber.Ctx, s
 }
 
 // For global, get elements from DB; For personal, calc elements
-func (s *DropMatrixService) getDropMatrixElements(ctx *fiber.Ctx, server string, accountId *null.Int) ([]*models.DropMatrixElement, error) {
+func (s *DropMatrixService) getDropMatrixElements(ctx context.Context, server string, accountId *null.Int) ([]*models.DropMatrixElement, error) {
 	if accountId.Valid {
 		maxAccumulableTimeRanges, err := s.TimeRangeService.GetMaxAccumulableTimeRangesByServer(ctx, server)
 		if err != nil {
@@ -213,7 +210,7 @@ func (s *DropMatrixService) getDropMatrixElements(ctx *fiber.Ctx, server string,
 }
 
 func (s *DropMatrixService) calcDropMatrixForTimeRanges(
-	ctx *fiber.Ctx, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
+	ctx context.Context, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
 ) ([]*models.DropMatrixElement, error) {
 	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, itemIdFilter)
 	if err != nil {
@@ -372,7 +369,7 @@ func (s *DropMatrixService) combineQuantityAndTimesResults(
 }
 
 func (s *DropMatrixService) convertDropMatrixElementsToMaxAccumulableDropMatrixQueryResult(
-	ctx *fiber.Ctx, server string, dropMatrixElements []*models.DropMatrixElement,
+	ctx context.Context, server string, dropMatrixElements []*models.DropMatrixElement,
 ) (*models.DropMatrixQueryResult, error) {
 	elementsMap := utils.GetDropMatrixElementsMap(dropMatrixElements)
 	result := &models.DropMatrixQueryResult{
@@ -445,7 +442,7 @@ func (s *DropMatrixService) combineDropMatrixResults(a *models.OneDropMatrixElem
 	return result, nil
 }
 
-func (s *DropMatrixService) convertDropMatrixElementsToDropMatrixQueryResult(ctx *fiber.Ctx, server string, dropMatrixElements []*models.DropMatrixElement) (*models.DropMatrixQueryResult, error) {
+func (s *DropMatrixService) convertDropMatrixElementsToDropMatrixQueryResult(ctx context.Context, server string, dropMatrixElements []*models.DropMatrixElement) (*models.DropMatrixQueryResult, error) {
 	dropMatrixQueryResult := &models.DropMatrixQueryResult{
 		Matrix: make([]*models.OneDropMatrixElement, 0),
 	}
@@ -483,7 +480,7 @@ func (s *DropMatrixService) convertDropMatrixElementsToDropMatrixQueryResult(ctx
 	return dropMatrixQueryResult, nil
 }
 
-func (s *DropMatrixService) applyShimForDropMatrixQuery(ctx *fiber.Ctx, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, queryResult *models.DropMatrixQueryResult) (*shims.DropMatrixQueryResult, error) {
+func (s *DropMatrixService) applyShimForDropMatrixQuery(ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, queryResult *models.DropMatrixQueryResult) (*shims.DropMatrixQueryResult, error) {
 	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
 	if err != nil {
 		return nil, err

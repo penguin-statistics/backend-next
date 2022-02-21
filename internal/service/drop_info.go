@@ -1,11 +1,11 @@
 package service
 
 import (
+	"context"
 	"strconv"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
-	"github.com/gofiber/fiber/v2"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -26,16 +26,16 @@ func NewDropInfoService(dropInfoRepo *repos.DropInfoRepo, timeRangeService *Time
 	}
 }
 
-func (s *DropInfoService) GetDropInfosByServer(ctx *fiber.Ctx, server string) ([]*models.DropInfo, error) {
-	return s.DropInfoRepo.GetDropInfosByServer(ctx.Context(), server)
+func (s *DropInfoService) GetDropInfosByServer(ctx context.Context, server string) ([]*models.DropInfo, error) {
+	return s.DropInfoRepo.GetDropInfosByServer(ctx, server)
 }
 
-func (s *DropInfoService) GetDropInfosWithFilters(ctx *fiber.Ctx, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*models.DropInfo, error) {
-	return s.DropInfoRepo.GetDropInfosWithFilters(ctx.Context(), server, timeRanges, stageIdFilter, itemIdFilter)
+func (s *DropInfoService) GetDropInfosWithFilters(ctx context.Context, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*models.DropInfo, error) {
+	return s.DropInfoRepo.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, itemIdFilter)
 }
 
 // Cache: itemDropSet#server|stageId|rangeId:{server}|{stageId}|{rangeId}, 24 hrs
-func (s *DropInfoService) GetItemDropSetByStageIdAndRangeId(ctx *fiber.Ctx, server string, stageId int, rangeId int) ([]int, error) {
+func (s *DropInfoService) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server string, stageId int, rangeId int) ([]int, error) {
 	var itemDropSet []int
 	key := server + constants.RedisSeparator + strconv.Itoa(stageId) + constants.RedisSeparator + strconv.Itoa(rangeId)
 	err := cache.ItemDropSetByStageIdAndRangeId.Get(key, &itemDropSet)
@@ -43,7 +43,7 @@ func (s *DropInfoService) GetItemDropSetByStageIdAndRangeId(ctx *fiber.Ctx, serv
 		return itemDropSet, nil
 	}
 
-	itemDropSet, err = s.DropInfoRepo.GetItemDropSetByStageIdAndRangeId(ctx.Context(), server, stageId, rangeId)
+	itemDropSet, err = s.DropInfoRepo.GetItemDropSetByStageIdAndRangeId(ctx, server, stageId, rangeId)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func (s *DropInfoService) GetItemDropSetByStageIdAndRangeId(ctx *fiber.Ctx, serv
 }
 
 // Cache: itemDropSet#server|stageId|startTime|endTime:{server}|{stageId}|{startTime}|{endTime}, 24 hrs
-func (s *DropInfoService) GetItemDropSetByStageIdAndTimeRange(ctx *fiber.Ctx, server string, stageId int, startTime *time.Time, endTime *time.Time) ([]int, error) {
+func (s *DropInfoService) GetItemDropSetByStageIdAndTimeRange(ctx context.Context, server string, stageId int, startTime *time.Time, endTime *time.Time) ([]int, error) {
 	var itemDropSet []int
 	key := server + constants.RedisSeparator + strconv.Itoa(stageId) + constants.RedisSeparator + strconv.Itoa(int(startTime.UnixMilli())) + constants.RedisSeparator + strconv.Itoa(int(endTime.UnixMilli()))
 	err := cache.ItemDropSetByStageIdAndTimeRange.Get(key, &itemDropSet)
@@ -65,7 +65,7 @@ func (s *DropInfoService) GetItemDropSetByStageIdAndTimeRange(ctx *fiber.Ctx, se
 		StartTime: startTime,
 		EndTime:   endTime,
 	}
-	dropInfos, err := s.DropInfoRepo.GetDropInfosWithFilters(ctx.Context(), server, []*models.TimeRange{timeRange}, []int{stageId}, nil)
+	dropInfos, err := s.DropInfoRepo.GetDropInfosWithFilters(ctx, server, []*models.TimeRange{timeRange}, []int{stageId}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -80,8 +80,8 @@ func (s *DropInfoService) GetItemDropSetByStageIdAndTimeRange(ctx *fiber.Ctx, se
 	return itemDropSet, nil
 }
 
-func (s *DropInfoService) GetAppearStageIdsByServer(ctx *fiber.Ctx, server string) ([]int, error) {
-	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx.Context(), server)
+func (s *DropInfoService) GetAppearStageIdsByServer(ctx context.Context, server string) ([]int, error) {
+	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +90,8 @@ func (s *DropInfoService) GetAppearStageIdsByServer(ctx *fiber.Ctx, server strin
 	return stageIds, nil
 }
 
-func (s *DropInfoService) GetCurrentDropInfosByServer(ctx *fiber.Ctx, server string) ([]*models.DropInfo, error) {
-	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx.Context(), server)
+func (s *DropInfoService) GetCurrentDropInfosByServer(ctx context.Context, server string) ([]*models.DropInfo, error) {
+	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}

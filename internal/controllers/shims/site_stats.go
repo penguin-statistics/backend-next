@@ -32,7 +32,7 @@ func RegisterSiteStatsController(v2 *server.V2, s *service.SiteStatsService) {
 func (c *SiteStatsController) GetSiteStats(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 
-	siteStats, err := c.service.GetShimSiteStats(ctx, server)
+	siteStats, err := c.service.GetShimSiteStats(ctx.Context(), server)
 	if err != nil {
 		return err
 	}

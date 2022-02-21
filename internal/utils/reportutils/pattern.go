@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cespare/xxhash/v2"
+	"github.com/zeebo/xxh3"
 
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 )
@@ -20,6 +20,6 @@ func CalculateDropPatternHash(drops []*types.Drop) string {
 
 	sort.Strings(segments)
 
-	hash := xxhash.Sum64String(strings.Join(segments, "|"))
+	hash := xxh3.HashStringSeed(strings.Join(segments, "|"), 0)
 	return strconv.FormatUint(hash, 16)
 }

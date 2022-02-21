@@ -85,7 +85,7 @@ func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, redis *redis.Cli
 func (s *ReportService) pipelineAccount(ctx *fiber.Ctx) (accountId int, err error) {
 	account, err := s.AccountService.GetAccountFromRequest(ctx)
 	if err != nil {
-		createdAccount, err := s.AccountService.CreateAccountWithRandomPenguinId(ctx)
+		createdAccount, err := s.AccountService.CreateAccountWithRandomPenguinId(ctx.Context())
 		if err != nil {
 			return 0, err
 		}
@@ -98,7 +98,7 @@ func (s *ReportService) pipelineAccount(ctx *fiber.Ctx) (accountId int, err erro
 	return accountId, nil
 }
 
-func (s *ReportService) pipelineMergeDrops(ctx *fiber.Ctx, drops []types.ArkDrop) ([]*types.Drop, error) {
+func (s *ReportService) pipelineMergeDrops(ctx context.Context, drops []types.ArkDrop) ([]*types.Drop, error) {
 	drops = reportutils.MergeDrops(drops)
 
 	convertedDrops := make([]*types.Drop, 0, len(drops))
@@ -157,7 +157,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 	}
 
 	// merge drops with same (dropType, itemId) pair
-	drops, err := s.pipelineMergeDrops(ctx, req.Drops)
+	drops, err := s.pipelineMergeDrops(ctx.Context(), req.Drops)
 	if err != nil {
 		return "", err
 	}
@@ -168,7 +168,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 	}
 
 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
-	category, err := s.StageService.GetStageExtraProcessTypeByArkId(ctx, singleReport.StageID)
+	category, err := s.StageService.GetStageExtraProcessTypeByArkId(ctx.Context(), singleReport.StageID)
 	if err != nil {
 		return "", err
 	}
@@ -202,7 +202,7 @@ func (s *ReportService) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types
 
 	for i, drop := range req.BatchDrops {
 		// merge drops with same (dropType, itemId) pair
-		drops, err := s.pipelineMergeDrops(ctx, drop.Drops)
+		drops, err := s.pipelineMergeDrops(ctx.Context(), drop.Drops)
 		if err != nil {
 			return "", err
 		}
@@ -229,7 +229,7 @@ func (s *ReportService) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types
 	return s.commitReportTask(ctx, "REPORT.BATCH", reportTask)
 }
 
-func (s *ReportService) RecallSingularReport(ctx *fiber.Ctx, req *types.SingleReportRecallRequest) error {
+func (s *ReportService) RecallSingularReport(ctx context.Context, req *types.SingleReportRecallRequest) error {
 	var reportId int
 	err := cache.RecentReports.Get(req.ReportHash, &reportId)
 	if err == redis.Nil {
@@ -238,7 +238,7 @@ func (s *ReportService) RecallSingularReport(ctx *fiber.Ctx, req *types.SingleRe
 		return err
 	}
 
-	err = s.DropReportRepo.DeleteDropReport(ctx.Context(), reportId)
+	err = s.DropReportRepo.DeleteDropReport(ctx, reportId)
 	if err != nil {
 		return err
 	}
@@ -332,8 +332,8 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 			}
 		}
 
-		// FIXME: the param is context.Context, so we have to use repo here, can we change it to use *fiber.Ctx?
-		// unable: consumer workers are not able to use *fiber.Ctx as ops here are not initiated due to a fiber request,
+		// FIXME: the param is context.Context, so we have to use repo here, can we change it to use context.Context?
+		// unable: consumer workers are not able to use context.Context as ops here are not initiated due to a fiber request,
 		// but rather a message dispatch
 		stage, err := s.StageService.StageRepo.GetStageByArkId(ctx, report.StageID)
 		if err != nil {
@@ -382,18 +382,18 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 	return tx.Commit()
 }
 
-// func (s *ReportService) VerifyAndSubmitBatchReport(ctx *fiber.Ctx, report *types.BatchReportRequest) error {
+// func (s *ReportService) VerifyAndSubmitBatchReport(ctx context.Context, report *types.BatchReportRequest) error {
 // 	// get PenguinID from HTTP header in form of Authorization: PenguinID ########
 // 	penguinID := strings.TrimSpace(strings.TrimPrefix(ctx.Get("Authorization"), "PenguinID"))
 
 // 	// if PenguinID is empty, create new PenguinID
-// 	account, err := s.AccountRepo.GetAccountByPenguinId(ctx.Context(), penguinID)
+// 	account, err := s.AccountRepo.GetAccountByPenguinId(ctx, penguinID)
 // 	if err != nil {
 // 		return err
 // 	}
 // 	var accountId int
 // 	if account == nil {
-// 		createdAccount, err := s.AccountRepo.CreateAccountWithRandomPenguinId(ctx.Context())
+// 		createdAccount, err := s.AccountRepo.CreateAccountWithRandomPenguinId(ctx)
 // 		if err != nil {
 // 			return err
 // 		}
@@ -411,7 +411,7 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 
 // 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
 // 	for _, report := range batchReport.Reports {
-// 		category, err := s.StageRepo.GetStageExtraProcessTypeByArkId(ctx.Context(), report.StageID)
+// 		category, err := s.StageRepo.GetStageExtraProcessTypeByArkId(ctx, report.StageID)
 // 		if err != nil {
 // 			return err
 // 		}

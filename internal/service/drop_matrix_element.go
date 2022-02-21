@@ -1,7 +1,7 @@
 package service
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"context"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/repos"
@@ -17,14 +17,14 @@ func NewDropMatrixElementService(dropMatrixElementRepo *repos.DropMatrixElementR
 	}
 }
 
-func (s *DropMatrixElementService) BatchSaveElements(ctx *fiber.Ctx, elements []*models.DropMatrixElement, server string) error {
-	return s.DropMatrixElementRepo.BatchSaveElements(ctx.Context(), elements, server)
+func (s *DropMatrixElementService) BatchSaveElements(ctx context.Context, elements []*models.DropMatrixElement, server string) error {
+	return s.DropMatrixElementRepo.BatchSaveElements(ctx, elements, server)
 }
 
-func (s *DropMatrixElementService) DeleteByServer(ctx *fiber.Ctx, server string) error {
-	return s.DropMatrixElementRepo.DeleteByServer(ctx.Context(), server)
+func (s *DropMatrixElementService) DeleteByServer(ctx context.Context, server string) error {
+	return s.DropMatrixElementRepo.DeleteByServer(ctx, server)
 }
 
-func (s *DropMatrixElementService) GetElementsByServer(ctx *fiber.Ctx, server string) ([]*models.DropMatrixElement, error) {
-	return s.DropMatrixElementRepo.GetElementsByServer(ctx.Context(), server)
+func (s *DropMatrixElementService) GetElementsByServer(ctx context.Context, server string) ([]*models.DropMatrixElement, error) {
+	return s.DropMatrixElementRepo.GetElementsByServer(ctx, server)
 }

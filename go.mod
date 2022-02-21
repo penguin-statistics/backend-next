@@ -11,6 +11,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.23.0
 	github.com/gofiber/helmet/v2 v2.2.4
 	github.com/nats-io/nats.go v1.13.1-0.20211122170419-d7c1d78a50fc
+	github.com/oschwald/geoip2-golang v1.6.1
 	github.com/penguin-statistics/fiber-swagger/v3 v3.0.2
 	github.com/penguin-statistics/fiberotel v0.8.2
 	github.com/stretchr/testify v1.7.0
@@ -20,6 +21,7 @@ require (
 	github.com/uptrace/bun/dialect/pgdialect v1.0.18
 	github.com/uptrace/bun/driver/pgdriver v1.0.18
 	github.com/uptrace/bun/extra/bundebug v1.0.18
+	github.com/zeebo/xxh3 v1.0.1
 	go.opentelemetry.io/otel v1.3.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.2.0
 	go.opentelemetry.io/otel/sdk v1.2.0
@@ -30,7 +32,7 @@ require (
 require (
 	github.com/go-logr/logr v1.2.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/oschwald/geoip2-golang v1.6.1 // indirect
+	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/oschwald/maxminddb-golang v1.8.0 // indirect
 	github.com/stretchr/objx v0.1.1 // indirect
 	github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.7 // indirect
@@ -45,7 +47,7 @@ require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
-	github.com/cespare/xxhash/v2 v2.1.2
+	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fatih/color v1.13.0 // indirect
@@ -60,7 +62,7 @@ require (
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/penguin-statistics/swaggo-files v1.0.0 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect

@@ -35,7 +35,7 @@ func RegisterAccountController(v2 *server.V2, s *service.AccountService) {
 func (c *AccountController) Login(ctx *fiber.Ctx) error {
 	inputPenguinId := ctx.Body()
 
-	account, err := c.service.GetAccountByPenguinId(ctx, string(inputPenguinId))
+	account, err := c.service.GetAccountByPenguinId(ctx.Context(), string(inputPenguinId))
 	if err != nil {
 		return err
 	}

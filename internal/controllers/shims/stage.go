@@ -33,7 +33,7 @@ func RegisterStageController(v2 *server.V2, stageService *service.StageService) 
 func (c *StageController) GetStages(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 
-	stages, err := c.StageService.GetShimStages(ctx, server)
+	stages, err := c.StageService.GetShimStages(ctx.Context(), server)
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func (c *StageController) GetStageByArkId(ctx *fiber.Ctx) error {
 	stageId := ctx.Params("stageId")
 	server := ctx.Query("server", "CN")
 
-	stage, err := c.StageService.GetShimStageByArkId(ctx, stageId, server)
+	stage, err := c.StageService.GetShimStageByArkId(ctx.Context(), stageId, server)
 	if err != nil {
 		return err
 	}

@@ -29,7 +29,7 @@ func RegisterEventPeriodController(v2 *server.V2, c EventPeriodController) {
 // @Router       /PenguinStats/api/v2/period [GET]
 // @Deprecated
 func (c *EventPeriodController) GetEventPeriods(ctx *fiber.Ctx) error {
-	activities, err := c.ActivityService.GetShimActivities(ctx)
+	activities, err := c.ActivityService.GetShimActivities(ctx.Context())
 	if err != nil {
 		return err
 	}

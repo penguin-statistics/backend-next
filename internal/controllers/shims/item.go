@@ -31,7 +31,7 @@ func RegisterItemController(v2 *server.V2, itemService *service.ItemService) {
 // @Router       /PenguinStats/api/v2/items [GET]
 // @Deprecated
 func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
-	items, err := c.ItemService.GetShimItems(ctx)
+	items, err := c.ItemService.GetShimItems(ctx.Context())
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
 func (c *ItemController) GetItemByArkId(ctx *fiber.Ctx) error {
 	itemId := ctx.Params("itemId")
 
-	item, err := c.ItemService.GetShimItemByArkId(ctx, itemId)
+	item, err := c.ItemService.GetShimItemByArkId(ctx.Context(), itemId)
 	if err != nil {
 		return err
 	}

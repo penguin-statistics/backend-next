@@ -1,10 +1,9 @@
 package service
 
 import (
+	"context"
 	"strconv"
 	"time"
-
-	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
@@ -22,14 +21,14 @@ func NewDropPatternElementService(dropPatternElementRepo *repos.DropPatternEleme
 }
 
 // Cache: dropPatternElements#patternId:{patternId}, 24hrs
-func (s *DropPatternElementService) GetDropPatternElementsByPatternId(ctx *fiber.Ctx, patternId int) ([]*models.DropPatternElement, error) {
+func (s *DropPatternElementService) GetDropPatternElementsByPatternId(ctx context.Context, patternId int) ([]*models.DropPatternElement, error) {
 	var dropPatternElements []*models.DropPatternElement
 	err := cache.DropPatternElementsByPatternId.Get(strconv.Itoa(patternId), &dropPatternElements)
 	if err == nil {
 		return dropPatternElements, nil
 	}
 
-	dbDropPatternElements, err := s.DropPatternElementRepo.GetDropPatternElementsByPatternId(ctx.Context(), patternId)
+	dbDropPatternElements, err := s.DropPatternElementRepo.GetDropPatternElementsByPatternId(ctx, patternId)
 	if err != nil {
 		return nil, err
 	}

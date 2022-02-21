@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"net/url"
 
 	"github.com/gofiber/fiber/v2"
@@ -64,32 +65,32 @@ func (s *ShortURLService) ResolveShortURL(ctx *fiber.Ctx, path string) string {
 	}
 
 	// Item Name Matching
-	if resolved, err := s.resolveByItemName(ctx, path); err == nil {
-		return resolved
+	if resolved, err := s.resolveByItemName(ctx.Context(), path); err == nil {
+		return s.siteURL(ctx, resolved)
 	}
-	if resolved, err := s.resolveByStageCode(ctx, path); err == nil {
-		return resolved
+	if resolved, err := s.resolveByStageCode(ctx.Context(), path); err == nil {
+		return s.siteURL(ctx, resolved)
 	}
-	if resolved, err := s.resolveByItemId(ctx, path); err == nil {
-		return resolved
+	if resolved, err := s.resolveByItemId(ctx.Context(), path); err == nil {
+		return s.siteURL(ctx, resolved)
 	}
-	if resolved, err := s.resolveByStageId(ctx, path); err == nil {
-		return resolved
+	if resolved, err := s.resolveByStageId(ctx.Context(), path); err == nil {
+		return s.siteURL(ctx, resolved)
 	}
 
-	return s.resolveUnknown(ctx, path)
+	return s.resolveUnknown(ctx.Context(), path)
 }
 
-func (s *ShortURLService) resolveByItemName(ctx *fiber.Ctx, path string) (string, error) {
+func (s *ShortURLService) resolveByItemName(ctx context.Context, path string) (string, error) {
 	item, err := s.ItemService.SearchItemByName(ctx, path)
 	if err != nil {
 		return "", err
 	}
 
-	return s.siteURL(ctx, "/result/item/"+item.ArkItemID+"?utm_source=exusiai&utm_medium=item&utm_campaign=name"), nil
+	return "/result/item/" + item.ArkItemID + "?utm_source=exusiai&utm_medium=item&utm_campaign=name", nil
 }
 
-func (s *ShortURLService) resolveByStageCode(ctx *fiber.Ctx, path string) (string, error) {
+func (s *ShortURLService) resolveByStageCode(ctx context.Context, path string) (string, error) {
 	stage, err := s.StageService.SearchStageByCode(ctx, path)
 	if err != nil {
 		return "", err
@@ -100,10 +101,10 @@ func (s *ShortURLService) resolveByStageCode(ctx *fiber.Ctx, path string) (strin
 		return "", err
 	}
 
-	return s.siteURL(ctx, "/result/stage/"+zone.ArkZoneID+"/"+stage.ArkStageID+"?utm_source=exusiai&utm_medium=stage&utm_campaign=code"), nil
+	return "/result/stage/" + zone.ArkZoneID + "/" + stage.ArkStageID + "?utm_source=exusiai&utm_medium=stage&utm_campaign=code", nil
 }
 
-func (s *ShortURLService) resolveByStageId(ctx *fiber.Ctx, path string) (string, error) {
+func (s *ShortURLService) resolveByStageId(ctx context.Context, path string) (string, error) {
 	stage, err := s.StageService.GetStageByArkId(ctx, path)
 	if err != nil {
 		return "", err
@@ -114,18 +115,18 @@ func (s *ShortURLService) resolveByStageId(ctx *fiber.Ctx, path string) (string,
 		return "", err
 	}
 
-	return s.siteURL(ctx, "/result/stage/"+zone.ArkZoneID+"/"+stage.ArkStageID+"?utm_source=exusiai&utm_medium=stage&utm_campaign=id"), nil
+	return "/result/stage/" + zone.ArkZoneID + "/" + stage.ArkStageID + "?utm_source=exusiai&utm_medium=stage&utm_campaign=id", nil
 }
 
-func (s *ShortURLService) resolveByItemId(ctx *fiber.Ctx, path string) (string, error) {
+func (s *ShortURLService) resolveByItemId(ctx context.Context, path string) (string, error) {
 	item, err := s.ItemService.GetItemByArkId(ctx, path)
 	if err != nil {
 		return "", err
 	}
 
-	return s.siteURL(ctx, "/result/item/"+item.ArkItemID+"?utm_source=exusiai&utm_medium=item&utm_campaign=id"), nil
+	return "/result/item/" + item.ArkItemID + "?utm_source=exusiai&utm_medium=item&utm_campaign=id", nil
 }
 
-func (s *ShortURLService) resolveUnknown(ctx *fiber.Ctx, path string) string {
-	return s.siteURL(ctx, "/search?utm_source=exusiai&utm_medium=search&utm_campaign=fallback&q="+url.PathEscape(path))
+func (s *ShortURLService) resolveUnknown(ctx context.Context, path string) string {
+	return "/search?utm_source=exusiai&utm_medium=search&utm_campaign=fallback&q=" + url.QueryEscape(path)
 }

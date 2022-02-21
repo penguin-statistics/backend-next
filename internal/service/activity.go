@@ -1,9 +1,9 @@
 package service
 
 import (
+	"context"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -24,14 +24,14 @@ func NewActivityService(activityRepo *repos.ActivityRepo) *ActivityService {
 }
 
 // Cache: (singular) activities, 24hrs; records last modified time
-func (s *ActivityService) GetActivities(ctx *fiber.Ctx) ([]*models.Activity, error) {
+func (s *ActivityService) GetActivities(ctx context.Context) ([]*models.Activity, error) {
 	var activities []*models.Activity
 	err := cache.Activities.Get(activities)
 	if err == nil {
 		return activities, nil
 	}
 
-	activities, err = s.ActivityRepo.GetActivities(ctx.Context())
+	activities, err = s.ActivityRepo.GetActivities(ctx)
 	if err := cache.Activities.Set(activities, 24*time.Hour); err == nil {
 		cache.LastModifiedTime.Set("[activities]", time.Now(), 0)
 	}
@@ -39,14 +39,14 @@ func (s *ActivityService) GetActivities(ctx *fiber.Ctx) ([]*models.Activity, err
 }
 
 // Cache: (singular) shimActivities, 24hrs; records last modified time
-func (s *ActivityService) GetShimActivities(ctx *fiber.Ctx) ([]*shims.Activity, error) {
+func (s *ActivityService) GetShimActivities(ctx context.Context) ([]*shims.Activity, error) {
 	var shimActivitiesFromCache []*shims.Activity
 	err := cache.ShimActivities.Get(&shimActivitiesFromCache)
 	if err == nil {
 		return shimActivitiesFromCache, nil
 	}
 
-	activities, err := s.ActivityRepo.GetActivities(ctx.Context())
+	activities, err := s.ActivityRepo.GetActivities(ctx)
 	if err != nil {
 		return nil, err
 	}

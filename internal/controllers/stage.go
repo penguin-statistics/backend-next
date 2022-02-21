@@ -28,7 +28,7 @@ func RegisterStageController(v3 *server.V3, c StageController) {
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /v3/stages [GET]
 func (c *StageController) GetStages(ctx *fiber.Ctx) error {
-	stages, err := c.StageService.GetStages(ctx)
+	stages, err := c.StageService.GetStages(ctx.Context())
 	if err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func (c *StageController) GetStages(ctx *fiber.Ctx) error {
 func (c *StageController) GetStageById(ctx *fiber.Ctx) error {
 	stageId := ctx.Params("stageId")
 
-	stage, err := c.StageService.GetStageByArkId(ctx, stageId)
+	stage, err := c.StageService.GetStageByArkId(ctx.Context(), stageId)
 	if err != nil {
 		return err
 	}
