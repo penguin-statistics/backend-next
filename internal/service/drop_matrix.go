@@ -261,7 +261,7 @@ func (s *DropMatrixService) calcDropMatrixForTimeRanges(
 			var dropItemIds []int
 			if rangeId == 0 {
 				// rangeId == 0 means it is a customized time range instead of a time range from the database
-				dropInfosForSpecialTimeRange, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, []*models.TimeRange{el2.Group[0].(*models.CombinedResultForDropMatrix).TimeRange}, nil, nil)
+				dropInfosForSpecialTimeRange, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, []*models.TimeRange{el2.Group[0].(*models.CombinedResultForDropMatrix).TimeRange}, []int{stageId}, itemIdFilter)
 				if err != nil {
 					return nil, err
 				}
