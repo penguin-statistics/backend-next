@@ -55,6 +55,9 @@ type Config struct {
 
 	// WorkerSeparation describes the separation time in-between different jobs
 	WorkerSeparation time.Duration `required:"true" split_words:"true" default:"3s"`
+
+	// EnableWorker is a flag to indicate whether to enable the worker.
+	EnableWorker bool `split_words:"true"`
 }
 
 func Parse() (*Config, error) {

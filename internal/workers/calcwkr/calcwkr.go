@@ -35,11 +35,13 @@ type Worker struct {
 }
 
 func Start(config *config.Config, deps WorkerDeps) {
-	(&Worker{
-		sep:        config.WorkerSeparation,
-		interval:   config.WorkerInterval,
-		WorkerDeps: deps,
-	}).do()
+	if config.EnableWorker {
+		(&Worker{
+			sep:        config.WorkerSeparation,
+			interval:   config.WorkerInterval,
+			WorkerDeps: deps,
+		}).do()
+	}
 }
 
 func (w *Worker) do() context.CancelFunc {
