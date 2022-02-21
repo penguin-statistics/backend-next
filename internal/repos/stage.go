@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
@@ -84,7 +85,10 @@ func (c *StageRepo) GetShimStages(ctx context.Context, server string) ([]*shims.
 				Relation("Stage", func(sq *bun.SelectQuery) *bun.SelectQuery {
 					return sq.Column("ark_stage_id")
 				}).
-				Where("server = ?", server)
+				Relation("TimeRange", func(sq *bun.SelectQuery) *bun.SelectQuery {
+					return sq.Where("start_time <= ? AND end_time > ?", time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339))
+				}).
+				Where("drop_info.server = ?", server)
 		}).
 		Scan(ctx)
 
@@ -112,7 +116,10 @@ func (c *StageRepo) GetShimStageByArkId(ctx context.Context, arkStageId string, 
 				Relation("Stage", func(sq *bun.SelectQuery) *bun.SelectQuery {
 					return sq.Column("ark_stage_id")
 				}).
-				Where("server = ?", server)
+				Relation("TimeRange", func(sq *bun.SelectQuery) *bun.SelectQuery {
+					return sq.Where("start_time <= ? AND end_time > ?", time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339))
+				}).
+				Where("drop_info.server = ?", server)
 		}).
 		Where("ark_stage_id = ?", arkStageId).
 		Scan(ctx)

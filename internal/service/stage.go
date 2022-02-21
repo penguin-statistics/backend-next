@@ -3,6 +3,7 @@ package service
 import (
 	"time"
 
+	"github.com/ahmetb/go-linq/v3"
 	"github.com/gofiber/fiber/v2"
 	"github.com/tidwall/gjson"
 
@@ -159,6 +160,21 @@ func (s *StageService) applyShim(stage *shims.Stage) {
 	if stage.Zone != nil {
 		stage.ArkZoneID = stage.Zone.ArkZoneID
 	}
+
+	recognitionOnlyArkItemIds := make([]string, 0)
+	linq.From(stage.DropInfos).
+		WhereT(func(dropInfo *shims.DropInfo) bool {
+			if dropInfo.DropType == constants.DropTypeRecognitionOnly {
+				extras := gjson.ParseBytes(dropInfo.Extras)
+				if !extras.IsObject() {
+					return false
+				}
+				recognitionOnlyArkItemIds = append(recognitionOnlyArkItemIds, extras.Get("arkItemId").Value().(string))
+			}
+			return dropInfo.DropType != constants.DropTypeRecognitionOnly
+		}).
+		ToSlice(&stage.DropInfos)
+	stage.RecognitionOnly = recognitionOnlyArkItemIds
 
 	for _, i := range stage.DropInfos {
 		if i.Item != nil {
