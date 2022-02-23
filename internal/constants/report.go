@@ -9,6 +9,7 @@ const (
 	DropTypeSpecial         = "SPECIAL"
 	DropTypeExtra           = "EXTRA"
 	DropTypeRecognitionOnly = "RECOGNITION_ONLY"
+	DropTypeFurniture       = "FURNITURE"
 )
 
 // DropTypeMap maps an API drop type to a database drop type.

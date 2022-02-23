@@ -74,6 +74,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(service.NewDropPatternElementService),
 		fx.Provide(service.NewPatternMatrixElementService),
 		fx.Provide(server.CreateVersioningEndpoints),
+		fx.Provide(service.NewGamedataService),
 		fx.Provide(utils.NewCrypto),
 		fx.Invoke(cache.Initialize),
 		fx.Invoke(logger.Configure),
