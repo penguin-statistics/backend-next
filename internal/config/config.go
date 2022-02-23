@@ -50,11 +50,14 @@ type Config struct {
 	// GeoIPDBPath is the path to the GeoIP2 database.
 	GeoIPDBPath string `required:"true" split_words:"true" default:"vendors/maxmind/assets/geolite2/GeoLite2-Country.mmdb"`
 
-	// WorkerInterval describes the interval in-between different batches of job running
+	// WorkerInterval describes the interval in-between different batches
 	WorkerInterval time.Duration `required:"true" split_words:"true" default:"10m"`
 
-	// WorkerSeparation describes the separation time in-between different jobs
+	// WorkerSeparation describes the separation time in-between different microtasks
 	WorkerSeparation time.Duration `required:"true" split_words:"true" default:"3s"`
+
+	// WorkerTimeout describes the timeout for a single batch to run
+	WorkerTimeout time.Duration `required:"true" split_words:"true" default:"10m"`
 
 	// WorkerEnabled is a flag to indicate whether to enable the worker.
 	WorkerEnabled bool `split_words:"true"`
