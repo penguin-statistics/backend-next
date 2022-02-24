@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/ahmetb/go-linq/v3"
 	"gopkg.in/guregu/null.v3"
@@ -34,7 +35,154 @@ var dropTypeOrderMapping = map[string]int{
 	"RECOGNITION_ONLY": 4,
 }
 
-func (s *GamedataService) FetchLatestStages(arkZoneIds []string) ([]*gamedata.Stage, error) {
+func (s *GamedataService) RenderObjects(ctx context.Context, context *gamedata.UpdateContext) (*gamedata.RenderedObjects, error) {
+	zone, err := s.renderNewZone(context)
+	if err != nil {
+		return nil, err
+	}
+
+	timeRange, err := s.renderNewTimeRange(context)
+	if err != nil {
+		return nil, err
+	}
+
+	activity, err := s.renderNewActivity(context)
+	if err != nil {
+		return nil, err
+	}
+
+	importStages, err := s.fetchLatestStages([]string{context.ArkZoneID})
+	if err != nil {
+		return nil, err
+	}
+
+	stages := make([]*models.Stage, 0)
+	dropInfos := make([]*models.DropInfo, 0)
+	for _, gamedataStage := range importStages {
+		stage, dropInfosForOneStage, err := s.genStageAndDropInfosFromGameData(ctx, context.Server, gamedataStage, 0, nil)
+		if err != nil {
+			return nil, err
+		}
+		stages = append(stages, stage)
+		dropInfos = append(dropInfos, dropInfosForOneStage...)
+	}
+
+	return &gamedata.RenderedObjects{
+		Zone:      zone,
+		Stages:    stages,
+		DropInfos: dropInfos,
+		TimeRange: timeRange,
+		Activity:  activity,
+	}, nil
+}
+
+func (s *GamedataService) renderNewZone(context *gamedata.UpdateContext) (*models.Zone, error) {
+	nameMap := make(map[string]string)
+	for _, lang := range constants.Languages {
+		nameMap[lang] = context.ZoneName
+	}
+	name, err := json.Marshal(nameMap)
+	if err != nil {
+		return nil, err
+	}
+
+	existenceMap := make(map[string]map[string]interface{})
+	for _, s := range constants.Servers {
+		existenceMap[s] = map[string]interface{}{
+			"exist": false,
+		}
+		if s == context.Server {
+			existenceMap[s]["exist"] = true
+			existenceMap[s]["openTime"] = context.StartTime.UnixMilli()
+			fakeEndTime := time.UnixMilli(constants.FakeEndTimeMilli)
+			endTime := &fakeEndTime
+			if context.EndTime != nil {
+				endTime = context.EndTime
+			}
+			existenceMap[s]["closeTime"] = endTime.UnixMilli()
+		}
+	}
+	existence, err := json.Marshal(existenceMap)
+	if err != nil {
+		return nil, err
+	}
+
+	backgroundStr := constants.ZoneBackgroundPath + context.ArkZoneID + constants.ZoneBackgroundExtension
+	background := null.StringFrom(backgroundStr)
+
+	return &models.Zone{
+		ArkZoneID:  context.ArkZoneID,
+		Index:      0,
+		Category:   context.ZoneCategory,
+		Type:       context.ZoneType,
+		Name:       name,
+		Existence:  existence,
+		Background: &background,
+	}, nil
+}
+
+func (s *GamedataService) renderNewTimeRange(context *gamedata.UpdateContext) (*models.TimeRange, error) {
+	fakeEndTime := time.UnixMilli(constants.FakeEndTimeMilli)
+	endTime := &fakeEndTime
+	if context.EndTime != nil {
+		endTime = context.EndTime
+	}
+
+	name := null.StringFrom(utils.GetZonePrefixFromArkZoneID(context.ArkZoneID) + "_" + context.Server)
+	startTimeInComment := context.StartTime.In(constants.LocMap[context.Server]).Format("2006/1/02 15:04")
+	endTimeInComment := "?"
+	if context.EndTime != nil {
+		endTimeInComment = context.EndTime.In(constants.LocMap[context.Server]).Format("2006/1/02 15:04")
+	}
+	comment := null.StringFrom(constants.ServerNameMapping[context.Server] + context.ZoneName + " " + startTimeInComment + " - " + endTimeInComment)
+	return &models.TimeRange{
+		StartTime: context.StartTime,
+		EndTime:   endTime,
+		Server:    context.Server,
+		Name:      &name,
+		Comment:   &comment,
+	}, nil
+}
+
+func (s *GamedataService) renderNewActivity(context *gamedata.UpdateContext) (*models.Activity, error) {
+	fakeEndTime := time.UnixMilli(constants.FakeEndTimeMilli)
+	endTime := &fakeEndTime
+	if context.EndTime != nil {
+		endTime = context.EndTime
+	}
+
+	nameMap := make(map[string]string)
+	for _, lang := range constants.Languages {
+		nameMap[lang] = context.ZoneName
+	}
+	name, err := json.Marshal(nameMap)
+	if err != nil {
+		return nil, err
+	}
+
+	existenceMap := make(map[string]map[string]interface{})
+	for _, s := range constants.Servers {
+		existenceMap[s] = map[string]interface{}{
+			"exist": false,
+		}
+		if s == context.Server {
+			existenceMap[s]["exist"] = true
+		}
+	}
+	existence, err := json.Marshal(existenceMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.Activity{
+		StartTime: context.StartTime,
+		EndTime:   endTime,
+		Name:      name,
+		Existence: existence,
+	}, nil
+}
+
+func (s *GamedataService) fetchLatestStages(arkZoneIds []string) ([]*gamedata.Stage, error) {
 	res, err := http.Get("https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/stage_table.json")
 	if err != nil {
 		return nil, err
@@ -84,7 +232,7 @@ func (s *GamedataService) FetchLatestStages(arkZoneIds []string) ([]*gamedata.St
 	return importStages, nil
 }
 
-func (s *GamedataService) GenStageAndDropInfosFromGameData(ctx context.Context, server string, gamedataStage *gamedata.Stage, zoneId int, timeRange *models.TimeRange) (*models.Stage, []*models.DropInfo, error) {
+func (s *GamedataService) genStageAndDropInfosFromGameData(ctx context.Context, server string, gamedataStage *gamedata.Stage, zoneId int, timeRange *models.TimeRange) (*models.Stage, []*models.DropInfo, error) {
 	codeMap := make(map[string]string)
 	for _, lang := range constants.Languages {
 		codeMap[lang] = gamedataStage.Code

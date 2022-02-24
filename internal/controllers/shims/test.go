@@ -1,13 +1,13 @@
 package shims
 
 import (
-	"encoding/json"
-	"fmt"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/models/gamedata"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
@@ -52,28 +52,20 @@ func (c *TestController) RefreshAllSiteStats(ctx *fiber.Ctx) error {
 }
 
 func (c *TestController) Test(ctx *fiber.Ctx) error {
-	importStages, err := c.GamedataService.FetchLatestStages([]string{"act15side_zone1"})
+	server := "CN"
+	startTime := time.Date(2022, time.January, 25, 16, 0, 0, 0, constants.LocMap[server])
+	endTime := time.Date(2022, time.February, 8, 4, 0, 0, 0, constants.LocMap[server])
+	context := &gamedata.UpdateContext{
+		ArkZoneID:    "act15side_zone1",
+		ZoneName:     "测试活动",
+		ZoneCategory: constants.ZoneCategoryActivity,
+		Server:       server,
+		StartTime:    &startTime,
+		EndTime:      &endTime,
+	}
+	renderedObjects, err := c.GamedataService.RenderObjects(ctx.Context(), context)
 	if err != nil {
 		return err
 	}
-	fmt.Println("\nimportStages:", len(importStages))
-	for _, stage := range importStages {
-		fmt.Printf("%s, ", stage.StageID)
-	}
-
-	var ss *models.Stage
-	for _, gamedataStage := range importStages {
-		stage, dropInfos, err := c.GamedataService.GenStageAndDropInfosFromGameData(ctx.Context(), "CN", gamedataStage, 0, nil)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("\nstageId: %s\n", stage.ArkStageID)
-		stageJson, _ := json.Marshal(stage)
-		fmt.Printf("stage: %s\n", stageJson)
-		for _, dropInfo := range dropInfos {
-			dropInfoJson, _ := json.Marshal(dropInfo)
-			fmt.Printf("dropInfo: %s\n", dropInfoJson)
-		}
-	}
-	return ctx.JSON(ss)
+	return ctx.JSON(renderedObjects)
 }

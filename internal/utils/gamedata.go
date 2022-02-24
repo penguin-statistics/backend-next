@@ -31,19 +31,19 @@ var RewardTypeMap = map[int]string{
 }
 
 func IsTrainingStage(stage *gamedata.Stage) bool {
-	return strings.HasPrefix(getArkStageIDSecondPart(stage), ArkStageIDMarkTraining) || strings.HasPrefix(stage.StageID, ArkStageIDMarkTraining+"_")
+	return strings.HasPrefix(GetArkStageIDSecondPart(stage), ArkStageIDMarkTraining) || strings.HasPrefix(stage.StageID, ArkStageIDMarkTraining+"_")
 }
 
 func IsStoryStage(stage *gamedata.Stage) bool {
-	return strings.HasPrefix(getArkStageIDSecondPart(stage), ArkStageIDMarkStory) || strings.HasPrefix(stage.StageID, ArkStageIDMarkStory+"_")
+	return strings.HasPrefix(GetArkStageIDSecondPart(stage), ArkStageIDMarkStory) || strings.HasPrefix(stage.StageID, ArkStageIDMarkStory+"_")
 }
 
 func IsChallengeModeStage(stage *gamedata.Stage) bool {
-	return strings.HasSuffix(getArkStageIDSecondPart(stage), ArkStageIDMarkChallengeMode)
+	return strings.HasSuffix(GetArkStageIDSecondPart(stage), ArkStageIDMarkChallengeMode)
 }
 
 func IsNormalModeExStage(stage *gamedata.Stage) bool {
-	return strings.HasPrefix(getArkStageIDSecondPart(stage), ArkStageIDMarkEx) && !IsChallengeModeStage(stage)
+	return strings.HasPrefix(GetArkStageIDSecondPart(stage), ArkStageIDMarkEx) && !IsChallengeModeStage(stage)
 }
 
 func IsCampaignStage(stage *gamedata.Stage) bool {
@@ -58,7 +58,7 @@ func IsDailyStage(stage *gamedata.Stage) bool {
 	return stage.StageType == StageTypeDaily
 }
 
-func getZonePrefixFromArkZoneID(arkZoneID string) string {
+func GetZonePrefixFromArkZoneID(arkZoneID string) string {
 	index := strings.Index(arkZoneID, "_zone")
 	if index == -1 {
 		return ""
@@ -66,8 +66,8 @@ func getZonePrefixFromArkZoneID(arkZoneID string) string {
 	return arkZoneID[0:index]
 }
 
-func getArkStageIDSecondPart(stage *gamedata.Stage) string {
-	zonePrefix := getZonePrefixFromArkZoneID(stage.ZoneID)
+func GetArkStageIDSecondPart(stage *gamedata.Stage) string {
+	zonePrefix := GetZonePrefixFromArkZoneID(stage.ZoneID)
 	if zonePrefix == "" || len(zonePrefix) >= len(stage.StageID) || !strings.HasPrefix(stage.StageID, zonePrefix) {
 		index := strings.Index(stage.StageID, "_")
 		if index == -1 {
