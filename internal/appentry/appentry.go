@@ -1,11 +1,9 @@
 package appentry
 
 import (
-	"os"
 	"time"
 
 	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
 	"github.com/penguin-statistics/backend-next/internal/controllers"
@@ -76,8 +74,8 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(server.CreateVersioningEndpoints),
 		fx.Provide(service.NewGamedataService),
 		fx.Provide(utils.NewCrypto),
-		fx.Invoke(cache.Initialize),
 		fx.Invoke(logger.Configure),
+		fx.Invoke(cache.Initialize),
 		fx.Invoke(shims.RegisterItemController),
 		fx.Invoke(shims.RegisterZoneController),
 		fx.Invoke(shims.RegisterStageController),
@@ -97,13 +95,6 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		// in which fiber has its own IdleTimeout for controlling the shutdown timeout.
 		// It acts as a countermeasure in case the fiber app is not properly shutting down.
 		fx.StopTimeout(5 * time.Minute),
-		fx.WithLogger(func(config *config.Config) fxevent.Logger {
-			if config.DevMode {
-				return &fxevent.ConsoleLogger{W: os.Stdout}
-			} else {
-				return fxevent.NopLogger
-			}
-		}),
 	}
 
 	if includeSwagger {

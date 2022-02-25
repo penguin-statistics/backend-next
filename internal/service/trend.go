@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"runtime"
 	"sync"
 	"time"
 
@@ -162,7 +163,7 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 		}
 	}()
 
-	limiter := make(chan struct{}, 7)
+	limiter := make(chan struct{}, runtime.NumCPU())
 	wg.Add(len(toCalc))
 	for _, el := range toCalc {
 		limiter <- struct{}{}

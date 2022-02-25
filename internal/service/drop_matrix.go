@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -129,7 +130,7 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx context.Context, se
 
 	usedTimeMap := sync.Map{}
 
-	limiter := make(chan struct{}, 7)
+	limiter := make(chan struct{}, runtime.NumCPU())
 	wg.Add(len(allTimeRanges))
 	for _, timeRange := range allTimeRanges {
 		limiter <- struct{}{}

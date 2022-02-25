@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"runtime"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -105,7 +106,7 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx context.Conte
 		}
 	}()
 
-	limiter := make(chan struct{}, 7)
+	limiter := make(chan struct{}, runtime.NumCPU())
 	wg.Add(len(stageIdsMap))
 
 	errCount := int32(0)
