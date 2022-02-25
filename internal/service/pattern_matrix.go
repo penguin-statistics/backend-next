@@ -2,10 +2,14 @@ package service
 
 import (
 	"context"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -101,30 +105,34 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx context.Conte
 		}
 	}()
 
-	var usedTimeMap sync.Map
-
 	limiter := make(chan struct{}, 7)
 	wg.Add(len(stageIdsMap))
+
+	errCount := int32(0)
 
 	for rangeId, stageIds := range stageIdsMap {
 		limiter <- struct{}{}
 		go func(rangeId int, stageIds []int) {
-			startTime := time.Now()
+			defer func() {
+				<-limiter
+			}()
 
 			timeRanges := []*models.TimeRange{timeRangesMap[rangeId]}
 			currentBatch, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, stageIds, &null.Int{})
 			if err != nil {
+				log.Error().Err(err).Msg("failed to calculate pattern matrix")
+				atomic.AddInt32(&errCount, 1)
 				return
 			}
 
 			ch <- currentBatch
-			<-limiter
-
-			usedTimeMap.Store(rangeId, int(time.Since(startTime).Microseconds()))
 		}(rangeId, stageIds)
 	}
-
 	wg.Wait()
+
+	if errCount > 0 {
+		return errors.New("failed to calculate pattern matrix (total: " + strconv.Itoa(int(errCount)) + " errors); see log for details")
+	}
 
 	if err := s.PatternMatrixElementService.BatchSaveElements(ctx, toSave, server); err != nil {
 		return err
