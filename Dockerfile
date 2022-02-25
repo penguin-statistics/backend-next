@@ -26,7 +26,7 @@ FROM base AS runner
 RUN apk add --no-cache libc6-compat
 
 ENV TINI_VERSION v0.19.0
-ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
+ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static /tini
 RUN chmod +x /tini
 
 COPY --from=builder /app/backend /app/backend
