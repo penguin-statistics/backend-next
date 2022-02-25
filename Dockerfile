@@ -23,6 +23,8 @@ RUN GIT_COMMIT=$(git rev-parse HEAD) \
 
 # runner
 FROM base AS runner
+RUN apk add --no-cache libc6-compat
+
 ENV TINI_VERSION v0.19.0
 ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /tini
 RUN chmod +x /tini
