@@ -23,6 +23,9 @@ RUN GIT_COMMIT=$(git rev-parse HEAD) \
     BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
     go build -o backend -ldflags "-X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitCommit=$(echo -n $GIT_COMMIT) -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitTag=$(echo -n $GIT_TAG) -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitBranch=$(echo -n $GIT_BRANCH) -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.BuildTime=$(echo -n $BUILD_TIME)" .
 
+# tf is going on
+RUN echo "GitCommit: $GIT_COMMIT"
+
 # runner
 FROM base AS runner
 RUN apk add --no-cache libc6-compat
