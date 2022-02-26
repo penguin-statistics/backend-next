@@ -27,12 +27,11 @@ RUN GIT_COMMIT=$(git rev-parse HEAD) \
 FROM base AS runner
 RUN apk add --no-cache libc6-compat
 
-ENV TINI_VERSION v0.19.0
-ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-static /tini
-RUN chmod +x /tini
+RUN apk add --no-cache tini
+# Tini is now available at /sbin/tini
 
 COPY --from=builder /app/backend /app/backend
 EXPOSE 8080
 
-ENTRYPOINT ["/tini", "--"]
+ENTRYPOINT ["/sbin/tini", "--"]
 CMD [ "/app/backend" ]
