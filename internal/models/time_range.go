@@ -24,7 +24,7 @@ func (tr *TimeRange) String() string {
 	return strconv.FormatInt(tr.StartTime.UnixMilli(), 10) + "-" + strconv.FormatInt(tr.EndTime.UnixMilli(), 10)
 }
 
-func (tr *TimeRange) FromString(s string) *TimeRange {
+func TimeRangeFromString(s string) *TimeRange {
 	if s == "" {
 		return nil
 	}

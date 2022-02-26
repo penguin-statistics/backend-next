@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
+	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -73,8 +74,8 @@ func (s *TrendService) GetShimSavedTrendResults(ctx context.Context, server stri
 	return &shimResult, nil
 }
 
-func (s *TrendService) GetShimCustomizedTrendResults(ctx context.Context, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIds []int, itemIds []int, accountId *null.Int) (*shims.TrendQueryResult, error) {
-	trendQueryResult, err := s.QueryTrend(ctx, server, startTime, intervalLength_hrs, intervalNum, stageIds, itemIds, accountId)
+func (s *TrendService) GetShimCustomizedTrendResults(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, itemIds []int, accountId *null.Int) (*shims.TrendQueryResult, error) {
+	trendQueryResult, err := s.QueryTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, itemIds, accountId)
 	if err != nil {
 		return nil, err
 	}
@@ -82,9 +83,9 @@ func (s *TrendService) GetShimCustomizedTrendResults(ctx context.Context, server
 }
 
 func (s *TrendService) QueryTrend(
-	ctx context.Context, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
+	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
 ) (*models.TrendQueryResult, error) {
-	trendElements, err := s.calcTrend(ctx, server, startTime, intervalLength_hrs, intervalNum, stageIdFilter, itemIdFilter, accountId)
+	trendElements, err := s.calcTrend(ctx, server, startTime, intervalLength, intervalNum, stageIdFilter, itemIdFilter, accountId)
 	if err != nil {
 		return nil, err
 	}
@@ -97,28 +98,35 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 		return err
 	}
 
-	toCalc := make([]map[string]interface{}, 0)
+	calcq := make([]map[string]interface{}, 0)
 	for stageId, maxAccumulableTimeRangesForOneStage := range maxAccumulableTimeRanges {
-		itemIdsMapByTimeRange := make(map[string][]int, 0)
+		itemIdsMapByTimeRange := make(map[string][]int)
 		for itemId, timeRanges := range maxAccumulableTimeRangesForOneStage {
 			sortedTimeRanges := make([]*models.TimeRange, 0)
-			linq.From(timeRanges).SortT(func(a, b *models.TimeRange) bool {
-				return a.StartTime.Before(*b.StartTime)
-			}).ToSlice(&sortedTimeRanges)
+
+			linq.From(timeRanges).
+				SortT(func(a, b *models.TimeRange) bool {
+					return a.StartTime.Before(*b.StartTime)
+				}).
+				ToSlice(&sortedTimeRanges)
+
 			combinedTimeRange := models.TimeRange{
 				StartTime: sortedTimeRanges[0].StartTime,
 				EndTime:   sortedTimeRanges[len(sortedTimeRanges)-1].EndTime,
 			}
-			if _, ok := itemIdsMapByTimeRange[combinedTimeRange.String()]; !ok {
-				itemIdsMapByTimeRange[combinedTimeRange.String()] = make([]int, 0)
+
+			combinedTimeRangeKey := combinedTimeRange.String()
+			if _, ok := itemIdsMapByTimeRange[combinedTimeRangeKey]; !ok {
+				itemIdsMapByTimeRange[combinedTimeRangeKey] = make([]int, 0)
 			}
-			itemIdsMapByTimeRange[combinedTimeRange.String()] = append(itemIdsMapByTimeRange[combinedTimeRange.String()], itemId)
+
+			itemIdsMapByTimeRange[combinedTimeRangeKey] = append(itemIdsMapByTimeRange[combinedTimeRangeKey], itemId)
 		}
 		for rangeStr, itemIds := range itemIdsMapByTimeRange {
-			var timeRange *models.TimeRange
-			timeRange = timeRange.FromString(rangeStr)
+			timeRange := models.TimeRangeFromString(rangeStr)
 			startTime := *timeRange.StartTime
 			endTime := *timeRange.EndTime
+
 			if endTime.After(time.Now()) {
 				endTime = time.Now()
 			}
@@ -142,7 +150,7 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 				startTime = endTime.Add(time.Hour * time.Duration((-1)*24*intervalNum))
 			}
 
-			toCalc = append(toCalc, map[string]interface{}{
+			calcq = append(calcq, map[string]interface{}{
 				"stageId":     stageId,
 				"itemIds":     itemIds,
 				"startTime":   startTime,
@@ -164,15 +172,15 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 	}()
 
 	limiter := make(chan struct{}, runtime.NumCPU())
-	wg.Add(len(toCalc))
-	for _, el := range toCalc {
+	wg.Add(len(calcq))
+	for _, el := range calcq {
 		limiter <- struct{}{}
 		go func(el map[string]interface{}) {
 			startTime := el["startTime"].(time.Time)
 			intervalNum := el["intervalNum"].(int)
 			stageId := el["stageId"].(int)
 			itemIds := el["itemIds"].([]int)
-			currentBatch, err := s.calcTrend(ctx, server, &startTime, 24, intervalNum, []int{stageId}, itemIds, &null.Int{})
+			currentBatch, err := s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, &null.Int{})
 			if err != nil {
 				return
 			}
@@ -197,9 +205,10 @@ func (s *TrendService) getSavedTrendResults(ctx context.Context, server string) 
 }
 
 func (s *TrendService) calcTrend(
-	ctx context.Context, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
+	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
 ) ([]*models.TrendElement, error) {
-	endTime := startTime.Add(time.Hour * time.Duration(intervalLength_hrs*intervalNum))
+	endTime := startTime.Add(time.Hour * time.Duration(int(intervalLength.Hours())*intervalNum))
+	log.Debug().Time("startTime", *startTime).Time("endTime", endTime).Int("intervalNum", intervalNum).Msg("calcTrend")
 	timeRange := models.TimeRange{
 		StartTime: startTime,
 		EndTime:   &endTime,
@@ -209,11 +218,11 @@ func (s *TrendService) calcTrend(
 		return nil, err
 	}
 
-	quantityResults, err := s.DropReportService.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength_hrs, intervalNum, utils.GetStageIdItemIdMapFromDropInfos(dropInfos), accountId)
+	quantityResults, err := s.DropReportService.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength, intervalNum, utils.GetStageIdItemIdMapFromDropInfos(dropInfos), accountId)
 	if err != nil {
 		return nil, err
 	}
-	timesResults, err := s.DropReportService.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength_hrs, intervalNum, utils.GetStageIdsFromDropInfos(dropInfos), accountId)
+	timesResults, err := s.DropReportService.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength, intervalNum, utils.GetStageIdsFromDropInfos(dropInfos), accountId)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +266,7 @@ func (s *TrendService) combineQuantityAndTimesResults(
 		quantityResultsMap := make(map[int]map[int]int)
 		for _, secondGroupElements := range secondGroupResultsForQuantity {
 			stageId := secondGroupElements.Key.(int)
-			resultsMap := make(map[int]int, 0)
+			resultsMap := make(map[int]int)
 			linq.From(secondGroupElements.Group).
 				ToMapByT(&resultsMap,
 					func(el interface{}) int { return el.(*models.TotalQuantityResultForTrend).ItemID },

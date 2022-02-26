@@ -1,6 +1,7 @@
 package shims
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -212,7 +213,7 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 	}
 
 	// handle start time (might be null)
-	startTime_milli := constants.SERVER_START_TIME_MAP_MILLI[query.Server]
+	startTime_milli := constants.ServerStartTimeMapMillis[query.Server]
 	if query.StartTime != nil && query.StartTime.Valid {
 		startTime_milli = query.StartTime.Int64
 	}
@@ -249,16 +250,17 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 		}
 		return c.DropMatrixService.GetShimCustomizedDropMatrixResults(ctx.Context(), query.Server, timeRange, []int{stage.StageID}, itemIds, &accountId)
 	} else {
-		intervalLength_hrs := int(query.Interval.Int64 / (1000 * 60 * 60))
-		if intervalLength_hrs == 0 {
-			return nil, fmt.Errorf("interval length must be greater than 1 hour")
+		// interval originally is in milliseconds, so we need to convert it to nanoseconds
+		intervalLength := time.Duration(query.Interval.Int64 * 1e7).Round(time.Hour)
+		if intervalLength.Hours() < 1 {
+			return nil, errors.New("interval length must be greater than 1 hour")
 		}
-		intervalNum := c.calcIntervalNum(startTime, endTime, intervalLength_hrs)
+		intervalNum := c.calcIntervalNum(startTime, endTime, intervalLength)
 		if intervalNum > constants.MaxIntervalNum {
-			return nil, fmt.Errorf("intervalNum too large")
+			return nil, fmt.Errorf("interval length is too long, max interval length is %d sections", constants.MaxIntervalNum)
 		}
 
-		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx.Context(), query.Server, &startTime, intervalLength_hrs, intervalNum, []int{stage.StageID}, itemIds, &accountId)
+		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx.Context(), query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, &accountId)
 		if err != nil {
 			return nil, err
 		}
@@ -266,7 +268,8 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 	}
 }
 
-func (c *ResultController) calcIntervalNum(startTime, endTime time.Time, intervalLength_hrs int) int {
-	diff := endTime.Unix() - startTime.Unix()
-	return int(diff / (3600 * int64(intervalLength_hrs)))
+func (c *ResultController) calcIntervalNum(startTime, endTime time.Time, intervalLength time.Duration) int {
+	diff := endTime.Sub(startTime)
+	// implicit float64 to int: drops fractional part (truncates towards 0)
+	return int(int(diff.Hours()) / int(intervalLength.Hours()))
 }

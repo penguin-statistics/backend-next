@@ -172,7 +172,7 @@ func (s *DropReportRepo) CalcTotalTimes(
 }
 
 func (s *DropReportRepo) CalcTotalQuantityForTrend(
-	ctx context.Context, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdItemIdMap map[int][]int, accountId *null.Int,
+	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId *null.Int,
 ) ([]*models.TotalQuantityResultForTrend, error) {
 	results := make([]*models.TotalQuantityResultForTrend, 0)
 	if len(stageIdItemIdMap) == 0 {
@@ -180,7 +180,7 @@ func (s *DropReportRepo) CalcTotalQuantityForTrend(
 	}
 
 	gameDayStart := utils.GetGameDayStartTime(server, *startTime)
-	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(intervalLength_hrs*(intervalNum+1)))
+	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(int(intervalLength.Hours())*(intervalNum+1)))
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "dr.created_at >= to_timestamp(%d)", gameDayStart.Unix())
@@ -207,12 +207,12 @@ func (s *DropReportRepo) CalcTotalQuantityForTrend(
 	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + ((n + ?) || ' hours')::interval AS interval_end, ")
 	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_id")
 	subQuery := s.DB.NewSelect().
-		TableExpr("generate_series(?, ? * ?, ?) AS n", 0, intervalLength_hrs, intervalNum, intervalLength_hrs).
+		TableExpr("generate_series(?, ? * ?, ?) AS n", 0, int(intervalLength.Hours()), intervalNum, int(intervalLength.Hours())).
 		ColumnExpr(subQueryExprBuilder.String(),
 			gameDayStart.Unix(),
 			gameDayStart.Unix(),
-			intervalLength_hrs,
-			intervalLength_hrs,
+			int(intervalLength.Hours()),
+			int(intervalLength.Hours()),
 		)
 	query := s.DB.NewSelect().
 		With("intervals", subQuery).
@@ -237,7 +237,7 @@ func (s *DropReportRepo) CalcTotalQuantityForTrend(
 }
 
 func (s *DropReportRepo) CalcTotalTimesForTrend(
-	ctx context.Context, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIds []int, accountId *null.Int,
+	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId *null.Int,
 ) ([]*models.TotalTimesResultForTrend, error) {
 	results := make([]*models.TotalTimesResultForTrend, 0)
 	if len(stageIds) == 0 {
@@ -245,7 +245,7 @@ func (s *DropReportRepo) CalcTotalTimesForTrend(
 	}
 
 	gameDayStart := utils.GetGameDayStartTime(server, *startTime)
-	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(intervalLength_hrs*(intervalNum+1)))
+	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(int(intervalLength.Hours())*(intervalNum+1)))
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "dr.created_at >= to_timestamp(%d)", gameDayStart.Unix())
@@ -266,12 +266,12 @@ func (s *DropReportRepo) CalcTotalTimesForTrend(
 	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + ((n + ?) || ' hours')::interval AS interval_end, ")
 	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_id")
 	subQuery := s.DB.NewSelect().
-		TableExpr("generate_series(?, ? * ?, ?) AS n", 0, intervalLength_hrs, intervalNum-1, intervalLength_hrs).
+		TableExpr("generate_series(?, ? * ?, ?) AS n", 0, int(intervalLength.Hours()), intervalNum-1, int(intervalLength.Hours())).
 		ColumnExpr(subQueryExprBuilder.String(),
 			gameDayStart.Unix(),
 			gameDayStart.Unix(),
-			intervalLength_hrs,
-			intervalLength_hrs,
+			int(intervalLength.Hours()),
+			int(intervalLength.Hours()),
 		)
 	query := s.DB.NewSelect().
 		With("intervals", subQuery).

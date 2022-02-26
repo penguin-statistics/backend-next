@@ -14,7 +14,7 @@ const (
 	GameDayStartNano   int = 0
 )
 
-var SERVER_START_TIME_MAP_MILLI = map[string]int64{
+var ServerStartTimeMapMillis = map[string]int64{
 	"CN": CNServerStartTimeMilli,
 	"US": USServerStartTimeMilli,
 	"JP": JPServerStartTimeMilli,

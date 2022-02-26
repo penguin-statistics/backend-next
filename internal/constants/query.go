@@ -1,6 +1,6 @@
 package constants
 
 const (
-	MaxIntervalNum     = 180
+	MaxIntervalNum     = 360
 	DefaultIntervalNum = 60
 )

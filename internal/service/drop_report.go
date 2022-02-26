@@ -36,10 +36,10 @@ func (s *DropReportService) CalcTotalTimesForPatternMatrix(ctx context.Context, 
 	return s.DropReportRepo.CalcTotalTimes(ctx, server, timeRange, stageIds, accountId, true)
 }
 
-func (s *DropReportService) CalcTotalQuantityForTrend(ctx context.Context, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIdItemIdMap map[int][]int, accountId *null.Int) ([]*models.TotalQuantityResultForTrend, error) {
-	return s.DropReportRepo.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength_hrs, intervalNum, stageIdItemIdMap, accountId)
+func (s *DropReportService) CalcTotalQuantityForTrend(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId *null.Int) ([]*models.TotalQuantityResultForTrend, error) {
+	return s.DropReportRepo.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIdItemIdMap, accountId)
 }
 
-func (s *DropReportService) CalcTotalTimesForTrend(ctx context.Context, server string, startTime *time.Time, intervalLength_hrs int, intervalNum int, stageIds []int, accountId *null.Int) ([]*models.TotalTimesResultForTrend, error) {
-	return s.DropReportRepo.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength_hrs, intervalNum, stageIds, accountId)
+func (s *DropReportService) CalcTotalTimesForTrend(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId *null.Int) ([]*models.TotalTimesResultForTrend, error) {
+	return s.DropReportRepo.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, accountId)
 }
