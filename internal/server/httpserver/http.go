@@ -37,7 +37,7 @@ import (
 func Create(config *config.Config, flake *snowflake.Node) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:      "Penguin Stats Backend v3",
-		ServerHeader: fmt.Sprintf("Penguin/%s", bininfo.GitTag),
+		ServerHeader: fmt.Sprintf("Penguin/%s", bininfo.Version),
 		// NOTICE: This will also affect WebSocket. Be aware if this fiber instance service is re-used
 		//         for long connection services.
 		ReadTimeout:  time.Second * 20,

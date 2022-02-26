@@ -18,8 +18,7 @@ jobs:
     - name: Get Tag Version
       id: get_version
       run: |
-        echo "GIT_COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
-        echo "GIT_TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+        echo "VERSION=${GITHUB_REF/refs\/tags\//}+${GITHUB_SHA}" >> $GITHUB_ENV
 
     - name: Build and Publish to Registry
       uses: elgohr/Publish-Docker-Github-Action@3.04
@@ -28,5 +27,5 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
         registry: ghcr.io
-        tags: 'latest,${{ env.GIT_TAG }}'
-        buildargs: GIT_COMMIT,GIT_TAG
+        tags: 'latest,${{ env.VERSION }}'
+        buildargs: VERSION

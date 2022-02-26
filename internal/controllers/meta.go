@@ -17,12 +17,7 @@ func RegisterMetaController(v3 *server.V3) {
 
 func (c *MetaController) BinInfo(ctx *fiber.Ctx) error {
 	return ctx.JSON(fiber.Map{
-		"git": fiber.Map{
-			"tag":    bininfo.GitTag,
-			"commit": bininfo.GitCommit,
-		},
-		"build": fiber.Map{
-			"time": bininfo.BuildTime,
-		},
+		"version": bininfo.Version,
+		"build":   bininfo.BuildTime,
 	})
 }
