@@ -100,7 +100,10 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx context.Conte
 
 	go func() {
 		for {
-			m := <-ch
+			m, ok := <-ch
+			if !ok {
+				return
+			}
 			toSave = append(toSave, m...)
 			wg.Done()
 		}
@@ -130,6 +133,7 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx context.Conte
 		}(rangeId, stageIds)
 	}
 	wg.Wait()
+	close(ch)
 
 	if errCount > 0 {
 		return errors.New("failed to calculate pattern matrix (total: " + strconv.Itoa(int(errCount)) + " errors); see log for details")

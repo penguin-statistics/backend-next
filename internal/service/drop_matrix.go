@@ -122,7 +122,10 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx context.Context, se
 
 	go func() {
 		for {
-			m := <-ch
+			m, ok := <-ch
+			if !ok {
+				return
+			}
 			toSave = append(toSave, m...)
 			wg.Done()
 		}
@@ -151,6 +154,7 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx context.Context, se
 	}
 
 	wg.Wait()
+	close(ch)
 
 	if err := s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server); err != nil {
 		return err

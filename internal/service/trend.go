@@ -165,7 +165,10 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 
 	go func() {
 		for {
-			m := <-ch
+			m, ok := <-ch
+			if !ok {
+				return
+			}
 			toSave = append(toSave, m...)
 			wg.Done()
 		}
@@ -189,6 +192,7 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 		}(el)
 	}
 	wg.Wait()
+	close(ch)
 
 	if err := s.TrendElementService.BatchSaveElements(ctx, toSave, server); err != nil {
 		return err
