@@ -219,21 +219,19 @@ func (s *TrendService) calcTrend(
 	}
 	combinedResults := s.combineQuantityAndTimesResults(quantityResults, timesResults)
 
-	finalResults := make([]*models.TrendElement, 0)
-	linq.From(combinedResults).
-		SelectT(func(el *models.CombinedResultForTrend) *models.TrendElement {
-			return &models.TrendElement{
-				StageID:   el.StageID,
-				ItemID:    el.ItemID,
-				Quantity:  el.Quantity,
-				Times:     el.Times,
-				Server:    server,
-				StartTime: el.StartTime,
-				EndTime:   el.EndTime,
-				GroupID:   el.GroupID,
-			}
-		}).
-		ToSlice(&finalResults)
+	finalResults := make([]*models.TrendElement, 0, len(combinedResults))
+	for _, result := range combinedResults {
+		finalResults = append(finalResults, &models.TrendElement{
+			StageID:   result.StageID,
+			ItemID:    result.ItemID,
+			Quantity:  result.Quantity,
+			Times:     result.Times,
+			Server:    server,
+			StartTime: result.StartTime,
+			EndTime:   result.EndTime,
+			GroupID:   result.GroupID,
+		})
+	}
 	return finalResults, nil
 }
 
