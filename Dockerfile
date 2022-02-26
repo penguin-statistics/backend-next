@@ -14,6 +14,8 @@ COPY go.sum ./
 RUN go mod download
 COPY . .
 
+RUN apk update && apk add bash git openssh
+
 # Inject versioning information & build the binary
 RUN GIT_COMMIT=$(git rev-parse HEAD) \
     GIT_TAG=$(git describe --tags) \
