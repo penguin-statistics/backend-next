@@ -20,7 +20,6 @@ jobs:
       run: |
         echo "GIT_COMMIT=${GITHUB_SHA}" >> $GITHUB_ENV
         echo "GIT_TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
-        echo "GIT_BRANCH=$(echo ${GITHUB_REF#refs/heads/} | tr / -)" >> $GITHUB_ENV
 
     - name: Build and Publish to Registry
       uses: elgohr/Publish-Docker-Github-Action@3.04
@@ -30,4 +29,4 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
         registry: ghcr.io
         tags: 'latest,${{ env.GIT_TAG }}'
-        buildargs: GIT_COMMIT,GIT_TAG,GIT_BRANCH
+        buildargs: GIT_COMMIT,GIT_TAG

@@ -20,7 +20,6 @@ func (c *MetaController) BinInfo(ctx *fiber.Ctx) error {
 		"git": fiber.Map{
 			"tag":    bininfo.GitTag,
 			"commit": bininfo.GitCommit,
-			"branch": bininfo.GitBranch,
 		},
 		"build": fiber.Map{
 			"time": bininfo.BuildTime,

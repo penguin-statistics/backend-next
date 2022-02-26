@@ -10,9 +10,6 @@ var (
 	// GitCommit is the commit hash used to build this binary.
 	GitCommit = "unknown"
 
-	// GitBranch is the branch used to build this binary.
-	GitBranch = "unknown"
-
 	// BuildTime is the time at which the application was built.
 	BuildTime = "1970-01-01T00:00:00Z"
 )
