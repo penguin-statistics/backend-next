@@ -6,6 +6,11 @@ FROM base AS builder
 ENV GOOS linux
 ENV GOARCH amd64
 
+# build-args
+ARG GIT_COMMIT
+ARG GIT_TAG
+ARG GIT_BRANCH
+
 # modules: utilize build cache
 COPY go.mod ./
 COPY go.sum ./
@@ -17,14 +22,10 @@ COPY . .
 RUN apk update && apk add bash git openssh
 
 # Inject versioning information & build the binary
-RUN GIT_COMMIT=$(git rev-parse HEAD) \
-    GIT_TAG=$(git describe --tags) \
-    GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
-    BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-    go build -o backend -ldflags "-X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitCommit=$(echo -n $GIT_COMMIT) -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitTag=$(echo -n $GIT_TAG) -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitBranch=$(echo -n $GIT_BRANCH) -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.BuildTime=$(echo -n $BUILD_TIME)" .
+RUN BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ") go build -o backend -ldflags "-X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitCommit=${GIT_COMMIT} -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitTag=${GIT_TAG} -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitBranch=${GIT_BRANCH} -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.BuildTime=$(echo -n $BUILD_TIME)" .
 
 # tf is going on
-RUN echo "GitCommit: $GIT_COMMIT"
+RUN echo "GitCommit: $GIT_COMMIT; GitTag: $GIT_TAG; GitBranch: $GIT_BRANCH; BuildTime: $BUILD_TIME"
 
 # runner
 FROM base AS runner
