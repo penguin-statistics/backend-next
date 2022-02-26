@@ -35,7 +35,7 @@ var dropTypeOrderMapping = map[string]int{
 	"RECOGNITION_ONLY": 4,
 }
 
-func (s *GamedataService) RenderObjects(ctx context.Context, context *gamedata.UpdateContext) (*gamedata.RenderedObjects, error) {
+func (s *GamedataService) UpdateBrandNewEvent(ctx context.Context, context *gamedata.BrandNewEventContext) (*gamedata.BrandNewEventObjects, error) {
 	zone, err := s.renderNewZone(context)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (s *GamedataService) RenderObjects(ctx context.Context, context *gamedata.U
 		dropInfos = append(dropInfos, dropInfosForOneStage...)
 	}
 
-	return &gamedata.RenderedObjects{
+	return &gamedata.BrandNewEventObjects{
 		Zone:      zone,
 		Stages:    stages,
 		DropInfos: dropInfos,
@@ -76,7 +76,7 @@ func (s *GamedataService) RenderObjects(ctx context.Context, context *gamedata.U
 	}, nil
 }
 
-func (s *GamedataService) renderNewZone(context *gamedata.UpdateContext) (*models.Zone, error) {
+func (s *GamedataService) renderNewZone(context *gamedata.BrandNewEventContext) (*models.Zone, error) {
 	nameMap := make(map[string]string)
 	for _, lang := range constants.Languages {
 		nameMap[lang] = context.ZoneName
@@ -121,7 +121,7 @@ func (s *GamedataService) renderNewZone(context *gamedata.UpdateContext) (*model
 	}, nil
 }
 
-func (s *GamedataService) renderNewTimeRange(context *gamedata.UpdateContext) (*models.TimeRange, error) {
+func (s *GamedataService) renderNewTimeRange(context *gamedata.BrandNewEventContext) (*models.TimeRange, error) {
 	fakeEndTime := time.UnixMilli(constants.FakeEndTimeMilli)
 	endTime := &fakeEndTime
 	if context.EndTime != nil {
@@ -144,7 +144,7 @@ func (s *GamedataService) renderNewTimeRange(context *gamedata.UpdateContext) (*
 	}, nil
 }
 
-func (s *GamedataService) renderNewActivity(context *gamedata.UpdateContext) (*models.Activity, error) {
+func (s *GamedataService) renderNewActivity(context *gamedata.BrandNewEventContext) (*models.Activity, error) {
 	fakeEndTime := time.UnixMilli(constants.FakeEndTimeMilli)
 	endTime := &fakeEndTime
 	if context.EndTime != nil {

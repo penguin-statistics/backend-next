@@ -8,7 +8,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 )
 
-type UpdateContext struct {
+type BrandNewEventContext struct {
 	ArkZoneID    string
 	ZoneName     string
 	ZoneCategory string
@@ -18,7 +18,7 @@ type UpdateContext struct {
 	EndTime      *time.Time
 }
 
-type RenderedObjects struct {
+type BrandNewEventObjects struct {
 	Zone      *models.Zone       `json:"zone"`
 	Stages    []*models.Stage    `json:"stages"`
 	DropInfos []*models.DropInfo `json:"dropInfos"`
