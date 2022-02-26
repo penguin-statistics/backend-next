@@ -131,12 +131,12 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 				endTime = time.Now()
 			}
 
-			// if start/end time is not a starting time of its game day, we need to adjust it
-			if !utils.IsGameDayStartTime(server, startTime) {
-				startTime = utils.GetGameDayStartTime(server, startTime)
-			}
+			startTime = utils.GetGameDayStartTime(server, startTime)
 			if !utils.IsGameDayStartTime(server, endTime) {
 				endTime = utils.GetGameDayEndTime(server, endTime)
+			} else {
+				loc := constants.LocMap[server]
+				endTime = endTime.In(loc)
 			}
 
 			diff := int(endTime.Sub(startTime).Hours())
