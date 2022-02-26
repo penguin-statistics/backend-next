@@ -21,7 +21,7 @@ RUN GIT_COMMIT=$(git rev-parse HEAD) \
     GIT_TAG=$(git describe --tags) \
     GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD) \
     BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-    go build -o backend -ldflags "-X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitCommit=${GIT_COMMIT} -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitTag=${GIT_TAG} -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitBranch=${GIT_BRANCH} -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.BuildTime=${BUILD_TIME}" .
+    go build -o backend -ldflags "-X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitCommit=$(echo -n $GIT_COMMIT) -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitTag=$(echo -n $GIT_TAG) -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.GitBranch=$(echo -n $GIT_BRANCH) -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.BuildTime=$(echo -n $BUILD_TIME)" .
 
 # runner
 FROM base AS runner
