@@ -45,7 +45,7 @@ func (s *DropReportRepo) DeleteDropReport(ctx context.Context, reportId int) err
 }
 
 func (s *DropReportRepo) CalcTotalQuantityForDropMatrix(
-	ctx context.Context, server string, timeRange *models.TimeRange, stageIdItemIdMap map[int][]int, accountId *null.Int,
+	ctx context.Context, server string, timeRange *models.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int,
 ) ([]*models.TotalQuantityResultForDropMatrix, error) {
 	results := make([]*models.TotalQuantityResultForDropMatrix, 0)
 	if len(stageIdItemIdMap) == 0 {
@@ -91,7 +91,7 @@ func (s *DropReportRepo) CalcTotalQuantityForDropMatrix(
 }
 
 func (s *DropReportRepo) CalcTotalQuantityForPatternMatrix(
-	ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId *null.Int,
+	ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId null.Int,
 ) ([]*models.TotalQuantityResultForPatternMatrix, error) {
 	results := make([]*models.TotalQuantityResultForPatternMatrix, 0)
 	if len(stageIds) == 0 {
@@ -130,7 +130,7 @@ func (s *DropReportRepo) CalcTotalQuantityForPatternMatrix(
 }
 
 func (s *DropReportRepo) CalcTotalTimes(
-	ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId *null.Int, excludeNonOneTimes bool,
+	ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId null.Int, excludeNonOneTimes bool,
 ) ([]*models.TotalTimesResult, error) {
 	results := make([]*models.TotalTimesResult, 0)
 	if len(stageIds) == 0 {
@@ -172,7 +172,7 @@ func (s *DropReportRepo) CalcTotalTimes(
 }
 
 func (s *DropReportRepo) CalcTotalQuantityForTrend(
-	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId *null.Int,
+	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int,
 ) ([]*models.TotalQuantityResultForTrend, error) {
 	results := make([]*models.TotalQuantityResultForTrend, 0)
 	if len(stageIdItemIdMap) == 0 {
@@ -237,7 +237,7 @@ func (s *DropReportRepo) CalcTotalQuantityForTrend(
 }
 
 func (s *DropReportRepo) CalcTotalTimesForTrend(
-	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId *null.Int,
+	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId null.Int,
 ) ([]*models.TotalTimesResultForTrend, error) {
 	results := make([]*models.TotalTimesResultForTrend, 0)
 	if len(stageIds) == 0 {

@@ -74,7 +74,7 @@ func (s *TrendService) GetShimSavedTrendResults(ctx context.Context, server stri
 	return &shimResult, nil
 }
 
-func (s *TrendService) GetShimCustomizedTrendResults(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, itemIds []int, accountId *null.Int) (*shims.TrendQueryResult, error) {
+func (s *TrendService) GetShimCustomizedTrendResults(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, itemIds []int, accountId null.Int) (*shims.TrendQueryResult, error) {
 	trendQueryResult, err := s.QueryTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, itemIds, accountId)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (s *TrendService) GetShimCustomizedTrendResults(ctx context.Context, server
 }
 
 func (s *TrendService) QueryTrend(
-	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
+	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId null.Int,
 ) (*models.TrendQueryResult, error) {
 	trendElements, err := s.calcTrend(ctx, server, startTime, intervalLength, intervalNum, stageIdFilter, itemIdFilter, accountId)
 	if err != nil {
@@ -183,7 +183,7 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 			intervalNum := el["intervalNum"].(int)
 			stageId := el["stageId"].(int)
 			itemIds := el["itemIds"].([]int)
-			currentBatch, err := s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, &null.Int{})
+			currentBatch, err := s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, null.NewInt(0, false))
 			if err != nil {
 				return
 			}
@@ -209,7 +209,7 @@ func (s *TrendService) getSavedTrendResults(ctx context.Context, server string) 
 }
 
 func (s *TrendService) calcTrend(
-	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId *null.Int,
+	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId null.Int,
 ) ([]*models.TrendElement, error) {
 	endTime := startTime.Add(time.Hour * time.Duration(int(intervalLength.Hours())*intervalNum))
 	log.Debug().Time("startTime", *startTime).Time("endTime", endTime).Int("intervalNum", intervalNum).Msg("calcTrend")

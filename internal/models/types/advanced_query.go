@@ -7,11 +7,11 @@ type AdvancedQueryRequest struct {
 }
 
 type AdvancedQuery struct {
-	Server     string     `json:"server" validate:"required,caseinsensitiveoneof=CN US JP KR" required:"true"`
-	StageID    string     `json:"stageId" validate:"required" required:"true"`
-	ItemIDs    []string   `json:"itemIds"`
-	IsPersonal *null.Bool `json:"isPersonal"`
-	StartTime  *null.Int  `json:"start"`
-	EndTime    *null.Int  `json:"end"`
-	Interval   *null.Int  `json:"interval"`
+	Server     string    `json:"server" validate:"required,caseinsensitiveoneof=CN US JP KR" required:"true"`
+	StageID    string    `json:"stageId" validate:"required" required:"true"`
+	ItemIDs    []string  `json:"itemIds"`
+	IsPersonal null.Bool `json:"isPersonal"`
+	StartTime  null.Int  `json:"start"`
+	EndTime    null.Int  `json:"end"`
+	Interval   null.Int  `json:"interval"`
 }

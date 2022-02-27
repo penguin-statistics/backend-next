@@ -139,8 +139,8 @@ func (s *GamedataService) renderNewTimeRange(context *gamedata.BrandNewEventCont
 		StartTime: context.StartTime,
 		EndTime:   endTime,
 		Server:    context.Server,
-		Name:      &name,
-		Comment:   &comment,
+		Name:      name,
+		Comment:   comment,
 	}, nil
 }
 
