@@ -2,7 +2,7 @@ package types
 
 import "gopkg.in/guregu/null.v3"
 
-type UpdateBrandNewEventRequest struct {
+type UpdateNewEventRequest struct {
 	ArkZoneID    string      `json:"arkZoneId"`
 	ZoneName     string      `json:"zoneName"`
 	ZoneCategory string      `json:"zoneCategory"`

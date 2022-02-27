@@ -8,7 +8,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 )
 
-type BrandNewEventContext struct {
+type NewEventBasicInfo struct {
 	ArkZoneID    string
 	ZoneName     string
 	ZoneCategory string
