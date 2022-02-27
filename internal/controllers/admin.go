@@ -27,9 +27,6 @@ type AdminController struct {
 func RegisterAdminController(admin *server.Admin, c AdminController) {
 	admin.Post("/render/event", c.UpdateBrandNewEvent)
 	admin.Post("/save", c.SaveRenderedObjects)
-	admin.Post("/intentionally/panic", func(c *fiber.Ctx) error {
-		panic("intentional panic")
-	})
 }
 
 func (c *AdminController) UpdateBrandNewEvent(ctx *fiber.Ctx) error {
