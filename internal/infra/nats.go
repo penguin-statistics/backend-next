@@ -9,7 +9,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/config"
 )
 
-func ProvideNats(config *config.Config) (*nats.Conn, nats.JetStreamContext, error) {
+func NATS(config *config.Config) (*nats.Conn, nats.JetStreamContext, error) {
 	nc, err := nats.Connect(config.NatsURL)
 	if err != nil {
 		return nil, nil, err

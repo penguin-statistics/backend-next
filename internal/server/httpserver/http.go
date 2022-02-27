@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/bwmarrin/snowflake"
-	ut "github.com/go-playground/universal-translator"
+	"github.com/gofiber/contrib/fibersentry"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
@@ -26,12 +25,11 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
-	"golang.org/x/text/language"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
+	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
-	"github.com/penguin-statistics/backend-next/internal/utils/i18n"
+	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
 )
 
 func Create(config *config.Config, flake *snowflake.Node) *fiber.App {
@@ -50,56 +48,14 @@ func Create(config *config.Config, flake *snowflake.Node) *fiber.App {
 			"::1",
 			"127.0.0.1",
 		},
-		ErrorHandler: func(ctx *fiber.Ctx, err error) error {
-			// Use custom error handler to return JSON error responses
-			if e, ok := err.(*errors.PenguinError); ok {
-				log.Warn().
-					Err(err).
-					Str("method", ctx.Method()).
-					Str("path", ctx.Path()).
-					Msg(e.Message)
-
-				// Provide error code if errors.PenguinError type
-				body := fiber.Map{
-					"code":    e.ErrorCode,
-					"message": e.Message,
-				}
-
-				// Add extra details if needed
-				if e.Extras != nil && len(*e.Extras) > 0 {
-					for k, v := range *e.Extras {
-						body[k] = v
-					}
-				}
-
-				return ctx.Status(e.StatusCode).JSON(body)
-			}
-
-			// Return default error handler
-			// Default 500 statuscode
-			code := fiber.StatusInternalServerError
-
-			if e, ok := err.(*fiber.Error); ok {
-				// Overwrite status code if fiber.Error type & provided code
-				code = e.Code
-			}
-
-			log.Error().
-				Stack().
-				Err(err).
-				Str("method", ctx.Method()).
-				Str("path", ctx.Path()).
-				Int("status", code).
-				Msg("Internal Server Error")
-
-			return ctx.Status(code).JSON(fiber.Map{
-				"code":    errors.CodeInternalError,
-				"message": "internal server error",
-			})
-		},
+		ErrorHandler: ErrorHandler,
 	})
 
 	app.Use(favicon.New())
+	app.Use(fibersentry.New(fibersentry.Config{
+		Repanic: true,
+		Timeout: time.Second * 5,
+	}))
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "*",
 		AllowMethods:     "GET, POST, DELETE, OPTIONS",
@@ -114,6 +70,7 @@ func Create(config *config.Config, flake *snowflake.Node) *fiber.App {
 				id := flake.Generate().IntBytes()
 				return hex.EncodeToString(id[:])
 			},
+			ContextKey: constants.ContextKeyRequestID,
 		},
 	))
 	app.Use(helmet.New(helmet.Config{
@@ -121,35 +78,9 @@ func Create(config *config.Config, flake *snowflake.Node) *fiber.App {
 		HSTSPreloadEnabled: true,
 		ReferrerPolicy:     "strict-origin-when-cross-origin",
 		PermissionPolicy:   "interest-cohort=()",
-		// ContentSecurityPolicy: "default-src 'none'; script-src 'none'; worker-src 'none'; frame-ancestors 'none'; sandbox",
 	}))
-	// app.Use("/api/v3/live", func(c *fiber.Ctx) error {
-	// 	if websocket.IsWebSocketUpgrade(c) {
-	// 		return c.Next()
-	// 	}
-	// 	return fiber.ErrUpgradeRequired
-	// })
-	app.Use(func(c *fiber.Ctx) error {
-		set := func(trans ut.Translator) error {
-			c.Locals("T", trans)
-			return c.Next()
-		}
-
-		tags, _, err := language.ParseAcceptLanguage(c.Get(fiber.HeaderAcceptLanguage))
-		if err != nil {
-			return set(i18n.UT.GetFallback())
-		}
-
-		var langs []string
-
-		for _, tag := range tags {
-			langs = append(langs, strings.ReplaceAll(strings.ToLower(tag.String()), "-", "_"))
-		}
-
-		trans, _ := i18n.UT.FindTranslator(langs...)
-
-		return set(trans)
-	})
+	app.Use(middlewares.EnrichSentry())
+	app.Use(middlewares.InjectI18n())
 	app.Use(recover.New(recover.Config{
 		EnableStackTrace: true,
 		StackTraceHandler: func(c *fiber.Ctx, e interface{}) {

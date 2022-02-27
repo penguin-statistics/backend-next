@@ -6,7 +6,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/config"
 )
 
-func ProvideGeoIPDatabase(config *config.Config) (*geoip2.Reader, error) {
+func GeoIPDatabase(config *config.Config) (*geoip2.Reader, error) {
 	db, err := geoip2.Open(config.GeoIPDBPath)
 	if err != nil {
 		return nil, err
