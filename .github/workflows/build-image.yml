@@ -18,7 +18,7 @@ jobs:
     - name: Get Tag Version
       id: get_version
       run: |
-        export TRUNCATED_GITHUB_SHA=$(echo ${{ github.sha }} | cut -c1-7));
+        export TRUNCATED_GITHUB_SHA=$(echo ${{ github.sha }} | cut -c1-7);
         echo "VERSION=${GITHUB_REF/refs\/tags\//}+${TRUNCATED_GITHUB_SHA}" >> $GITHUB_ENV
         echo "GIT_TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
 
