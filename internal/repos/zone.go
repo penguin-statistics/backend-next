@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
@@ -21,12 +20,9 @@ func NewZoneRepo(db *bun.DB) *ZoneRepo {
 }
 
 func (c *ZoneRepo) SaveZones(ctx context.Context, tx bun.Tx, zones *[]*models.Zone) error {
-	spew.Dump(zones)
 	_, err := tx.NewInsert().
-		ExcludeColumn("zone_id").
 		Model(zones).
 		Exec(ctx)
-	spew.Dump(err)
 	return err
 }
 

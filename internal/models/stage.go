@@ -19,7 +19,7 @@ type Stage struct {
 	// StageType is the type of the stage, e.g. "MAIN", "SUB", "ACTIVITY" and "DAILY".
 	StageType string `json:"stageType"`
 	// ExtraProcessType is the type of extra process that is used in the stage, e.g. "GACHABOX".
-	ExtraProcessType string `json:"extraProcessType"`
+	ExtraProcessType null.String `json:"extraProcessType"`
 	// Code is a map with language code as key and the code of the stage in that language as value.
 	Code json.RawMessage `json:"code"`
 	// Sanity is the sanity requirement for a full clear of the stage.

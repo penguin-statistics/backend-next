@@ -75,7 +75,10 @@ func (c *AdminController) SaveRenderedObjects(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	c.AdminService.SaveRenderedObjects(ctx.Context(), &request)
+	err := c.AdminService.SaveRenderedObjects(ctx.Context(), &request)
+	if err != nil {
+		return err
+	}
 
 	return ctx.JSON(request)
 }

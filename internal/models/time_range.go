@@ -16,7 +16,7 @@ type TimeRange struct {
 	Name      null.String `json:"name,omitempty" swaggertype:"string"`
 	StartTime *time.Time  `json:"startTime"`
 	EndTime   *time.Time  `json:"endTime"`
-	Comment   null.String `json:"-" bun:"-" swaggertype:"string"`
+	Comment   null.String `json:"comment" swaggertype:"string"`
 	Server    string      `json:"server"`
 }
 

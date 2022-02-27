@@ -17,6 +17,13 @@ func NewActivityRepo(db *bun.DB) *ActivityRepo {
 	return &ActivityRepo{DB: db}
 }
 
+func (c *ActivityRepo) SaveActivities(ctx context.Context, tx bun.Tx, activities *[]*models.Activity) error {
+	_, err := tx.NewInsert().
+		Model(activities).
+		Exec(ctx)
+	return err
+}
+
 func (c *ActivityRepo) GetActivities(ctx context.Context) ([]*models.Activity, error) {
 	var activities []*models.Activity
 	err := c.DB.NewSelect().
