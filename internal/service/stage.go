@@ -6,6 +6,7 @@ import (
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/tidwall/gjson"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
@@ -105,7 +106,7 @@ func (s *StageService) GetShimStageByArkId(ctx context.Context, arkStageId strin
 	return dbStage, nil
 }
 
-func (s *StageService) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId string) (string, error) {
+func (s *StageService) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId string) (null.String, error) {
 	return s.StageRepo.GetStageExtraProcessTypeByArkId(ctx, arkStageId)
 }
 
