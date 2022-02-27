@@ -35,23 +35,23 @@ var dropTypeOrderMapping = map[string]int{
 	"RECOGNITION_ONLY": 4,
 }
 
-func (s *GamedataService) UpdateBrandNewEvent(ctx context.Context, context *gamedata.BrandNewEventContext) (*gamedata.RenderedObjects, error) {
-	zone, err := s.renderNewZone(context)
+func (s *GamedataService) UpdateNewEvent(ctx context.Context, info *gamedata.NewEventBasicInfo) (*gamedata.RenderedObjects, error) {
+	zone, err := s.renderNewZone(info)
 	if err != nil {
 		return nil, err
 	}
 
-	timeRange, err := s.renderNewTimeRange(context)
+	timeRange, err := s.renderNewTimeRange(info)
 	if err != nil {
 		return nil, err
 	}
 
-	activity, err := s.renderNewActivity(context)
+	activity, err := s.renderNewActivity(info)
 	if err != nil {
 		return nil, err
 	}
 
-	importStages, err := s.fetchLatestStages([]string{context.ArkZoneID})
+	importStages, err := s.fetchLatestStages([]string{info.ArkZoneID})
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (s *GamedataService) UpdateBrandNewEvent(ctx context.Context, context *game
 	stages := make([]*models.Stage, 0)
 	dropInfos := make([]*models.DropInfo, 0)
 	for _, gamedataStage := range importStages {
-		stage, dropInfosForOneStage, err := s.genStageAndDropInfosFromGameData(ctx, context.Server, gamedataStage, 0, nil)
+		stage, dropInfosForOneStage, err := s.genStageAndDropInfosFromGameData(ctx, info.Server, gamedataStage, 0, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -76,10 +76,10 @@ func (s *GamedataService) UpdateBrandNewEvent(ctx context.Context, context *game
 	}, nil
 }
 
-func (s *GamedataService) renderNewZone(context *gamedata.BrandNewEventContext) (*models.Zone, error) {
+func (s *GamedataService) renderNewZone(info *gamedata.NewEventBasicInfo) (*models.Zone, error) {
 	nameMap := make(map[string]string)
 	for _, lang := range constants.Languages {
-		nameMap[lang] = context.ZoneName
+		nameMap[lang] = info.ZoneName
 	}
 	name, err := json.Marshal(nameMap)
 	if err != nil {
@@ -91,13 +91,13 @@ func (s *GamedataService) renderNewZone(context *gamedata.BrandNewEventContext) 
 		existenceMap[s] = map[string]interface{}{
 			"exist": false,
 		}
-		if s == context.Server {
+		if s == info.Server {
 			existenceMap[s]["exist"] = true
-			existenceMap[s]["openTime"] = context.StartTime.UnixMilli()
+			existenceMap[s]["openTime"] = info.StartTime.UnixMilli()
 			fakeEndTime := time.UnixMilli(constants.FakeEndTimeMilli)
 			endTime := &fakeEndTime
-			if context.EndTime != nil {
-				endTime = context.EndTime
+			if info.EndTime != nil {
+				endTime = info.EndTime
 			}
 			existenceMap[s]["closeTime"] = endTime.UnixMilli()
 		}
@@ -107,53 +107,53 @@ func (s *GamedataService) renderNewZone(context *gamedata.BrandNewEventContext) 
 		return nil, err
 	}
 
-	backgroundStr := constants.ZoneBackgroundPath + context.ArkZoneID + constants.ZoneBackgroundExtension
+	backgroundStr := constants.ZoneBackgroundPath + info.ArkZoneID + constants.ZoneBackgroundExtension
 	background := null.StringFrom(backgroundStr)
 
 	return &models.Zone{
-		ArkZoneID:  context.ArkZoneID,
+		ArkZoneID:  info.ArkZoneID,
 		Index:      0,
-		Category:   context.ZoneCategory,
-		Type:       context.ZoneType,
+		Category:   info.ZoneCategory,
+		Type:       info.ZoneType,
 		Name:       name,
 		Existence:  existence,
 		Background: background,
 	}, nil
 }
 
-func (s *GamedataService) renderNewTimeRange(context *gamedata.BrandNewEventContext) (*models.TimeRange, error) {
+func (s *GamedataService) renderNewTimeRange(info *gamedata.NewEventBasicInfo) (*models.TimeRange, error) {
 	fakeEndTime := time.UnixMilli(constants.FakeEndTimeMilli)
 	endTime := &fakeEndTime
-	if context.EndTime != nil {
-		endTime = context.EndTime
+	if info.EndTime != nil {
+		endTime = info.EndTime
 	}
 
-	name := null.StringFrom(utils.GetZonePrefixFromArkZoneID(context.ArkZoneID) + "_" + context.Server)
-	startTimeInComment := context.StartTime.In(constants.LocMap[context.Server]).Format("2006/1/02 15:04")
+	name := null.StringFrom(utils.GetZonePrefixFromArkZoneID(info.ArkZoneID) + "_" + info.Server)
+	startTimeInComment := info.StartTime.In(constants.LocMap[info.Server]).Format("2006/1/02 15:04")
 	endTimeInComment := "?"
-	if context.EndTime != nil {
-		endTimeInComment = context.EndTime.In(constants.LocMap[context.Server]).Format("2006/1/02 15:04")
+	if info.EndTime != nil {
+		endTimeInComment = info.EndTime.In(constants.LocMap[info.Server]).Format("2006/1/02 15:04")
 	}
-	comment := null.StringFrom(constants.ServerNameMapping[context.Server] + context.ZoneName + " " + startTimeInComment + " - " + endTimeInComment)
+	comment := null.StringFrom(constants.ServerNameMapping[info.Server] + info.ZoneName + " " + startTimeInComment + " - " + endTimeInComment)
 	return &models.TimeRange{
-		StartTime: context.StartTime,
+		StartTime: info.StartTime,
 		EndTime:   endTime,
-		Server:    context.Server,
+		Server:    info.Server,
 		Name:      name,
 		Comment:   comment,
 	}, nil
 }
 
-func (s *GamedataService) renderNewActivity(context *gamedata.BrandNewEventContext) (*models.Activity, error) {
+func (s *GamedataService) renderNewActivity(info *gamedata.NewEventBasicInfo) (*models.Activity, error) {
 	fakeEndTime := time.UnixMilli(constants.FakeEndTimeMilli)
 	endTime := &fakeEndTime
-	if context.EndTime != nil {
-		endTime = context.EndTime
+	if info.EndTime != nil {
+		endTime = info.EndTime
 	}
 
 	nameMap := make(map[string]string)
 	for _, lang := range constants.Languages {
-		nameMap[lang] = context.ZoneName
+		nameMap[lang] = info.ZoneName
 	}
 	name, err := json.Marshal(nameMap)
 	if err != nil {
@@ -165,7 +165,7 @@ func (s *GamedataService) renderNewActivity(context *gamedata.BrandNewEventConte
 		existenceMap[s] = map[string]interface{}{
 			"exist": false,
 		}
-		if s == context.Server {
+		if s == info.Server {
 			existenceMap[s]["exist"] = true
 		}
 	}
@@ -175,7 +175,7 @@ func (s *GamedataService) renderNewActivity(context *gamedata.BrandNewEventConte
 	}
 
 	return &models.Activity{
-		StartTime: context.StartTime,
+		StartTime: info.StartTime,
 		EndTime:   endTime,
 		Name:      name,
 		Existence: existence,

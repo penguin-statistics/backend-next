@@ -25,12 +25,12 @@ type AdminController struct {
 }
 
 func RegisterAdminController(admin *server.Admin, c AdminController) {
-	admin.Post("/render/event", c.UpdateBrandNewEvent)
+	admin.Post("/render/event", c.UpdateNewEvent)
 	admin.Post("/save", c.SaveRenderedObjects)
 }
 
-func (c *AdminController) UpdateBrandNewEvent(ctx *fiber.Ctx) error {
-	var request types.UpdateBrandNewEventRequest
+func (c *AdminController) UpdateNewEvent(ctx *fiber.Ctx) error {
+	var request types.UpdateNewEventRequest
 	if err := rekuest.ValidBody(ctx, &request); err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func (c *AdminController) UpdateBrandNewEvent(ctx *fiber.Ctx) error {
 		}
 	}
 
-	context := &gamedata.BrandNewEventContext{
+	info := &gamedata.NewEventBasicInfo{
 		ArkZoneID:    request.ArkZoneID,
 		ZoneName:     request.ZoneName,
 		ZoneCategory: request.ZoneCategory,
@@ -57,7 +57,7 @@ func (c *AdminController) UpdateBrandNewEvent(ctx *fiber.Ctx) error {
 		EndTime:      &endTime,
 	}
 
-	renderedObjects, err := c.GamedataService.UpdateBrandNewEvent(ctx.Context(), context)
+	renderedObjects, err := c.GamedataService.UpdateNewEvent(ctx.Context(), info)
 	if err != nil {
 		return err
 	}
