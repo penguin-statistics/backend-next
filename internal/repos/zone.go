@@ -7,7 +7,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 )
@@ -20,6 +19,7 @@ func NewZoneRepo(db *bun.DB) *ZoneRepo {
 	return &ZoneRepo{db: db}
 }
 
+// Cache: AllZones
 func (c *ZoneRepo) GetZones(ctx context.Context) ([]*models.Zone, error) {
 	var zones []*models.Zone
 	err := c.db.NewSelect().
@@ -35,14 +35,26 @@ func (c *ZoneRepo) GetZones(ctx context.Context) ([]*models.Zone, error) {
 	return zones, nil
 }
 
-func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*models.Zone, error) {
+func (c *ZoneRepo) GetZoneById(ctx context.Context, id int) (*models.Zone, error) {
 	var zone models.Zone
-	err := cache.ZoneFromArkId.Get(arkZoneId, &zone)
-	if err == nil {
-		return &zone, nil
+	err := c.db.NewSelect().
+		Model(&zone).
+		Where("zone_id = ?", id).
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
 	}
 
-	err = c.db.NewSelect().
+	return &zone, nil
+}
+
+// Cache: ZoneFromArkId
+func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*models.Zone, error) {
+	var zone models.Zone
+	err := c.db.NewSelect().
 		Model(&zone).
 		Where("ark_zone_id = ?", arkZoneId).
 		Scan(ctx)
@@ -53,7 +65,6 @@ func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model
 		return nil, err
 	}
 
-	go cache.ZoneFromArkId.Set(arkZoneId, &zone)
 	return &zone, nil
 }
 
@@ -79,7 +90,7 @@ func (c *ZoneRepo) GetShimZones(ctx context.Context) ([]*shims.Zone, error) {
 	return zones, nil
 }
 
-func (c *ZoneRepo) GetShimZoneByArkId(ctx context.Context, zoneId string) (*shims.Zone, error) {
+func (c *ZoneRepo) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*shims.Zone, error) {
 	var zone shims.Zone
 	err := c.db.NewSelect().
 		Model(&zone).
@@ -88,7 +99,7 @@ func (c *ZoneRepo) GetShimZoneByArkId(ctx context.Context, zoneId string) (*shim
 			// see https://github.com/go-pg/pg/issues/1315
 			return q.Column("ark_stage_id", "zone_id")
 		}).
-		Where("ark_zone_id = ?", zoneId).
+		Where("ark_zone_id = ?", arkZoneId).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {

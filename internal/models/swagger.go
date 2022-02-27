@@ -39,8 +39,8 @@ type Existence struct {
 	JP ServerExistence `json:"JP" validate:"required"`
 	// KR: 韩服 Korea Server (maintained by Yostar Limited)
 	KR ServerExistence `json:"KR" validate:"required"`
-	// TW: 台服 Taiwan Server (maintained by 龍成網路有限公司)
-	TW ServerExistence `json:"TW" validate:"required"`
+	// // TW: 台服 Taiwan Server (maintained by 龍成網路有限公司)
+	// TW ServerExistence `json:"TW" validate:"required"`
 }
 
 type Keywords struct {

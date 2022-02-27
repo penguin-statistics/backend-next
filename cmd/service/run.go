@@ -2,35 +2,50 @@ package service
 
 import (
 	"context"
+	"errors"
+	"net"
 	"time"
 
-	"go.uber.org/fx"
-	// "github.com/davecgh/go-spew/spew"
+	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
+	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
+	"github.com/penguin-statistics/backend-next/internal/pkg/async"
 )
 
 func run(app *fiber.App, config *config.Config, lc fx.Lifecycle) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			errChan := make(chan error)
+			ln, err := net.Listen("tcp", config.Address)
+			if err != nil {
+				return err
+			}
 
 			go func() {
-				errChan <- app.Listen(config.Address)
+				if err := app.Listener(ln); err != nil {
+					log.Error().Err(err).Msg("server terminated unexpectedly")
+				}
 			}()
 
-			// wait for at maximum 100ms for errChan to return anything, else just assume succeeded and return
-			// nil for error
-			select {
-			case err := <-errChan:
-				return err
-			case <-time.After(100 * time.Millisecond):
-				return nil
-			}
+			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			return app.Shutdown()
+			if config.DevMode {
+				return nil
+			}
+
+			return async.WaitAll(
+				async.Errable(app.Shutdown),
+				async.Errable(func() error {
+					flushed := sentry.Flush(time.Second * 30)
+					if !flushed {
+						return errors.New("sentry flush timeout, some events may be lost")
+					}
+					return nil
+				}),
+			)
 		},
 	})
 }

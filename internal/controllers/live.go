@@ -2,11 +2,11 @@ package controllers
 
 import (
 	"github.com/gofiber/fiber/v2"
+
 	"github.com/penguin-statistics/backend-next/internal/server"
 )
 
-type LiveController struct {
-}
+type LiveController struct{}
 
 func RegisterLiveController(v3 *server.V3) {
 	c := &LiveController{}

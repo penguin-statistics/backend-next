@@ -1,9 +1,9 @@
 package service
 
 import (
-	"github.com/penguin-statistics/backend-next/internal/appentry"
-
 	"go.uber.org/fx"
+
+	"github.com/penguin-statistics/backend-next/internal/appentry"
 )
 
 func Bootstrap() {

@@ -3,12 +3,13 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 
+	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
 )
@@ -36,16 +37,11 @@ func (c *StageRepo) GetStages(ctx context.Context) ([]*models.Stage, error) {
 	return stages, nil
 }
 
-func (c *StageRepo) GetStageByArkId(ctx context.Context, stageArkId string) (*models.Stage, error) {
+func (c *StageRepo) GetStageById(ctx context.Context, stageId int) (*models.Stage, error) {
 	var stage models.Stage
-	err := cache.StageFromArkId.Get(stageArkId, &stage)
-	if err == nil {
-		return &stage, nil
-	}
-
-	err = c.db.NewSelect().
+	err := c.db.NewSelect().
 		Model(&stage).
-		Where("ark_stage_id = ?", stageArkId).
+		Where("stage_id = ?", stageId).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
@@ -54,7 +50,22 @@ func (c *StageRepo) GetStageByArkId(ctx context.Context, stageArkId string) (*mo
 		return nil, err
 	}
 
-	go cache.StageFromArkId.Set(stageArkId, &stage)
+	return &stage, nil
+}
+
+func (c *StageRepo) GetStageByArkId(ctx context.Context, arkStageId string) (*models.Stage, error) {
+	var stage models.Stage
+	err := c.db.NewSelect().
+		Model(&stage).
+		Where("ark_stage_id = ?", arkStageId).
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
 	return &stage, nil
 }
 
@@ -74,7 +85,10 @@ func (c *StageRepo) GetShimStages(ctx context.Context, server string) ([]*shims.
 				Relation("Stage", func(sq *bun.SelectQuery) *bun.SelectQuery {
 					return sq.Column("ark_stage_id")
 				}).
-				Where("server = ?", server)
+				Relation("TimeRange", func(sq *bun.SelectQuery) *bun.SelectQuery {
+					return sq.Where("start_time <= ? AND end_time > ?", time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339))
+				}).
+				Where("drop_info.server = ?", server)
 		}).
 		Scan(ctx)
 
@@ -87,7 +101,7 @@ func (c *StageRepo) GetShimStages(ctx context.Context, server string) ([]*shims.
 	return stages, nil
 }
 
-func (c *StageRepo) GetShimStageByArkId(ctx context.Context, stageId string, server string) (*shims.Stage, error) {
+func (c *StageRepo) GetShimStageByArkId(ctx context.Context, arkStageId string, server string) (*shims.Stage, error) {
 	var stage shims.Stage
 	err := c.db.NewSelect().
 		Model(&stage).
@@ -102,20 +116,72 @@ func (c *StageRepo) GetShimStageByArkId(ctx context.Context, stageId string, ser
 				Relation("Stage", func(sq *bun.SelectQuery) *bun.SelectQuery {
 					return sq.Column("ark_stage_id")
 				}).
-				Where("server = ?", server)
+				Relation("TimeRange", func(sq *bun.SelectQuery) *bun.SelectQuery {
+					return sq.Where("start_time <= ? AND end_time > ?", time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339))
+				}).
+				Where("drop_info.server = ?", server)
 		}).
-		Where("ark_stage_id = ?", stageId).
+		Where("ark_stage_id = ?", arkStageId).
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
 		return nil, errors.ErrNotFound
 	} else if err != nil {
 		log.Error().
-			Str("stageId", stageId).
+			Str("stageId", arkStageId).
 			Err(err).
 			Msg("failed to get shim stage")
 		return nil, err
 	}
 
 	return &stage, nil
+}
+
+func (c *StageRepo) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId string) (string, error) {
+	var stage models.Stage
+	err := c.db.NewSelect().
+		Model(&stage).
+		Column("st.extra_process_type").
+		Where("st.ark_stage_id = ?", arkStageId).
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return "", errors.ErrNotFound
+	} else if err != nil {
+		return "", err
+	}
+
+	return stage.ExtraProcessType, nil
+}
+
+func (c *StageRepo) SearchStageByCode(ctx context.Context, code string) (*models.Stage, error) {
+	var stage models.Stage
+	err := c.db.NewSelect().
+		Model(&stage).
+		Where("\"code\"::TEXT ILIKE ?", "%"+code+"%").
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return &stage, nil
+}
+
+func (c *StageRepo) GetGachaBoxStages(ctx context.Context) ([]*models.Stage, error) {
+	var stages []*models.Stage
+	err := c.db.NewSelect().
+		Model(&stages).
+		Where("extra_process_type = ?", constants.ExtraProcessTypeGachaBox).
+		Scan(ctx)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return stages, nil
 }

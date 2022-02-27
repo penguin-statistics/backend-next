@@ -3,6 +3,7 @@ package infra
 import (
 	"context"
 	"database/sql"
+	"runtime"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -14,14 +15,16 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/config"
 )
 
-func ProvidePostgres(config *config.Config) (*bun.DB, error) {
-	// Open a PostgreSQL database.
-	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(config.PostgresDSN)))
+func Postgres(config *config.Config) (*bun.DB, error) {
+	// Open a Postgres database.
+	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(config.PostgresDSN), pgdriver.WithApplicationName("penguin-backend")))
 
 	// Create a Bun db on top of it.
 	db := bun.NewDB(pgdb, pgdialect.New())
-	db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithEnabled(true), bundebug.WithVerbose(true)))
-	db.AddQueryHook(bunotel.NewQueryHook(bunotel.WithDBName("penguin_structured")))
+	if config.DevMode {
+		db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithEnabled(true), bundebug.WithVerbose(config.BunDebugVerbose)))
+		db.AddQueryHook(bunotel.NewQueryHook(bunotel.WithDBName("penguin_structured")))
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
@@ -29,6 +32,10 @@ func ProvidePostgres(config *config.Config) (*bun.DB, error) {
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
 	}
+
+	pgdb.SetMaxOpenConns(runtime.NumCPU() * 16)
+	pgdb.SetMaxIdleConns(runtime.NumCPU() * 4)
+	pgdb.SetConnMaxIdleTime(time.Minute * 10)
 
 	return db, nil
 }

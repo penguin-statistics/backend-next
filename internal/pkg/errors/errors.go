@@ -16,8 +16,11 @@ var (
 	// ErrNotFound is returned when a resource is not found.
 	ErrNotFound = New(fiber.StatusBadRequest, CodeNotFound, "resource not found with given parameters")
 
-	// ErrInvalidRequest is returned when a request is invalid.
-	ErrInvalidRequest = New(fiber.StatusBadRequest, CodeInvalidRequest, "invalid request: some or all request parameters are invalid")
+	// ErrInvalidReq is returned when a request is invalid.
+	ErrInvalidReq = New(fiber.StatusBadRequest, CodeInvalidRequest, "invalid request: some or all request parameters are invalid")
+
+	// ErrInternalError is returned when an internal error occurs.
+	ErrInternalError = New(fiber.StatusInternalServerError, CodeInternalError, "internal server error occurred")
 )
 
 type Extras map[string]interface{}
@@ -37,7 +40,7 @@ func New(statusCode int, errorCode string, message string) *PenguinError {
 	}
 }
 
-func (e PenguinError) WithMessage(format string, parts ...interface{}) *PenguinError {
+func (e PenguinError) Msg(format string, parts ...interface{}) *PenguinError {
 	e.Message = fmt.Sprintf(format, parts...)
 	return &e
 }
@@ -48,11 +51,12 @@ func (e PenguinError) WithExtras(extras Extras) *PenguinError {
 }
 
 func NewInvalidViolations(violations interface{}) *PenguinError {
-	e := ErrInvalidRequest
+	// copy ErrInvalidRequest as e
+	e := *ErrInvalidReq
 	e.Extras = &Extras{
 		"violations": violations,
 	}
-	return e
+	return &e
 }
 
 func (e *PenguinError) Error() string {

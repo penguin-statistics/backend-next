@@ -14,21 +14,18 @@ type Config struct {
 	// DevMode to indicate development mode. When true, the program would spin up utilities for debugging and
 	// provide a more contextual message when encountered a panic. See internal/server/http/http.go for the
 	// actual implementation details.
-	//
-	// Notice if you see lines such as
-	// `Post "http://localhost:14268/api/traces": dial tcp [::1]:14268: connect: connection refused`
-	// shown in your console, it is actually the opentelemetry module doing its job to report a span and your local
-	// machine is not running a Jaeger instance on the Jaeger default log collection port (14268). If you don't need
-	// Jaeger tracing, you can safely ignore this error as it will have no meaningful effect on the behavior
-	// of the service. However, in case when you do need Jaeger tracing, follow the official guide at
-	// https://www.jaegertracing.io/docs/1.29/getting-started/#all-in-one to setup a Jaeger instance with Docker.
 	DevMode bool `split_words:"true"`
+
+	// TracingEnabled to indicate whether to enable OpenTelemetry tracing.
+	TracingEnabled bool `split_words:"true"`
 
 	// infrastructure components connection instructions
 
 	// PostgresDSN is the data source name for the PostgreSQL database. See
 	// https://bun.uptrace.dev/postgres/#pgdriver for more details on how to construct a PostgreSQL DSN.
 	PostgresDSN string `required:"true" split_words:"true"`
+
+	BunDebugVerbose bool `split_words:"true"`
 
 	// NatsURL is the URL of the NATS server. See https://pkg.go.dev/github.com/nats-io/nats.go#Connect
 	// for more information on how to construct a NATS URL.
@@ -49,6 +46,21 @@ type Config struct {
 
 	// HttpServerShutdownTimeout is the timeout for the HTTP server to shutdown gracefully.
 	HttpServerShutdownTimeout time.Duration `required:"true" split_words:"true" default:"60s"`
+
+	// GeoIPDBPath is the path to the GeoIP2 database.
+	GeoIPDBPath string `required:"true" split_words:"true" default:"vendors/maxmind/assets/geolite2/GeoLite2-Country.mmdb"`
+
+	// WorkerInterval describes the interval in-between different batches
+	WorkerInterval time.Duration `required:"true" split_words:"true" default:"10m"`
+
+	// WorkerSeparation describes the separation time in-between different microtasks
+	WorkerSeparation time.Duration `required:"true" split_words:"true" default:"3s"`
+
+	// WorkerTimeout describes the timeout for a single batch to run
+	WorkerTimeout time.Duration `required:"true" split_words:"true" default:"10m"`
+
+	// WorkerEnabled is a flag to indicate whether to enable the worker.
+	WorkerEnabled bool `split_words:"true"`
 }
 
 func Parse() (*Config, error) {

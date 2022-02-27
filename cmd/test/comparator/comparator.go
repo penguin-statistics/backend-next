@@ -1,10 +1,10 @@
 package comparator
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 
+	"github.com/pkg/errors"
 	"github.com/tidwall/gjson"
 )
 

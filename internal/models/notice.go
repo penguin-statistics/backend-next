@@ -10,8 +10,8 @@ import (
 type Notice struct {
 	bun.BaseModel `bun:"notices"`
 
-	NoticeID   int             `bun:",pk" json:"id"`
-	Conditions json.RawMessage `json:"conditions"`
-	Severity   null.Int        `json:"severity"`
-	Content    string          `json:"content"`
+	NoticeID  int             `bun:",pk" json:"id"`
+	Existence json.RawMessage `json:"existence"`
+	Severity  null.Int        `json:"severity"`
+	Content   json.RawMessage `json:"content_i18n"`
 }

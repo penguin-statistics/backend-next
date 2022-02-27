@@ -1,12 +1,17 @@
 basePath: /api
 definitions:
+  errors.Extras:
+    additionalProperties: true
+    type: object
   errors.PenguinError:
     properties:
       errorCode:
         example: INVALID_REQUEST
         type: string
+      extras:
+        $ref: '#/definitions/errors.Extras'
       message:
-        example: 'invalid request: request parameters are invalid'
+        example: 'invalid request: some or all request parameters are invalid'
         type: string
       statusCode:
         example: 400
@@ -113,6 +118,21 @@ definitions:
         $ref: '#/definitions/models.I18nOptionalString'
         description: Pronounciation hints of the item
     type: object
+  models.Notice:
+    properties:
+      content_i18n:
+        items:
+          type: integer
+        type: array
+      existence:
+        items:
+          type: integer
+        type: array
+      id:
+        type: integer
+      severity:
+        $ref: '#/definitions/null.Int'
+    type: object
   models.ServerExistence:
     properties:
       endTime:
@@ -138,6 +158,10 @@ definitions:
         items:
           type: integer
         type: array
+      extraProcessType:
+        description: ExtraProcessType is the type of extra process that is used in
+          the stage, e.g. "GACHABOX".
+        type: string
       minClearTime:
         description: MinClearTime is the minimum time (in milliseconds as a duration)
           it takes to clear the stage, referencing from prts.wiki
@@ -151,6 +175,10 @@ definitions:
       stageId:
         description: ArkStageID (stageId) is the previously used, string form ID of
           the stage; in JSON-representation `stageId` is used as key.
+        type: string
+      stageType:
+        description: StageType is the type of the stage, e.g. "MAIN", "SUB", "ACTIVITY"
+          and "DAILY".
         type: string
       zoneId:
         description: ZoneID is the numerical ID of the zone the stage is in.
@@ -191,6 +219,55 @@ definitions:
       zoneId:
         type: string
     type: object
+  null.Bool:
+    properties:
+      bool:
+        type: boolean
+      valid:
+        description: Valid is true if Bool is not NULL
+        type: boolean
+    type: object
+  null.Int:
+    properties:
+      int64:
+        type: integer
+      valid:
+        description: Valid is true if Int64 is not NULL
+        type: boolean
+    type: object
+  shims.Activity:
+    properties:
+      end:
+        $ref: '#/definitions/null.Int'
+      existence:
+        items:
+          type: integer
+        type: array
+      label_i18n:
+        items:
+          type: integer
+        type: array
+      start:
+        type: integer
+    type: object
+  shims.DropInfo:
+    properties:
+      bounds:
+        items:
+          type: integer
+        type: array
+      dropType:
+        type: string
+      itemId:
+        type: string
+    type: object
+  shims.DropMatrixQueryResult:
+    properties:
+      matrix:
+        items:
+          $ref: '#/definitions/shims.OneDropMatrixElement'
+        type: array
+    type: object
   shims.Item:
     properties:
       alias:
@@ -226,6 +303,90 @@ definitions:
           type: integer
         type: array
     type: object
+  shims.OneDrop:
+    properties:
+      itemId:
+        type: string
+      quantity:
+        type: integer
+    type: object
+  shims.OneDropMatrixElement:
+    properties:
+      end:
+        $ref: '#/definitions/null.Int'
+      itemId:
+        type: string
+      quantity:
+        type: integer
+      stageId:
+        type: string
+      start:
+        type: integer
+      times:
+        type: integer
+    type: object
+  shims.OneItemTrend:
+    properties:
+      quantity:
+        items:
+          type: integer
+        type: array
+      times:
+        items:
+          type: integer
+        type: array
+    type: object
+  shims.OnePatternMatrixElement:
+    properties:
+      end:
+        $ref: '#/definitions/null.Int'
+      pattern:
+        $ref: '#/definitions/shims.Pattern'
+      quantity:
+        type: integer
+      stageId:
+        type: string
+      start:
+        type: integer
+      times:
+        type: integer
+    type: object
+  shims.Pattern:
+    properties:
+      drops:
+        items:
+          $ref: '#/definitions/shims.OneDrop'
+        type: array
+    type: object
+  shims.PatternMatrixQueryResult:
+    properties:
+      pattern_matrix:
+        items:
+          $ref: '#/definitions/shims.OnePatternMatrixElement'
+        type: array
+    type: object
+  shims.ReportResponse:
+    properties:
+      reportHash:
+        type: string
+    type: object
+  shims.SiteStats:
+    properties:
+      totalApCost:
+        type: integer
+      totalItemQuantities:
+        items:
+          $ref: '#/definitions/shims.TotalItemQuantity'
+        type: array
+      totalStageTimes:
+        items:
+          $ref: '#/definitions/shims.TotalStageTime'
+        type: array
+      totalStageTimes_24h:
+        items:
+          $ref: '#/definitions/shims.TotalStageTime'
+        type: array
+    type: object
   shims.Stage:
     properties:
       apCost:
@@ -236,16 +397,56 @@ definitions:
         items:
           type: integer
         type: array
+      dropInfos:
+        items:
+          $ref: '#/definitions/shims.DropInfo'
+        type: array
       existence:
         items:
           type: integer
         type: array
       minClearTime:
         type: number
+      recognitionOnly:
+        items:
+          type: string
+        type: array
       stageId:
+        type: string
+      stageType:
         type: string
       zoneId:
         type: string
+    type: object
+  shims.StageTrend:
+    properties:
+      results:
+        additionalProperties:
+          $ref: '#/definitions/shims.OneItemTrend'
+        type: object
+      startTime:
+        type: integer
+    type: object
+  shims.TotalItemQuantity:
+    properties:
+      itemId:
+        type: string
+      quantity:
+        type: integer
+    type: object
+  shims.TotalStageTime:
+    properties:
+      stageId:
+        type: string
+      times:
+        type: integer
+    type: object
+  shims.TrendQueryResult:
+    properties:
+      trend:
+        additionalProperties:
+          $ref: '#/definitions/shims.StageTrend'
+        type: object
     type: object
   shims.Zone:
     properties:
@@ -274,7 +475,40 @@ definitions:
           type: integer
         type: array
     type: object
-host: localhost:9010
+  types.AdvancedQuery:
+    properties:
+      end:
+        $ref: '#/definitions/null.Int'
+      interval:
+        $ref: '#/definitions/null.Int'
+      isPersonal:
+        $ref: '#/definitions/null.Bool'
+      itemIds:
+        items:
+          type: string
+        type: array
+      server:
+        type: string
+      stageId:
+        type: string
+      start:
+        $ref: '#/definitions/null.Int'
+    required:
+    - server
+    - stageId
+    type: object
+  types.AdvancedQueryRequest:
+    properties:
+      queries:
+        items:
+          $ref: '#/definitions/types.AdvancedQuery'
+        maxItems: 5
+        minItems: 1
+        type: array
+    required:
+    - queries
+    type: object
+host: https://penguin-stats.io
 info:
   contact:
     email: alvissreimu@gmail.com
@@ -288,7 +522,117 @@ info:
   title: Penguin Statistics API
   version: 3.0.0-alpha.1
 paths:
-  /v2/items:
+  /PenguinStats/api/v2/_private/result/matrix/{server}/{source}:
+    get:
+      deprecated: true
+      parameters:
+      - description: Server; default to CN
+        in: path
+        name: server
+        required: true
+        type: string
+      - description: Global or Personal; default to global
+        in: path
+        name: source
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/shims.DropMatrixQueryResult'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get DropMatrix
+      tags:
+      - Private
+  /PenguinStats/api/v2/_private/result/pattern/{server}/{source}:
+    get:
+      deprecated: true
+      parameters:
+      - description: Server; default to CN
+        in: path
+        name: server
+        required: true
+        type: string
+      - description: Global or Personal; default to global
+        in: path
+        name: source
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/shims.PatternMatrixQueryResult'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get PatternMatrix
+      tags:
+      - Private
+  /PenguinStats/api/v2/_private/result/trend/{server}:
+    get:
+      deprecated: true
+      parameters:
+      - description: Server; default to CN
+        in: path
+        name: server
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/shims.TrendQueryResult'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get Trends
+      tags:
+      - Private
+  /PenguinStats/api/v2/advanced:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.AdvancedQueryRequest'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Execute Advanced Query
+      tags:
+      - Result
+  /PenguinStats/api/v2/formula:
+    get:
+      deprecated: true
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get Formula
+      tags:
+      - Formula
+  /PenguinStats/api/v2/items:
     get:
       deprecated: true
       produces:
@@ -311,10 +655,10 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/errors.PenguinError'
-      summary: Get all Items
+      summary: Get All Items
       tags:
       - Item
-  /v2/items/{itemId}:
+  /PenguinStats/api/v2/items/{itemId}:
     get:
       deprecated: true
       parameters:
@@ -349,7 +693,217 @@ paths:
       summary: Get an Item with ID
       tags:
       - Item
-  /v2/stages:
+  /PenguinStats/api/v2/notice:
+    get:
+      deprecated: true
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Notice'
+            type: array
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get All Notices
+      tags:
+      - Notice
+  /PenguinStats/api/v2/period:
+    get:
+      deprecated: true
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              allOf:
+              - $ref: '#/definitions/shims.Activity'
+              - properties:
+                  existence:
+                    $ref: '#/definitions/models.Existence'
+                  label_i18n:
+                    $ref: '#/definitions/models.I18nString'
+                type: object
+            type: array
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get All Event Periods
+      tags:
+      - EventPeriod
+  /PenguinStats/api/v2/report:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/shims.ReportResponse'
+        "400":
+          description: Invalid or missing itemId. Notice that this shall be the **string
+            ID** of the item, instead of the internally used numerical ID of the item.
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Submit an Item Drop Report
+      tags:
+      - Report
+  /PenguinStats/api/v2/report/recall:
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: ""
+        "400":
+          description: Invalid or missing itemId. Notice that this shall be the **string
+            ID** of the item, instead of the internally used numerical ID of the item.
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Recall an Item Drop Report
+      tags:
+      - Report
+  /PenguinStats/api/v2/report/recognition:
+    post:
+      description: Submit an Item Drop Report with Frontend Recognition. Notice that
+        this is a private API and is not designed for external use.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.Item'
+            - properties:
+                existence:
+                  $ref: '#/definitions/models.Existence'
+                keywords:
+                  $ref: '#/definitions/models.Keywords'
+                name:
+                  $ref: '#/definitions/models.I18nString'
+              type: object
+        "400":
+          description: Invalid or missing itemId. Notice that this shall be the **string
+            ID** of the item, instead of the internally used numerical ID of the item.
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Bulk Submit with Frontend Recognition
+      tags:
+      - Report
+  /PenguinStats/api/v2/result/matrix:
+    get:
+      deprecated: true
+      parameters:
+      - description: Server; default to CN
+        in: query
+        name: server
+        required: true
+        type: string
+      - description: Whether to query for personal drop matrix or not
+        in: query
+        name: is_personal
+        type: boolean
+      - description: Whether to show closed stages or not
+        in: query
+        name: show_closed_zones
+        type: boolean
+      - description: Comma separated list of ark stage ids
+        in: query
+        name: stageFilter
+        type: string
+      - description: Comma separated list of ark item ids
+        in: query
+        name: itemFilter
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/shims.DropMatrixQueryResult'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get DropMatrix
+      tags:
+      - Result
+  /PenguinStats/api/v2/result/pattern:
+    get:
+      deprecated: true
+      parameters:
+      - description: Server; default to CN
+        in: query
+        name: server
+        required: true
+        type: string
+      - description: Whether to query for personal pattern matrix or not
+        in: query
+        name: is_personal
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/shims.PatternMatrixQueryResult'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get PatternMatrix
+      tags:
+      - Result
+  /PenguinStats/api/v2/result/trends:
+    get:
+      deprecated: true
+      parameters:
+      - description: Server; default to CN
+        in: query
+        name: server
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/shims.TrendQueryResult'
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get Trends
+      tags:
+      - Result
+  /PenguinStats/api/v2/stages:
     get:
       deprecated: true
       produces:
@@ -372,10 +926,10 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/errors.PenguinError'
-      summary: Get all Stages
+      summary: Get All Stages
       tags:
       - Stage
-  /v2/stages/{stageId}:
+  /PenguinStats/api/v2/stages/{stageId}:
     get:
       deprecated: true
       parameters:
@@ -411,7 +965,60 @@ paths:
       summary: Get an Stage with ID
       tags:
       - Stage
-  /v2/zones:
+  /PenguinStats/api/v2/stats:
+    get:
+      deprecated: true
+      parameters:
+      - description: Server; default to CN
+        in: query
+        name: server
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/shims.SiteStats'
+            type: array
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Get Site Stats
+      tags:
+      - SiteStats
+  /PenguinStats/api/v2/users:
+    post:
+      consumes:
+      - text/plain
+      deprecated: true
+      parameters:
+      - description: User ID
+        in: body
+        name: userId
+        required: true
+        schema:
+          type: integer
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/shims.SiteStats'
+            type: array
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/errors.PenguinError'
+      summary: Login with PenguinID
+      tags:
+      - Account
+  /PenguinStats/api/v2/zones:
     get:
       deprecated: true
       produces:
@@ -434,10 +1041,10 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/errors.PenguinError'
-      summary: Get all Zones
+      summary: Get All Zones
       tags:
       - Zone
-  /v2/zones/{zoneId}:
+  /PenguinStats/api/v2/zones/{zoneId}:
     get:
       deprecated: true
       parameters:
@@ -497,7 +1104,7 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/errors.PenguinError'
-      summary: Get all Items
+      summary: Get All Items
       tags:
       - Item
   /v3/items/{itemId}:
@@ -558,7 +1165,7 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/errors.PenguinError'
-      summary: Get all Stages
+      summary: Get All Stages
       tags:
       - Stage
   /v3/stages/{stageId}:
@@ -618,7 +1225,7 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/errors.PenguinError'
-      summary: Get all Zones
+      summary: Get All Zones
       tags:
       - Zone
   /v3/zones/{zoneId}:
