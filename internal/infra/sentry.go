@@ -2,6 +2,7 @@ package infra
 
 import (
 	"github.com/getsentry/sentry-go"
+	"github.com/rs/zerolog/log"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
 	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
@@ -9,10 +10,17 @@ import (
 
 // SentryInit initializes sentry with side-effect
 func SentryInit(config *config.Config) error {
+	if config.SentryDSN == "" {
+		log.Warn().Msg("Sentry is disabled due to missing DSN.")
+		return nil
+	} else {
+		log.Info().Msg("Initializing Sentry...")
+	}
 	return sentry.Init(sentry.ClientOptions{
-		Dsn:              "https://bd66e3da75eb4510a381e30e1e71f6fa@o292786.ingest.sentry.io/6233653",
+		Dsn:              config.SentryDSN,
 		Release:          "backend-next@" + bininfo.Version,
 		Debug:            config.DevMode,
 		AttachStacktrace: true,
+		TracesSampleRate: 0.01,
 	})
 }

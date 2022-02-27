@@ -36,6 +36,9 @@ type Config struct {
 	// for more information on how to construct a Redis URL.
 	RedisURL string `required:"true" split_words:"true" default:"redis://127.0.0.1:6379/1"`
 
+	// SentryDSN is the DSN of the Sentry server. See https://pkg.go.dev/github.com/getsentry/sentry-go#ClientOptions
+	SentryDSN string `split_words:"true"`
+
 	// RecognitionEncryptionPrivateKey is the private key used to decrypt the recognition data.
 	// Normal contributors should not need to change this: when left empty, recognition report is simply disabled.
 	RecognitionEncryptionPrivateKey []byte `split_words:"true"`
