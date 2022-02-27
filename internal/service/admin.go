@@ -29,12 +29,12 @@ func (s *AdminService) SaveRenderedObjects(ctx context.Context, objects *gamedat
 	}
 
 	zones := []*models.Zone{objects.Zone}
-	if err := s.ZoneRepo.SaveZones(ctx, tx, &zones); err != nil {
+	if err := s.ZoneRepo.SaveZones(ctx, tx, zones); err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	//TODO: save other stuff
+	// TODO: save other stuff
 
 	if err := tx.Commit(); err != nil {
 		tx.Rollback()
