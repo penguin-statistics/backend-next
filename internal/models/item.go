@@ -22,9 +22,9 @@ type Item struct {
 	SortID int `json:"sortId"`
 	Rarity int `json:"rarity"`
 	// Group is an identifier of what the item actually is. For example, both orirock and orirock cube would have the same group, `orirock`.
-	Group *null.String `json:"group,omitempty" swaggertype:"string"`
+	Group null.String `json:"group,omitempty" swaggertype:"string"`
 	// Sprite describes the location of the item's sprite on the sprite image, in a form of Y:X.
-	Sprite *null.String `json:"sprite,omitempty" swaggertype:"string"`
+	Sprite null.String `json:"sprite,omitempty" swaggertype:"string"`
 	// Keywords is an arbitrary JSON object containing the keywords of the item, for optimizing the results of the frontend built-in search engine.
 	Keywords json.RawMessage `json:"keywords,omitempty" swaggertype:"object"`
 }
