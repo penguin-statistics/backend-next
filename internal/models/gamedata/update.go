@@ -18,7 +18,7 @@ type BrandNewEventContext struct {
 	EndTime      *time.Time
 }
 
-type BrandNewEventObjects struct {
+type RenderedObjects struct {
 	Zone      *models.Zone       `json:"zone"`
 	Stages    []*models.Stage    `json:"stages"`
 	DropInfos []*models.DropInfo `json:"dropInfos"`

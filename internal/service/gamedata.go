@@ -35,7 +35,7 @@ var dropTypeOrderMapping = map[string]int{
 	"RECOGNITION_ONLY": 4,
 }
 
-func (s *GamedataService) UpdateBrandNewEvent(ctx context.Context, context *gamedata.BrandNewEventContext) (*gamedata.BrandNewEventObjects, error) {
+func (s *GamedataService) UpdateBrandNewEvent(ctx context.Context, context *gamedata.BrandNewEventContext) (*gamedata.RenderedObjects, error) {
 	zone, err := s.renderNewZone(context)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (s *GamedataService) UpdateBrandNewEvent(ctx context.Context, context *game
 		dropInfos = append(dropInfos, dropInfosForOneStage...)
 	}
 
-	return &gamedata.BrandNewEventObjects{
+	return &gamedata.RenderedObjects{
 		Zone:      zone,
 		Stages:    stages,
 		DropInfos: dropInfos,
