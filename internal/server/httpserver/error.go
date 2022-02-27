@@ -1,7 +1,7 @@
 package httpserver
 
 import (
-	"github.com/getsentry/sentry-go"
+	"github.com/gofiber/contrib/fibersentry"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 
@@ -50,7 +50,7 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 		Int("status", code).
 		Msg("Internal Server Error")
 
-	sentry.CaptureException(err)
+	fibersentry.GetHubFromContext(ctx).CaptureException(err)
 
 	return ctx.Status(code).JSON(fiber.Map{
 		"code":    errors.CodeInternalError,
