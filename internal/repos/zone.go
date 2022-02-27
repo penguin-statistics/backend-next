@@ -19,6 +19,11 @@ func NewZoneRepo(db *bun.DB) *ZoneRepo {
 	return &ZoneRepo{db: db}
 }
 
+func (c *ZoneRepo) SaveZones(ctx context.Context, tx bun.Tx, zones *[]*models.Zone) error {
+	_, err := tx.NewInsert().Model(zones).Exec(ctx)
+	return err
+}
+
 // Cache: AllZones
 func (c *ZoneRepo) GetZones(ctx context.Context) ([]*models.Zone, error) {
 	var zones []*models.Zone

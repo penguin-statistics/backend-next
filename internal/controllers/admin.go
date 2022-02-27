@@ -21,13 +21,12 @@ type AdminController struct {
 	fx.In
 
 	GamedataService *service.GamedataService
+	AdminService    *service.AdminService
 }
 
 func RegisterAdminController(admin *server.Admin, c AdminController) {
-	admin.Post("/render", c.UpdateBrandNewEvent)
-	admin.Post("/intentionally/panic", func(c *fiber.Ctx) error {
-		panic("intentional panic")
-	})
+	admin.Post("/render/event", c.UpdateBrandNewEvent)
+	admin.Post("/save", c.SaveRenderedObjects)
 }
 
 func (c *AdminController) UpdateBrandNewEvent(ctx *fiber.Ctx) error {
@@ -68,4 +67,15 @@ func (c *AdminController) UpdateBrandNewEvent(ctx *fiber.Ctx) error {
 	}
 	ctx.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	return ctx.Send(marshalResult)
+}
+
+func (c *AdminController) SaveRenderedObjects(ctx *fiber.Ctx) error {
+	var request gamedata.RenderedObjects
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	c.AdminService.SaveRenderedObjects(ctx.Context(), &request)
+
+	return ctx.JSON(request)
 }
