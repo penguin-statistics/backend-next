@@ -55,11 +55,11 @@ func RegisterResultController(
 // @Summary      Get DropMatrix
 // @Tags         Result
 // @Produce      json
-// @Param        server            query string "CN"  "Server"
-// @Param        is_personal       query bool   false "Whether to query for personal drop matrix or not"
+// @Param        server            query    string true  "Server; default to CN"
+// @Param        is_personal       query    bool   false "Whether to query for personal drop matrix or not"
 // @Param        show_closed_zones query    bool   false "Whether to show closed stages or not"
-// @Param        stageFilter       query    string ""    "Comma separated list of ark stage ids"
-// @Param        itemFilter        query    string ""    "Comma separated list of ark item ids"
+// @Param        stageFilter       query    string false "Comma separated list of ark stage ids"
+// @Param        itemFilter        query    string false "Comma separated list of ark item ids"
 // @Success      200               {object} shims.DropMatrixQueryResult
 // @Failure      500               {object} errors.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/result/matrix [GET]
@@ -108,7 +108,7 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 // @Summary      Get PatternMatrix
 // @Tags         Result
 // @Produce      json
-// @Param        server            query string "CN"  "Server"
+// @Param        server            query    string true  "Server; default to CN"
 // @Param        is_personal       query bool   false "Whether to query for personal pattern matrix or not"
 // @Success      200               {object} shims.PatternMatrixQueryResult
 // @Failure      500               {object} errors.PenguinError "An unexpected error occurred"
@@ -150,7 +150,7 @@ func (c *ResultController) GetPatternMatrix(ctx *fiber.Ctx) error {
 // @Summary      Get Trends
 // @Tags         Result
 // @Produce      json
-// @Param        server            query string "CN"  "Server"
+// @Param        server            query    string true  "Server; default to CN"
 // @Success      200               {object} shims.TrendQueryResult
 // @Failure      500               {object} errors.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/result/trends [GET]
@@ -175,7 +175,7 @@ func (c *ResultController) GetTrends(ctx *fiber.Ctx) error {
 // @Summary      Execute Advanced Query
 // @Tags         Result
 // @Produce      json
-// @Success      200     {object}  models.AdvancedQueryReques
+// @Success      200     {object}  types.AdvancedQueryRequest
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/advanced [POST]
 func (c *ResultController) AdvancedQuery(ctx *fiber.Ctx) error {

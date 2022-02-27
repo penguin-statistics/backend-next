@@ -35,7 +35,7 @@ func RegisterReportController(v2 *server.V2, v3 *server.V3, c ReportController) 
 // @Tags         Report
 // @Accept	     json
 // @Produce      json
-// @Success      200     {object}  models.Item{name=models.I18nString,existence=models.Existence,keywords=models.Keywords}
+// @Success      201     {object}  shims.ReportResponse
 // @Failure      400     {object}  errors.PenguinError "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item."
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/report [POST]
@@ -57,10 +57,10 @@ func (c *ReportController) SingularReport(ctx *fiber.Ctx) error {
 // @Tags         Report
 // @Accept	     json
 // @Produce      json
-// @Success      200     {object}  models.Item{name=models.I18nString,existence=models.Existence,keywords=models.Keywords}
+// @Success      204
 // @Failure      400     {object}  errors.PenguinError "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item."
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
-// @Router       /PenguinStats/api/v2/report [POST]
+// @Router       /PenguinStats/api/v2/report/recall [POST]
 func (c *ReportController) RecallSingularReport(ctx *fiber.Ctx) error {
 	var req types.SingleReportRecallRequest
 	if err := rekuest.ValidBody(ctx, &req); err != nil {

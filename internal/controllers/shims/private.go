@@ -47,8 +47,8 @@ func RegisterPrivateController(
 // @Summary      Get DropMatrix
 // @Tags         Private
 // @Produce      json
-// @Param        server            path     string   "CN"     "Server"
-// @Param        source            path     string   "global" "Global or Personal"
+// @Param        server            path     string   true     "Server; default to CN"
+// @Param        source            path     string   true     "Global or Personal; default to global"
 // @Success      200               {object} shims.DropMatrixQueryResult
 // @Failure      500               {object} errors.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/_private/result/matrix/{server}/{source} [GET]
@@ -87,8 +87,8 @@ func (c *PrivateController) GetDropMatrix(ctx *fiber.Ctx) error {
 // @Summary      Get PatternMatrix
 // @Tags         Private
 // @Produce      json
-// @Param        server            path     string   "CN"     "Server"
-// @Param        source            path     string   "global" "Global or Personal"
+// @Param        server            path     string   true     "Server; default to CN"
+// @Param        source            path     string   true     "Global or Personal; default to global"
 // @Success      200               {object} shims.PatternMatrixQueryResult
 // @Failure      500               {object} errors.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/_private/result/pattern/{server}/{source} [GET]
@@ -126,7 +126,7 @@ func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
 // @Summary      Get Trends
 // @Tags         Private
 // @Produce      json
-// @Param        server            path     string   "CN"     "Server"
+// @Param        server            path     string   true     "Server; default to CN"
 // @Success      200               {object} shims.TrendQueryResult
 // @Failure      500               {object} errors.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/_private/result/trend/{server} [GET]
