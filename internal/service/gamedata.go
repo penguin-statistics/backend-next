@@ -57,22 +57,22 @@ func (s *GamedataService) UpdateNewEvent(ctx context.Context, info *gamedata.New
 	}
 
 	stages := make([]*models.Stage, 0)
-	dropInfos := make([]*models.DropInfo, 0)
+	dropInfosMap := make(map[string][]*models.DropInfo)
 	for _, gamedataStage := range importStages {
-		stage, dropInfosForOneStage, err := s.genStageAndDropInfosFromGameData(ctx, info.Server, gamedataStage, 0, nil)
+		stage, dropInfosForOneStage, err := s.genStageAndDropInfosFromGameData(ctx, info.Server, gamedataStage, 0, timeRange)
 		if err != nil {
 			return nil, err
 		}
 		stages = append(stages, stage)
-		dropInfos = append(dropInfos, dropInfosForOneStage...)
+		dropInfosMap[stage.ArkStageID] = dropInfosForOneStage
 	}
 
 	return &gamedata.RenderedObjects{
-		Zone:      zone,
-		Stages:    stages,
-		DropInfos: dropInfos,
-		TimeRange: timeRange,
-		Activity:  activity,
+		Zone:         zone,
+		Stages:       stages,
+		DropInfosMap: dropInfosMap,
+		TimeRange:    timeRange,
+		Activity:     activity,
 	}, nil
 }
 
@@ -128,11 +128,11 @@ func (s *GamedataService) renderNewTimeRange(info *gamedata.NewEventBasicInfo) (
 		endTime = info.EndTime
 	}
 
-	name := null.StringFrom(utils.GetZonePrefixFromArkZoneID(info.ArkZoneID) + "_" + info.Server)
-	startTimeInComment := info.StartTime.In(constants.LocMap[info.Server]).Format("2006/1/02 15:04")
+	name := null.StringFrom(utils.GetZonePrefixFromArkZoneID(info.ArkZoneID))
+	startTimeInComment := info.StartTime.In(constants.LocMap[info.Server]).Format("2006/1/2 15:04")
 	endTimeInComment := "?"
 	if info.EndTime != nil {
-		endTimeInComment = info.EndTime.In(constants.LocMap[info.Server]).Format("2006/1/02 15:04")
+		endTimeInComment = info.EndTime.In(constants.LocMap[info.Server]).Format("2006/1/2 15:04")
 	}
 	comment := null.StringFrom(constants.ServerNameMapping[info.Server] + info.ZoneName + " " + startTimeInComment + " - " + endTimeInComment)
 	return &models.TimeRange{
@@ -235,14 +235,20 @@ func (s *GamedataService) genStageAndDropInfosFromGameData(ctx context.Context, 
 		return nil, nil, err
 	}
 
-	existenceMap := make(map[string]map[string]bool)
+	existenceMap := make(map[string]map[string]interface{})
 	for _, s := range constants.Servers {
-		exist := false
-		if s == server {
-			exist = true
+		existenceMap[s] = map[string]interface{}{
+			"exist": false,
 		}
-		existenceMap[s] = map[string]bool{
-			"exist": exist,
+		if s == server {
+			existenceMap[s]["exist"] = true
+			existenceMap[s]["openTime"] = timeRange.StartTime.UnixMilli()
+			fakeEndTime := time.UnixMilli(constants.FakeEndTimeMilli)
+			endTime := &fakeEndTime
+			if timeRange.EndTime != nil {
+				endTime = timeRange.EndTime
+			}
+			existenceMap[s]["closeTime"] = endTime.UnixMilli()
 		}
 	}
 	existence, err := json.Marshal(existenceMap)

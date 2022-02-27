@@ -19,9 +19,9 @@ type NewEventBasicInfo struct {
 }
 
 type RenderedObjects struct {
-	Zone      *models.Zone       `json:"zone"`
-	Stages    []*models.Stage    `json:"stages"`
-	DropInfos []*models.DropInfo `json:"dropInfos"`
-	TimeRange *models.TimeRange  `json:"timeRange"`
-	Activity  *models.Activity   `json:"activity"`
+	Zone         *models.Zone                  `json:"zone"`
+	Stages       []*models.Stage               `json:"stages"`
+	DropInfosMap map[string][]*models.DropInfo `json:"dropInfosMap"`
+	TimeRange    *models.TimeRange             `json:"timeRange"`
+	Activity     *models.Activity              `json:"activity"`
 }

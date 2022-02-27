@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
@@ -20,6 +21,13 @@ type StageRepo struct {
 
 func NewStageRepo(db *bun.DB) *StageRepo {
 	return &StageRepo{db: db}
+}
+
+func (c *StageRepo) SaveStages(ctx context.Context, tx bun.Tx, stages *[]*models.Stage) error {
+	_, err := tx.NewInsert().
+		Model(stages).
+		Exec(ctx)
+	return err
 }
 
 func (c *StageRepo) GetStages(ctx context.Context) ([]*models.Stage, error) {
@@ -137,7 +145,7 @@ func (c *StageRepo) GetShimStageByArkId(ctx context.Context, arkStageId string, 
 	return &stage, nil
 }
 
-func (c *StageRepo) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId string) (string, error) {
+func (c *StageRepo) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId string) (null.String, error) {
 	var stage models.Stage
 	err := c.db.NewSelect().
 		Model(&stage).
@@ -146,9 +154,9 @@ func (c *StageRepo) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStag
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return "", errors.ErrNotFound
+		return null.NewString("", false), errors.ErrNotFound
 	} else if err != nil {
-		return "", err
+		return null.NewString("", false), err
 	}
 
 	return stage.ExtraProcessType, nil

@@ -172,7 +172,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 	if err != nil {
 		return "", err
 	}
-	if category == constants.ExtraProcessTypeGachaBox {
+	if category.Valid && category.String == constants.ExtraProcessTypeGachaBox {
 		reportutils.AggregateGachaBoxDrops(singleReport)
 	}
 

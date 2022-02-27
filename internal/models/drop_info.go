@@ -18,13 +18,13 @@ type DropInfo struct {
 	RangeID     int             `json:"rangeId"`
 	Accumulable bool            `json:"accumulable"`
 	Bounds      *Bounds         `json:"bounds"`
-	Extras      json.RawMessage `json:"extras"`
+	Extras      json.RawMessage `json:"extras,omitempty"`
 }
 
 type Bounds struct {
 	Upper      int   `json:"upper"`
 	Lower      int   `json:"lower"`
-	Exceptions []int `json:"exceptions"`
+	Exceptions []int `json:"exceptions,omitempty"`
 }
 
 func (b *Bounds) Scan(src interface{}) error {
