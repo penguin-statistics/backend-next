@@ -152,7 +152,7 @@ func (s *ItemService) applyShim(item *shims.Item) {
 	item.Name = nameI18n.Map()["zh"].String()
 
 	var coordSegments []int
-	if item.Sprite != nil && item.Sprite.Valid {
+	if item.Sprite.Valid {
 		segments := strings.SplitN(item.Sprite.String, ":", 2)
 
 		linq.From(segments).Select(func(i interface{}) interface{} {

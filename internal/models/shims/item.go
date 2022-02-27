@@ -18,8 +18,8 @@ type Item struct {
 	ItemType    string          `bun:"column:type" json:"itemType"`
 	SortID      int             `json:"sortId"`
 	Rarity      int             `json:"rarity"`
-	Group       *null.String    `json:"groupID,omitempty" swaggertype:"string"`
-	Sprite      *null.String    `json:"-" swaggertype:"string"`
+	Group       null.String     `json:"groupID,omitempty" swaggertype:"string"`
+	Sprite      null.String     `json:"-" swaggertype:"string"`
 	SpriteCoord *[]int          `bun:"-" json:"spriteCoord,omitempty"`
 	Keywords    json.RawMessage `json:"-"`
 	AliasMap    json.RawMessage `bun:"-" json:"alias,omitempty" swaggertype:"array,string"`

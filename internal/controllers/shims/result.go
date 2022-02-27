@@ -87,7 +87,7 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimQueryResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx.Context(), server, showClosedZones, stageFilterStr, itemFilterStr, &accountId)
+	shimQueryResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx.Context(), server, showClosedZones, stageFilterStr, itemFilterStr, accountId)
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func (c *ResultController) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.Context(), server, &accountId)
+	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.Context(), server, accountId)
 	if err != nil {
 		return err
 	}
@@ -199,7 +199,7 @@ func (c *ResultController) AdvancedQuery(ctx *fiber.Ctx) error {
 func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery) (interface{}, error) {
 	// handle isPersonal (might be null) and account
 	isPersonal := false
-	if query.IsPersonal != nil && query.IsPersonal.Valid {
+	if query.IsPersonal.Valid {
 		isPersonal = query.IsPersonal.Bool
 	}
 	accountId := null.NewInt(0, false)
@@ -214,14 +214,14 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 
 	// handle start time (might be null)
 	startTime_milli := constants.ServerStartTimeMapMillis[query.Server]
-	if query.StartTime != nil && query.StartTime.Valid {
+	if query.StartTime.Valid {
 		startTime_milli = query.StartTime.Int64
 	}
 	startTime := time.UnixMilli(startTime_milli)
 
 	// handle end time (might be null)
 	endTime_milli := constants.FakeEndTimeMilli
-	if query.EndTime != nil && query.EndTime.Valid {
+	if query.EndTime.Valid {
 		endTime_milli = query.EndTime.Int64
 	}
 	endTime := time.UnixMilli(endTime_milli)
@@ -243,12 +243,12 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 	}
 
 	// if there is no interval, then do drop matrix query, otherwise do trend query
-	if query.Interval == nil || !query.Interval.Valid {
+	if !query.Interval.Valid {
 		timeRange := &models.TimeRange{
 			StartTime: &startTime,
 			EndTime:   &endTime,
 		}
-		return c.DropMatrixService.GetShimCustomizedDropMatrixResults(ctx.Context(), query.Server, timeRange, []int{stage.StageID}, itemIds, &accountId)
+		return c.DropMatrixService.GetShimCustomizedDropMatrixResults(ctx.Context(), query.Server, timeRange, []int{stage.StageID}, itemIds, accountId)
 	} else {
 		// interval originally is in milliseconds, so we need to convert it to nanoseconds
 		intervalLength := time.Duration(query.Interval.Int64 * 1e7).Round(time.Hour)
@@ -260,7 +260,7 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 			return nil, fmt.Errorf("interval length is too long, max interval length is %d sections", constants.MaxIntervalNum)
 		}
 
-		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx.Context(), query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, &accountId)
+		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx.Context(), query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, accountId)
 		if err != nil {
 			return nil, err
 		}
