@@ -12,7 +12,7 @@ type BrandNewEventContext struct {
 	ArkZoneID    string
 	ZoneName     string
 	ZoneCategory string
-	ZoneType     *null.String
+	ZoneType     null.String
 	Server       string
 	StartTime    *time.Time
 	EndTime      *time.Time

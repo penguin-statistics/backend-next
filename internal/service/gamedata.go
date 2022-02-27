@@ -117,7 +117,7 @@ func (s *GamedataService) renderNewZone(context *gamedata.BrandNewEventContext) 
 		Type:       context.ZoneType,
 		Name:       name,
 		Existence:  existence,
-		Background: &background,
+		Background: background,
 	}, nil
 }
 
@@ -208,19 +208,12 @@ func (s *GamedataService) fetchLatestStages(arkZoneIds []string) ([]*gamedata.St
 		}
 
 		if utils.IsCampaignStage(stage) {
-
 		} else if utils.IsGuideStage(stage) {
-
 		} else if utils.IsDailyStage(stage) {
-
 		} else if utils.IsChallengeModeStage(stage) {
-
 		} else if utils.IsTrainingStage(stage) {
-
 		} else if utils.IsStoryStage(stage) {
-
 		} else if utils.IsNormalModeExStage(stage) {
-
 		} else {
 			importStages = append(importStages, stage)
 		}

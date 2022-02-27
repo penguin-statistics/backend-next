@@ -23,23 +23,17 @@ func NewAdminService(db *bun.DB, zoneRepo *repos.ZoneRepo) *AdminService {
 }
 
 func (s *AdminService) SaveRenderedObjects(ctx context.Context, objects *gamedata.RenderedObjects) error {
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
+	var innerErr error
+	s.DB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		zones := []*models.Zone{objects.Zone}
+		if err := s.ZoneRepo.SaveZones(ctx, tx, &zones); err != nil {
+			innerErr = err
+			return err
+		}
 
-	zones := []*models.Zone{objects.Zone}
-	if err := s.ZoneRepo.SaveZones(ctx, tx, zones); err != nil {
-		tx.Rollback()
-		return err
-	}
+		// TODO: save other stuff
 
-	// TODO: save other stuff
-
-	if err := tx.Commit(); err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	return nil
+		return nil
+	})
+	return innerErr
 }
