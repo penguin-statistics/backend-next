@@ -24,8 +24,8 @@ func RegisterSiteStatsController(v2 *server.V2, s *service.SiteStatsService) {
 // @Summary      Get Site Stats
 // @Tags         SiteStats
 // @Produce      json
-// @Param        server  query      string  "CN"  "Server"
-// @Success      200     {array}  shims.SiteStats
+// @Param        server  query     string  true  "Server; default to CN"
+// @Success      200     {array}   shims.SiteStats
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/stats [GET]
 // @Deprecated

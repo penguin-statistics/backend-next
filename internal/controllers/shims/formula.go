@@ -22,7 +22,7 @@ func RegisterFormulaController(v2 *server.V2, formulaService *service.FormulaSer
 // @Summary      Get Formula
 // @Tags         Formula
 // @Produce      json
-// @Success      200     {array}
+// @Success      200
 // @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/formula [GET]
 // @Deprecated

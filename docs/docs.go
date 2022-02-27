@@ -31,7 +31,174 @@ var doc = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/v2/items": {
+        "/PenguinStats/api/v2/_private/result/matrix/{server}/{source}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Private"
+                ],
+                "summary": "Get DropMatrix",
+                "deprecated": true,
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Server; default to CN",
+                        "name": "server",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Global or Personal; default to global",
+                        "name": "source",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/shims.DropMatrixQueryResult"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/_private/result/pattern/{server}/{source}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Private"
+                ],
+                "summary": "Get PatternMatrix",
+                "deprecated": true,
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Server; default to CN",
+                        "name": "server",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Global or Personal; default to global",
+                        "name": "source",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/shims.PatternMatrixQueryResult"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/_private/result/trend/{server}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Private"
+                ],
+                "summary": "Get Trends",
+                "deprecated": true,
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Server; default to CN",
+                        "name": "server",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/shims.TrendQueryResult"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/advanced": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Result"
+                ],
+                "summary": "Execute Advanced Query",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/types.AdvancedQueryRequest"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/formula": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Formula"
+                ],
+                "summary": "Get Formula",
+                "deprecated": true,
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/items": {
             "get": {
                 "produces": [
                     "application/json"
@@ -75,7 +242,7 @@ var doc = `{
                 }
             }
         },
-        "/v2/items/{itemId}": {
+        "/PenguinStats/api/v2/items/{itemId}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -131,7 +298,330 @@ var doc = `{
                 }
             }
         },
-        "/v2/stages": {
+        "/PenguinStats/api/v2/notice": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notice"
+                ],
+                "summary": "Get All Notices",
+                "deprecated": true,
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Notice"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/period": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "EventPeriod"
+                ],
+                "summary": "Get All Event Periods",
+                "deprecated": true,
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/definitions/shims.Activity"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "existence": {
+                                                "$ref": "#/definitions/models.Existence"
+                                            },
+                                            "label_i18n": {
+                                                "$ref": "#/definitions/models.I18nString"
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/report": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Report"
+                ],
+                "summary": "Submit an Item Drop Report",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/shims.ReportResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item.",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/report/recall": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Report"
+                ],
+                "summary": "Recall an Item Drop Report",
+                "responses": {
+                    "204": {
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item.",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/report/recognition": {
+            "post": {
+                "description": "Submit an Item Drop Report with Frontend Recognition. Notice that this is a private API and is not designed for external use.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Report"
+                ],
+                "summary": "Bulk Submit with Frontend Recognition",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.Item"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "existence": {
+                                            "$ref": "#/definitions/models.Existence"
+                                        },
+                                        "keywords": {
+                                            "$ref": "#/definitions/models.Keywords"
+                                        },
+                                        "name": {
+                                            "$ref": "#/definitions/models.I18nString"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item.",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/result/matrix": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Result"
+                ],
+                "summary": "Get DropMatrix",
+                "deprecated": true,
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Server; default to CN",
+                        "name": "server",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Whether to query for personal drop matrix or not",
+                        "name": "is_personal",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Whether to show closed stages or not",
+                        "name": "show_closed_zones",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma separated list of ark stage ids",
+                        "name": "stageFilter",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma separated list of ark item ids",
+                        "name": "itemFilter",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/shims.DropMatrixQueryResult"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/result/pattern": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Result"
+                ],
+                "summary": "Get PatternMatrix",
+                "deprecated": true,
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Server; default to CN",
+                        "name": "server",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Whether to query for personal pattern matrix or not",
+                        "name": "is_personal",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/shims.PatternMatrixQueryResult"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/result/trends": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Result"
+                ],
+                "summary": "Get Trends",
+                "deprecated": true,
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Server; default to CN",
+                        "name": "server",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/shims.TrendQueryResult"
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/stages": {
             "get": {
                 "produces": [
                     "application/json"
@@ -175,7 +665,7 @@ var doc = `{
                 }
             }
         },
-        "/v2/stages/{stageId}": {
+        "/PenguinStats/api/v2/stages/{stageId}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -231,7 +721,88 @@ var doc = `{
                 }
             }
         },
-        "/v2/zones": {
+        "/PenguinStats/api/v2/stats": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SiteStats"
+                ],
+                "summary": "Get Site Stats",
+                "deprecated": true,
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Server; default to CN",
+                        "name": "server",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/shims.SiteStats"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/users": {
+            "post": {
+                "consumes": [
+                    "text/plain"
+                ],
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "Account"
+                ],
+                "summary": "Login with PenguinID",
+                "deprecated": true,
+                "parameters": [
+                    {
+                        "description": "User ID",
+                        "name": "userId",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/shims.SiteStats"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/errors.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
+        "/PenguinStats/api/v2/zones": {
             "get": {
                 "produces": [
                     "application/json"
@@ -275,7 +846,7 @@ var doc = `{
                 }
             }
         },
-        "/v2/zones/{zoneId}": {
+        "/PenguinStats/api/v2/zones/{zoneId}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -633,6 +1204,10 @@ var doc = `{
         }
     },
     "definitions": {
+        "errors.Extras": {
+            "type": "object",
+            "additionalProperties": true
+        },
         "errors.PenguinError": {
             "type": "object",
             "properties": {
@@ -640,9 +1215,12 @@ var doc = `{
                     "type": "string",
                     "example": "INVALID_REQUEST"
                 },
+                "extras": {
+                    "$ref": "#/definitions/errors.Extras"
+                },
                 "message": {
                     "type": "string",
-                    "example": "invalid request: request parameters are invalid"
+                    "example": "invalid request: some or all request parameters are invalid"
                 },
                 "statusCode": {
                     "type": "integer",
@@ -778,6 +1356,29 @@ var doc = `{
                 }
             }
         },
+        "models.Notice": {
+            "type": "object",
+            "properties": {
+                "content_i18n": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "existence": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "severity": {
+                    "$ref": "#/definitions/null.Int"
+                }
+            }
+        },
         "models.ServerExistence": {
             "type": "object",
             "required": [
@@ -812,6 +1413,10 @@ var doc = `{
                         "type": "integer"
                     }
                 },
+                "extraProcessType": {
+                    "description": "ExtraProcessType is the type of extra process that is used in the stage, e.g. \"GACHABOX\".",
+                    "type": "string"
+                },
                 "minClearTime": {
                     "description": "MinClearTime is the minimum time (in milliseconds as a duration) it takes to clear the stage, referencing from prts.wiki",
                     "type": "number"
@@ -826,6 +1431,10 @@ var doc = `{
                 },
                 "stageId": {
                     "description": "ArkStageID (stageId) is the previously used, string form ID of the stage; in JSON-representation ` + "`" + `stageId` + "`" + ` is used as key.",
+                    "type": "string"
+                },
+                "stageType": {
+                    "description": "StageType is the type of the stage, e.g. \"MAIN\", \"SUB\", \"ACTIVITY\" and \"DAILY\".",
                     "type": "string"
                 },
                 "zoneId": {
@@ -874,6 +1483,81 @@ var doc = `{
                 },
                 "zoneId": {
                     "type": "string"
+                }
+            }
+        },
+        "null.Bool": {
+            "type": "object",
+            "properties": {
+                "bool": {
+                    "type": "boolean"
+                },
+                "valid": {
+                    "description": "Valid is true if Bool is not NULL",
+                    "type": "boolean"
+                }
+            }
+        },
+        "null.Int": {
+            "type": "object",
+            "properties": {
+                "int64": {
+                    "type": "integer"
+                },
+                "valid": {
+                    "description": "Valid is true if Int64 is not NULL",
+                    "type": "boolean"
+                }
+            }
+        },
+        "shims.Activity": {
+            "type": "object",
+            "properties": {
+                "end": {
+                    "$ref": "#/definitions/null.Int"
+                },
+                "existence": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "label_i18n": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "start": {
+                    "type": "integer"
+                }
+            }
+        },
+        "shims.DropInfo": {
+            "type": "object",
+            "properties": {
+                "bounds": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "dropType": {
+                    "type": "string"
+                },
+                "itemId": {
+                    "type": "string"
+                }
+            }
+        },
+        "shims.DropMatrixQueryResult": {
+            "type": "object",
+            "properties": {
+                "matrix": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/shims.OneDropMatrixElement"
+                    }
                 }
             }
         },
@@ -930,6 +1614,136 @@ var doc = `{
                 }
             }
         },
+        "shims.OneDrop": {
+            "type": "object",
+            "properties": {
+                "itemId": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                }
+            }
+        },
+        "shims.OneDropMatrixElement": {
+            "type": "object",
+            "properties": {
+                "end": {
+                    "$ref": "#/definitions/null.Int"
+                },
+                "itemId": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "stageId": {
+                    "type": "string"
+                },
+                "start": {
+                    "type": "integer"
+                },
+                "times": {
+                    "type": "integer"
+                }
+            }
+        },
+        "shims.OneItemTrend": {
+            "type": "object",
+            "properties": {
+                "quantity": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "times": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "shims.OnePatternMatrixElement": {
+            "type": "object",
+            "properties": {
+                "end": {
+                    "$ref": "#/definitions/null.Int"
+                },
+                "pattern": {
+                    "$ref": "#/definitions/shims.Pattern"
+                },
+                "quantity": {
+                    "type": "integer"
+                },
+                "stageId": {
+                    "type": "string"
+                },
+                "start": {
+                    "type": "integer"
+                },
+                "times": {
+                    "type": "integer"
+                }
+            }
+        },
+        "shims.Pattern": {
+            "type": "object",
+            "properties": {
+                "drops": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/shims.OneDrop"
+                    }
+                }
+            }
+        },
+        "shims.PatternMatrixQueryResult": {
+            "type": "object",
+            "properties": {
+                "pattern_matrix": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/shims.OnePatternMatrixElement"
+                    }
+                }
+            }
+        },
+        "shims.ReportResponse": {
+            "type": "object",
+            "properties": {
+                "reportHash": {
+                    "type": "string"
+                }
+            }
+        },
+        "shims.SiteStats": {
+            "type": "object",
+            "properties": {
+                "totalApCost": {
+                    "type": "integer"
+                },
+                "totalItemQuantities": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/shims.TotalItemQuantity"
+                    }
+                },
+                "totalStageTimes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/shims.TotalStageTime"
+                    }
+                },
+                "totalStageTimes_24h": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/shims.TotalStageTime"
+                    }
+                }
+            }
+        },
         "shims.Stage": {
             "type": "object",
             "properties": {
@@ -945,6 +1759,12 @@ var doc = `{
                         "type": "integer"
                     }
                 },
+                "dropInfos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/shims.DropInfo"
+                    }
+                },
                 "existence": {
                     "type": "array",
                     "items": {
@@ -954,11 +1774,67 @@ var doc = `{
                 "minClearTime": {
                     "type": "number"
                 },
+                "recognitionOnly": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "stageId": {
+                    "type": "string"
+                },
+                "stageType": {
                     "type": "string"
                 },
                 "zoneId": {
                     "type": "string"
+                }
+            }
+        },
+        "shims.StageTrend": {
+            "type": "object",
+            "properties": {
+                "results": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/shims.OneItemTrend"
+                    }
+                },
+                "startTime": {
+                    "type": "integer"
+                }
+            }
+        },
+        "shims.TotalItemQuantity": {
+            "type": "object",
+            "properties": {
+                "itemId": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                }
+            }
+        },
+        "shims.TotalStageTime": {
+            "type": "object",
+            "properties": {
+                "stageId": {
+                    "type": "string"
+                },
+                "times": {
+                    "type": "integer"
+                }
+            }
+        },
+        "shims.TrendQueryResult": {
+            "type": "object",
+            "properties": {
+                "trend": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/shims.StageTrend"
+                    }
                 }
             }
         },
@@ -1002,6 +1878,55 @@ var doc = `{
                     }
                 }
             }
+        },
+        "types.AdvancedQuery": {
+            "type": "object",
+            "required": [
+                "server",
+                "stageId"
+            ],
+            "properties": {
+                "end": {
+                    "$ref": "#/definitions/null.Int"
+                },
+                "interval": {
+                    "$ref": "#/definitions/null.Int"
+                },
+                "isPersonal": {
+                    "$ref": "#/definitions/null.Bool"
+                },
+                "itemIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "server": {
+                    "type": "string"
+                },
+                "stageId": {
+                    "type": "string"
+                },
+                "start": {
+                    "$ref": "#/definitions/null.Int"
+                }
+            }
+        },
+        "types.AdvancedQueryRequest": {
+            "type": "object",
+            "required": [
+                "queries"
+            ],
+            "properties": {
+                "queries": {
+                    "type": "array",
+                    "maxItems": 5,
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/types.AdvancedQuery"
+                    }
+                }
+            }
         }
     }
 }`
@@ -1018,7 +1943,7 @@ type swaggerInfo struct {
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = swaggerInfo{
 	Version:     "3.0.0-alpha.1",
-	Host:        "localhost:9010",
+	Host:        "https://penguin-stats.io",
 	BasePath:    "/api",
 	Schemes:     []string{},
 	Title:       "Penguin Statistics API",

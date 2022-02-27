@@ -15,8 +15,8 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/config"
 )
 
-func ProvidePostgres(config *config.Config) (*bun.DB, error) {
-	// Open a PostgreSQL database.
+func Postgres(config *config.Config) (*bun.DB, error) {
+	// Open a Postgres database.
 	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(config.PostgresDSN), pgdriver.WithApplicationName("penguin-backend")))
 
 	// Create a Bun db on top of it.
