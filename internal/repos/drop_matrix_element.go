@@ -3,7 +3,8 @@ package repos
 import (
 	"context"
 	"database/sql"
-	"errors"
+
+	"github.com/pkg/errors"
 
 	"github.com/uptrace/bun"
 

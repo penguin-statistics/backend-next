@@ -1,10 +1,11 @@
 package shims
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gofiber/fiber/v2"
 	"gopkg.in/guregu/null.v3"

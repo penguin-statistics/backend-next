@@ -3,8 +3,9 @@ package repos
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
