@@ -4,7 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
-	"github\.com/penguin-statistics/backend-next/internal/server/svr"
+	"github.com/penguin-statistics/backend-next/internal/server/svr"
 )
 
 type MetaController struct{}

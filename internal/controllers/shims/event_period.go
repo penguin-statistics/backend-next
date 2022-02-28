@@ -7,7 +7,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github\.com/penguin-statistics/backend-next/internal/server/svr"
+	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
