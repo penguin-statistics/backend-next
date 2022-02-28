@@ -10,7 +10,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models/gamedata"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
-	"github\.com/penguin-statistics/backend-next/internal/server/svr"
+	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
 )
