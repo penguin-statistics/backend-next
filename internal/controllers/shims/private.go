@@ -8,7 +8,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github\.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
@@ -22,7 +22,7 @@ type PrivateController struct {
 }
 
 func RegisterPrivateController(
-	v2 *server.V2,
+	v2 *svr.V2,
 	dropMatrixService *service.DropMatrixService,
 	patternMatrixService *service.PatternMatrixService,
 	trendService *service.TrendService,

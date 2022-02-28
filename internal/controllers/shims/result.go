@@ -14,7 +14,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github\.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
 )
@@ -29,7 +29,7 @@ type ResultController struct {
 }
 
 func RegisterResultController(
-	v2 *server.V2,
+	v2 *svr.V2,
 	dropMatrixService *service.DropMatrixService,
 	patternMatrixService *service.PatternMatrixService,
 	trendService *service.TrendService,
@@ -271,5 +271,5 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 func (c *ResultController) calcIntervalNum(startTime, endTime time.Time, intervalLength time.Duration) int {
 	diff := endTime.Sub(startTime)
 	// implicit float64 to int: drops fractional part (truncates towards 0)
-	return int(int(diff.Hours()) / int(intervalLength.Hours()))
+	return int(diff.Hours()) / int(intervalLength.Hours())
 }

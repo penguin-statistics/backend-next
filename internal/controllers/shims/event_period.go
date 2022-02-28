@@ -7,7 +7,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github\.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
@@ -17,7 +17,7 @@ type EventPeriodController struct {
 	ActivityService *service.ActivityService
 }
 
-func RegisterEventPeriodController(v2 *server.V2, c EventPeriodController) {
+func RegisterEventPeriodController(v2 *svr.V2, c EventPeriodController) {
 	v2.Get("/period", c.GetEventPeriods)
 }
 

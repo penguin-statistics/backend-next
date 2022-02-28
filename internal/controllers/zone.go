@@ -5,7 +5,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github\.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
@@ -16,7 +16,7 @@ type ZoneController struct {
 	Redis       *redis.Client
 }
 
-func RegisterZoneController(v3 *server.V3, c ZoneController) {
+func RegisterZoneController(v3 *svr.V3, c ZoneController) {
 	v3.Get("/zones", c.GetZones)
 	v3.Get("/zones/:zoneId", c.GetZoneById)
 }

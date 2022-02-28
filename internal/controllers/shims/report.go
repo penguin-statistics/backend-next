@@ -11,7 +11,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github\.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
@@ -24,7 +24,7 @@ type ReportController struct {
 	ReportService *service.ReportService
 }
 
-func RegisterReportController(v2 *server.V2, v3 *server.V3, c ReportController) {
+func RegisterReportController(v2 *svr.V2, v3 *svr.V3, c ReportController) {
 	v2.Post("/report", c.SingularReport)
 	v2.Post("/report/recall", c.RecallSingularReport)
 	v2.Post("/report/recognition", c.RecognitionReport)

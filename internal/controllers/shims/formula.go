@@ -3,7 +3,7 @@ package shims
 import (
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github\.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
@@ -11,7 +11,7 @@ type FormulaController struct {
 	FormulaService *service.FormulaService
 }
 
-func RegisterFormulaController(v2 *server.V2, formulaService *service.FormulaService) {
+func RegisterFormulaController(v2 *svr.V2, formulaService *service.FormulaService) {
 	c := &FormulaController{
 		FormulaService: formulaService,
 	}

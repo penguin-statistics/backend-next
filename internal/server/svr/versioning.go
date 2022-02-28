@@ -1,4 +1,4 @@
-package server
+package svr
 
 import (
 	"github.com/gofiber/fiber/v2"
