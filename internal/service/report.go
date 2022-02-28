@@ -129,12 +129,12 @@ func (s *ReportService) commitReportTask(ctx *fiber.Ctx, subject string, task *t
 	taskId = s.pipelineTaskId(ctx)
 	task.TaskID = taskId
 
-	reportTaskJson, err := json.Marshal(task)
+	reportTaskJSON, err := json.Marshal(task)
 	if err != nil {
 		return "", err
 	}
 
-	pub, err := s.NatsJS.PublishAsync(subject, reportTaskJson)
+	pub, err := s.NatsJS.PublishAsync(subject, reportTaskJSON)
 	if err != nil {
 		return "", err
 	}

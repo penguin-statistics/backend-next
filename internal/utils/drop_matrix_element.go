@@ -16,7 +16,7 @@ func GetDropMatrixElementsMap(elements []*models.DropMatrixElement) map[int]map[
 		).ToSlice(&groupedResults1)
 	for _, el := range groupedResults1 {
 		stageId := el.Key.(int)
-		subMapByItemId := make(map[int]map[int]*models.DropMatrixElement, 0)
+		subMapByItemId := make(map[int]map[int]*models.DropMatrixElement)
 		var groupedResults2 []linq.Group
 		linq.From(el.Group).
 			GroupByT(

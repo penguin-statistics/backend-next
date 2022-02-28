@@ -41,7 +41,7 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 		ReadTimeout:  time.Second * 20,
 		WriteTimeout: time.Second * 20,
 		// allow possibility for graceful shutdown, otherwise app#Shutdown() will block forever
-		IdleTimeout:             conf.HttpServerShutdownTimeout,
+		IdleTimeout:             conf.HTTPServerShutdownTimeout,
 		ProxyHeader:             fiber.HeaderXForwardedFor,
 		EnableTrustedProxyCheck: true,
 		TrustedProxies: []string{

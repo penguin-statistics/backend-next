@@ -9,11 +9,11 @@ import (
 )
 
 type Comparator struct {
-	referenceJson gjson.Result
+	refJSON gjson.Result
 }
 
-func NewComparator(referenceJson gjson.Result) *Comparator {
-	return &Comparator{referenceJson: referenceJson}
+func NewComparator(refJSON gjson.Result) *Comparator {
+	return &Comparator{refJSON: refJSON}
 }
 
 func NewComparatorFromFilePath(filePath string) (*Comparator, error) {
@@ -44,7 +44,7 @@ func gjsonIsBool(r gjson.Result) bool {
 
 func (c *Comparison) recursive(actual gjson.Result, ref gjson.Result) error {
 	newError := func(a gjson.Result, b gjson.Result, msg string) error {
-		return fmt.Errorf("comparison failed:\nactual at %s (value: %s)\nreference at %s (value: %s)\n%s", a.Path(c.actualJson.Raw), a.Raw, b.Path(c.referenceJson.Raw), b.Raw, msg)
+		return fmt.Errorf("comparison failed:\nactual at %s (value: %s)\nreference at %s (value: %s)\n%s", a.Path(c.actualJSON.Raw), a.Raw, b.Path(c.refJSON.Raw), b.Raw, msg)
 	}
 
 	if ref.IsObject() {
@@ -69,20 +69,20 @@ func (c *Comparison) recursive(actual gjson.Result, ref gjson.Result) error {
 }
 
 type Comparison struct {
-	actualJson    gjson.Result
-	referenceJson gjson.Result
+	actualJSON    gjson.Result
+	refJSON       gjson.Result
 	toleranceKeys []string
 }
 
-func (c *Comparator) Compare(actualJson []byte, toleranceKeys []string) error {
-	res := gjson.ParseBytes(actualJson)
+func (c *Comparator) Compare(actualJSON []byte, toleranceKeys []string) error {
+	res := gjson.ParseBytes(actualJSON)
 	if !res.IsObject() && !res.IsArray() {
 		return errors.New("invalid actualJson structure")
 	}
 
 	comp := &Comparison{
-		actualJson:    res,
-		referenceJson: c.referenceJson,
+		actualJSON:    res,
+		refJSON:       c.refJSON,
 		toleranceKeys: toleranceKeys,
 	}
 
@@ -91,7 +91,7 @@ func (c *Comparator) Compare(actualJson []byte, toleranceKeys []string) error {
 	}
 
 	for _, value := range res.Array() {
-		err := comp.recursive(value, c.referenceJson)
+		err := comp.recursive(value, c.refJSON)
 		if err != nil {
 			return err
 		}

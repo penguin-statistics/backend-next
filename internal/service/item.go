@@ -121,11 +121,11 @@ func (s *ItemService) GetItemsMapById(ctx context.Context) (map[int]*models.Item
 		if err != nil {
 			return nil, err
 		}
-		itemsMapById := make(map[int]*models.Item)
+		s := make(map[int]*models.Item)
 		for _, item := range items {
-			itemsMapById[item.ItemID] = item
+			s[item.ItemID] = item
 		}
-		return itemsMapById, nil
+		return s, nil
 	}, 24*time.Hour)
 	return itemsMapById, nil
 }
@@ -138,11 +138,11 @@ func (s *ItemService) GetItemsMapByArkId(ctx context.Context) (map[string]*model
 		if err != nil {
 			return nil, err
 		}
-		itemsMapByArkId := make(map[string]*models.Item)
+		s := make(map[string]*models.Item)
 		for _, item := range items {
-			itemsMapByArkId[item.ArkItemID] = item
+			s[item.ArkItemID] = item
 		}
-		return itemsMapByArkId, nil
+		return s, nil
 	}, 24*time.Hour)
 	return itemsMapByArkId, nil
 }
