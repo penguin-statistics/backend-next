@@ -6,12 +6,15 @@ import (
 	"strconv"
 
 	"github.com/ahmetb/go-linq/v3"
+	"github.com/pkg/errors"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
+
+var ErrInvalidDropType = errors.New("invalid drop type")
 
 type DropVerifier struct {
 	DropInfoRepo *repos.DropInfoRepo
@@ -31,7 +34,7 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, r
 		SelectT(func(drop *types.Drop) []string {
 			mappedDropType, have := constants.DropTypeMap[drop.DropType]
 			if !have {
-				err = fmt.Errorf("invalid drop type: expected one of %v, but got `%s`", constants.DropTypeMapKeys, drop.DropType)
+				err = errors.Wrap(ErrInvalidDropType, fmt.Sprintf("expected one of %v, but got `%s`", constants.DropTypeMapKeys, drop.DropType))
 				return []string{}
 			}
 			return []string{

@@ -431,7 +431,7 @@ func (s *DropMatrixService) convertDropMatrixElementsToMaxAccumulableDropMatrixQ
 	return result, nil
 }
 
-func (s *DropMatrixService) combineDropMatrixResults(a *models.OneDropMatrixElement, b *models.OneDropMatrixElement) (*models.OneDropMatrixElement, error) {
+func (s *DropMatrixService) combineDropMatrixResults(a, b *models.OneDropMatrixElement) (*models.OneDropMatrixElement, error) {
 	if a.StageID != b.StageID {
 		return nil, errors.New("stageId not match")
 	}
@@ -485,7 +485,7 @@ func (s *DropMatrixService) convertDropMatrixElementsToDropMatrixQueryResult(ctx
 	return dropMatrixQueryResult, nil
 }
 
-func (s *DropMatrixService) applyShimForDropMatrixQuery(ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, queryResult *models.DropMatrixQueryResult) (*shims.DropMatrixQueryResult, error) {
+func (s *DropMatrixService) applyShimForDropMatrixQuery(ctx context.Context, server string, showClosedZones bool, stageFilterStr, itemFilterStr string, queryResult *models.DropMatrixQueryResult) (*shims.DropMatrixQueryResult, error) {
 	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
 	if err != nil {
 		return nil, err
