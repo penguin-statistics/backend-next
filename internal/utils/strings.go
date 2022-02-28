@@ -8,7 +8,7 @@ import (
 
 var validIdRegex = regexp.MustCompile(`^[a-zA-Z0-9\-_]+$`)
 
-func IsAscii(s string) bool {
+func IsASCII(s string) bool {
 	for _, r := range s {
 		if r > 127 {
 			return false
@@ -40,7 +40,7 @@ func NonNullString(s string) bool {
 func AddSpace(s string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {
-		if i > 0 && IsAscii(s[i:i+1]) != IsAscii(s[i-1:i]) && s[i-1] != ' ' && s[i] != ' ' {
+		if i > 0 && IsASCII(s[i:i+1]) != IsASCII(s[i-1:i]) && s[i-1] != ' ' && s[i] != ' ' {
 			b.WriteByte(' ')
 		}
 		b.WriteByte(s[i])

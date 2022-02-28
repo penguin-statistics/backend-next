@@ -40,7 +40,7 @@ linters:
     - goconst
     # - gocritic
     - gocyclo
-    - revive
+    # - revive
     # - gomnd
     - goprintffuncname
     - gosec
@@ -112,10 +112,14 @@ issues:
     - exported function .* should have comment or be unexported
     - exported type .* should have comment or be unexported
     - exported const .* should have comment or be unexported
+    - comment on exported method
     # ignore cache errcheck
     - Error return value of `cache\..*` is not checked
     # some times we don't need crypto/rand
     - G404
+    # can we plz just don't care about this casing problem...
+    - Id.*ID
+    - comment on exported type
   exclude-use-default: false
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
