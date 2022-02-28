@@ -2,10 +2,11 @@ package cache
 
 import (
 	"context"
-	"errors"
 	"reflect"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/rs/zerolog/log"

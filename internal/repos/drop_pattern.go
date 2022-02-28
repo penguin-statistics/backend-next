@@ -3,11 +3,12 @@ package repos
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	"github.com/uptrace/bun"
 	"github.com/zeebo/xxh3"

@@ -312,7 +312,7 @@ func (s *GamedataService) genStageAndDropInfosFromGameData(ctx context.Context, 
 			if reward.Type == constants.ItemTypeMaterial {
 				item := itemsMap[reward.Id]
 				items = append(items, item)
-				bounds := s.decideItemBounds(item, gamedataStage.ApCost)
+				bounds := s.decideItemBounds(item)
 				dropInfos = append(dropInfos, &models.DropInfo{
 					Server:      server,
 					ItemID:      null.IntFrom(int64(item.ItemID)),
@@ -374,7 +374,7 @@ func (s *GamedataService) genStageAndDropInfosFromGameData(ctx context.Context, 
 	return stage, dropInfos, nil
 }
 
-func (s *GamedataService) decideItemBounds(item *models.Item, sanity int) *models.Bounds {
+func (s *GamedataService) decideItemBounds(item *models.Item) *models.Bounds {
 	var upper int
 	var lower int
 

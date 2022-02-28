@@ -3,11 +3,12 @@ package repos
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/uptrace/bun"
