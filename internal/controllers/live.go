@@ -3,12 +3,12 @@ package controllers
 import (
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github.com/penguin-statistics/backend-next/internal/server/svr"
 )
 
 type LiveController struct{}
 
-func RegisterLiveController(v3 *server.V3) {
+func RegisterLiveController(v3 *svr.V3) {
 	c := &LiveController{}
 
 	v3.Get("/live", c.Live())

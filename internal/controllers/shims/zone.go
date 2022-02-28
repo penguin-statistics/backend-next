@@ -6,7 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github\.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
@@ -14,7 +14,7 @@ type ZoneController struct {
 	ZoneService *service.ZoneService
 }
 
-func RegisterZoneController(v2 *server.V2, zoneService *service.ZoneService) {
+func RegisterZoneController(v2 *svr.V2, zoneService *service.ZoneService) {
 	c := &ZoneController{
 		ZoneService: zoneService,
 	}

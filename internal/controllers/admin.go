@@ -10,7 +10,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models/gamedata"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github\.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
 )
@@ -24,7 +24,7 @@ type AdminController struct {
 	AdminService    *service.AdminService
 }
 
-func RegisterAdminController(admin *server.Admin, c AdminController) {
+func RegisterAdminController(admin *svr.Admin, c AdminController) {
 	admin.Post("/render/event", c.UpdateNewEvent)
 	admin.Post("/save", c.SaveRenderedObjects)
 }

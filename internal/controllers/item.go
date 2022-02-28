@@ -8,7 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github\.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
@@ -20,7 +20,7 @@ type ItemController struct {
 	Redis       *redis.Client
 }
 
-func RegisterItemController(v3 *server.V3, c ItemController) {
+func RegisterItemController(v3 *svr.V3, c ItemController) {
 	v3.Get("/items", c.GetItems)
 	v3.Get("/items/:itemId", buildSanitizer(utils.NonNullString, utils.IsInt), c.GetItemById)
 }

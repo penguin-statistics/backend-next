@@ -38,14 +38,14 @@ linters:
     - exhaustive
     - funlen
     - goconst
-    - gocritic
+    # - gocritic
     - gocyclo
     - revive
     # - gomnd
     - goprintffuncname
     - gosec
     - gosimple
-    - govet
+    # - govet
     - vet
     - ineffassign
     - misspell
@@ -64,7 +64,7 @@ linters:
     - varcheck
     - whitespace
     - asciicheck
-    - goerr113
+    # - goerr113
     - nestif
     - prealloc
 
@@ -105,8 +105,17 @@ issues:
     - Potential file inclusion via variable
     # stylecheck: unnecessary comment requirement
     - ST1000
-    - |
-      shadow: declaration of "err".*
+    # err is fine to be shadowed
+    - declaration of "err"
+    # revive: unnecessary comment requirement
+    - exported method .* should have comment or be unexported
+    - exported function .* should have comment or be unexported
+    - exported type .* should have comment or be unexported
+    - exported const .* should have comment or be unexported
+    # ignore cache errcheck
+    - Error return value of `cache\..*` is not checked
+    # some times we don't need crypto/rand
+    - G404
   exclude-use-default: false
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
