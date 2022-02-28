@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func CompareStageCode(code1 string, code2 string) bool {
+func CompareStageCode(code1, code2 string) bool {
 	splittedCode1 := strings.Split(code1, "-")
 	splittedCode2 := strings.Split(code2, "-")
 	if len(splittedCode1) != len(splittedCode2) {
@@ -21,7 +21,7 @@ func CompareStageCode(code1 string, code2 string) bool {
 	return false
 }
 
-func subStageCodeComparator(part1 string, part2 string) bool {
+func subStageCodeComparator(part1, part2 string) bool {
 	num1, err1 := strconv.Atoi(part1)
 	num2, err2 := strconv.Atoi(part2)
 	if err1 == nil && err2 == nil {

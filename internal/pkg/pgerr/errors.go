@@ -32,7 +32,7 @@ type PenguinError struct {
 	Extras     *Extras
 }
 
-func New(statusCode int, errorCode string, message string) *PenguinError {
+func New(statusCode int, errorCode, message string) *PenguinError {
 	return &PenguinError{
 		StatusCode: statusCode,
 		ErrorCode:  errorCode,

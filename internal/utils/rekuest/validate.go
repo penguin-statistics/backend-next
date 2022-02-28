@@ -71,7 +71,7 @@ type ErrorResponse struct {
 }
 
 // Translate translates errors into ErrorResponses
-func translate(ut ut.Translator, ve validator.ValidationErrors) []*ErrorResponse {
+func translate(utt ut.Translator, ve validator.ValidationErrors) []*ErrorResponse {
 	trans := []*ErrorResponse{}
 
 	var fe validator.FieldError
@@ -79,7 +79,7 @@ func translate(ut ut.Translator, ve validator.ValidationErrors) []*ErrorResponse
 	for i := 0; i < len(ve); i++ {
 		fe = ve[i]
 
-		message := fe.Translate(ut)
+		message := fe.Translate(utt)
 		message = utils.AddSpace(message)
 
 		trans = append(trans, &ErrorResponse{

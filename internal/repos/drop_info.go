@@ -8,9 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/ahmetb/go-linq/v3"
+	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -172,7 +171,7 @@ func (s *DropInfoRepo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, se
 	return itemIds, nil
 }
 
-func (s *DropInfoRepo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) (itemDropInfos []*models.DropInfo, typeDropInfos []*models.DropInfo, err error) {
+func (s *DropInfoRepo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) (itemDropInfos, typeDropInfos []*models.DropInfo, err error) {
 	var typesToInclude []string
 
 	// get distinct drop types
