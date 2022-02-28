@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -31,7 +32,7 @@ func (s *DropPatternRepo) GetDropPatternById(ctx context.Context, id int) (*mode
 		Where("id = ?", id).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -47,7 +48,7 @@ func (s *DropPatternRepo) GetDropPatternByHash(ctx context.Context, hash string)
 		Where("hash = ?", hash).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -69,7 +70,7 @@ func (s *DropPatternRepo) GetOrCreateDropPatternFromDrops(ctx context.Context, t
 
 	if err == nil {
 		return dropPattern, false, nil
-	} else if err != nil && err != sql.ErrNoRows {
+	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, false, err
 	}
 
@@ -83,7 +84,7 @@ func (s *DropPatternRepo) GetOrCreateDropPatternFromDrops(ctx context.Context, t
 	return dropPattern, true, nil
 }
 
-func (s *DropPatternRepo) calculateDropPatternHash(drops []*types.Drop) (string, string) {
+func (s *DropPatternRepo) calculateDropPatternHash(drops []*types.Drop) (originalFingerprint string, hexHash string) {
 	segments := make([]string, len(drops))
 
 	for i, drop := range drops {
@@ -92,7 +93,7 @@ func (s *DropPatternRepo) calculateDropPatternHash(drops []*types.Drop) (string,
 
 	sort.Strings(segments)
 
-	originalFingerprint := strings.Join(segments, "|")
+	originalFingerprint = strings.Join(segments, "|")
 	hash := xxh3.HashStringSeed(originalFingerprint, 0)
 	return originalFingerprint, strconv.FormatUint(hash, 16)
 }

@@ -9,8 +9,8 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/config"
 )
 
-func NATS(config *config.Config) (*nats.Conn, nats.JetStreamContext, error) {
-	nc, err := nats.Connect(config.NatsURL)
+func NATS(conf *config.Config) (*nats.Conn, nats.JetStreamContext, error) {
+	nc, err := nats.Connect(conf.NatsURL)
 	if err != nil {
 		return nil, nil, err
 	}

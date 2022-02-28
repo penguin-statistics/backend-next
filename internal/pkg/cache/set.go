@@ -35,7 +35,7 @@ func (c *Set) Get(key string, dest interface{}) error {
 	key = c.key(key)
 	resp, err := c.client.Get(context.Background(), key).Bytes()
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
+		if !errors.Is(err, redis.Nil) {
 			log.Error().Err(err).Str("key", key).Msg("failed to get value from redis")
 		}
 		return err
@@ -74,7 +74,7 @@ func (c *Set) MutexGetSet(key string, dest interface{}, valueFunc func() (interf
 	err := c.Get(key, dest)
 	if err == nil {
 		return false, nil
-	} else if errors.Is(err, redis.Nil) {
+	} else if !errors.Is(err, redis.Nil) {
 		log.Error().Err(err).Str("key", key).Msg("failed to get value from redis in MutexGetSet")
 		return false, err
 	}
@@ -90,7 +90,7 @@ func (c *Set) slowMutexGetSet(key string, dest interface{}, valueFunc func() (in
 
 	if err == nil {
 		return nil
-	} else if errors.Is(err, redis.Nil) {
+	} else if !errors.Is(err, redis.Nil) {
 		log.Error().Err(err).Str("key", key).Msg("failed to get value from redis in MutexGetSet inner check")
 		return err
 	}

@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/uptrace/bun"
 
@@ -24,7 +25,7 @@ func (c *PropertyRepo) GetProperties(ctx context.Context) ([]*models.Property, e
 		Model(&properties).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -40,7 +41,7 @@ func (c *PropertyRepo) GetPropertyByKey(ctx context.Context, key string) (*model
 		Where("key = ?", key).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err

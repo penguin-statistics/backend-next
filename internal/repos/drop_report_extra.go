@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/uptrace/bun"
 
@@ -26,7 +27,7 @@ func (c *DropReportExtraRepo) GetDropReportExtraById(ctx context.Context, id int
 		Where("report_id = ?", id).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err

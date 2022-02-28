@@ -57,18 +57,18 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, r
 		return fmt.Errorf("invalid drop info count: expected %d, but got %d", len(drops), len(itemDropInfos))
 	}
 
-	if err = d.verifyDropType(ctx, report, typeDropInfos); err != nil {
+	if err = d.verifyDropType(report, typeDropInfos); err != nil {
 		return err
 	}
 
-	if err = d.verifyDropItem(ctx, report, itemDropInfos); err != nil {
+	if err = d.verifyDropItem(report, itemDropInfos); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (d *DropVerifier) verifyDropType(ctx context.Context, report *types.SingleReport, dropInfos []*models.DropInfo) error {
+func (d *DropVerifier) verifyDropType(report *types.SingleReport, dropInfos []*models.DropInfo) error {
 	dropTypeAmountMap := make(map[string]int)
 	linq.From(report.Drops).
 		SelectT(func(drop *types.Drop) string {
@@ -105,7 +105,7 @@ func (d *DropVerifier) verifyDropType(ctx context.Context, report *types.SingleR
 	return nil
 }
 
-func (d *DropVerifier) verifyDropItem(ctx context.Context, report *types.SingleReport, dropInfos []*models.DropInfo) error {
+func (d *DropVerifier) verifyDropItem(report *types.SingleReport, dropInfos []*models.DropInfo) error {
 	for _, dropInfo := range dropInfos {
 		for _, drop := range report.Drops {
 			if drop.DropType != dropInfo.DropType || drop.ItemID != int(dropInfo.ItemID.Int64) {

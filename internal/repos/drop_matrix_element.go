@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/uptrace/bun"
 
@@ -40,7 +41,7 @@ func (s *DropMatrixElementRepo) DeleteByServer(ctx context.Context, server strin
 func (s *DropMatrixElementRepo) GetElementsByServer(ctx context.Context, server string) ([]*models.DropMatrixElement, error) {
 	var elements []*models.DropMatrixElement
 	err := s.db.NewSelect().Model(&elements).Where("server = ?", server).Scan(ctx)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err

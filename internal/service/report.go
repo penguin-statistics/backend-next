@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -11,6 +10,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
 	"github.com/nats-io/nats.go"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
@@ -26,7 +26,10 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
 )
 
-var ErrReportNotFound = pgerr.ErrInvalidReq.Msg("report not existed or has already been recalled")
+var (
+	ErrReportNotFound = pgerr.ErrInvalidReq.Msg("report not existed or has already been recalled")
+	ErrNatsTimeout    = errors.New("timeout waiting for NATS response")
+)
 
 type ReportService struct {
 	DB                     *bun.DB
@@ -144,7 +147,7 @@ func (s *ReportService) commitReportTask(ctx *fiber.Ctx, subject string, task *t
 	case <-ctx.Context().Done():
 		return "", ctx.Context().Err()
 	case <-time.After(time.Second * 15):
-		return "", fmt.Errorf("timeout waiting for NATS response")
+		return "", ErrNatsTimeout
 	}
 }
 
@@ -232,7 +235,7 @@ func (s *ReportService) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types
 func (s *ReportService) RecallSingularReport(ctx context.Context, req *types.SingleReportRecallRequest) error {
 	var reportId int
 	err := cache.RecentReports.Get(req.ReportHash, &reportId)
-	if err == redis.Nil {
+	if errors.Is(err, redis.Nil) {
 		return ErrReportNotFound
 	} else if err != nil {
 		return err

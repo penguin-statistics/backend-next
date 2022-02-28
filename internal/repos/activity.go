@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/uptrace/bun"
 
@@ -30,7 +31,7 @@ func (c *ActivityRepo) GetActivities(ctx context.Context) ([]*models.Activity, e
 		Model(&activities).
 		Scan(ctx)
 
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 

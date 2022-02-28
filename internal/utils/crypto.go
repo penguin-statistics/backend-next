@@ -11,9 +11,9 @@ import (
 	"encoding/pem"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/rs/zerolog/log"
 )
 
 type Crypto struct {
@@ -29,9 +29,9 @@ func intSliceToByteSlice(iv []int) []byte {
 	return b
 }
 
-func NewCrypto(config *config.Config) *Crypto {
+func NewCrypto(conf *config.Config) *Crypto {
 	pk := []byte("-----BEGIN RSA PRIVATE KEY-----\n")
-	pk = append(pk, config.RecognitionEncryptionPrivateKey...)
+	pk = append(pk, conf.RecognitionEncryptionPrivateKey...)
 	pk = append(pk, []byte("\n-----END RSA PRIVATE KEY-----")...)
 
 	rsaPrivateKeyPEMBlock, _ := pem.Decode(pk)
@@ -45,7 +45,7 @@ func NewCrypto(config *config.Config) *Crypto {
 	}
 	rsaPrivateKey := rsaPrivateKeyNotAsserted.(*rsa.PrivateKey)
 
-	iv := intSliceToByteSlice(config.RecognitionEncryptionIV)
+	iv := intSliceToByteSlice(conf.RecognitionEncryptionIV)
 
 	return &Crypto{
 		privateKey: rsaPrivateKey,
