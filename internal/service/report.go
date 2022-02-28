@@ -19,14 +19,14 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
 )
 
-var ErrReportNotFound = errors.ErrInvalidReq.Msg("report not existed or has already been recalled")
+var ErrReportNotFound = pgerr.ErrInvalidReq.Msg("report not existed or has already been recalled")
 
 type ReportService struct {
 	DB                     *bun.DB

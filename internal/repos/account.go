@@ -11,7 +11,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
 const ACCOUNT_MAX_RETRY = 100
@@ -52,7 +52,7 @@ func (c *AccountRepo) CreateAccountWithRandomPenguinId(ctx context.Context) (*mo
 		return account, nil
 	}
 
-	return nil, errors.ErrInternalError.Msg("failed to create account")
+	return nil, pgerr.ErrInternalError.Msg("failed to create account")
 }
 
 func (c *AccountRepo) GetAccountById(ctx context.Context, accountId string) (*models.Account, error) {
@@ -65,7 +65,7 @@ func (c *AccountRepo) GetAccountById(ctx context.Context, accountId string) (*mo
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (c *AccountRepo) GetAccountByPenguinId(ctx context.Context, penguinId strin
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}

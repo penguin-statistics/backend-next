@@ -7,7 +7,7 @@ import (
 )
 
 func GetDropMatrixElementsMap(elements []*models.DropMatrixElement) map[int]map[int]map[int]*models.DropMatrixElement {
-	elementsMap := make(map[int]map[int]map[int]*models.DropMatrixElement, 0)
+	elementsMap := make(map[int]map[int]map[int]*models.DropMatrixElement)
 	var groupedResults1 []linq.Group
 	linq.From(elements).
 		GroupByT(
@@ -26,7 +26,7 @@ func GetDropMatrixElementsMap(elements []*models.DropMatrixElement) map[int]map[
 			ToSlice(&groupedResults2)
 		for _, el2 := range groupedResults2 {
 			itemId := el2.Key.(int)
-			subMapByRangeId := make(map[int]*models.DropMatrixElement, 0)
+			subMapByRangeId := make(map[int]*models.DropMatrixElement)
 			for _, el3 := range el2.Group {
 				element := el3.(*models.DropMatrixElement)
 				subMapByRangeId[element.RangeID] = element

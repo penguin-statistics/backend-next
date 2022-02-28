@@ -12,7 +12,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
 type StageRepo struct {
@@ -37,7 +37,7 @@ func (c *StageRepo) GetStages(ctx context.Context) ([]*models.Stage, error) {
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func (c *StageRepo) GetStageById(ctx context.Context, stageId int) (*models.Stag
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (c *StageRepo) GetStageByArkId(ctx context.Context, arkStageId string) (*mo
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (c *StageRepo) GetShimStages(ctx context.Context, server string) ([]*shims.
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func (c *StageRepo) GetShimStageByArkId(ctx context.Context, arkStageId string, 
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		log.Error().
 			Str("stageId", arkStageId).
@@ -154,7 +154,7 @@ func (c *StageRepo) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStag
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return null.NewString("", false), errors.ErrNotFound
+		return null.NewString("", false), pgerr.ErrNotFound
 	} else if err != nil {
 		return null.NewString("", false), err
 	}
@@ -170,7 +170,7 @@ func (c *StageRepo) SearchStageByCode(ctx context.Context, code string) (*models
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func (c *StageRepo) GetGachaBoxStages(ctx context.Context) ([]*models.Stage, err
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}

@@ -8,8 +8,9 @@ import (
 	zh_translations "github.com/go-playground/validator/v10/translations/zh"
 	zh_tw_translations "github.com/go-playground/validator/v10/translations/zh_tw"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
 
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 	"github.com/penguin-statistics/backend-next/internal/utils/i18n"
 )
@@ -17,45 +18,50 @@ import (
 var Validate = utils.NewValidator()
 
 func init() {
+	var err error
 	entr, _ := i18n.UT.GetTranslator("en")
-	en_translations.RegisterDefaultTranslations(Validate, entr)
+	err = en_translations.RegisterDefaultTranslations(Validate, entr)
+	if err != nil {
+		log.Warn().Err(err).Str("locale", "en").Msg("could not register translation")
+	}
 
 	zhtr, _ := i18n.UT.GetTranslator("zh")
-	zh_translations.RegisterDefaultTranslations(Validate, zhtr)
+	err = zh_translations.RegisterDefaultTranslations(Validate, zhtr)
+	if err != nil {
+		log.Warn().Err(err).Str("locale", "zh").Msg("could not register translation")
+	}
 
 	zhtwtr, _ := i18n.UT.GetTranslator("zh_Hant_TW")
-	zh_tw_translations.RegisterDefaultTranslations(Validate, zhtwtr)
+	err = zh_tw_translations.RegisterDefaultTranslations(Validate, zhtwtr)
+	if err != nil {
+		log.Warn().Err(err).Str("locale", "zh_Hant_TW").Msg("could not register translation")
+	}
 
 	jatr, _ := i18n.UT.GetTranslator("ja")
-	ja_translations.RegisterDefaultTranslations(Validate, jatr)
+	err = ja_translations.RegisterDefaultTranslations(Validate, jatr)
+	if err != nil {
+		log.Warn().Err(err).Str("locale", "ja").Msg("could not register translation")
+	}
 
-	Validate.RegisterTranslation("caseinsensitiveoneof", entr, func(ut ut.Translator) error {
-		return nil
-	}, func(ut ut.Translator, fe validator.FieldError) string {
-		t, _ := ut.T("oneof", fe.Field(), fe.Param())
-		return t
-	})
+	translators := map[string]ut.Translator{
+		"en":         entr,
+		"zh":         zhtr,
+		"zh_Hant_TW": zhtwtr,
+		"ja":         jatr,
+	}
 
-	Validate.RegisterTranslation("caseinsensitiveoneof", zhtr, func(ut ut.Translator) error {
-		return nil
-	}, func(ut ut.Translator, fe validator.FieldError) string {
-		t, _ := ut.T("oneof", fe.Field(), fe.Param())
-		return t
-	})
+	for l, t := range translators {
+		err = Validate.RegisterTranslation("caseinsensitiveoneof", t, func(ut ut.Translator) error {
+			return nil
+		}, func(ut ut.Translator, fe validator.FieldError) string {
+			t, _ := ut.T("oneof", fe.Field(), fe.Param())
+			return t
+		})
 
-	Validate.RegisterTranslation("caseinsensitiveoneof", zhtwtr, func(ut ut.Translator) error {
-		return nil
-	}, func(ut ut.Translator, fe validator.FieldError) string {
-		t, _ := ut.T("oneof", fe.Field(), fe.Param())
-		return t
-	})
-
-	Validate.RegisterTranslation("caseinsensitiveoneof", jatr, func(ut ut.Translator) error {
-		return nil
-	}, func(ut ut.Translator, fe validator.FieldError) string {
-		t, _ := ut.T("oneof", fe.Field(), fe.Param())
-		return t
-	})
+		if err != nil {
+			log.Warn().Err(err).Str("locale", l).Msg("could not register translation for function caseinsensitiveoneof")
+		}
+	}
 }
 
 type ErrorResponse struct {
@@ -115,11 +121,11 @@ func validateStruct(ctx *fiber.Ctx, s interface{}) []*ErrorResponse {
 // always be a pointer.
 func ValidBody(ctx *fiber.Ctx, dest interface{}) error {
 	if err := ctx.BodyParser(dest); err != nil {
-		return errors.ErrInvalidReq.Msg("invalid request: %s", err)
+		return pgerr.ErrInvalidReq.Msg("invalid request: %s", err)
 	}
 
 	if err := validateStruct(ctx, dest); err != nil {
-		return errors.NewInvalidViolations(err)
+		return pgerr.NewInvalidViolations(err)
 	}
 
 	return nil
@@ -127,7 +133,7 @@ func ValidBody(ctx *fiber.Ctx, dest interface{}) error {
 
 func ValidStruct(ctx *fiber.Ctx, dest interface{}) error {
 	if err := validateStruct(ctx, dest); err != nil {
-		return errors.NewInvalidViolations(err)
+		return pgerr.NewInvalidViolations(err)
 	}
 
 	return nil
@@ -135,7 +141,7 @@ func ValidStruct(ctx *fiber.Ctx, dest interface{}) error {
 
 func ValidVar(ctx *fiber.Ctx, field interface{}, tag string) error {
 	if err := validateVar(ctx, field, tag); err != nil {
-		return errors.NewInvalidViolations(err)
+		return pgerr.NewInvalidViolations(err)
 	}
 
 	return nil
