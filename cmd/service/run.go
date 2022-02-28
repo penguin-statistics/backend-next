@@ -2,12 +2,12 @@ package service
 
 import (
 	"context"
-	"errors"
 	"net"
 	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 

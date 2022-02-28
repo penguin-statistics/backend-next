@@ -3,10 +3,11 @@ package repos
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"math/rand"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"

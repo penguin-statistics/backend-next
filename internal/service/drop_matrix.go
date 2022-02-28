@@ -176,7 +176,7 @@ func (s *DropMatrixService) QueryDropMatrix(
 	if err != nil {
 		return nil, err
 	}
-	return s.convertDropMatrixElementsToDropMatrixQueryResult(ctx, server, dropMatrixElements)
+	return s.convertDropMatrixElementsToDropMatrixQueryResult(ctx, dropMatrixElements)
 }
 
 // calc DropMatrixQueryResult for max accumulable timeranges
@@ -447,7 +447,7 @@ func (s *DropMatrixService) combineDropMatrixResults(a *models.OneDropMatrixElem
 	return result, nil
 }
 
-func (s *DropMatrixService) convertDropMatrixElementsToDropMatrixQueryResult(ctx context.Context, server string, dropMatrixElements []*models.DropMatrixElement) (*models.DropMatrixQueryResult, error) {
+func (s *DropMatrixService) convertDropMatrixElementsToDropMatrixQueryResult(ctx context.Context, dropMatrixElements []*models.DropMatrixElement) (*models.DropMatrixQueryResult, error) {
 	dropMatrixQueryResult := &models.DropMatrixQueryResult{
 		Matrix: make([]*models.OneDropMatrixElement, 0),
 	}
