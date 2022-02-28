@@ -10,7 +10,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils"
@@ -92,7 +92,7 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 		log.Warn().
 			Err(err).
 			Msg("failed to decrypt recognition request")
-		return errors.ErrInvalidReq
+		return pgerr.ErrInvalidReq
 	}
 
 	privateKey := segments[0]
@@ -103,7 +103,7 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 		log.Warn().
 			Err(err).
 			Msg("failed to decrypt recognition request")
-		return errors.ErrInvalidReq
+		return pgerr.ErrInvalidReq
 	}
 
 	var request types.BatchReportRequest
@@ -111,7 +111,7 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 		log.Warn().
 			Err(err).
 			Msg("failed to unmarshal recognition request")
-		return errors.ErrInvalidReq
+		return pgerr.ErrInvalidReq
 	}
 
 	if e := log.Trace(); e.Enabled() {

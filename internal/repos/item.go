@@ -8,7 +8,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
 type ItemRepo struct {
@@ -26,7 +26,7 @@ func (c *ItemRepo) GetItems(ctx context.Context) ([]*models.Item, error) {
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (c *ItemRepo) GetItemById(ctx context.Context, itemId int) (*models.Item, e
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*model
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (c *ItemRepo) GetShimItems(ctx context.Context) ([]*shims.Item, error) {
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func (c *ItemRepo) GetShimItemByArkId(ctx context.Context, itemId string) (*shim
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (c *ItemRepo) SearchItemByName(ctx context.Context, name string) (*models.I
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}

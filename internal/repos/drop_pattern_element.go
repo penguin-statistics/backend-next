@@ -8,7 +8,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
 type DropPatternElementRepo struct {
@@ -27,7 +27,7 @@ func (r *DropPatternElementRepo) GetDropPatternElementById(ctx context.Context, 
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (r *DropPatternElementRepo) GetDropPatternElementByHash(ctx context.Context
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}

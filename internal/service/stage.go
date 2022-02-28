@@ -12,7 +12,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
 
@@ -146,7 +146,7 @@ func (s *StageService) GetStagesMapByArkId(ctx context.Context) (map[string]*mod
 
 func (s *StageService) GetGachaBoxStages(ctx context.Context) ([]*models.Stage, error) {
 	stages, err := s.StageRepo.GetGachaBoxStages(ctx)
-	if err == errors.ErrNotFound {
+	if err == pgerr.ErrNotFound {
 		return make([]*models.Stage, 0), nil
 	} else if err != nil {
 		return nil, err

@@ -6,8 +6,9 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/penguin-statistics/backend-next/cmd/test/comparator"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/penguin-statistics/backend-next/cmd/test/comparator"
 )
 
 func TestV2Zones(t *testing.T) {

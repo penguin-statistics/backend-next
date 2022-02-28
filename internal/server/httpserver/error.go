@@ -1,23 +1,27 @@
 package httpserver
 
 import (
+	"strconv"
+
+	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/contrib/fibersentry"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 )
 
 func ErrorHandler(ctx *fiber.Ctx, err error) error {
 	// Use custom error handler to return JSON error responses
-	if e, ok := err.(*errors.PenguinError); ok {
+	if e, ok := err.(*pgerr.PenguinError); ok {
 		log.Warn().
 			Err(err).
 			Str("method", ctx.Method()).
 			Str("path", ctx.Path()).
 			Msg(e.Message)
 
-		// Provide error code if errors.PenguinError type
+		// Provide error code if pgerr.PenguinError type
 		body := fiber.Map{
 			"code":    e.ErrorCode,
 			"message": e.Message,
@@ -50,10 +54,17 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 		Int("status", code).
 		Msg("Internal Server Error")
 
-	fibersentry.GetHubFromContext(ctx).CaptureException(err)
+	hub := fibersentry.GetHubFromContext(ctx)
+	hub.Scope().SetTag("status", strconv.Itoa(code))
+	if u := pgid.Extract(ctx); u != "" {
+		hub.Scope().SetUser(sentry.User{
+			ID: u,
+		})
+	}
+	hub.CaptureException(err)
 
 	return ctx.Status(code).JSON(fiber.Map{
-		"code":    errors.CodeInternalError,
+		"code":    pgerr.CodeInternalError,
 		"message": "internal server error",
 	})
 }

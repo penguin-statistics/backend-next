@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 
-	"github.com/penguin-statistics/backend-next/internal/appentry"
-
 	"go.uber.org/fx"
+
+	"github.com/penguin-statistics/backend-next/internal/appentry"
 )
 
 func populate(targets ...interface{}) {

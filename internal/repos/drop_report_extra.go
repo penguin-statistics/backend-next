@@ -7,7 +7,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
 type DropReportExtraRepo struct {
@@ -27,7 +27,7 @@ func (c *DropReportExtraRepo) GetDropReportExtraById(ctx context.Context, id int
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
