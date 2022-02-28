@@ -6,7 +6,9 @@ import (
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/uptrace/bun"
 
+	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/gamedata"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
@@ -80,5 +82,30 @@ func (s *AdminService) SaveRenderedObjects(ctx context.Context, objects *gamedat
 
 		return nil
 	})
+
+	// if no error, purge cache
+	if innerErr == nil {
+		// zone
+		cache.Zones.Delete()
+		cache.ShimZones.Delete()
+
+		// activity
+		cache.Activities.Delete()
+		cache.ShimActivities.Delete()
+
+		// timerange
+		cache.TimeRanges.Delete(objects.TimeRange.Server)
+		cache.TimeRangesMap.Delete(objects.TimeRange.Server)
+		cache.MaxAccumulableTimeRanges.Delete(objects.TimeRange.Server)
+
+		// stage
+		cache.Stages.Delete()
+		cache.StagesMapById.Delete()
+		cache.StagesMapByArkId.Delete()
+		for _, server := range constants.Servers {
+			cache.ShimStages.Delete(server)
+		}
+	}
+
 	return innerErr
 }
