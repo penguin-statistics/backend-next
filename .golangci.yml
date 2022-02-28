@@ -38,14 +38,14 @@ linters:
     - exhaustive
     - funlen
     - goconst
-    # - gocritic
+    - gocritic
     - gocyclo
     # - revive
     # - gomnd
     - goprintffuncname
     - gosec
     - gosimple
-    # - govet
+    - govet
     - vet
     - ineffassign
     - misspell
@@ -64,7 +64,7 @@ linters:
     - varcheck
     - whitespace
     - asciicheck
-    # - goerr113
+    - goerr113
     - nestif
     - prealloc
 

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-
 	"github.com/uptrace/bun"
 	"github.com/zeebo/xxh3"
 
@@ -85,7 +84,7 @@ func (s *DropPatternRepo) GetOrCreateDropPatternFromDrops(ctx context.Context, t
 	return dropPattern, true, nil
 }
 
-func (s *DropPatternRepo) calculateDropPatternHash(drops []*types.Drop) (originalFingerprint string, hexHash string) {
+func (s *DropPatternRepo) calculateDropPatternHash(drops []*types.Drop) (originalFingerprint, hexHash string) {
 	segments := make([]string, len(drops))
 
 	for i, drop := range drops {
