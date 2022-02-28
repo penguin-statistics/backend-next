@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/uptrace/bun"
 
@@ -23,7 +24,7 @@ func (c *NoticeRepo) GetNotices(ctx context.Context) ([]*models.Notice, error) {
 		Model(&notice).
 		Scan(ctx)
 
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 

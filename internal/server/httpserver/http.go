@@ -32,7 +32,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
 )
 
-func Create(config *config.Config, flake *snowflake.Node) *fiber.App {
+func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:      "Penguin Stats Backend v3",
 		ServerHeader: fmt.Sprintf("Penguin/%s", bininfo.Version),
@@ -41,7 +41,7 @@ func Create(config *config.Config, flake *snowflake.Node) *fiber.App {
 		ReadTimeout:  time.Second * 20,
 		WriteTimeout: time.Second * 20,
 		// allow possibility for graceful shutdown, otherwise app#Shutdown() will block forever
-		IdleTimeout:             config.HttpServerShutdownTimeout,
+		IdleTimeout:             conf.HttpServerShutdownTimeout,
 		ProxyHeader:             fiber.HeaderXForwardedFor,
 		EnableTrustedProxyCheck: true,
 		TrustedProxies: []string{
@@ -89,7 +89,7 @@ func Create(config *config.Config, flake *snowflake.Node) *fiber.App {
 			log.Error().Msgf("panic: %v\n%s\n", e, buf)
 		},
 	}))
-	if config.TracingEnabled {
+	if conf.TracingEnabled {
 		exporter, err := jaeger.New(jaeger.WithCollectorEndpoint())
 		if err != nil {
 			panic(err)
@@ -109,7 +109,7 @@ func Create(config *config.Config, flake *snowflake.Node) *fiber.App {
 			SpanName: "HTTP {{ .Method }} {{ .Path }}",
 		}))
 	}
-	if config.DevMode {
+	if conf.DevMode {
 		log.Info().Msg("Running in DEV mode")
 		app.Use(pprof.New())
 

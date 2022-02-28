@@ -15,10 +15,10 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/async"
 )
 
-func run(app *fiber.App, config *config.Config, lc fx.Lifecycle) {
+func run(app *fiber.App, conf *config.Config, lc fx.Lifecycle) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			ln, err := net.Listen("tcp", config.Address)
+			ln, err := net.Listen("tcp", conf.Address)
 			if err != nil {
 				return err
 			}
@@ -32,7 +32,7 @@ func run(app *fiber.App, config *config.Config, lc fx.Lifecycle) {
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			if config.DevMode {
+			if conf.DevMode {
 				return nil
 			}
 

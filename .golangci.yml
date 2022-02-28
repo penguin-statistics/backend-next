@@ -1,6 +1,6 @@
 linters-settings:
   dupl:
-    threshold: 100
+    threshold: 500 # we got swagger comments so...
   funlen:
     lines: 100
     statements: 50
@@ -41,7 +41,7 @@ linters:
     - gocritic
     - gocyclo
     - revive
-    - gomnd
+    # - gomnd
     - goprintffuncname
     - gosec
     - gosimple
@@ -105,9 +105,13 @@ issues:
     - Potential file inclusion via variable
     # stylecheck: unnecessary comment requirement
     - ST1000
+    - |
+      shadow: declaration of "err".*
   exclude-use-default: false
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
-    - path: _test\.go
+    - path: cmd/test/
       linters:
-        - gomnd
+        - errcheck
+        - gocritic
+        - nestif

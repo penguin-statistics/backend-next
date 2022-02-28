@@ -3,12 +3,12 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
+	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -16,6 +16,8 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/gamedata"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
+
+var ErrCannotGetFromRemote = errors.New("cannot get from remote")
 
 type GamedataService struct {
 	ItemService *ItemService
@@ -190,7 +192,7 @@ func (s *GamedataService) renderNewActivity(info *gamedata.NewEventBasicInfo) (*
 func (s *GamedataService) fetchLatestStages(ctx context.Context, arkZoneIds []string) ([]*gamedata.Stage, error) {
 	u := "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/stage_table.json"
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -200,11 +202,11 @@ func (s *GamedataService) fetchLatestStages(ctx context.Context, arkZoneIds []st
 		return nil, err
 	}
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get")
+		return nil, ErrCannotGetFromRemote
 	}
 	defer res.Body.Close()
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -219,14 +221,15 @@ func (s *GamedataService) fetchLatestStages(ctx context.Context, arkZoneIds []st
 			continue
 		}
 
-		if utils.IsCampaignStage(stage) {
-		} else if utils.IsGuideStage(stage) {
-		} else if utils.IsDailyStage(stage) {
-		} else if utils.IsChallengeModeStage(stage) {
-		} else if utils.IsTrainingStage(stage) {
-		} else if utils.IsStoryStage(stage) {
-		} else if utils.IsNormalModeExStage(stage) {
-		} else {
+		switch {
+		case utils.IsCampaignStage(stage):
+		case utils.IsGuideStage(stage):
+		case utils.IsDailyStage(stage):
+		case utils.IsChallengeModeStage(stage):
+		case utils.IsTrainingStage(stage):
+		case utils.IsStoryStage(stage):
+		case utils.IsNormalModeExStage(stage):
+		default:
 			importStages = append(importStages, stage)
 		}
 	}
@@ -377,16 +380,19 @@ func (s *GamedataService) genStageAndDropInfosFromGameData(ctx context.Context, 
 func (s *GamedataService) decideItemBounds(item *models.Item, sanity int) *models.Bounds {
 	var upper int
 	var lower int
-	if item.Rarity >= 2 {
+
+	switch {
+	case item.Rarity >= 2:
 		upper = 1
 		lower = 0
-	} else if item.Rarity == 1 {
+	case item.Rarity == 1:
 		upper = 3
 		lower = 0
-	} else if item.Rarity == 0 {
+	case item.Rarity == 0:
 		upper = 5
 		lower = 0
 	}
+
 	bounds := &models.Bounds{
 		Upper: upper,
 		Lower: lower,

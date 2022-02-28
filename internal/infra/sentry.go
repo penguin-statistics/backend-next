@@ -9,17 +9,17 @@ import (
 )
 
 // SentryInit initializes sentry with side-effect
-func SentryInit(config *config.Config) error {
-	if config.SentryDSN == "" {
+func SentryInit(conf *config.Config) error {
+	if conf.SentryDSN == "" {
 		log.Warn().Msg("Sentry is disabled due to missing DSN.")
 		return nil
 	} else {
 		log.Info().Msg("Initializing Sentry...")
 	}
 	return sentry.Init(sentry.ClientOptions{
-		Dsn:              config.SentryDSN,
+		Dsn:              conf.SentryDSN,
 		Release:          "backend-next@" + bininfo.Version,
-		Debug:            config.DevMode,
+		Debug:            conf.DevMode,
 		AttachStacktrace: true,
 		TracesSampleRate: 0.01,
 	})

@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/uptrace/bun"
 
@@ -32,7 +33,7 @@ func (c *ZoneRepo) GetZones(ctx context.Context) ([]*models.Zone, error) {
 		Model(&zones).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -48,7 +49,7 @@ func (c *ZoneRepo) GetZoneById(ctx context.Context, id int) (*models.Zone, error
 		Where("zone_id = ?", id).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -64,7 +65,7 @@ func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model
 		Where("ark_zone_id = ?", arkZoneId).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -86,7 +87,7 @@ func (c *ZoneRepo) GetShimZones(ctx context.Context) ([]*shims.Zone, error) {
 		}).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -107,7 +108,7 @@ func (c *ZoneRepo) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*s
 		Where("ark_zone_id = ?", arkZoneId).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err

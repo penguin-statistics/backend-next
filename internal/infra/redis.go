@@ -9,8 +9,8 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/config"
 )
 
-func Redis(config *config.Config) (*redis.Client, error) {
-	u, err := redis.ParseURL(config.RedisURL)
+func Redis(conf *config.Config) (*redis.Client, error) {
+	u, err := redis.ParseURL(conf.RedisURL)
 	if err != nil {
 		return nil, err
 	}
