@@ -118,11 +118,11 @@ func (s *StageService) GetStagesMapById(ctx context.Context) (map[int]*models.St
 		if err != nil {
 			return nil, err
 		}
-		stagesMapById := make(map[int]*models.Stage)
+		s := make(map[int]*models.Stage)
 		for _, stage := range stages {
-			stagesMapById[stage.StageID] = stage
+			s[stage.StageID] = stage
 		}
-		return stagesMapById, nil
+		return s, nil
 	}, 24*time.Hour)
 	return stagesMapById, nil
 }
@@ -135,11 +135,11 @@ func (s *StageService) GetStagesMapByArkId(ctx context.Context) (map[string]*mod
 		if err != nil {
 			return nil, err
 		}
-		stagesMapByArkId := make(map[string]*models.Stage)
+		s := make(map[string]*models.Stage)
 		for _, stage := range stages {
-			stagesMapByArkId[stage.ArkStageID] = stage
+			s[stage.ArkStageID] = stage
 		}
-		return stagesMapByArkId, nil
+		return s, nil
 	}, 24*time.Hour)
 	return stagesMapByArkId, nil
 }

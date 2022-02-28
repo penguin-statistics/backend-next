@@ -47,8 +47,8 @@ type Config struct {
 	// Normal contributors should not need to change this: when left empty, recognition report is simply disabled.
 	RecognitionEncryptionIV []int `split_words:"true"`
 
-	// HttpServerShutdownTimeout is the timeout for the HTTP server to shutdown gracefully.
-	HttpServerShutdownTimeout time.Duration `required:"true" split_words:"true" default:"60s"`
+	// HTTPServerShutdownTimeout is the timeout for the HTTP server to shutdown gracefully.
+	HTTPServerShutdownTimeout time.Duration `required:"true" split_words:"true" default:"60s"`
 
 	// GeoIPDBPath is the path to the GeoIP2 database.
 	GeoIPDBPath string `required:"true" split_words:"true" default:"vendors/maxmind/assets/geolite2/GeoLite2-Country.mmdb"`

@@ -5,9 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -214,18 +213,18 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 	}
 
 	// handle start time (might be null)
-	startTime_milli := constants.ServerStartTimeMapMillis[query.Server]
+	startTimeMilli := constants.ServerStartTimeMapMillis[query.Server]
 	if query.StartTime.Valid {
-		startTime_milli = query.StartTime.Int64
+		startTimeMilli = query.StartTime.Int64
 	}
-	startTime := time.UnixMilli(startTime_milli)
+	startTime := time.UnixMilli(startTimeMilli)
 
 	// handle end time (might be null)
-	endTime_milli := constants.FakeEndTimeMilli
+	endTimeMilli := constants.FakeEndTimeMilli
 	if query.EndTime.Valid {
-		endTime_milli = query.EndTime.Int64
+		endTimeMilli = query.EndTime.Int64
 	}
-	endTime := time.UnixMilli(endTime_milli)
+	endTime := time.UnixMilli(endTimeMilli)
 
 	// handle ark stage id
 	stage, err := c.StageService.GetStageByArkId(ctx.Context(), query.StageID)

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 
@@ -16,7 +15,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
-const ACCOUNT_MAX_RETRY = 100
+const AccountMaxRetries = 100
 
 type AccountRepo struct {
 	db *bun.DB
@@ -34,7 +33,7 @@ func generateRandomPenguinId() string {
 
 func (c *AccountRepo) CreateAccountWithRandomPenguinId(ctx context.Context) (*models.Account, error) {
 	// retry if account already exists
-	for i := 0; i < ACCOUNT_MAX_RETRY; i++ {
+	for i := 0; i < AccountMaxRetries; i++ {
 		account := &models.Account{
 			PenguinID: generateRandomPenguinId(),
 		}
