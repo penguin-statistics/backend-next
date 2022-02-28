@@ -78,7 +78,7 @@ func (s *ShortURLService) ResolveShortURL(ctx *fiber.Ctx, path string) string {
 		return s.siteURL(ctx, resolved)
 	}
 
-	return s.resolveUnknown(ctx.Context(), path)
+	return s.resolveUnknown(path)
 }
 
 func (s *ShortURLService) resolveByItemName(ctx context.Context, path string) (string, error) {
@@ -127,6 +127,6 @@ func (s *ShortURLService) resolveByItemId(ctx context.Context, path string) (str
 	return "/result/item/" + item.ArkItemID + "?utm_source=exusiai&utm_medium=item&utm_campaign=id", nil
 }
 
-func (s *ShortURLService) resolveUnknown(ctx context.Context, path string) string {
+func (s *ShortURLService) resolveUnknown(path string) string {
 	return "/search?utm_source=exusiai&utm_medium=search&utm_campaign=fallback&q=" + url.QueryEscape(path)
 }

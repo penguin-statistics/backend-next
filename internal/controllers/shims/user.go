@@ -8,7 +8,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github\.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
@@ -16,7 +16,7 @@ type AccountController struct {
 	service *service.AccountService
 }
 
-func RegisterAccountController(v2 *server.V2, s *service.AccountService) {
+func RegisterAccountController(v2 *svr.V2, s *service.AccountService) {
 	c := &AccountController{
 		service: s,
 	}

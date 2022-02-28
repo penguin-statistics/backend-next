@@ -6,7 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github\.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
@@ -14,7 +14,7 @@ type ItemController struct {
 	ItemService *service.ItemService
 }
 
-func RegisterItemController(v2 *server.V2, itemService *service.ItemService) {
+func RegisterItemController(v2 *svr.V2, itemService *service.ItemService) {
 	c := &ItemController{
 		ItemService: itemService,
 	}

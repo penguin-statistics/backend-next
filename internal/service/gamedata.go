@@ -48,10 +48,7 @@ func (s *GamedataService) UpdateNewEvent(ctx context.Context, info *gamedata.New
 		return nil, err
 	}
 
-	timeRange, err := s.renderNewTimeRange(info)
-	if err != nil {
-		return nil, err
-	}
+	timeRange := s.renderNewTimeRange(info)
 
 	activity, err := s.renderNewActivity(info)
 	if err != nil {
@@ -128,7 +125,7 @@ func (s *GamedataService) renderNewZone(info *gamedata.NewEventBasicInfo) (*mode
 	}, nil
 }
 
-func (s *GamedataService) renderNewTimeRange(info *gamedata.NewEventBasicInfo) (*models.TimeRange, error) {
+func (s *GamedataService) renderNewTimeRange(info *gamedata.NewEventBasicInfo) *models.TimeRange {
 	fakeEndTime := time.UnixMilli(constants.FakeEndTimeMilli)
 	endTime := &fakeEndTime
 	if info.EndTime != nil {
@@ -148,7 +145,7 @@ func (s *GamedataService) renderNewTimeRange(info *gamedata.NewEventBasicInfo) (
 		Server:    info.Server,
 		Name:      name,
 		Comment:   comment,
-	}, nil
+	}
 }
 
 func (s *GamedataService) renderNewActivity(info *gamedata.NewEventBasicInfo) (*models.Activity, error) {
@@ -327,7 +324,7 @@ func (s *GamedataService) genStageAndDropInfosFromGameData(ctx context.Context, 
 		}
 
 		// add dropinfo for dropType
-		dropTypeBounds := s.decideDropTypeBounds(dropType, items, gamedataStage.ApCost)
+		dropTypeBounds := s.decideDropTypeBounds(dropType, items)
 		dropInfos = append(dropInfos, &models.DropInfo{
 			Server:      server,
 			DropType:    utils.RewardTypeMap[dropType],
@@ -400,7 +397,7 @@ func (s *GamedataService) decideItemBounds(item *models.Item, sanity int) *model
 	return bounds
 }
 
-func (s *GamedataService) decideDropTypeBounds(dropType int, items []*models.Item, sanity int) *models.Bounds {
+func (s *GamedataService) decideDropTypeBounds(dropType int, items []*models.Item) *models.Bounds {
 	if dropType == 2 || dropType == 3 {
 		return &models.Bounds{Upper: len(items), Lower: 0}
 	}

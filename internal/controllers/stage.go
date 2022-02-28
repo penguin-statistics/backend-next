@@ -5,7 +5,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github\.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
@@ -16,7 +16,7 @@ type StageController struct {
 	Redis        *redis.Client
 }
 
-func RegisterStageController(v3 *server.V3, c StageController) {
+func RegisterStageController(v3 *svr.V3, c StageController) {
 	v3.Get("/stages", c.GetStages)
 	v3.Get("/stages/:stageId", c.GetStageById)
 }

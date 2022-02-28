@@ -71,8 +71,8 @@ func (r *DropPatternElementRepo) CreateDropPatternElements(ctx context.Context, 
 	}
 
 	ptrElements := make([]*models.DropPatternElement, 0, len(elements))
-	for _, element := range elements {
-		ptrElements = append(ptrElements, &element)
+	for i := range elements {
+		ptrElements = append(ptrElements, &elements[i])
 	}
 
 	return ptrElements, nil

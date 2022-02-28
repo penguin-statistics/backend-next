@@ -13,8 +13,8 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/flake"
 	"github.com/penguin-statistics/backend-next/internal/pkg/logger"
 	"github.com/penguin-statistics/backend-next/internal/repos"
-	"github.com/penguin-statistics/backend-next/internal/server"
 	"github.com/penguin-statistics/backend-next/internal/server/httpserver"
+	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
@@ -71,7 +71,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(service.NewDropMatrixElementService),
 		fx.Provide(service.NewDropPatternElementService),
 		fx.Provide(service.NewPatternMatrixElementService),
-		fx.Provide(server.CreateVersioningEndpoints),
+		fx.Provide(svr.CreateVersioningEndpoints),
 		fx.Provide(service.NewGamedataService),
 		fx.Provide(service.NewAdminService),
 		fx.Provide(utils.NewCrypto),

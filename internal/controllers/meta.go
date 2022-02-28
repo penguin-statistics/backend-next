@@ -4,12 +4,12 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github\.com/penguin-statistics/backend-next/internal/server/svr"
 )
 
 type MetaController struct{}
 
-func RegisterMetaController(v3 *server.V3) {
+func RegisterMetaController(v3 *svr.V3) {
 	c := &MetaController{}
 
 	v3.Get("/meta/bininfo", c.BinInfo)

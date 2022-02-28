@@ -4,7 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/server"
+	"github\.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
@@ -17,7 +17,7 @@ type TestController struct {
 	GamedataService      *service.GamedataService
 }
 
-func RegisterTestController(v2 *server.V2, c TestController) {
+func RegisterTestController(v2 *svr.V2, c TestController) {
 	v2.Get("/refresh/matrix/:server", c.RefreshAllDropMatrixElements)
 	v2.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
 	v2.Get("/refresh/trend/:server", c.RefreshAllTrendElements)
