@@ -26,7 +26,6 @@ func (c *ZoneRepo) SaveZones(ctx context.Context, tx bun.Tx, zones *[]*models.Zo
 	return err
 }
 
-// Cache: AllZones
 func (c *ZoneRepo) GetZones(ctx context.Context) ([]*models.Zone, error) {
 	var zones []*models.Zone
 	err := c.db.NewSelect().
@@ -58,7 +57,6 @@ func (c *ZoneRepo) GetZoneById(ctx context.Context, id int) (*models.Zone, error
 	return &zone, nil
 }
 
-// Cache: ZoneFromArkId
 func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*models.Zone, error) {
 	var zone models.Zone
 	err := c.db.NewSelect().
