@@ -15,6 +15,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v3.1.0
+
     - name: Get Tag Version
       id: get_version
       run: |

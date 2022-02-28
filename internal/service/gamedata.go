@@ -19,11 +19,16 @@ import (
 
 type GamedataService struct {
 	ItemService *ItemService
+
+	client *http.Client
 }
 
 func NewGamedataService(itemService *ItemService) *GamedataService {
 	return &GamedataService{
 		ItemService: itemService,
+		client: &http.Client{
+			Timeout: time.Second * 10,
+		},
 	}
 }
 
@@ -51,7 +56,7 @@ func (s *GamedataService) UpdateNewEvent(ctx context.Context, info *gamedata.New
 		return nil, err
 	}
 
-	importStages, err := s.fetchLatestStages([]string{info.ArkZoneID})
+	importStages, err := s.fetchLatestStages(ctx, []string{info.ArkZoneID})
 	if err != nil {
 		return nil, err
 	}
@@ -182,8 +187,15 @@ func (s *GamedataService) renderNewActivity(info *gamedata.NewEventBasicInfo) (*
 	}, nil
 }
 
-func (s *GamedataService) fetchLatestStages(arkZoneIds []string) ([]*gamedata.Stage, error) {
-	res, err := http.Get("https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/stage_table.json")
+func (s *GamedataService) fetchLatestStages(ctx context.Context, arkZoneIds []string) ([]*gamedata.Stage, error) {
+	u := "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/stage_table.json"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}

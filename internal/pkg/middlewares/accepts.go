@@ -4,8 +4,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
 func Accepts(mimes ...string) func(ctx *fiber.Ctx) error {
@@ -14,7 +13,7 @@ func Accepts(mimes ...string) func(ctx *fiber.Ctx) error {
 			return nil
 		}
 
-		return errors.ErrInvalidReq.Msg("Invalid or missing Accept header. Accepts: %s", strings.Join(mimes, ", "))
+		return pgerr.ErrInvalidReq.Msg("Invalid or missing Accept header. Accepts: %s", strings.Join(mimes, ", "))
 	}
 }
 

@@ -144,7 +144,10 @@ func BenchmarkJsonOrGobOrMsgpackDecoding(b *testing.B) {
 			if err != nil {
 				b.Error(err)
 			}
-			reader.Seek(0, 0)
+			_, err = reader.Seek(0, 0)
+			if err != nil {
+				b.Fatal(err)
+			}
 		}
 	})
 
@@ -160,7 +163,10 @@ func BenchmarkJsonOrGobOrMsgpackDecoding(b *testing.B) {
 			if err != nil {
 				b.Error(err)
 			}
-			reader2.Seek(0, 0)
+			_, err = reader2.Seek(0, 0)
+			if err != nil {
+				b.Fatal(err)
+			}
 		}
 	})
 
@@ -170,7 +176,10 @@ func BenchmarkJsonOrGobOrMsgpackDecoding(b *testing.B) {
 			if err != nil {
 				b.Error(err)
 			}
-			reader2.Seek(0, 0)
+			_, err = reader2.Seek(0, 0)
+			if err != nil {
+				b.Fatal(err)
+			}
 		}
 	})
 }

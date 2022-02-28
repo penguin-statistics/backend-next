@@ -8,7 +8,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
-	"github.com/penguin-statistics/backend-next/internal/pkg/errors"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
 type ZoneRepo struct {
@@ -33,7 +33,7 @@ func (c *ZoneRepo) GetZones(ctx context.Context) ([]*models.Zone, error) {
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -49,7 +49,7 @@ func (c *ZoneRepo) GetZoneById(ctx context.Context, id int) (*models.Zone, error
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func (c *ZoneRepo) GetShimZones(ctx context.Context) ([]*shims.Zone, error) {
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func (c *ZoneRepo) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*s
 		Scan(ctx)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.ErrNotFound
+		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
