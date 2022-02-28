@@ -36,12 +36,12 @@ type Worker struct {
 	WorkerDeps
 }
 
-func Start(config *config.Config, deps WorkerDeps) {
-	if config.WorkerEnabled {
+func Start(conf *config.Config, deps WorkerDeps) {
+	if conf.WorkerEnabled {
 		(&Worker{
-			sep:        config.WorkerSeparation,
-			interval:   config.WorkerInterval,
-			timeout:    config.WorkerTimeout,
+			sep:        conf.WorkerSeparation,
+			interval:   conf.WorkerInterval,
+			timeout:    conf.WorkerTimeout,
 			WorkerDeps: deps,
 		}).do()
 	} else {

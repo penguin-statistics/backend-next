@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -64,7 +65,7 @@ func (c *AccountRepo) GetAccountById(ctx context.Context, accountId string) (*mo
 		Where("account_id = ?", accountId).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -81,7 +82,7 @@ func (c *AccountRepo) GetAccountByPenguinId(ctx context.Context, penguinId strin
 		Where("penguin_id = ?", penguinId).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err

@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/uptrace/bun"
 
@@ -25,7 +26,7 @@ func (c *ItemRepo) GetItems(ctx context.Context) ([]*models.Item, error) {
 		Model(&items).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -41,7 +42,7 @@ func (c *ItemRepo) GetItemById(ctx context.Context, itemId int) (*models.Item, e
 		Where("item_id = ?", itemId).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -57,7 +58,7 @@ func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*model
 		Where("ark_item_id = ?", arkItemId).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -73,7 +74,7 @@ func (c *ItemRepo) GetShimItems(ctx context.Context) ([]*shims.Item, error) {
 		Model(&items).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -89,7 +90,7 @@ func (c *ItemRepo) GetShimItemByArkId(ctx context.Context, itemId string) (*shim
 		Where("ark_item_id = ?", itemId).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -105,7 +106,7 @@ func (c *ItemRepo) SearchItemByName(ctx context.Context, name string) (*models.I
 		Where("\"name\"::TEXT ILIKE ?", "%"+name+"%").
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err

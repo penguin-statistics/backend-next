@@ -11,7 +11,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/config"
 )
 
-func Configure(config *config.Config) {
+func Configure(conf *config.Config) {
 	zerolog.TimeFieldFormat = time.RFC3339Nano
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 
@@ -23,7 +23,7 @@ func Configure(config *config.Config) {
 	}
 
 	var level zerolog.Level
-	if config.DevMode {
+	if conf.DevMode {
 		level = zerolog.TraceLevel
 	} else {
 		level = zerolog.DebugLevel

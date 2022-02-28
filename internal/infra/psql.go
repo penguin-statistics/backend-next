@@ -15,14 +15,14 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/config"
 )
 
-func Postgres(config *config.Config) (*bun.DB, error) {
+func Postgres(conf *config.Config) (*bun.DB, error) {
 	// Open a Postgres database.
-	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(config.PostgresDSN), pgdriver.WithApplicationName("penguin-backend")))
+	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(conf.PostgresDSN), pgdriver.WithApplicationName("penguin-backend")))
 
 	// Create a Bun db on top of it.
 	db := bun.NewDB(pgdb, pgdialect.New())
-	if config.DevMode {
-		db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithEnabled(true), bundebug.WithVerbose(config.BunDebugVerbose)))
+	if conf.DevMode {
+		db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithEnabled(true), bundebug.WithVerbose(conf.BunDebugVerbose)))
 		db.AddQueryHook(bunotel.NewQueryHook(bunotel.WithDBName("penguin_structured")))
 	}
 

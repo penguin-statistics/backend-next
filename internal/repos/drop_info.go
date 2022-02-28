@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -39,7 +40,7 @@ func (s *DropInfoRepo) GetDropInfo(ctx context.Context, id int) (*models.DropInf
 		Where("id = ?", id).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -56,7 +57,7 @@ func (s *DropInfoRepo) GetDropInfosByServerAndStageId(ctx context.Context, serve
 		Where("server = ?", server).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -72,7 +73,7 @@ func (s *DropInfoRepo) GetDropInfosByServer(ctx context.Context, server string) 
 		Where("server = ?", server).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -130,7 +131,7 @@ func (s *DropInfoRepo) GetForCurrentTimeRange(ctx context.Context, query *DropIn
 		DoFilterCurrentTimeRange().
 		Q.Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -151,7 +152,7 @@ func (s *DropInfoRepo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, se
 			Where("di.range_id = ?", rangeId),
 	).Q.Scan(ctx, &results)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -170,7 +171,7 @@ func (s *DropInfoRepo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, se
 	return itemIds, nil
 }
 
-func (s *DropInfoRepo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) ([]*models.DropInfo, []*models.DropInfo, error) {
+func (s *DropInfoRepo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) (itemDropInfos []*models.DropInfo, typeDropInfos []*models.DropInfo, err error) {
 	var typesToInclude []string
 
 	// get distinct drop types
@@ -189,8 +190,6 @@ func (s *DropInfoRepo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, 
 	if err != nil {
 		return nil, nil, err
 	}
-	var itemDropInfos []*models.DropInfo
-	var typeDropInfos []*models.DropInfo
 	for _, dropInfo := range allDropInfos {
 		if dropInfo.DropType != constants.DropTypeRecognitionOnly {
 			if dropInfo.ItemID.Valid {

@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -36,7 +37,7 @@ func (c *StageRepo) GetStages(ctx context.Context) ([]*models.Stage, error) {
 		Model(&stages).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -52,7 +53,7 @@ func (c *StageRepo) GetStageById(ctx context.Context, stageId int) (*models.Stag
 		Where("stage_id = ?", stageId).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -68,7 +69,7 @@ func (c *StageRepo) GetStageByArkId(ctx context.Context, arkStageId string) (*mo
 		Where("ark_stage_id = ?", arkStageId).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -100,7 +101,7 @@ func (c *StageRepo) GetShimStages(ctx context.Context, server string) ([]*shims.
 		}).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -132,7 +133,7 @@ func (c *StageRepo) GetShimStageByArkId(ctx context.Context, arkStageId string, 
 		Where("ark_stage_id = ?", arkStageId).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		log.Error().
@@ -153,7 +154,7 @@ func (c *StageRepo) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStag
 		Where("st.ark_stage_id = ?", arkStageId).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return null.NewString("", false), pgerr.ErrNotFound
 	} else if err != nil {
 		return null.NewString("", false), err
@@ -169,7 +170,7 @@ func (c *StageRepo) SearchStageByCode(ctx context.Context, code string) (*models
 		Where("\"code\"::TEXT ILIKE ?", "%"+code+"%").
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -185,7 +186,7 @@ func (c *StageRepo) GetGachaBoxStages(ctx context.Context) ([]*models.Stage, err
 		Where("extra_process_type = ?", constants.ExtraProcessTypeGachaBox).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err

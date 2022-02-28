@@ -3,6 +3,7 @@ package repos
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/uptrace/bun"
 
@@ -26,7 +27,7 @@ func (r *DropPatternElementRepo) GetDropPatternElementById(ctx context.Context, 
 		Where("id = ?", id).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -42,7 +43,7 @@ func (r *DropPatternElementRepo) GetDropPatternElementByHash(ctx context.Context
 		Where("hash = ?", hash).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -84,7 +85,7 @@ func (r *DropPatternElementRepo) GetDropPatternElementsByPatternId(ctx context.C
 		Where("drop_pattern_id = ?", patternId).
 		Scan(ctx)
 
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		elements = make([]*models.DropPatternElement, 0)
 	} else if err != nil {
 		return nil, err

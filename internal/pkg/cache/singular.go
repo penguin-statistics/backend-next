@@ -30,7 +30,7 @@ type Singular struct {
 func (c *Singular) Get(dest interface{}) error {
 	resp, err := c.client.Get(context.Background(), c.key).Bytes()
 	if err != nil {
-		if errors.Is(err, redis.Nil) {
+		if !errors.Is(err, redis.Nil) {
 			log.Error().Err(err).Str("key", c.key).Msg("failed to get value from redis")
 		}
 		return err
@@ -64,7 +64,7 @@ func (c *Singular) MutexGetSet(dest interface{}, valueFunc func() (interface{}, 
 	err := c.Get(dest)
 	if err == nil {
 		return nil
-	} else if errors.Is(err, redis.Nil) {
+	} else if !errors.Is(err, redis.Nil) {
 		log.Error().Err(err).Str("key", c.key).Msg("failed to get value from redis in MutexGetSet")
 		return err
 	}
@@ -80,7 +80,7 @@ func (c *Singular) slowMutexGetSet(dest interface{}, valueFunc func() (interface
 
 	if err == nil {
 		return nil
-	} else if errors.Is(err, redis.Nil) {
+	} else if !errors.Is(err, redis.Nil) {
 		log.Error().Err(err).Str("key", c.key).Msg("failed to get value from redis in MutexGetSet inner check")
 		return err
 	}
