@@ -1,8 +1,13 @@
 package svr
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"crypto/subtle"
+	"strings"
 
+	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog/log"
+
+	"github.com/penguin-statistics/backend-next/internal/config"
 	"github.com/penguin-statistics/backend-next/internal/constants"
 )
 
@@ -18,14 +23,26 @@ type Admin struct {
 	fiber.Router
 }
 
-func CreateVersioningEndpoints(app *fiber.App) (*V2, *V3, *Admin) {
+func CreateVersioningEndpoints(app *fiber.App, conf *config.Config) (*V2, *V3, *Admin) {
 	v2 := app.Group("/PenguinStats/api/v2", func(c *fiber.Ctx) error {
 		// add compatibility versioning header for v2 shims
 		c.Set(constants.ShimCompatibilityHeaderKey, constants.ShimCompatibilityHeaderValue)
 		return c.Next()
 	})
 	v3 := app.Group("/api/v3")
-	admin := app.Group("/api/_/admin")
+	admin := app.Group("/api/_/admin", func(c *fiber.Ctx) error {
+		if len(conf.AdminKey) < 64 {
+			log.Error().Msg("admin key is not set or is too short (at least should be 64 chars long), and a request has reached")
+			return c.SendStatus(fiber.StatusInternalServerError)
+		}
+		key := strings.TrimSpace(strings.TrimPrefix(c.Get(fiber.HeaderAuthorization), "Bearer"))
+
+		// use constant time comparison to prevent timing attacks
+		if subtle.ConstantTimeCompare([]byte(key), []byte(conf.AdminKey)) != 1 {
+			return c.SendStatus(fiber.StatusUnauthorized)
+		}
+		return c.Next()
+	})
 
 	return &V2{Router: v2}, &V3{Router: v3}, &Admin{Router: admin}
 }
