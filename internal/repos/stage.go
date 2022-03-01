@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
@@ -23,13 +22,6 @@ type StageRepo struct {
 
 func NewStageRepo(db *bun.DB) *StageRepo {
 	return &StageRepo{db: db}
-}
-
-func (c *StageRepo) SaveStages(ctx context.Context, tx bun.Tx, stages *[]*models.Stage) error {
-	_, err := tx.NewInsert().
-		Model(stages).
-		Exec(ctx)
-	return err
 }
 
 func (c *StageRepo) GetStages(ctx context.Context) ([]*models.Stage, error) {

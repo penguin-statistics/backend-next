@@ -50,6 +50,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(repos.NewDropMatrixElementRepo),
 		fx.Provide(repos.NewDropPatternElementRepo),
 		fx.Provide(repos.NewPatternMatrixElementRepo),
+		fx.Provide(repos.NewAdminRepo),
 		fx.Provide(service.NewItemService),
 		fx.Provide(service.NewStageService),
 		fx.Provide(service.NewZoneService),

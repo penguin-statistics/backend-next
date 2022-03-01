@@ -18,6 +18,14 @@ type NewEventBasicInfo struct {
 	EndTime      *time.Time
 }
 
+type CloneEventBasicInfo struct {
+	ZonePrefix string
+	FromServer string
+	ToServer   string
+	StartTime  *time.Time
+	EndTime    *time.Time
+}
+
 type RenderedObjects struct {
 	Zone         *models.Zone                  `json:"zone"`
 	Stages       []*models.Stage               `json:"stages"`
