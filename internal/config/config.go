@@ -64,6 +64,9 @@ type Config struct {
 
 	// WorkerEnabled is a flag to indicate whether to enable the worker.
 	WorkerEnabled bool `split_words:"true"`
+
+	// AdminKey is the key used to authenticate the admin API.
+	AdminKey string `split_words:"true"`
 }
 
 func Parse() (*Config, error) {
