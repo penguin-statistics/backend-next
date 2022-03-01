@@ -26,13 +26,6 @@ func NewDropInfoRepo(db *bun.DB) *DropInfoRepo {
 	return &DropInfoRepo{DB: db}
 }
 
-func (s *DropInfoRepo) SaveDropInfos(ctx context.Context, tx bun.Tx, dropInfos *[]*models.DropInfo) error {
-	_, err := tx.NewInsert().
-		Model(dropInfos).
-		Exec(ctx)
-	return err
-}
-
 func (s *DropInfoRepo) GetDropInfo(ctx context.Context, id int) (*models.DropInfo, error) {
 	var dropInfo models.DropInfo
 	err := s.DB.NewSelect().

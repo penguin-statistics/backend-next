@@ -25,26 +25,19 @@ type AdminController struct {
 }
 
 func RegisterAdminController(admin *svr.Admin, c AdminController) {
-	admin.Post("/render/event", c.UpdateNewEvent)
 	admin.Post("/save", c.SaveRenderedObjects)
 }
 
+// FIXME: Should be moved to a proper place
 func (c *AdminController) UpdateNewEvent(ctx *fiber.Ctx) error {
 	var request types.UpdateNewEventRequest
 	if err := rekuest.ValidBody(ctx, &request); err != nil {
 		return err
 	}
 
-	startTime, err := time.Parse(TimeLayout, request.StartTime)
+	startTime, endTime, err := getTimeFromString(request.TimeRange)
 	if err != nil {
 		return err
-	}
-	endTime := time.UnixMilli(constants.FakeEndTimeMilli)
-	if request.EndTime.Valid {
-		endTime, err = time.Parse(TimeLayout, request.EndTime.String)
-		if err != nil {
-			return err
-		}
 	}
 
 	info := &gamedata.NewEventBasicInfo{
@@ -53,8 +46,8 @@ func (c *AdminController) UpdateNewEvent(ctx *fiber.Ctx) error {
 		ZoneCategory: request.ZoneCategory,
 		ZoneType:     request.ZoneType,
 		Server:       request.Server,
-		StartTime:    &startTime,
-		EndTime:      &endTime,
+		StartTime:    startTime,
+		EndTime:      endTime,
 	}
 
 	renderedObjects, err := c.GamedataService.UpdateNewEvent(ctx.Context(), info)
@@ -81,4 +74,19 @@ func (c *AdminController) SaveRenderedObjects(ctx *fiber.Ctx) error {
 	}
 
 	return ctx.JSON(request)
+}
+
+func getTimeFromString(timeRange types.TimeRange) (*time.Time, *time.Time, error) {
+	startTime, err := time.Parse(TimeLayout, timeRange.StartTime)
+	if err != nil {
+		return nil, nil, err
+	}
+	endTime := time.UnixMilli(constants.FakeEndTimeMilli)
+	if timeRange.EndTime.Valid {
+		endTime, err = time.Parse(TimeLayout, timeRange.EndTime.String)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	return &startTime, &endTime, nil
 }

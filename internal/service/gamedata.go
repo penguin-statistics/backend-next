@@ -19,6 +19,8 @@ import (
 
 var ErrCannotGetFromRemote = errors.New("cannot get from remote")
 
+// FIXME: Should be moved to a proper place
+
 type GamedataService struct {
 	ItemService *ItemService
 

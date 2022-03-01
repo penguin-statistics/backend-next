@@ -16,13 +16,6 @@ func NewTimeRangeRepo(db *bun.DB) *TimeRangeRepo {
 	return &TimeRangeRepo{db: db}
 }
 
-func (c *TimeRangeRepo) SaveTimeRanges(ctx context.Context, tx bun.Tx, timeRanges *[]*models.TimeRange) error {
-	_, err := tx.NewInsert().
-		Model(timeRanges).
-		Exec(ctx)
-	return err
-}
-
 func (c *TimeRangeRepo) GetTimeRangesByServer(ctx context.Context, server string) ([]*models.TimeRange, error) {
 	var timeRanges []*models.TimeRange
 	if err := c.db.NewSelect().
