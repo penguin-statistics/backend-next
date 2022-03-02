@@ -26,3 +26,8 @@ type TimeRange struct {
 	StartTime string      `json:"startTime"`
 	EndTime   null.String `json:"endTime"`
 }
+
+type PurgeCacheRequest struct {
+	Name string      `json:"name"`
+	Key  null.String `json:"key"`
+}

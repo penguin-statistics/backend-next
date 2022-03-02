@@ -6,9 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/go-redis/redis/v8"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/vmihailenco/msgpack/v5"
 )
@@ -116,6 +115,9 @@ func (c *Set) slowMutexGetSet(key string, dest interface{}, valueFunc func() (in
 
 func (c *Set) Delete(key string) error {
 	key = c.key(key)
+	if l := log.Trace(); l.Enabled() {
+		l.Str("key", key).Msg("deleting value from redis")
+	}
 	if err := c.client.Del(context.Background(), key).Err(); err != nil {
 		log.Error().Err(err).Str("key", key).Msg("failed to delete value from redis")
 		return err
@@ -130,6 +132,9 @@ func (c *Set) Clear() error {
 			redis.call('del', unpack(keys, i, math.min(i+4999, #keys)))
 		end
 	return keys`)
+	if l := log.Trace(); l.Enabled() {
+		l.Str("prefix", c.prefix).Msg("clearing set cache from redis")
+	}
 	err := script.Eval(context.Background(), c.client, []string{}, []string{c.prefix + "*"}).Err()
 	if err != nil {
 		log.Error().Err(err).Str("prefix", c.prefix).Msg("failed to clear cache")

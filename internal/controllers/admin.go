@@ -8,6 +8,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/gamedata"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
@@ -26,6 +27,29 @@ type AdminController struct {
 
 func RegisterAdminController(admin *svr.Admin, c AdminController) {
 	admin.Post("/save", c.SaveRenderedObjects)
+	admin.Post("/purge", c.PurgeCache)
+}
+
+func (c *AdminController) SaveRenderedObjects(ctx *fiber.Ctx) error {
+	var request gamedata.RenderedObjects
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	err := c.AdminService.SaveRenderedObjects(ctx.Context(), &request)
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(request)
+}
+
+func (c *AdminController) PurgeCache(ctx *fiber.Ctx) error {
+	var request types.PurgeCacheRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+	return cache.Delete(request.Name, request.Key)
 }
 
 // FIXME: Should be moved to a proper place
@@ -60,20 +84,6 @@ func (c *AdminController) UpdateNewEvent(ctx *fiber.Ctx) error {
 	}
 	ctx.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	return ctx.Send(marshalResult)
-}
-
-func (c *AdminController) SaveRenderedObjects(ctx *fiber.Ctx) error {
-	var request gamedata.RenderedObjects
-	if err := rekuest.ValidBody(ctx, &request); err != nil {
-		return err
-	}
-
-	err := c.AdminService.SaveRenderedObjects(ctx.Context(), &request)
-	if err != nil {
-		return err
-	}
-
-	return ctx.JSON(request)
 }
 
 func getTimeFromString(timeRange types.TimeRange) (*time.Time, *time.Time, error) {
