@@ -6,9 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
-
 	"github.com/go-redis/redis/v8"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/vmihailenco/msgpack/v5"
 )
@@ -105,6 +104,9 @@ func (c *Singular) slowMutexGetSet(dest interface{}, valueFunc func() (interface
 }
 
 func (c *Singular) Delete() error {
+	if l := log.Trace(); l.Enabled() {
+		l.Str("key", c.key).Msg("deleting value from redis")
+	}
 	if err := c.client.Del(context.Background(), c.key).Err(); err != nil {
 		log.Error().Err(err).Str("key", c.key).Msg("failed to delete value from redis")
 		return err
