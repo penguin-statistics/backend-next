@@ -7,12 +7,14 @@ require (
 	github.com/bwmarrin/snowflake v0.3.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/uniuri v0.0.0-20200228104902-7aecb25e1fe5
+	github.com/getsentry/sentry-go v0.12.0
 	github.com/go-playground/locales v0.14.0
 	github.com/go-playground/universal-translator v0.18.0
 	github.com/go-playground/validator/v10 v10.9.0
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/goccy/go-json v0.9.4
-	github.com/gofiber/fiber/v2 v2.27.0
+	github.com/gofiber/contrib/fibersentry v0.0.0-20220215083858-d7416de5f637
+	github.com/gofiber/fiber/v2 v2.24.0
 	github.com/gofiber/helmet/v2 v2.2.4
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/nats-io/nats.go v1.13.1-0.20220121202836-972a071d373d
@@ -48,14 +50,12 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fatih/color v1.13.0 // indirect
-	github.com/getsentry/sentry-go v0.12.0 // indirect
 	github.com/go-logr/logr v1.2.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.6 // indirect
 	github.com/go-openapi/spec v0.20.4 // indirect
 	github.com/go-openapi/swag v0.19.15 // indirect
-	github.com/gofiber/contrib/fibersentry v0.0.0-20220215083858-d7416de5f637 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.14.4 // indirect
@@ -76,7 +76,7 @@ require (
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
 	github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.7 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.33.0 // indirect
+	github.com/valyala/fasthttp v1.32.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/otel/internal/metric v0.26.0 // indirect
