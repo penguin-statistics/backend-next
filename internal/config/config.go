@@ -73,8 +73,8 @@ func Parse() (*Config, error) {
 	var config Config
 	err := envconfig.Process("penguin_v3", &config)
 	if err != nil {
-		err = fmt.Errorf("failed to parse configuration: %w. More info on how to configure this backend is located at https://pkg.go.dev/github.com/penguin-statistics/backend-next/internal/config#Config", err)
-		return nil, err
+		envconfig.Usage("penguin_v3", &config)
+		return nil, fmt.Errorf("failed to parse configuration: %w. More info on how to configure this backend is located at https://pkg.go.dev/github.com/penguin-statistics/backend-next/internal/config#Config", err)
 	}
 
 	return &config, nil
