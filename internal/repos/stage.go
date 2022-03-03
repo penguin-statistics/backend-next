@@ -28,6 +28,7 @@ func (c *StageRepo) GetStages(ctx context.Context) ([]*models.Stage, error) {
 	var stages []*models.Stage
 	err := c.db.NewSelect().
 		Model(&stages).
+		Order("stage_id ASC").
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -92,6 +93,7 @@ func (c *StageRepo) GetShimStages(ctx context.Context, server string) ([]*shims.
 				}).
 				Where("drop_info.server = ?", server)
 		}).
+		Order("stage_id ASC").
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {
