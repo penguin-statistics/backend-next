@@ -61,6 +61,7 @@ func (s *SiteStatsService) RefreshShimSiteStats(ctx context.Context, server stri
 	}
 
 	var results shims.SiteStats
+	cache.ShimSiteStats.Delete(server)
 	_, err := cache.ShimSiteStats.MutexGetSet(server, &results, valueFunc, 24*time.Hour)
 	if err != nil {
 		return nil, err
