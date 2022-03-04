@@ -21,13 +21,22 @@ const TimeLayout = "2006-01-02 15:04:05 -07:00"
 type AdminController struct {
 	fx.In
 
-	GamedataService *service.GamedataService
-	AdminService    *service.AdminService
+	GamedataService      *service.GamedataService
+	AdminService         *service.AdminService
+	DropMatrixService    *service.DropMatrixService
+	PatternMatrixService *service.PatternMatrixService
+	TrendService         *service.TrendService
+	SiteStatsService     *service.SiteStatsService
 }
 
 func RegisterAdminController(admin *svr.Admin, c AdminController) {
 	admin.Post("/save", c.SaveRenderedObjects)
 	admin.Post("/purge", c.PurgeCache)
+
+	admin.Get("/refresh/matrix/:server", c.RefreshAllDropMatrixElements)
+	admin.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
+	admin.Get("/refresh/trend/:server", c.RefreshAllTrendElements)
+	admin.Get("/refresh/sitestats/:server", c.RefreshAllSiteStats)
 }
 
 func (c *AdminController) SaveRenderedObjects(ctx *fiber.Ctx) error {
@@ -84,6 +93,27 @@ func (c *AdminController) UpdateNewEvent(ctx *fiber.Ctx) error {
 	}
 	ctx.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
 	return ctx.Send(marshalResult)
+}
+
+func (c *AdminController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
+	server := ctx.Params("server")
+	return c.DropMatrixService.RefreshAllDropMatrixElements(ctx.Context(), server)
+}
+
+func (c *AdminController) RefreshAllPatternMatrixElements(ctx *fiber.Ctx) error {
+	server := ctx.Params("server")
+	return c.PatternMatrixService.RefreshAllPatternMatrixElements(ctx.Context(), server)
+}
+
+func (c *AdminController) RefreshAllTrendElements(ctx *fiber.Ctx) error {
+	server := ctx.Params("server")
+	return c.TrendService.RefreshTrendElements(ctx.Context(), server)
+}
+
+func (c *AdminController) RefreshAllSiteStats(ctx *fiber.Ctx) error {
+	server := ctx.Params("server")
+	_, err := c.SiteStatsService.RefreshShimSiteStats(ctx.Context(), server)
+	return err
 }
 
 func getTimeFromString(timeRange types.TimeRange) (*time.Time, *time.Time, error) {
