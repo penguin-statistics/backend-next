@@ -1,6 +1,7 @@
 package rekuest
 
 import (
+	"github.com/davecgh/go-spew/spew"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 	en_translations "github.com/go-playground/validator/v10/translations/en"
@@ -65,7 +66,7 @@ func init() {
 }
 
 type ErrorResponse struct {
-	Field     string `json:"field"`
+	Field     string `json:"field,omitempty"`
 	Violation string `json:"violation"`
 	Message   string `json:"message"`
 }
@@ -142,6 +143,19 @@ func ValidStruct(ctx *fiber.Ctx, dest interface{}) error {
 func ValidVar(ctx *fiber.Ctx, field interface{}, tag string) error {
 	if err := validateVar(ctx, field, tag); err != nil {
 		return pgerr.NewInvalidViolations(err)
+	}
+
+	return nil
+}
+
+type serverRequest struct {
+	Server string `validate:"required,alpha,oneof=CN US JP KR"`
+}
+
+func ValidServer(ctx *fiber.Ctx, server string) error {
+	spew.Dump(server)
+	if err := ValidStruct(ctx, serverRequest{server}); err != nil {
+		return err
 	}
 
 	return nil

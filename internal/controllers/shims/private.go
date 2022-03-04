@@ -10,6 +10,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
+	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
 )
 
 type PrivateController struct {
@@ -39,9 +40,16 @@ func RegisterPrivateController(
 		StageService:         stageService,
 	}
 
-	v2.Get("/_private/result/matrix/:server/:source", c.GetDropMatrix)
-	v2.Get("/_private/result/pattern/:server/:source", c.GetPatternMatrix)
-	v2.Get("/_private/result/trend/:server", c.GetTrends)
+	serverValidator := func(c *fiber.Ctx) error {
+		if err := rekuest.ValidServer(c, c.Params("server")); err != nil {
+			return err
+		}
+		return c.Next()
+	}
+
+	v2.Get("/_private/result/matrix/:server/:source", serverValidator, c.GetDropMatrix)
+	v2.Get("/_private/result/pattern/:server/:source", serverValidator, c.GetPatternMatrix)
+	v2.Get("/_private/result/trend/:server", serverValidator, c.GetTrends)
 }
 
 // @Summary      Get DropMatrix
