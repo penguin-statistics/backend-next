@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cache"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"github.com/gofiber/fiber/v2/middleware/recover"
@@ -135,33 +136,36 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 
 		// Cache requests with itemFilter and stageFilter as there appears to be an unknown source requesting
 		// with such behaviors very eagerly, causing a relatively high load on the database.
-		log.Info().Msg("enabling fiber-level cache for all requests containing itemFilter or stageFilter query params.")
-		// app.Use(limiter.New(limiter.Config{
-		// 	Next: func(c *fiber.Ctx) bool {
-		// 		if c.Query("itemFilter") != "" || c.Query("stageFilter") != "" {
-		// 			return false
-		// 		}
-		// 		return true
-		// 	},
-		// 	LimitReached: func(c *fiber.Ctx) error {
-		// 		return c.JSON(fiber.Map{
-		// 			"code":    "TOO_MANY_REQUESTS",
-		// 			"message": "Your client is sending requests too frequently. The Penguin Stats result matrix are updated periodically and should not be requested too frequently.",
-		// 		})
-		// 	},
-		// 	Max:        300,
-		// 	Expiration: time.Minute * 5,
-		// }))
-
-		app.Use(cache.New(cache.Config{
+		log.Info().Msg("enabling fiber-level cache & limiter for all requests containing itemFilter or stageFilter query params.")
+		app.Use(limiter.New(limiter.Config{
 			Next: func(c *fiber.Ctx) bool {
-				// only cache requests with itemFilter and stageFilter query params
 				if c.Query("itemFilter") != "" || c.Query("stageFilter") != "" {
 					return false
 				}
 				return true
 			},
+			LimitReached: func(c *fiber.Ctx) error {
+				return c.JSON(fiber.Map{
+					"code":    "TOO_MANY_REQUESTS",
+					"message": "Your client is sending requests too frequently. The Penguin Stats result matrix are updated periodically and should not be requested too frequently.",
+				})
+			},
+			Max:        300,
 			Expiration: time.Minute * 5,
+		}))
+
+		app.Use(cache.New(cache.Config{
+			Next: func(c *fiber.Ctx) bool {
+				// only cache requests with itemFilter and stageFilter query params
+				if c.Query("itemFilter") != "" || c.Query("stageFilter") != "" {
+					time.Sleep(time.Second) // simulate a slow request
+					return false
+				}
+				return true
+			},
+			CacheHeader:  "X-Penguin-Cache",
+			CacheControl: true,
+			Expiration:   time.Minute * 5,
 			KeyGenerator: func(c *fiber.Ctx) string {
 				return utils.CopyString(c.OriginalURL())
 			},
