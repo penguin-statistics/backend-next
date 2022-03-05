@@ -52,6 +52,7 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 			"127.0.0.1",
 		},
 		ErrorHandler: ErrorHandler,
+		Immutable: true,
 	})
 
 	app.Use(favicon.New())
