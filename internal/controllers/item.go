@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
@@ -17,7 +16,6 @@ type ItemController struct {
 	fx.In
 
 	ItemService *service.ItemService
-	Redis       *redis.Client
 }
 
 func RegisterItemController(v3 *svr.V3, c ItemController) {
