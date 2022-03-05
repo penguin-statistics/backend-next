@@ -119,10 +119,13 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 			Msg("received recognition report request")
 	}
 
-	_, err = c.ReportService.PreprocessAndQueueBatchReport(ctx, &request)
+	taskId, err := c.ReportService.PreprocessAndQueueBatchReport(ctx, &request)
 	if err != nil {
 		return err
 	}
 
-	return ctx.JSON(request)
+	return ctx.JSON(fiber.Map{
+		"taskId": taskId,
+		"errors": []string{},
+	})
 }
