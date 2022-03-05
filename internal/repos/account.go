@@ -42,7 +42,7 @@ func (c *AccountRepo) CreateAccountWithRandomPenguinId(ctx context.Context) (*mo
 			Returning("account_id").
 			Exec(ctx)
 		if err != nil {
-			log.Debug().Err(err).Int("retry", i).Msg("failed to create account. retrying...")
+			log.Warn().Err(err).Int("retry", i).Msg("failed to create account. retrying...")
 			continue
 		} else if i > 0 {
 			log.Info().
