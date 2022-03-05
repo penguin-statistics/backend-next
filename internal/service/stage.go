@@ -162,6 +162,10 @@ func (s *StageService) applyShim(stage *shims.Stage) {
 		stage.ArkZoneID = stage.Zone.ArkZoneID
 	}
 
+	if !stage.Sanity.Valid {
+		stage.Sanity = null.NewInt(constants.DefaultNullSanity, true)
+	}
+
 	recognitionOnlyArkItemIds := make([]string, 0)
 	linq.From(stage.DropInfos).
 		WhereT(func(dropInfo *shims.DropInfo) bool {
