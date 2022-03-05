@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
@@ -13,7 +12,6 @@ type StageController struct {
 	fx.In
 
 	StageService *service.StageService
-	Redis        *redis.Client
 }
 
 func RegisterStageController(v3 *svr.V3, c StageController) {
