@@ -293,7 +293,7 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 					return
 				}
 
-				log.Debug().Str("taskId", reportTask.TaskID).Msg("report task processed successfully")
+				log.Info().Str("taskId", reportTask.TaskID).Msg("report task processed successfully")
 			}()
 		case <-ctx.Done():
 			return ctx.Err()
@@ -302,7 +302,7 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 }
 
 func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types.ReportTask) error {
-	log.Debug().Str("taskId", reportTask.TaskID).Msg("now processing new report task")
+	log.Info().Str("taskId", reportTask.TaskID).Msg("now processing new report task")
 	taskReliability := 0
 	if err := s.ReportVerifier.Verify(ctx, reportTask); err != nil {
 		// TODO: use different error code for different types of error

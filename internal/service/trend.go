@@ -212,7 +212,14 @@ func (s *TrendService) calcTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId null.Int,
 ) ([]*models.TrendElement, error) {
 	endTime := startTime.Add(time.Hour * time.Duration(int(intervalLength.Hours())*intervalNum))
-	log.Debug().Time("startTime", *startTime).Time("endTime", endTime).Int("intervalNum", intervalNum).Msg("calcTrend")
+	if e := log.Trace(); e.Enabled() {
+		e.Str("server", server).
+			Time("startTime", *startTime).
+			Time("endTime", endTime).
+			Dur("intervalLength", intervalLength).
+			Int("intervalNum", intervalNum).
+			Msg("calculating trend...")
+	}
 	timeRange := models.TimeRange{
 		StartTime: startTime,
 		EndTime:   &endTime,
