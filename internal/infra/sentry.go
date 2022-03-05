@@ -8,6 +8,14 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
 )
 
+func getEnvironment(conf *config.Config) string {
+	if conf.DevMode {
+		return "development"
+	} else {
+		return "production"
+	}
+}
+
 // SentryInit initializes sentry with side-effect
 func SentryInit(conf *config.Config) error {
 	if conf.SentryDSN == "" {
@@ -16,11 +24,20 @@ func SentryInit(conf *config.Config) error {
 	} else {
 		log.Info().Msg("Initializing Sentry...")
 	}
+
 	return sentry.Init(sentry.ClientOptions{
 		Dsn:              conf.SentryDSN,
 		Release:          "backend-next@" + bininfo.Version,
 		Debug:            conf.DevMode,
 		AttachStacktrace: true,
 		TracesSampleRate: 0.01,
+		Environment:      getEnvironment(conf),
+		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+			if conf.DevMode {
+				log.Trace().Msg("not sending event to Sentry: DEV mode enabled")
+				return nil
+			}
+			return event
+		},
 	})
 }
