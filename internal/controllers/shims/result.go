@@ -251,7 +251,7 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 		return c.DropMatrixService.GetShimCustomizedDropMatrixResults(ctx.Context(), query.Server, timeRange, []int{stage.StageID}, itemIds, accountId)
 	} else {
 		// interval originally is in milliseconds, so we need to convert it to nanoseconds
-		intervalLength := time.Duration(query.Interval.Int64 * 1e7).Round(time.Hour)
+		intervalLength := time.Duration(query.Interval.Int64 * 1e6).Round(time.Hour)
 		if intervalLength.Hours() < 1 {
 			return nil, errors.New("interval length must be greater than 1 hour")
 		}

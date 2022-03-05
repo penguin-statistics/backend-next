@@ -57,7 +57,7 @@ func (s *TrendService) GetShimSavedTrendResults(ctx context.Context, server stri
 		if err != nil {
 			return nil, err
 		}
-		slowShimResult, err := s.applyShimForTrendQuery(ctx, server, queryResult)
+		slowShimResult, err := s.applyShimForSavedTrendQuery(ctx, server, queryResult)
 		if err != nil {
 			return nil, err
 		}
@@ -79,7 +79,7 @@ func (s *TrendService) GetShimCustomizedTrendResults(ctx context.Context, server
 	if err != nil {
 		return nil, err
 	}
-	return s.applyShimForTrendQuery(ctx, server, trendQueryResult)
+	return s.applyShimForCustomizedTrendQuery(ctx, server, trendQueryResult, startTime)
 }
 
 func (s *TrendService) QueryTrend(
@@ -380,7 +380,42 @@ func (s *TrendService) convertTrendElementsToTrendQueryResult(trendElements []*m
 	return trendQueryResult, nil
 }
 
-func (s *TrendService) applyShimForTrendQuery(ctx context.Context, server string, queryResult *models.TrendQueryResult) (*shims.TrendQueryResult, error) {
+func (s *TrendService) applyShimForCustomizedTrendQuery(ctx context.Context, server string, queryResult *models.TrendQueryResult, startTime *time.Time) (*shims.TrendQueryResult, error) {
+	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stagesMapById, err := s.StageService.GetStagesMapById(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	results := &shims.TrendQueryResult{
+		Trend: make(map[string]*shims.StageTrend),
+	}
+	for _, stageTrend := range queryResult.Trends {
+		stage := stagesMapById[stageTrend.StageID]
+		shimStageTrend := shims.StageTrend{
+			Results:   make(map[string]*shims.OneItemTrend),
+			StartTime: startTime.UnixMilli(),
+		}
+
+		for _, itemTrend := range stageTrend.Results {
+			item := itemsMapById[itemTrend.ItemID]
+			shimStageTrend.Results[item.ArkItemID] = &shims.OneItemTrend{
+				Quantity: itemTrend.Quantity,
+				Times:    itemTrend.Times,
+			}
+		}
+		if len(shimStageTrend.Results) > 0 {
+			results.Trend[stage.ArkStageID] = &shimStageTrend
+		}
+	}
+	return results, nil
+}
+
+func (s *TrendService) applyShimForSavedTrendQuery(ctx context.Context, server string, queryResult *models.TrendQueryResult) (*shims.TrendQueryResult, error) {
 	shimMinStartTime := utils.GetGameDayEndTime(server, time.Now()).Add(-1 * constants.DefaultIntervalNum * 24 * time.Hour)
 	currentGameDayEndTime := utils.GetGameDayEndTime(server, time.Now())
 
