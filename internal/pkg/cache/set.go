@@ -1,21 +1,18 @@
 package cache
 
 import (
-	"context"
 	"reflect"
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v8"
-	"github.com/pkg/errors"
+	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"
-	"github.com/vmihailenco/msgpack/v5"
 )
 
-func NewSet(client *redis.Client, prefix string) *Set {
+func NewSet(prefix string) *Set {
 	return &Set{
-		client: client,
 		prefix: prefix + ":",
+		c:      cache.New(cache.NoExpiration, time.Minute*10),
 	}
 }
 
@@ -23,8 +20,9 @@ type Set struct {
 	// m is a mutex for MutexGetSet for concurrent prevention
 	m sync.Mutex
 
-	client *redis.Client
 	prefix string
+
+	c *cache.Cache
 }
 
 func (c *Set) key(key string) string {
@@ -33,50 +31,28 @@ func (c *Set) key(key string) string {
 
 func (c *Set) Get(key string, dest interface{}) error {
 	key = c.key(key)
-	resp, err := c.client.Get(context.Background(), key).Bytes()
-	if err != nil {
-		if !errors.Is(err, redis.Nil) {
-			log.Error().Err(err).Str("key", key).Msg("failed to get value from redis")
-		}
-		return err
+	result, ok := c.c.Get(key)
+	if !ok {
+		return ErrNotFound
 	}
-	err = msgpack.Unmarshal(resp, dest)
-	if err != nil {
-		log.Error().Err(err).Str("key", key).Msg("failed to unmarshal value from msgpack from redis")
-		return err
-	}
+	reflect.ValueOf(dest).Elem().Set(reflect.ValueOf(result))
 	return nil
 }
 
 func (c *Set) Set(key string, value interface{}, expire time.Duration) error {
 	key = c.key(key)
-	if l := log.Trace(); l.Enabled() {
-		l.Str("key", key).Msg("setting value to redis")
-	}
-	b, err := msgpack.Marshal(value)
-	if err != nil {
-		log.Error().Err(err).Str("key", key).Msg("failed to marshal value with msgpack")
-		return err
-	}
-	err = c.client.Set(context.Background(), key, b, expire).Err()
-	if err != nil {
-		log.Error().Err(err).Str("key", key).Msg("failed to set value to redis")
-		return err
-	}
+	c.c.Set(key, value, expire)
 	return nil
 }
 
 // MutexGetSet gets value from cache and writes to dest, or if the key does not exists, it executes valueFunc
 // to get cache value if the key still not exists when serially dispatched, sets value to cache and
 // writes value to dest.
-// The first return value means whether the value is got from cache or not. True means calculated; False means getting from redis.
+// The first return value means whether the value is got from cache or not. True means calculated; False means got from cache.
 func (c *Set) MutexGetSet(key string, dest interface{}, valueFunc func() (interface{}, error), expire time.Duration) (bool, error) {
 	err := c.Get(key, dest)
 	if err == nil {
 		return false, nil
-	} else if !errors.Is(err, redis.Nil) {
-		log.Error().Err(err).Str("key", key).Msg("failed to get value from redis in MutexGetSet")
-		return false, err
 	}
 	// onwards, cache key does not exist
 
@@ -90,9 +66,6 @@ func (c *Set) slowMutexGetSet(key string, dest interface{}, valueFunc func() (in
 
 	if err == nil {
 		return nil
-	} else if !errors.Is(err, redis.Nil) {
-		log.Error().Err(err).Str("key", key).Msg("failed to get value from redis in MutexGetSet inner check")
-		return err
 	}
 
 	value, err := valueFunc()
@@ -103,7 +76,7 @@ func (c *Set) slowMutexGetSet(key string, dest interface{}, valueFunc func() (in
 
 	err = c.Set(key, value, expire)
 	if err != nil {
-		log.Error().Err(err).Str("key", key).Msg("failed to set value to redis in MutexGetSet")
+		log.Error().Err(err).Str("key", key).Msg("failed to set value to cache in MutexGetSet")
 		return err
 	}
 
@@ -116,29 +89,14 @@ func (c *Set) slowMutexGetSet(key string, dest interface{}, valueFunc func() (in
 func (c *Set) Delete(key string) error {
 	key = c.key(key)
 	if l := log.Trace(); l.Enabled() {
-		l.Str("key", key).Msg("deleting value from redis")
+		l.Str("key", key).Msg("deleting value from cache")
 	}
-	if err := c.client.Del(context.Background(), key).Err(); err != nil {
-		log.Error().Err(err).Str("key", key).Msg("failed to delete value from redis")
-		return err
-	}
+	c.c.Delete(key)
 
 	return nil
 }
 
 func (c *Set) Clear() error {
-	script := redis.NewScript(`local keys = redis.call('keys', ARGV[1])
-		for i=1,#keys,5000 do
-			redis.call('del', unpack(keys, i, math.min(i+4999, #keys)))
-		end
-	return keys`)
-	if l := log.Trace(); l.Enabled() {
-		l.Str("prefix", c.prefix).Msg("clearing set cache from redis")
-	}
-	err := script.Eval(context.Background(), c.client, []string{}, []string{c.prefix + "*"}).Err()
-	if err != nil {
-		log.Error().Err(err).Str("prefix", c.prefix).Msg("failed to clear cache")
-		return err
-	}
+	c.c.Flush()
 	return nil
 }

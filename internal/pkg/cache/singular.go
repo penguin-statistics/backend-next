@@ -1,21 +1,18 @@
 package cache
 
 import (
-	"context"
 	"reflect"
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v8"
-	"github.com/pkg/errors"
+	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"
-	"github.com/vmihailenco/msgpack/v5"
 )
 
-func NewSingular(client *redis.Client, key string) *Singular {
+func NewSingular(key string) *Singular {
 	return &Singular{
-		client: client,
-		key:    key,
+		key: key,
+		c:   cache.New(cache.NoExpiration, time.Minute*10),
 	}
 }
 
@@ -23,50 +20,33 @@ type Singular struct {
 	// m is a mutex for MutexGetSet for concurrent prevention
 	m sync.Mutex
 
-	client *redis.Client
-	key    string
+	key string
+
+	c *cache.Cache
 }
 
 func (c *Singular) Get(dest interface{}) error {
-	resp, err := c.client.Get(context.Background(), c.key).Bytes()
-	if err != nil {
-		if !errors.Is(err, redis.Nil) {
-			log.Error().Err(err).Str("key", c.key).Msg("failed to get value from redis")
-		}
-		return err
+	result, ok := c.c.Get(c.key)
+	if !ok {
+		return ErrNotFound
 	}
-	err = msgpack.Unmarshal(resp, dest)
-	if err != nil {
-		log.Error().Err(err).Str("key", c.key).Msg("failed to unmarshal value from msgpack from redis")
-		return err
-	}
+	reflect.ValueOf(dest).Elem().Set(reflect.ValueOf(result))
 	return nil
 }
 
 func (c *Singular) Set(value interface{}, expire time.Duration) error {
-	b, err := msgpack.Marshal(value)
-	if err != nil {
-		log.Error().Err(err).Str("key", c.key).Msg("failed to marshal value with msgpack")
-		return err
-	}
-	err = c.client.Set(context.Background(), c.key, b, expire).Err()
-	if err != nil {
-		log.Error().Err(err).Str("key", c.key).Msg("failed to set value to redis")
-		return err
-	}
+	c.c.Set(c.key, value, expire)
 	return nil
 }
 
 // MutexGetSet gets value from cache and writes to dest, or if the key does not exists, it executes valueFunc
 // to get cache value if the key still not exists when serially dispatched, sets value to cache and
 // writes value to dest.
+// The first return value means whether the value is got from cache or not. True means calculated; False means got from cache.
 func (c *Singular) MutexGetSet(dest interface{}, valueFunc func() (interface{}, error), expire time.Duration) error {
 	err := c.Get(dest)
 	if err == nil {
 		return nil
-	} else if !errors.Is(err, redis.Nil) {
-		log.Error().Err(err).Str("key", c.key).Msg("failed to get value from redis in MutexGetSet")
-		return err
 	}
 	// onwards, cache key does not exist
 
@@ -80,9 +60,6 @@ func (c *Singular) slowMutexGetSet(dest interface{}, valueFunc func() (interface
 
 	if err == nil {
 		return nil
-	} else if !errors.Is(err, redis.Nil) {
-		log.Error().Err(err).Str("key", c.key).Msg("failed to get value from redis in MutexGetSet inner check")
-		return err
 	}
 
 	value, err := valueFunc()
@@ -93,7 +70,7 @@ func (c *Singular) slowMutexGetSet(dest interface{}, valueFunc func() (interface
 
 	err = c.Set(value, expire)
 	if err != nil {
-		log.Error().Err(err).Str("key", c.key).Msg("failed to set value to redis in MutexGetSet")
+		log.Error().Err(err).Str("key", c.key).Msg("failed to set value to cache in MutexGetSet")
 		return err
 	}
 
@@ -104,12 +81,6 @@ func (c *Singular) slowMutexGetSet(dest interface{}, valueFunc func() (interface
 }
 
 func (c *Singular) Delete() error {
-	if l := log.Trace(); l.Enabled() {
-		l.Str("key", c.key).Msg("deleting value from redis")
-	}
-	if err := c.client.Del(context.Background(), c.key).Err(); err != nil {
-		log.Error().Err(err).Str("key", c.key).Msg("failed to delete value from redis")
-		return err
-	}
+	c.c.Flush()
 	return nil
 }
