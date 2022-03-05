@@ -145,7 +145,7 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 				return true
 			},
 			LimitReached: func(c *fiber.Ctx) error {
-				return c.JSON(fiber.Map{
+				return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 					"code":    "TOO_MANY_REQUESTS",
 					"message": "Your client is sending requests too frequently. The Penguin Stats result matrix are updated periodically and should not be requested too frequently.",
 				})
