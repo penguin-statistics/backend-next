@@ -52,7 +52,7 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 			"127.0.0.1",
 		},
 		ErrorHandler: ErrorHandler,
-		Immutable: true,
+		Immutable:    true,
 	})
 
 	app.Use(favicon.New())
@@ -63,7 +63,7 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "*",
 		AllowMethods:     "GET, POST, DELETE, OPTIONS",
-		AllowHeaders:     "Content-Type, Authorization, X-Requested-With, X-Penguin-Variant",
+		AllowHeaders:     "Content-Type, Authorization, X-Requested-With, X-Penguin-Variant, sentry-trace",
 		ExposeHeaders:    "Content-Type, X-Penguin-Set-PenguinID, X-Penguin-Upgrade, X-Penguin-Compatible, X-Penguin-Request-ID",
 		AllowCredentials: true,
 	}))
