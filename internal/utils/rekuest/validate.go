@@ -1,7 +1,6 @@
 package rekuest
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 	en_translations "github.com/go-playground/validator/v10/translations/en"
@@ -153,7 +152,6 @@ type serverRequest struct {
 }
 
 func ValidServer(ctx *fiber.Ctx, server string) error {
-	spew.Dump(server)
 	if err := ValidStruct(ctx, serverRequest{server}); err != nil {
 		return err
 	}
