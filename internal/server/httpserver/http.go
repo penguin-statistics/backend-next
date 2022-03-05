@@ -10,12 +10,14 @@ import (
 	"github.com/bwmarrin/snowflake"
 	"github.com/gofiber/contrib/fibersentry"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cache"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
+	"github.com/gofiber/fiber/v2/utils"
 	"github.com/gofiber/helmet/v2"
 	"github.com/penguin-statistics/fiberotel"
 	"github.com/rs/zerolog/log"
@@ -118,7 +120,9 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 			TimeFormat: time.RFC3339,
 			Output:     os.Stdout,
 		}))
-	} else {
+	}
+
+	if !conf.DevMode {
 		// app.Use(limiter.New(limiter.Config{
 		// 	Max:        30,
 		// 	Expiration: time.Minute,
@@ -127,6 +131,40 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 			Format:     "${pid} ${locals:requestid} ${status} ${latency}\t${ip}\t- ${method} ${url}\n",
 			TimeFormat: time.RFC3339,
 			Output:     log.Logger,
+		}))
+
+		// Cache requests with itemFilter and stageFilter as there appears to be an unknown source requesting
+		// with such behaviors very eagerly, causing a relatively high load on the database.
+		log.Info().Msg("enabling fiber-level cache for all requests containing itemFilter or stageFilter query params.")
+		// app.Use(limiter.New(limiter.Config{
+		// 	Next: func(c *fiber.Ctx) bool {
+		// 		if c.Query("itemFilter") != "" || c.Query("stageFilter") != "" {
+		// 			return false
+		// 		}
+		// 		return true
+		// 	},
+		// 	LimitReached: func(c *fiber.Ctx) error {
+		// 		return c.JSON(fiber.Map{
+		// 			"code":    "TOO_MANY_REQUESTS",
+		// 			"message": "Your client is sending requests too frequently. The Penguin Stats result matrix are updated periodically and should not be requested too frequently.",
+		// 		})
+		// 	},
+		// 	Max:        300,
+		// 	Expiration: time.Minute * 5,
+		// }))
+
+		app.Use(cache.New(cache.Config{
+			Next: func(c *fiber.Ctx) bool {
+				// only cache requests with itemFilter and stageFilter query params
+				if c.Query("itemFilter") != "" || c.Query("stageFilter") != "" {
+					return false
+				}
+				return true
+			},
+			Expiration: time.Minute * 5,
+			KeyGenerator: func(c *fiber.Ctx) string {
+				return utils.CopyString(c.OriginalURL())
+			},
 		}))
 	}
 
