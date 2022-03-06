@@ -12,7 +12,12 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
 
-var ErrInvalidDropType = errors.New("invalid drop type")
+var (
+	ErrInvalidDropType      = errors.New("invalid drop type")
+	ErrInvalidDropItem      = errors.New("invalid drop item")
+	ErrInvalidDropInfoCount = errors.New("invalid drop info count")
+	ErrUnknownItemID        = errors.New("unknown item id")
+)
 
 type DropVerifier struct {
 	DropInfoRepo *repos.DropInfoRepo
@@ -24,27 +29,31 @@ func NewDropVerifier(dropInfoRepo *repos.DropInfoRepo) *DropVerifier {
 	}
 }
 
-func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, reportTask *types.ReportTask) error {
+func (d *DropVerifier) Name() string {
+	return "drop"
+}
+
+func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, reportTask *types.ReportTask) (errs []error) {
 	itemDropInfos, typeDropInfos, err := d.DropInfoRepo.GetForCurrentTimeRangeWithDropTypes(ctx, &repos.DropInfoQuery{
 		Server:     reportTask.Server,
 		ArkStageId: report.StageID,
 	})
 	if err != nil {
-		return err
+		errs = append(errs, err)
 	}
 
-	if err = d.verifyDropType(report, typeDropInfos); err != nil {
-		return err
+	if innerErrs := d.verifyDropType(report, typeDropInfos); innerErrs != nil {
+		errs = append(errs, innerErrs...)
 	}
 
-	if err = d.verifyDropItem(report, itemDropInfos); err != nil {
-		return err
+	if innerErrs := d.verifyDropItem(report, itemDropInfos); innerErrs != nil {
+		errs = append(errs, innerErrs...)
 	}
 
-	return nil
+	return errs
 }
 
-func (d *DropVerifier) verifyDropType(report *types.SingleReport, dropInfos []*models.DropInfo) error {
+func (d *DropVerifier) verifyDropType(report *types.SingleReport, dropInfos []*models.DropInfo) (errs []error) {
 	// dropTypeAmountMap: key is drop type, value is amount (how many kinds of items are dropped under this type)
 	dropTypeAmountMap := make(map[string]int)
 	linq.From(report.Drops).
@@ -66,15 +75,15 @@ func (d *DropVerifier) verifyDropType(report *types.SingleReport, dropInfos []*m
 	for _, dropInfo := range dropInfos {
 		count := dropTypeAmountMap[dropInfo.DropType]
 		if dropInfo.Bounds.Lower > count {
-			return fmt.Errorf("drop type `%s`: expected at least %d, but got %d", dropInfo.DropType, dropInfo.Bounds.Lower, count)
+			errs = append(errs, errors.Wrap(ErrInvalidDropType, fmt.Sprintf("drop type `%s`: expected at least %d, but got %d", dropInfo.DropType, dropInfo.Bounds.Lower, count)))
 		} else if dropInfo.Bounds.Upper < count {
-			return fmt.Errorf("drop type `%s`: expected at most %d, but got %d", dropInfo.DropType, dropInfo.Bounds.Upper, count)
+			errs = append(errs, errors.Wrap(ErrInvalidDropType, fmt.Sprintf("drop type `%s`: expected at most %d, but got %d", dropInfo.DropType, dropInfo.Bounds.Lower, count)))
 		}
 		if dropInfo.Bounds.Exceptions != nil {
 			if linq.From(dropInfo.Bounds.Exceptions).AnyWithT(func(exception int) bool {
 				return exception == count
 			}) {
-				return fmt.Errorf("drop type `%s`: expected not to have %d", dropInfo.DropType, count)
+				errs = append(errs, errors.Wrap(ErrInvalidDropType, fmt.Sprintf("drop type `%s`: expected not to have (%v), but got %d", dropInfo.DropType, dropInfo.Bounds.Exceptions, count)))
 			}
 		}
 	}
@@ -87,7 +96,7 @@ func (d *DropVerifier) verifyDropType(report *types.SingleReport, dropInfos []*m
  * Check 1: iterate drops, check if any item is not in dropInfos
  * Check 2: iterate dropInfos, check if quantity is within bounds
  */
-func (d *DropVerifier) verifyDropItem(report *types.SingleReport, dropInfos []*models.DropInfo) error {
+func (d *DropVerifier) verifyDropItem(report *types.SingleReport, dropInfos []*models.DropInfo) (errs []error) {
 	itemIdSetFromDropInfos := make(map[int]struct{})
 	for _, dropInfo := range dropInfos {
 		itemIdSetFromDropInfos[int(dropInfo.ItemID.Int64)] = struct{}{}
@@ -98,7 +107,7 @@ func (d *DropVerifier) verifyDropItem(report *types.SingleReport, dropInfos []*m
 	for _, drop := range report.Drops {
 		// Check 1
 		if _, ok := itemIdSetFromDropInfos[int(drop.ItemID)]; !ok {
-			return fmt.Errorf("item id %d: not found in drop info", drop.ItemID)
+			errs = append(errs, errors.Wrap(ErrUnknownItemID, fmt.Sprintf("item ID %d not found in drop info", drop.ItemID)))
 		}
 		if _, ok := dropItemQuantityMap[drop.ItemID]; !ok {
 			dropItemQuantityMap[drop.ItemID] = make(map[string]int)
@@ -109,20 +118,20 @@ func (d *DropVerifier) verifyDropItem(report *types.SingleReport, dropInfos []*m
 	// Check 2
 	for _, dropInfo := range dropInfos {
 		itemId := int(dropInfo.ItemID.Int64)
-		quantity := 0
+		count := 0
 		if quantityMap, ok := dropItemQuantityMap[itemId]; ok {
-			quantity = quantityMap[dropInfo.DropType]
+			count = quantityMap[dropInfo.DropType]
 		}
-		if dropInfo.Bounds.Lower > quantity {
-			return fmt.Errorf("drop item `%d`: expected at least %d, but got %d", itemId, dropInfo.Bounds.Lower, quantity)
-		} else if dropInfo.Bounds.Upper < quantity {
-			return fmt.Errorf("drop item `%d`: expected at most %d, but got %d", itemId, dropInfo.Bounds.Upper, quantity)
+		if dropInfo.Bounds.Lower > count {
+			errs = append(errs, errors.Wrap(ErrInvalidDropItem, fmt.Sprintf("drop type `%s`: expected at least %d, but got %d", dropInfo.DropType, dropInfo.Bounds.Lower, count)))
+		} else if dropInfo.Bounds.Upper < count {
+			errs = append(errs, errors.Wrap(ErrInvalidDropItem, fmt.Sprintf("drop type `%s`: expected at most %d, but got %d", dropInfo.DropType, dropInfo.Bounds.Lower, count)))
 		}
 		if dropInfo.Bounds.Exceptions != nil {
 			if linq.From(dropInfo.Bounds.Exceptions).AnyWithT(func(exception int) bool {
-				return exception == quantity
+				return exception == count
 			}) {
-				return fmt.Errorf("drop item `%d`: expected not to have %d", itemId, quantity)
+				errs = append(errs, errors.Wrap(ErrInvalidDropItem, fmt.Sprintf("drop type `%s`: expected not to have (%v), but got %d", dropInfo.DropType, dropInfo.Bounds.Exceptions, count)))
 			}
 		}
 	}
