@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -44,9 +43,6 @@ func (c *Set) Get(key string, dest interface{}) error {
 	} else {
 		r = reflect.ValueOf(result)
 	}
-	fmt.Println(result, dest)
-	fmt.Println(reflect.TypeOf(result), reflect.TypeOf(dest))
-	fmt.Println(r.Type(), reflect.TypeOf(dest))
 	reflect.ValueOf(dest).Elem().Set(r)
 	return nil
 }
