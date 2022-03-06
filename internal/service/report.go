@@ -313,13 +313,12 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 		Interface("task", reportTask).
 		Logger()
 
-	L.Info().Str("taskId", reportTask.TaskID).Msg("now processing new report task")
+	L.Info().Msg("now processing new report task")
 	taskReliability := 0
 	if errs := s.ReportVerifier.Verify(ctx, reportTask); len(errs) > 0 {
 		// TODO: use different error code for different types of error
 		taskReliability = 1
 		L.Warn().
-			Str("taskId", reportTask.TaskID).
 			Interface("errors", errs).
 			Msg("report task verification failed, marking task as unreliable")
 	}
