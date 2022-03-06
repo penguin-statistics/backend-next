@@ -6,8 +6,14 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 )
 
+type VerifyViolation struct {
+	Name string `json:"name"`
+	Err  error  `json:"err"`
+}
+
 type Verifier interface {
-	Verify(ctx context.Context, report *types.SingleReport, reportTask *types.ReportTask) error
+	Name() string
+	Verify(ctx context.Context, report *types.SingleReport, reportTask *types.ReportTask) []error
 }
 
 type ReportVerifier []Verifier
@@ -20,13 +26,19 @@ func NewReportVerifier(userVerifier *UserVerifier, dropVerifier *DropVerifier, m
 	}
 }
 
-func (verifier ReportVerifier) Verify(ctx context.Context, reportTask *types.ReportTask) error {
+func (verifier ReportVerifier) Verify(ctx context.Context, reportTask *types.ReportTask) []*VerifyViolation {
+	errs := make([]*VerifyViolation, 0, len(verifier))
 	for _, report := range reportTask.Reports {
 		for _, pipe := range verifier {
-			if err := pipe.Verify(ctx, report, reportTask); err != nil {
-				return err
+			if innerErrs := pipe.Verify(ctx, report, reportTask); innerErrs != nil {
+				for _, err := range innerErrs {
+					errs = append(errs, &VerifyViolation{
+						Name: pipe.Name(),
+						Err:  err,
+					})
+				}
 			}
 		}
 	}
-	return nil
+	return errs
 }
