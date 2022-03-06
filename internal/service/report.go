@@ -367,7 +367,6 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 			AccountID:   reportTask.AccountID,
 		}
 		if err = s.DropReportRepo.CreateDropReport(ctx, tx, dropReport); err != nil {
-			// panic(err)
 			return err
 		}
 
@@ -398,54 +397,3 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 	intendedCommit = true
 	return tx.Commit()
 }
-
-// func (s *ReportService) VerifyAndSubmitBatchReport(ctx context.Context, report *types.BatchReportRequest) error {
-// 	// get PenguinID from HTTP header in form of Authorization: PenguinID ########
-// 	penguinID := strings.TrimSpace(strings.TrimPrefix(ctx.Get("Authorization"), "PenguinID"))
-
-// 	// if PenguinID is empty, create new PenguinID
-// 	account, err := s.AccountRepo.GetAccountByPenguinId(ctx, penguinID)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	var accountId int
-// 	if account == nil {
-// 		createdAccount, err := s.AccountRepo.CreateAccountWithRandomPenguinId(ctx)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		accountId = createdAccount.AccountID
-// 	} else {
-// 		accountId = account.AccountID
-// 	}
-
-// 	// merge drops with same (dropType, itemId) pair
-// 	for _, report := range report.Reports {
-// 		report.Drops = reportutils.MergeDrops(report.Drops)
-// 	}
-
-// 	batchReport := convertion.BatchReportRequestToBatchReport(report)
-
-// 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
-// 	for _, report := range batchReport.Reports {
-// 		category, err := s.StageRepo.GetStageExtraProcessTypeByArkId(ctx, report.StageID)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		if category == constants.ExtraProcessTypeGachaBox {
-// 			reportutils.AggregateGachaBoxDrops(report)
-// 		}
-// 	}
-
-// 	// construct ReportContext
-// 	reportTask := &types.ReportContext{
-// 		FragmentReportCommon: types.FragmentReportCommon{
-// 			Server:  report.Server,
-// 			Source:  report.Source,
-// 			Version: report.Version,
-// 		},
-// 		Reports:  batchReport.Reports,
-// 		AccountID: accountId,
-// 		IP:        ctx.IP(),
-// 	}
-// }
