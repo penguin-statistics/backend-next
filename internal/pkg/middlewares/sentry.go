@@ -21,7 +21,9 @@ func EnrichSentry() func(c *fiber.Ctx) error {
 		if err := fasthttpadaptor.ConvertRequest(c.Context(), &r, true); err != nil {
 			return err
 		}
-		rootSpan := sentry.StartSpan(c.Context(), "backend", sentry.ContinueFromRequest(&r))
+
+		rootSpan := sentry.StartSpan(c.Context(), "backend", sentry.ContinueFromRequest(&r), sentry.TransactionName(c.Method()+" "+c.Path()))
+		rootSpan.SetTag("url", c.OriginalURL())
 		defer rootSpan.Finish()
 
 		return c.Next()
