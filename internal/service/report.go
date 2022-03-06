@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"runtime"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -17,7 +18,6 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
@@ -33,6 +33,7 @@ var (
 
 type ReportService struct {
 	DB                     *bun.DB
+	Redis                  *redis.Client
 	NatsJS                 nats.JetStreamContext
 	ItemService            *ItemService
 	StageService           *StageService
@@ -45,9 +46,10 @@ type ReportService struct {
 	ReportVerifier         *reportutils.ReportVerifier
 }
 
-func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, itemService *ItemService, stageService *StageService, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
+func NewReportService(db *bun.DB, redis *redis.Client, natsJs nats.JetStreamContext, itemService *ItemService, stageService *StageService, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
 	service := &ReportService{
 		DB:                     db,
+		Redis:                  redis,
 		NatsJS:                 natsJs,
 		ItemService:            itemService,
 		StageService:           stageService,
@@ -71,7 +73,7 @@ func NewReportService(db *bun.DB, natsJs nats.JetStreamContext, itemService *Ite
 			}
 		}()
 
-		for i := 0; i < 3; i++ {
+		for i := 0; i < runtime.NumCPU(); i++ {
 			go func() {
 				err := service.ReportConsumeWorker(context.Background(), ch)
 				if err != nil {
@@ -145,12 +147,12 @@ func (s *ReportService) commitReportTask(ctx *fiber.Ctx, subject string, task *t
 		return taskId, nil
 	case <-ctx.Context().Done():
 		return "", ctx.Context().Err()
-	case <-time.After(time.Second * 15):
+	case <-time.After(time.Second * 10):
 		return "", ErrNatsTimeout
 	}
 }
 
-// returns TaskID and error, if any
+// returns taskID and error, if any
 func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingleReportRequest) (taskId string, err error) {
 	// if account is not found, create new account
 	accountId, err := s.pipelineAccount(ctx)
@@ -233,10 +235,14 @@ func (s *ReportService) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types
 
 func (s *ReportService) RecallSingularReport(ctx context.Context, req *types.SingleReportRecallRequest) error {
 	var reportId int
-	err := cache.RecentReports.Get(req.ReportHash, &reportId)
-	if errors.Is(err, redis.Nil) {
+	r := s.Redis.Get(ctx, req.ReportHash)
+	if errors.Is(r.Err(), redis.Nil) {
 		return ErrReportNotFound
-	} else if err != nil {
+	} else if r.Err() != nil {
+		return r.Err()
+	}
+	reportId, err := r.Int()
+	if err != nil {
 		return err
 	}
 
@@ -245,7 +251,7 @@ func (s *ReportService) RecallSingularReport(ctx context.Context, req *types.Sin
 		return err
 	}
 
-	cache.RecentReports.Delete(req.ReportHash)
+	s.Redis.Del(ctx, req.ReportHash)
 
 	return nil
 }
@@ -307,7 +313,7 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 
 	L.Info().Str("taskId", reportTask.TaskID).Msg("now processing new report task")
 	taskReliability := 0
-	if errs := s.ReportVerifier.Verify(ctx, reportTask); errs != nil && len(errs) > 0 {
+	if errs := s.ReportVerifier.Verify(ctx, reportTask); len(errs) > 0 {
 		// TODO: use different error code for different types of error
 		taskReliability = 1
 		L.Warn().
@@ -384,7 +390,9 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 			return err
 		}
 
-		cache.RecentReports.Set(reportTask.TaskID, dropReport.ReportID, 24*time.Hour)
+		if err := s.Redis.Set(ctx, reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
+			return err
+		}
 	}
 
 	intendedCommit = true
