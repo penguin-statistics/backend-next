@@ -46,10 +46,10 @@ type ReportService struct {
 	ReportVerifier         *reportutils.ReportVerifier
 }
 
-func NewReportService(db *bun.DB, redis *redis.Client, natsJs nats.JetStreamContext, itemService *ItemService, stageService *StageService, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
+func NewReportService(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *ItemService, stageService *StageService, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
 	service := &ReportService{
 		DB:                     db,
-		Redis:                  redis,
+		Redis:                  redisClient,
 		NatsJS:                 natsJs,
 		ItemService:            itemService,
 		StageService:           stageService,
@@ -280,7 +280,9 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 				defer func() {
 					inprogressInformer.Stop()
 					cancelTask()
-					msg.Ack()
+					if err := msg.Ack(); err != nil {
+						log.Error().Err(err).Msg("failed to ack")
+					}
 				}()
 
 				reportTask := &types.ReportTask{}
@@ -331,7 +333,9 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 	defer func() {
 		if !intendedCommit {
 			L.Warn().Msg("rolling back transaction due to error")
-			tx.Rollback()
+			if err := tx.Rollback(); err != nil {
+				L.Error().Err(err).Msg("failed to rollback transaction")
+			}
 		}
 	}()
 
