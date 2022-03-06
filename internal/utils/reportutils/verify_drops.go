@@ -78,8 +78,7 @@ func (d *DropVerifier) verifyDropType(report *types.SingleReport, dropInfos []*m
 			errs = append(errs, errors.Wrap(ErrInvalidDropType, fmt.Sprintf("drop type `%s`: expected at least %d, but got %d", dropInfo.DropType, dropInfo.Bounds.Lower, count)))
 		} else if dropInfo.Bounds.Upper < count {
 			errs = append(errs, errors.Wrap(ErrInvalidDropType, fmt.Sprintf("drop type `%s`: expected at most %d, but got %d", dropInfo.DropType, dropInfo.Bounds.Lower, count)))
-		}
-		if dropInfo.Bounds.Exceptions != nil {
+		} else if dropInfo.Bounds.Exceptions != nil {
 			if linq.From(dropInfo.Bounds.Exceptions).AnyWithT(func(exception int) bool {
 				return exception == count
 			}) {
@@ -126,8 +125,7 @@ func (d *DropVerifier) verifyDropItem(report *types.SingleReport, dropInfos []*m
 			errs = append(errs, errors.Wrap(ErrInvalidDropItem, fmt.Sprintf("drop type `%s`: expected at least %d, but got %d", dropInfo.DropType, dropInfo.Bounds.Lower, count)))
 		} else if dropInfo.Bounds.Upper < count {
 			errs = append(errs, errors.Wrap(ErrInvalidDropItem, fmt.Sprintf("drop type `%s`: expected at most %d, but got %d", dropInfo.DropType, dropInfo.Bounds.Lower, count)))
-		}
-		if dropInfo.Bounds.Exceptions != nil {
+		} else if dropInfo.Bounds.Exceptions != nil {
 			if linq.From(dropInfo.Bounds.Exceptions).AnyWithT(func(exception int) bool {
 				return exception == count
 			}) {
