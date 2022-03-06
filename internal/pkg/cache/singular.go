@@ -30,7 +30,15 @@ func (c *Singular) Get(dest interface{}) error {
 	if !ok {
 		return ErrNotFound
 	}
-	reflect.ValueOf(dest).Elem().Set(reflect.ValueOf(result))
+	// copy value to dest
+	var r reflect.Value
+	if reflect.ValueOf(result).Kind() == reflect.Ptr {
+		r = reflect.ValueOf(result).Elem()
+	} else {
+		r = reflect.ValueOf(result)
+	}
+	reflect.ValueOf(dest).Elem().Set(r)
+
 	return nil
 }
 
@@ -75,7 +83,14 @@ func (c *Singular) slowMutexGetSet(dest interface{}, valueFunc func() (interface
 	}
 
 	// copy value to dest
-	reflect.ValueOf(dest).Elem().Set(reflect.ValueOf(value))
+	// copy value to dest
+	var r reflect.Value
+	if reflect.ValueOf(value).Kind() == reflect.Ptr {
+		r = reflect.ValueOf(value).Elem()
+	} else {
+		r = reflect.ValueOf(value)
+	}
+	reflect.ValueOf(dest).Elem().Set(r)
 
 	return nil
 }
