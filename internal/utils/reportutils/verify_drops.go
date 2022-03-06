@@ -7,6 +7,7 @@ import (
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
@@ -32,14 +33,9 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, r
 	var err error
 	linq.From(drops).
 		SelectT(func(drop *types.Drop) []string {
-			mappedDropType, have := constants.DropTypeMap[drop.DropType]
-			if !have {
-				err = errors.Wrap(ErrInvalidDropType, fmt.Sprintf("expected one of %v, but got `%s`", constants.DropTypeMapKeys, drop.DropType))
-				return []string{}
-			}
 			return []string{
 				strconv.Itoa(drop.ItemID),
-				mappedDropType,
+				drop.DropType,
 			}
 		}).
 		ToSlice(&tuples)
@@ -84,7 +80,7 @@ func (d *DropVerifier) verifyDropType(report *types.SingleReport, dropInfos []*m
 			return dropType
 		}).
 		ToMapByT(&dropTypeAmountMap, func(dropTypeGroup linq.Group) string {
-			return constants.DropTypeMap[dropTypeGroup.Key.(string)]
+			return dropTypeGroup.Key.(string)
 		}, func(dropTypeGroup linq.Group) int {
 			return len(dropTypeGroup.Group)
 		})
@@ -112,6 +108,12 @@ func (d *DropVerifier) verifyDropItem(report *types.SingleReport, dropInfos []*m
 	for _, dropInfo := range dropInfos {
 		for _, drop := range report.Drops {
 			if drop.DropType != dropInfo.DropType || drop.ItemID != int(dropInfo.ItemID.Int64) {
+				log.Debug().
+					Str("drop.DropType", drop.DropType).
+					Str("dropInfo.DropType", dropInfo.DropType).
+					Int("drop.ItemID", drop.ItemID).
+					Int("dropInfo.ItemID", int(dropInfo.ItemID.Int64)).
+					Msg("matching failed")
 				continue
 			}
 			count := drop.Quantity

@@ -99,7 +99,7 @@ func (s *ReportService) pipelineAccount(ctx *fiber.Ctx) (accountId int, err erro
 	return accountId, nil
 }
 
-func (s *ReportService) pipelineMergeDrops(ctx context.Context, drops []types.ArkDrop) ([]*types.Drop, error) {
+func (s *ReportService) pipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []types.ArkDrop) ([]*types.Drop, error) {
 	drops = reportutils.MergeDrops(drops)
 
 	convertedDrops := make([]*types.Drop, 0, len(drops))
@@ -110,7 +110,8 @@ func (s *ReportService) pipelineMergeDrops(ctx context.Context, drops []types.Ar
 		}
 
 		convertedDrops = append(convertedDrops, &types.Drop{
-			DropType: drop.DropType,
+			// maps DropType to DB DropType
+			DropType: constants.DropTypeMap[drop.DropType],
 			ItemID:   item.ItemID,
 			Quantity: drop.Quantity,
 		})
@@ -158,7 +159,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 	}
 
 	// merge drops with same (dropType, itemId) pair
-	drops, err := s.pipelineMergeDrops(ctx.Context(), req.Drops)
+	drops, err := s.pipelineMergeDropsAndMapDropTypes(ctx.Context(), req.Drops)
 	if err != nil {
 		return "", err
 	}
@@ -203,7 +204,7 @@ func (s *ReportService) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types
 
 	for i, drop := range req.BatchDrops {
 		// merge drops with same (dropType, itemId) pair
-		drops, err := s.pipelineMergeDrops(ctx.Context(), drop.Drops)
+		drops, err := s.pipelineMergeDropsAndMapDropTypes(ctx.Context(), drop.Drops)
 		if err != nil {
 			return "", err
 		}
