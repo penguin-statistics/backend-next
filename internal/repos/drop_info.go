@@ -78,10 +78,6 @@ func (s *DropInfoRepo) GetDropInfosByServer(ctx context.Context, server string) 
 type DropInfoQuery struct {
 	Server     string
 	ArkStageId string
-	// DropTuples is in form of [](drop_item_id, drop_item_type)
-	DropTuples [][]string
-
-	withDropTypes *[]string
 }
 
 // GetDropInfoByArkId returns a drop info by its ark id.
@@ -91,32 +87,7 @@ func (s *DropInfoRepo) GetForCurrentTimeRange(ctx context.Context, query *DropIn
 		s.DB.NewSelect().
 			Model(&dropInfo).
 			Where("di.server = ?", query.Server).
-			Where("st.ark_stage_id = ?", query.ArkStageId).
-			WhereGroup(" AND ", func(sq *bun.SelectQuery) *bun.SelectQuery {
-				return sq.
-					Apply(func(sq *bun.SelectQuery) *bun.SelectQuery {
-						if len(query.DropTuples) == 0 {
-							return sq
-						} else {
-							return sq.Where("(it.item_id, di.drop_type) IN (?)", bun.In(query.DropTuples))
-						}
-					}).
-					// Type Drop Infos
-					WhereGroup(" OR ", func(sq *bun.SelectQuery) *bun.SelectQuery {
-						if query.withDropTypes == nil {
-							return sq
-						}
-						return sq.
-							Where("di.item_id IS NULL").
-							Apply(func(sq *bun.SelectQuery) *bun.SelectQuery {
-								if len(*query.withDropTypes) == 0 {
-									return sq
-								} else {
-									return sq.Where("di.drop_type IN (?)", bun.In(*query.withDropTypes))
-								}
-							})
-					})
-			}),
+			Where("st.ark_stage_id = ?", query.ArkStageId),
 	).
 		UseItemById("di.item_id").
 		UseStageById("di.stage_id").
@@ -165,20 +136,6 @@ func (s *DropInfoRepo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, se
 }
 
 func (s *DropInfoRepo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) (itemDropInfos, typeDropInfos []*models.DropInfo, err error) {
-	var typesToInclude []string
-
-	// get distinct drop types
-	linq.From(query.DropTuples).
-		SelectT(func(tuple []string) string {
-			return tuple[1] // select drop types
-		}).
-		Distinct().
-		SelectT(func(dropType string) string {
-			return dropType
-		}).
-		ToSlice(&typesToInclude)
-
-	query.withDropTypes = &typesToInclude
 	allDropInfos, err := s.GetForCurrentTimeRange(ctx, query)
 	if err != nil {
 		return nil, nil, err
