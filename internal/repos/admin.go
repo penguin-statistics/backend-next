@@ -16,7 +16,7 @@ func NewAdminRepo(db *bun.DB) *AdminRepo {
 	return &AdminRepo{db: db}
 }
 
-func (c *AdminRepo) SaveZones(ctx context.Context, tx bun.Tx, zones *[]*models.Zone) error {
+func (r *AdminRepo) SaveZones(ctx context.Context, tx bun.Tx, zones *[]*models.Zone) error {
 	_, err := tx.NewInsert().
 		On("CONFLICT (ark_zone_id) DO UPDATE").
 		Model(zones).
@@ -24,7 +24,7 @@ func (c *AdminRepo) SaveZones(ctx context.Context, tx bun.Tx, zones *[]*models.Z
 	return err
 }
 
-func (c *AdminRepo) SaveActivities(ctx context.Context, tx bun.Tx, activities *[]*models.Activity) error {
+func (r *AdminRepo) SaveActivities(ctx context.Context, tx bun.Tx, activities *[]*models.Activity) error {
 	_, err := tx.NewInsert().
 		On("CONFLICT (activity_id) DO UPDATE").
 		Model(activities).
@@ -32,7 +32,7 @@ func (c *AdminRepo) SaveActivities(ctx context.Context, tx bun.Tx, activities *[
 	return err
 }
 
-func (c *AdminRepo) SaveTimeRanges(ctx context.Context, tx bun.Tx, timeRanges *[]*models.TimeRange) error {
+func (r *AdminRepo) SaveTimeRanges(ctx context.Context, tx bun.Tx, timeRanges *[]*models.TimeRange) error {
 	_, err := tx.NewInsert().
 		On("CONFLICT (range_id) DO UPDATE").
 		Model(timeRanges).
@@ -40,7 +40,7 @@ func (c *AdminRepo) SaveTimeRanges(ctx context.Context, tx bun.Tx, timeRanges *[
 	return err
 }
 
-func (c *AdminRepo) SaveStages(ctx context.Context, tx bun.Tx, stages *[]*models.Stage) error {
+func (r *AdminRepo) SaveStages(ctx context.Context, tx bun.Tx, stages *[]*models.Stage) error {
 	_, err := tx.NewInsert().
 		On("CONFLICT (ark_stage_id) DO UPDATE").
 		Model(stages).
@@ -48,7 +48,7 @@ func (c *AdminRepo) SaveStages(ctx context.Context, tx bun.Tx, stages *[]*models
 	return err
 }
 
-func (s *AdminRepo) SaveDropInfos(ctx context.Context, tx bun.Tx, dropInfos *[]*models.DropInfo) error {
+func (r *AdminRepo) SaveDropInfos(ctx context.Context, tx bun.Tx, dropInfos *[]*models.DropInfo) error {
 	_, err := tx.NewInsert().
 		On("CONFLICT (drop_id) DO UPDATE").
 		Model(dropInfos).
