@@ -116,17 +116,17 @@ func (c *AdminController) RefreshAllSiteStats(ctx *fiber.Ctx) error {
 	return err
 }
 
-func getTimeFromString(timeRange types.TimeRange) (*time.Time, *time.Time, error) {
-	startTime, err := time.Parse(TimeLayout, timeRange.StartTime)
+func getTimeFromString(timeRange types.TimeRange) (startTime *time.Time, endTime *time.Time, err error) {
+	start, err := time.Parse(TimeLayout, timeRange.StartTime)
 	if err != nil {
 		return nil, nil, err
 	}
-	endTime := time.UnixMilli(constants.FakeEndTimeMilli)
+	end := time.UnixMilli(constants.FakeEndTimeMilli)
 	if timeRange.EndTime.Valid {
-		endTime, err = time.Parse(TimeLayout, timeRange.EndTime.String)
+		end, err = time.Parse(TimeLayout, timeRange.EndTime.String)
 		if err != nil {
 			return nil, nil, err
 		}
 	}
-	return &startTime, &endTime, nil
+	return &start, &end, nil
 }

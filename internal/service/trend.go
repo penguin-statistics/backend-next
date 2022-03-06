@@ -79,7 +79,7 @@ func (s *TrendService) GetShimCustomizedTrendResults(ctx context.Context, server
 	if err != nil {
 		return nil, err
 	}
-	return s.applyShimForCustomizedTrendQuery(ctx, server, trendQueryResult, startTime)
+	return s.applyShimForCustomizedTrendQuery(ctx, trendQueryResult, startTime)
 }
 
 func (s *TrendService) QueryTrend(
@@ -380,7 +380,7 @@ func (s *TrendService) convertTrendElementsToTrendQueryResult(trendElements []*m
 	return trendQueryResult, nil
 }
 
-func (s *TrendService) applyShimForCustomizedTrendQuery(ctx context.Context, server string, queryResult *models.TrendQueryResult, startTime *time.Time) (*shims.TrendQueryResult, error) {
+func (s *TrendService) applyShimForCustomizedTrendQuery(ctx context.Context, queryResult *models.TrendQueryResult, startTime *time.Time) (*shims.TrendQueryResult, error) {
 	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
 	if err != nil {
 		return nil, err

@@ -27,7 +27,7 @@ func NewAdminService(db *bun.DB, adminRepo *repos.AdminRepo) *AdminService {
 
 func (s *AdminService) SaveRenderedObjects(ctx context.Context, objects *gamedata.RenderedObjects) error {
 	var innerErr error
-	s.DB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := s.DB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var zoneId int
 		var zones []*models.Zone
 		if objects.Zone != nil {
@@ -92,6 +92,9 @@ func (s *AdminService) SaveRenderedObjects(ctx context.Context, objects *gamedat
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	// if no error, purge cache
 	if innerErr == nil {

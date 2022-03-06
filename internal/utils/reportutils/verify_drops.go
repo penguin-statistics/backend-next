@@ -105,7 +105,7 @@ func (d *DropVerifier) verifyDropItem(report *types.SingleReport, dropInfos []*m
 	dropItemQuantityMap := make(map[int]map[string]int)
 	for _, drop := range report.Drops {
 		// Check 1
-		if _, ok := itemIdSetFromDropInfos[int(drop.ItemID)]; !ok {
+		if _, ok := itemIdSetFromDropInfos[drop.ItemID]; !ok {
 			errs = append(errs, errors.Wrap(ErrUnknownItemID, fmt.Sprintf("item ID %d not found in drop info", drop.ItemID)))
 		}
 		if _, ok := dropItemQuantityMap[drop.ItemID]; !ok {
