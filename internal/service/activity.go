@@ -32,7 +32,10 @@ func (s *ActivityService) GetActivities(ctx context.Context) ([]*models.Activity
 	}
 
 	activities, err = s.ActivityRepo.GetActivities(ctx)
-	if err := cache.Activities.Set(activities, 24*time.Hour); err == nil {
+	if err != nil {
+		return nil, err
+	}
+	if err = cache.Activities.Set(activities, 24*time.Hour); err == nil {
 		cache.LastModifiedTime.Set("[activities]", time.Now(), 0)
 	}
 	return activities, err

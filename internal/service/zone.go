@@ -31,8 +31,11 @@ func (s *ZoneService) GetZones(ctx context.Context) ([]*models.Zone, error) {
 	}
 
 	zones, err = s.ZoneRepo.GetZones(ctx)
+	if err != nil {
+		return nil, err
+	}
 	go cache.Zones.Set(zones, 24*time.Hour)
-	return zones, err
+	return zones, nil
 }
 
 func (s *ZoneService) GetZoneById(ctx context.Context, id int) (*models.Zone, error) {
@@ -48,8 +51,11 @@ func (s *ZoneService) GetZoneByArkId(ctx context.Context, arkZoneId string) (*mo
 	}
 
 	dbZone, err := s.ZoneRepo.GetZoneByArkId(ctx, arkZoneId)
+	if err != nil {
+		return nil, err
+	}
 	go cache.ZoneByArkId.Set(arkZoneId, dbZone, 24*time.Hour)
-	return dbZone, err
+	return dbZone, nil
 }
 
 // Cache: (singular) shimZones, 24hrs; records last modified time

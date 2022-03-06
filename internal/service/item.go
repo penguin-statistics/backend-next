@@ -13,6 +13,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
@@ -50,7 +51,7 @@ func (s *ItemService) GetItemById(ctx context.Context, itemId int) (*models.Item
 	}
 	item, ok := itemsMapById[itemId]
 	if !ok {
-		return nil, nil
+		return nil, pgerr.ErrNotFound
 	}
 	return item, nil
 }

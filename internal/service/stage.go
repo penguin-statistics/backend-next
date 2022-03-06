@@ -46,7 +46,7 @@ func (s *StageService) GetStageById(ctx context.Context, stageId int) (*models.S
 	}
 	stage, ok := stagesMapById[stageId]
 	if !ok {
-		return nil, nil
+		return nil, pgerr.ErrNotFound
 	}
 	return stage, nil
 }
@@ -60,8 +60,11 @@ func (s *StageService) GetStageByArkId(ctx context.Context, arkStageId string) (
 	}
 
 	dbStage, err := s.StageRepo.GetStageByArkId(ctx, arkStageId)
+	if err != nil {
+		return nil, err
+	}
 	go cache.StageByArkId.Set(arkStageId, dbStage, 24*time.Hour)
-	return dbStage, err
+	return dbStage, nil
 }
 
 func (s *StageService) SearchStageByCode(ctx context.Context, code string) (*models.Stage, error) {
