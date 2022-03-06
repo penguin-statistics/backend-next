@@ -7,9 +7,7 @@ import (
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/repos"
@@ -108,12 +106,6 @@ func (d *DropVerifier) verifyDropItem(report *types.SingleReport, dropInfos []*m
 	for _, dropInfo := range dropInfos {
 		for _, drop := range report.Drops {
 			if drop.DropType != dropInfo.DropType || drop.ItemID != int(dropInfo.ItemID.Int64) {
-				log.Debug().
-					Str("drop.DropType", drop.DropType).
-					Str("dropInfo.DropType", dropInfo.DropType).
-					Int("drop.ItemID", drop.ItemID).
-					Int("dropInfo.ItemID", int(dropInfo.ItemID.Int64)).
-					Msg("matching failed")
 				continue
 			}
 			count := drop.Quantity
