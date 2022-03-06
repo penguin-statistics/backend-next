@@ -9,9 +9,9 @@ type ArkDrop struct {
 }
 
 type Drop struct {
-	DropType string
-	ItemID   int
-	Quantity int
+	DropType string `json:"dropType"`
+	ItemID   int    `json:"itemId"`
+	Quantity int    `json:"quantity"`
 }
 
 type SingleReportRequest struct {

@@ -88,7 +88,7 @@ func (d *DropVerifier) verifyDropType(report *types.SingleReport, dropInfos []*m
 		}
 	}
 
-	return nil
+	return errs
 }
 
 /**
@@ -136,5 +136,5 @@ func (d *DropVerifier) verifyDropItem(report *types.SingleReport, dropInfos []*m
 		}
 	}
 
-	return nil
+	return errs
 }

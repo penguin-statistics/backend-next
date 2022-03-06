@@ -7,8 +7,8 @@ import (
 )
 
 type VerifyViolation struct {
-	Name string `json:"name"`
-	Err  error  `json:"err"`
+	Name  string `json:"name"`
+	Error string `json:"error"`
 }
 
 type Verifier interface {
@@ -30,11 +30,11 @@ func (verifier ReportVerifier) Verify(ctx context.Context, reportTask *types.Rep
 	errs := make([]*VerifyViolation, 0, len(verifier))
 	for _, report := range reportTask.Reports {
 		for _, pipe := range verifier {
-			if innerErrs := pipe.Verify(ctx, report, reportTask); innerErrs != nil {
+			if innerErrs := pipe.Verify(ctx, report, reportTask); len(innerErrs) > 0 {
 				for _, err := range innerErrs {
 					errs = append(errs, &VerifyViolation{
-						Name: pipe.Name(),
-						Err:  err,
+						Name:  pipe.Name(),
+						Error: err.Error(),
 					})
 				}
 			}
