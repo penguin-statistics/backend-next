@@ -301,12 +301,16 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 }
 
 func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types.ReportTask) error {
-	log.Info().Str("taskId", reportTask.TaskID).Msg("now processing new report task")
+	L := log.With().
+		Interface("task", reportTask).
+		Logger()
+
+	L.Info().Str("taskId", reportTask.TaskID).Msg("now processing new report task")
 	taskReliability := 0
 	if err := s.ReportVerifier.Verify(ctx, reportTask); err != nil {
 		// TODO: use different error code for different types of error
 		taskReliability = 1
-		log.Warn().Err(err).Msg("report task verification failed, marking task as unreliable")
+		L.Warn().Str("taskId", reportTask.TaskID).Err(err).Msg("report task verification failed, marking task as unreliable")
 	}
 
 	tx, err := s.DB.BeginTx(ctx, nil)
@@ -316,6 +320,7 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 	intendedCommit := false
 	defer func() {
 		if !intendedCommit {
+			L.Warn().Msg("rolling back transaction due to error")
 			tx.Rollback()
 		}
 	}()
