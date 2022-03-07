@@ -22,9 +22,9 @@ func EnrichSentry() func(c *fiber.Ctx) error {
 			return err
 		}
 
-		rootSpan := sentry.StartSpan(c.Context(), "backend", sentry.ContinueFromRequest(&r), sentry.TransactionName(c.Method()+" "+c.Path()))
-		rootSpan.SetTag("url", c.OriginalURL())
-		defer rootSpan.Finish()
+		span := sentry.StartSpan(c.Context(), "backend", sentry.ContinueFromRequest(&r), sentry.TransactionName(c.Method()+" "+c.Path()))
+		span.SetTag("url", c.OriginalURL())
+		defer span.Finish()
 
 		return c.Next()
 	}

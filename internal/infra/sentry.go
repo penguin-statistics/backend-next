@@ -30,7 +30,7 @@ func SentryInit(conf *config.Config) error {
 		Release:          "backend-next@" + bininfo.Version,
 		Debug:            conf.DevMode,
 		AttachStacktrace: true,
-		TracesSampleRate: 0.025,
+		TracesSampleRate: 0.2,
 		Environment:      getEnvironment(conf),
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			if conf.DevMode {
