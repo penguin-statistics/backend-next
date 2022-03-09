@@ -28,10 +28,10 @@ func RegisterAccountController(v2 *svr.V2, s *service.AccountService) {
 // @Accept       plain
 // @Produce      plain
 // @Param        userId  body      int  true  "User ID"
-// @Success      200     {array}  shims.SiteStats
-// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Success      200     {object}   shims.LoginResponse  "User ID. In the deprecated backend this is, for some reason, been implemented to return a JSON in the response body but with a `Content-Type: text/plain` in the response header instead of the correct `Content-Type: application/json`. So the v2 API has replicated this behavior to ensure compatibility."
+// @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
+// @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/users [POST]
-// @Deprecated
 func (c *AccountController) Login(ctx *fiber.Ctx) error {
 	inputPenguinId := ctx.Body()
 

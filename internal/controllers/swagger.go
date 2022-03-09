@@ -4,10 +4,12 @@ import (
 	"github.com/gofiber/fiber/v2"
 	swagger "github.com/penguin-statistics/fiber-swagger/v3"
 
-	_ "github.com/penguin-statistics/backend-next/docs"
+	"github.com/penguin-statistics/backend-next/docs"
+	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
 )
 
 func RegisterSwaggerController(app *fiber.App) {
+	docs.SwaggerInfo.Version = bininfo.Version
 	app.Get("/swagger/*", swagger.Handler) // default
 
 	// app.Get("/swagger/*", swagger.New(swagger.Config{ // custom

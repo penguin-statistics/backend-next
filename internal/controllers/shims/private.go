@@ -52,15 +52,14 @@ func RegisterPrivateController(
 	v2.Get("/_private/result/trend/:server", serverValidator, c.GetTrends)
 }
 
-// @Summary      Get DropMatrix
+// @Summary      Get Drop Matrix
 // @Tags         Private
 // @Produce      json
-// @Param        server            path     string   true     "Server; default to CN"
-// @Param        source            path     string   true     "Global or Personal; default to global"
+// @Param        server            path     string   true     "Server; default to CN" Enums(CN, US, JP, KR)
+// @Param        source            path     string   true     "Global or Personal; default to global" Enums(global, personal)
 // @Success      200               {object} shims.DropMatrixQueryResult
-// @Failure      500               {object} errors.PenguinError "An unexpected error occurred"
+// @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/_private/result/matrix/{server}/{source} [GET]
-// @Deprecated
 func (c *PrivateController) GetDropMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	isPersonal := ctx.Params("source") == "personal"
@@ -92,15 +91,14 @@ func (c *PrivateController) GetDropMatrix(ctx *fiber.Ctx) error {
 	return ctx.JSON(shimResult)
 }
 
-// @Summary      Get PatternMatrix
+// @Summary      Get Pattern Matrix
 // @Tags         Private
 // @Produce      json
-// @Param        server            path     string   true     "Server; default to CN"
-// @Param        source            path     string   true     "Global or Personal; default to global"
+// @Param        server            path     string   true     "Server; default to CN" Enums(CN, US, JP, KR)
+// @Param        source            path     string   true     "Global or Personal; default to global" Enums(global, personal)
 // @Success      200               {object} shims.PatternMatrixQueryResult
-// @Failure      500               {object} errors.PenguinError "An unexpected error occurred"
+// @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/_private/result/pattern/{server}/{source} [GET]
-// @Deprecated
 func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	isPersonal := ctx.Params("source") == "personal"
@@ -134,11 +132,10 @@ func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
 // @Summary      Get Trends
 // @Tags         Private
 // @Produce      json
-// @Param        server            path     string   true     "Server; default to CN"
+// @Param        server            path     string   true     "Server; default to CN" Enums(CN, US, JP, KR)
 // @Success      200               {object} shims.TrendQueryResult
-// @Failure      500               {object} errors.PenguinError "An unexpected error occurred"
+// @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/_private/result/trend/{server} [GET]
-// @Deprecated
 func (c *PrivateController) GetTrends(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	shimResult, err := c.TrendService.GetShimSavedTrendResults(ctx.Context(), server)

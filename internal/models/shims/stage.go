@@ -18,10 +18,10 @@ type Stage struct {
 	ArkZoneID       string          `bun:"-" json:"zoneId"`
 	StageType       string          `json:"stageType"`
 	Code            string          `bun:"-" json:"code"`
-	CodeI18n        json.RawMessage `bun:"code" json:"code_i18n"`
-	Sanity          null.Int        `json:"apCost" swaggertype:"number"`
-	Existence       json.RawMessage `json:"existence"`
-	MinClearTime    null.Int        `json:"minClearTime" swaggertype:"number"`
+	CodeI18n        json.RawMessage `bun:"code" json:"code_i18n" swaggertype:"object"`
+	Sanity          null.Int        `json:"apCost" swaggertype:"integer"`
+	Existence       json.RawMessage `json:"existence" swaggertype:"object"`
+	MinClearTime    null.Int        `json:"minClearTime" swaggertype:"integer"`
 	RecognitionOnly []string        `bun:"-" json:"recognitionOnly,omitempty"`
 
 	Zone *models.Zone `bun:"rel:belongs-to,join:zone_id=zone_id" json:"-"`

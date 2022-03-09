@@ -11,7 +11,7 @@ type Notice struct {
 	bun.BaseModel `bun:"notices"`
 
 	NoticeID  int             `bun:",pk" json:"id"`
-	Existence json.RawMessage `json:"existence"`
-	Severity  null.Int        `json:"severity"`
+	Existence json.RawMessage `json:"existence" swaggertype:"object"`
+	Severity  null.Int        `json:"severity" swaggertype:"integer"`
 	Content   json.RawMessage `json:"content_i18n"`
 }

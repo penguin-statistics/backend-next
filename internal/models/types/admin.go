@@ -8,7 +8,7 @@ type UpdateNewEventRequest struct {
 	ArkZoneID    string      `json:"arkZoneId"`
 	ZoneName     string      `json:"zoneName"`
 	ZoneCategory string      `json:"zoneCategory"`
-	ZoneType     null.String `json:"zoneType"`
+	ZoneType     null.String `json:"zoneType" swaggertype:"string"`
 	Server       string      `json:"server"`
 
 	TimeRange
@@ -24,10 +24,10 @@ type CloneEventRequest struct {
 
 type TimeRange struct {
 	StartTime string      `json:"startTime"`
-	EndTime   null.String `json:"endTime"`
+	EndTime   null.String `json:"endTime" swaggertype:"string"`
 }
 
 type PurgeCacheRequest struct {
 	Name string      `json:"name"`
-	Key  null.String `json:"key"`
+	Key  null.String `json:"key" swaggertype:"string"`
 }

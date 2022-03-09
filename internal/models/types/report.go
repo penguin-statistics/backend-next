@@ -23,7 +23,7 @@ type SingleReportRequest struct {
 }
 
 type SingleReportRecallRequest struct {
-	ReportHash string `json:"reportHash" validate:"required,printascii"`
+	ReportHash string `json:"reportHash" validate:"required,printascii" example:"0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ"`
 }
 
 type BatchReportDrop struct {
@@ -35,7 +35,7 @@ type BatchReportDrop struct {
 
 type ReportRequestMetadata struct {
 	Fingerprint  string      `json:"fingerprint" validate:"lte=128"`
-	MD5          null.String `json:"md5" validate:"lte=32"`
+	MD5          null.String `json:"md5" validate:"lte=32" swaggertype:"string"`
 	FileName     string      `json:"fileName" validate:"lte=512"`
 	LastModified int         `json:"lastModified"`
 }

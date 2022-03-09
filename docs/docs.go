@@ -39,10 +39,15 @@ var doc = `{
                 "tags": [
                     "Private"
                 ],
-                "summary": "Get DropMatrix",
-                "deprecated": true,
+                "summary": "Get Drop Matrix",
                 "parameters": [
                     {
+                        "enum": [
+                            "CN",
+                            "US",
+                            "JP",
+                            "KR"
+                        ],
                         "type": "string",
                         "description": "Server; default to CN",
                         "name": "server",
@@ -50,6 +55,10 @@ var doc = `{
                         "required": true
                     },
                     {
+                        "enum": [
+                            "global",
+                            "personal"
+                        ],
                         "type": "string",
                         "description": "Global or Personal; default to global",
                         "name": "source",
@@ -67,7 +76,7 @@ var doc = `{
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -81,10 +90,15 @@ var doc = `{
                 "tags": [
                     "Private"
                 ],
-                "summary": "Get PatternMatrix",
-                "deprecated": true,
+                "summary": "Get Pattern Matrix",
                 "parameters": [
                     {
+                        "enum": [
+                            "CN",
+                            "US",
+                            "JP",
+                            "KR"
+                        ],
                         "type": "string",
                         "description": "Server; default to CN",
                         "name": "server",
@@ -92,6 +106,10 @@ var doc = `{
                         "required": true
                     },
                     {
+                        "enum": [
+                            "global",
+                            "personal"
+                        ],
                         "type": "string",
                         "description": "Global or Personal; default to global",
                         "name": "source",
@@ -109,7 +127,7 @@ var doc = `{
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -124,9 +142,14 @@ var doc = `{
                     "Private"
                 ],
                 "summary": "Get Trends",
-                "deprecated": true,
                 "parameters": [
                     {
+                        "enum": [
+                            "CN",
+                            "US",
+                            "JP",
+                            "KR"
+                        ],
                         "type": "string",
                         "description": "Server; default to CN",
                         "name": "server",
@@ -144,7 +167,7 @@ var doc = `{
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -159,17 +182,64 @@ var doc = `{
                     "Result"
                 ],
                 "summary": "Execute Advanced Query",
-                "responses": {
-                    "200": {
-                        "description": "OK",
+                "parameters": [
+                    {
+                        "description": "Query",
+                        "name": "query",
+                        "in": "body",
+                        "required": true,
                         "schema": {
                             "$ref": "#/definitions/types.AdvancedQueryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Drop Matrix Response: when ` + "`" + `interval` + "`" + ` has been left undefined.",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/shims.AdvancedQueryResult"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "advanced_results": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/shims.DropMatrixQueryResult"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "202": {
+                        "description": "Trend Response: when ` + "`" + `interval` + "`" + ` has been defined a value greater than ` + "`" + `0` + "`" + `. Notice that this response still responds with a status code of ` + "`" + `200` + "`" + `, but due to swagger limitations, to denote a different response with the same status code is not possible. Therefore, a status code of ` + "`" + `202` + "`" + ` is used, only for the purpose of workaround.",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/shims.AdvancedQueryResult"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "advanced_results": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/shims.TrendQueryResult"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     },
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -184,7 +254,6 @@ var doc = `{
                     "Formula"
                 ],
                 "summary": "Get Formula",
-                "deprecated": true,
                 "responses": {
                     "200": {
                         "description": ""
@@ -192,7 +261,7 @@ var doc = `{
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -207,7 +276,6 @@ var doc = `{
                     "Item"
                 ],
                 "summary": "Get All Items",
-                "deprecated": true,
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -236,7 +304,7 @@ var doc = `{
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -251,7 +319,6 @@ var doc = `{
                     "Item"
                 ],
                 "summary": "Get an Item with ID",
-                "deprecated": true,
                 "parameters": [
                     {
                         "type": "string",
@@ -286,13 +353,13 @@ var doc = `{
                     "400": {
                         "description": "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item.",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     },
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -307,7 +374,6 @@ var doc = `{
                     "Notice"
                 ],
                 "summary": "Get All Notices",
-                "deprecated": true,
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -321,7 +387,7 @@ var doc = `{
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -336,7 +402,6 @@ var doc = `{
                     "EventPeriod"
                 ],
                 "summary": "Get All Event Periods",
-                "deprecated": true,
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -365,7 +430,7 @@ var doc = `{
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -373,6 +438,12 @@ var doc = `{
         },
         "/PenguinStats/api/v2/report": {
             "post": {
+                "security": [
+                    {
+                        "PenguinIDAuth": []
+                    }
+                ],
+                "description": "Submit a Drop Report. You can use the ` + "`" + `reportHash` + "`" + ` in the response to recall the report in 24 hours after it has been submitted.",
                 "consumes": [
                     "application/json"
                 ],
@@ -382,24 +453,35 @@ var doc = `{
                 "tags": [
                     "Report"
                 ],
-                "summary": "Submit an Item Drop Report",
+                "summary": "Submit a Drop Report",
+                "parameters": [
+                    {
+                        "description": "Report Request",
+                        "name": "report",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.SingleReportRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "Report has been successfully submitted",
                         "schema": {
                             "$ref": "#/definitions/shims.ReportResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item.",
+                        "description": "Invalid request",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     },
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -407,6 +489,7 @@ var doc = `{
         },
         "/PenguinStats/api/v2/report/recall": {
             "post": {
+                "description": "Recall a Drop Report by its ` + "`" + `reportHash` + "`" + `. The farest report you can recall is limited to 24 hours. Recalling a report after it has been already recalled will result in an error.",
                 "consumes": [
                     "application/json"
                 ],
@@ -416,21 +499,32 @@ var doc = `{
                 "tags": [
                     "Report"
                 ],
-                "summary": "Recall an Item Drop Report",
+                "summary": "Recall a Drop Report",
+                "parameters": [
+                    {
+                        "description": "Report Recall Request",
+                        "name": "report",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.SingleReportRecallRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "204": {
-                        "description": ""
+                        "description": "Report has been successfully recalled"
                     },
                     "400": {
-                        "description": "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item.",
+                        "description": "` + "`" + `reportHash` + "`" + ` is missing, invalid, or already been recalled.",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     },
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -438,7 +532,12 @@ var doc = `{
         },
         "/PenguinStats/api/v2/report/recognition": {
             "post": {
-                "description": "Submit an Item Drop Report with Frontend Recognition. Notice that this is a private API and is not designed for external use.",
+                "security": [
+                    {
+                        "PenguinIDAuth": []
+                    }
+                ],
+                "description": "Submit an Item Drop Report with Frontend Recognition. Notice that this is a **private API** and is not designed for external use.",
                 "produces": [
                     "application/json"
                 ],
@@ -446,41 +545,34 @@ var doc = `{
                     "Report"
                 ],
                 "summary": "Bulk Submit with Frontend Recognition",
+                "parameters": [
+                    {
+                        "description": "Recognition Report Request",
+                        "name": "report",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Report has been successfully submitted for queue processing",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/models.Item"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "existence": {
-                                            "$ref": "#/definitions/models.Existence"
-                                        },
-                                        "keywords": {
-                                            "$ref": "#/definitions/models.Keywords"
-                                        },
-                                        "name": {
-                                            "$ref": "#/definitions/models.I18nString"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/shims.RecognitionReportResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item.",
+                        "description": "Invalid request",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     },
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -488,16 +580,26 @@ var doc = `{
         },
         "/PenguinStats/api/v2/result/matrix": {
             "get": {
+                "security": [
+                    {
+                        "PenguinIDAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Result"
                 ],
-                "summary": "Get DropMatrix",
-                "deprecated": true,
+                "summary": "Get Drop Matrix",
                 "parameters": [
                     {
+                        "enum": [
+                            "CN",
+                            "US",
+                            "JP",
+                            "KR"
+                        ],
                         "type": "string",
                         "description": "Server; default to CN",
                         "name": "server",
@@ -506,7 +608,7 @@ var doc = `{
                     },
                     {
                         "type": "boolean",
-                        "description": "Whether to query for personal drop matrix or not",
+                        "description": "Whether to query for personal drop matrix or not. If ` + "`" + `is_personal` + "`" + ` equals to ` + "`" + `true` + "`" + `, a valid PenguinID would be required to be provided (PenguinIDAuth)",
                         "name": "is_personal",
                         "in": "query"
                     },
@@ -517,21 +619,29 @@ var doc = `{
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "Comma separated list of ark stage ids",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Comma separated list of stage IDs to filter",
                         "name": "stageFilter",
                         "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "Comma separated list of ark item ids",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Comma separated list of item IDs to filter",
                         "name": "itemFilter",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Drop Matrix response",
                         "schema": {
                             "$ref": "#/definitions/shims.DropMatrixQueryResult"
                         }
@@ -539,7 +649,7 @@ var doc = `{
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -547,16 +657,26 @@ var doc = `{
         },
         "/PenguinStats/api/v2/result/pattern": {
             "get": {
+                "security": [
+                    {
+                        "PenguinIDAuth": []
+                    }
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Result"
                 ],
-                "summary": "Get PatternMatrix",
-                "deprecated": true,
+                "summary": "Get Pattern Matrix",
                 "parameters": [
                     {
+                        "enum": [
+                            "CN",
+                            "US",
+                            "JP",
+                            "KR"
+                        ],
                         "type": "string",
                         "description": "Server; default to CN",
                         "name": "server",
@@ -565,7 +685,7 @@ var doc = `{
                     },
                     {
                         "type": "boolean",
-                        "description": "Whether to query for personal pattern matrix or not",
+                        "description": "Whether to query for personal drop matrix or not. If ` + "`" + `is_personal` + "`" + ` equals to ` + "`" + `true` + "`" + `, a valid PenguinID would be required to be provided (PenguinIDAuth)",
                         "name": "is_personal",
                         "in": "query"
                     }
@@ -580,7 +700,7 @@ var doc = `{
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -595,9 +715,14 @@ var doc = `{
                     "Result"
                 ],
                 "summary": "Get Trends",
-                "deprecated": true,
                 "parameters": [
                     {
+                        "enum": [
+                            "CN",
+                            "US",
+                            "JP",
+                            "KR"
+                        ],
                         "type": "string",
                         "description": "Server; default to CN",
                         "name": "server",
@@ -615,7 +740,7 @@ var doc = `{
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -630,7 +755,6 @@ var doc = `{
                     "Stage"
                 ],
                 "summary": "Get All Stages",
-                "deprecated": true,
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -659,7 +783,7 @@ var doc = `{
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -674,7 +798,6 @@ var doc = `{
                     "Stage"
                 ],
                 "summary": "Get an Stage with ID",
-                "deprecated": true,
                 "parameters": [
                     {
                         "type": "integer",
@@ -709,13 +832,13 @@ var doc = `{
                     "400": {
                         "description": "Invalid or missing stageId. Notice that this shall be the **string ID** of the stage, instead of the internally used numerical ID of the stage.",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     },
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -730,9 +853,14 @@ var doc = `{
                     "SiteStats"
                 ],
                 "summary": "Get Site Stats",
-                "deprecated": true,
                 "parameters": [
                     {
+                        "enum": [
+                            "CN",
+                            "US",
+                            "JP",
+                            "KR"
+                        ],
                         "type": "string",
                         "description": "Server; default to CN",
                         "name": "server",
@@ -753,7 +881,7 @@ var doc = `{
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -761,6 +889,11 @@ var doc = `{
         },
         "/PenguinStats/api/v2/users": {
             "post": {
+                "security": [
+                    {
+                        "PenguinIDAuth": []
+                    }
+                ],
                 "consumes": [
                     "text/plain"
                 ],
@@ -771,7 +904,6 @@ var doc = `{
                     "Account"
                 ],
                 "summary": "Login with PenguinID",
-                "deprecated": true,
                 "parameters": [
                     {
                         "description": "User ID",
@@ -785,18 +917,15 @@ var doc = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "User ID. In the deprecated backend this is, for some reason, been implemented to return a JSON in the response body but with a ` + "`" + `Content-Type: text/plain` + "`" + ` in the response header instead of the correct ` + "`" + `Content-Type: application/json` + "`" + `. So the v2 API has replicated this behavior to ensure compatibility.",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/shims.SiteStats"
-                            }
+                            "$ref": "#/definitions/shims.LoginResponse"
                         }
                     },
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -811,7 +940,6 @@ var doc = `{
                     "Zone"
                 ],
                 "summary": "Get All Zones",
-                "deprecated": true,
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -840,7 +968,7 @@ var doc = `{
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -855,7 +983,6 @@ var doc = `{
                     "Zone"
                 ],
                 "summary": "Get a Zone with ID",
-                "deprecated": true,
                 "parameters": [
                     {
                         "type": "integer",
@@ -890,313 +1017,13 @@ var doc = `{
                     "400": {
                         "description": "Invalid or missing zoneId. Notice that this shall be the **string ID** of the zone, instead of the v3 API internally used numerical ID of the zone.",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     },
                     "500": {
                         "description": "An unexpected error occurred",
                         "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
-                        }
-                    }
-                }
-            }
-        },
-        "/v3/items": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Item"
-                ],
-                "summary": "Get All Items",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "allOf": [
-                                    {
-                                        "$ref": "#/definitions/models.Item"
-                                    },
-                                    {
-                                        "type": "object",
-                                        "properties": {
-                                            "existence": {
-                                                "$ref": "#/definitions/models.Existence"
-                                            },
-                                            "keywords": {
-                                                "$ref": "#/definitions/models.Keywords"
-                                            },
-                                            "name": {
-                                                "$ref": "#/definitions/models.I18nString"
-                                            }
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "An unexpected error occurred",
-                        "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
-                        }
-                    }
-                }
-            }
-        },
-        "/v3/items/{itemId}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Item"
-                ],
-                "summary": "Get an Item with ID",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Item ID",
-                        "name": "itemId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/models.Item"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "existence": {
-                                            "$ref": "#/definitions/models.Existence"
-                                        },
-                                        "keywords": {
-                                            "$ref": "#/definitions/models.Keywords"
-                                        },
-                                        "name": {
-                                            "$ref": "#/definitions/models.I18nString"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item.",
-                        "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
-                        }
-                    },
-                    "500": {
-                        "description": "An unexpected error occurred",
-                        "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
-                        }
-                    }
-                }
-            }
-        },
-        "/v3/stages": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Stage"
-                ],
-                "summary": "Get All Stages",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "allOf": [
-                                    {
-                                        "$ref": "#/definitions/models.Stage"
-                                    },
-                                    {
-                                        "type": "object",
-                                        "properties": {
-                                            "code": {
-                                                "$ref": "#/definitions/models.I18nString"
-                                            },
-                                            "existence": {
-                                                "$ref": "#/definitions/models.Existence"
-                                            }
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "An unexpected error occurred",
-                        "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
-                        }
-                    }
-                }
-            }
-        },
-        "/v3/stages/{stageId}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Stage"
-                ],
-                "summary": "Get an Stage with ID",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Stage ID",
-                        "name": "stageId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/models.Stage"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "code": {
-                                            "$ref": "#/definitions/models.I18nString"
-                                        },
-                                        "existence": {
-                                            "$ref": "#/definitions/models.Existence"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid or missing stageId. Notice that this shall be the **string ID** of the stage, instead of the internally used numerical ID of the stage.",
-                        "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
-                        }
-                    },
-                    "500": {
-                        "description": "An unexpected error occurred",
-                        "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
-                        }
-                    }
-                }
-            }
-        },
-        "/v3/zones": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Zone"
-                ],
-                "summary": "Get All Zones",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "allOf": [
-                                    {
-                                        "$ref": "#/definitions/models.Zone"
-                                    },
-                                    {
-                                        "type": "object",
-                                        "properties": {
-                                            "existence": {
-                                                "$ref": "#/definitions/models.Existence"
-                                            },
-                                            "name": {
-                                                "$ref": "#/definitions/models.I18nString"
-                                            }
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "An unexpected error occurred",
-                        "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
-                        }
-                    }
-                }
-            }
-        },
-        "/v3/zones/{zoneId}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Zone"
-                ],
-                "summary": "Get a Zone with ID",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Zone ID",
-                        "name": "zoneId",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/models.Zone"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "existence": {
-                                            "$ref": "#/definitions/models.Existence"
-                                        },
-                                        "name": {
-                                            "$ref": "#/definitions/models.I18nString"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid or missing zoneId. Notice that this shall be the **string ID** of the zone, instead of the internally used numerical ID of the zone.",
-                        "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
-                        }
-                    },
-                    "500": {
-                        "description": "An unexpected error occurred",
-                        "schema": {
-                            "$ref": "#/definitions/errors.PenguinError"
+                            "$ref": "#/definitions/pgerr.PenguinError"
                         }
                     }
                 }
@@ -1204,30 +1031,6 @@ var doc = `{
         }
     },
     "definitions": {
-        "errors.Extras": {
-            "type": "object",
-            "additionalProperties": true
-        },
-        "errors.PenguinError": {
-            "type": "object",
-            "properties": {
-                "errorCode": {
-                    "type": "string",
-                    "example": "INVALID_REQUEST"
-                },
-                "extras": {
-                    "$ref": "#/definitions/errors.Extras"
-                },
-                "message": {
-                    "type": "string",
-                    "example": "invalid request: some or all request parameters are invalid"
-                },
-                "statusCode": {
-                    "type": "integer",
-                    "example": 400
-                }
-            }
-        },
         "models.Existence": {
             "type": "object",
             "required": [
@@ -1252,27 +1055,6 @@ var doc = `{
                 "US": {
                     "description": "US: 美服/国际服 Global Server (maintained by Yostar Limited)",
                     "$ref": "#/definitions/models.ServerExistence"
-                }
-            }
-        },
-        "models.I18nOptionalString": {
-            "type": "object",
-            "properties": {
-                "en": {
-                    "description": "EN: English (en)",
-                    "type": "string"
-                },
-                "ja": {
-                    "description": "JP: 日本語 (ja)",
-                    "type": "string"
-                },
-                "ko": {
-                    "description": "KR: 한국어 (ko)",
-                    "type": "string"
-                },
-                "zh": {
-                    "description": "ZH: 中文 (zh-CN)",
-                    "type": "string"
                 }
             }
         },
@@ -1303,59 +1085,6 @@ var doc = `{
                 }
             }
         },
-        "models.Item": {
-            "type": "object",
-            "properties": {
-                "existence": {
-                    "description": "Existence is a map with server code as key and the existence of the item in that server as value.",
-                    "type": "object"
-                },
-                "group": {
-                    "description": "Group is an identifier of what the item actually is. For example, both orirock and orirock cube would have the same group, ` + "`" + `orirock` + "`" + `.",
-                    "type": "string"
-                },
-                "itemId": {
-                    "description": "ArkItemID (itemId) is the previously used, string form ID of the item; in JSON-representation ` + "`" + `itemId` + "`" + ` is used as key.",
-                    "type": "string"
-                },
-                "keywords": {
-                    "description": "Keywords is an arbitrary JSON object containing the keywords of the item, for optimizing the results of the frontend built-in search engine.",
-                    "type": "object"
-                },
-                "name": {
-                    "description": "Name is a map with language code as key and the name of the item in that language as value.",
-                    "type": "object"
-                },
-                "penguinItemId": {
-                    "description": "ItemID (penguinItemId) is the numerical ID of the item.",
-                    "type": "integer"
-                },
-                "rarity": {
-                    "type": "integer"
-                },
-                "sortId": {
-                    "description": "SortID is the sort position of the item.",
-                    "type": "integer"
-                },
-                "sprite": {
-                    "description": "Sprite describes the location of the item's sprite on the sprite image, in a form of Y:X.",
-                    "type": "string"
-                }
-            }
-        },
-        "models.Keywords": {
-            "type": "object",
-            "properties": {
-                "alias": {
-                    "description": "Alias of the item,",
-                    "$ref": "#/definitions/models.I18nOptionalString"
-                },
-                "pron": {
-                    "description": "Pronounciation hints of the item",
-                    "$ref": "#/definitions/models.I18nOptionalString"
-                }
-            }
-        },
         "models.Notice": {
             "type": "object",
             "properties": {
@@ -1366,16 +1095,13 @@ var doc = `{
                     }
                 },
                 "existence": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "id": {
                     "type": "integer"
                 },
                 "severity": {
-                    "$ref": "#/definitions/null.Int"
+                    "type": "integer"
                 }
             }
         },
@@ -1396,117 +1122,23 @@ var doc = `{
                 }
             }
         },
-        "models.Stage": {
+        "pgerr.Extras": {
+            "type": "object",
+            "additionalProperties": true
+        },
+        "pgerr.PenguinError": {
             "type": "object",
             "properties": {
                 "code": {
-                    "description": "Code is a map with language code as key and the code of the stage in that language as value.",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "existence": {
-                    "description": "Existence is a map with server code as key and the existence of the item in that server as value.",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "extraProcessType": {
-                    "description": "ExtraProcessType is the type of extra process that is used in the stage, e.g. \"GACHABOX\".",
-                    "type": "string"
-                },
-                "minClearTime": {
-                    "description": "MinClearTime is the minimum time (in milliseconds as a duration) it takes to clear the stage, referencing from prts.wiki",
-                    "type": "number"
-                },
-                "penguinStageId": {
-                    "description": "StageID (penguinStageId) is the numerical ID of the stage.",
-                    "type": "integer"
-                },
-                "sanity": {
-                    "description": "Sanity is the sanity requirement for a full clear of the stage.",
-                    "type": "number"
-                },
-                "stageId": {
-                    "description": "ArkStageID (stageId) is the previously used, string form ID of the stage; in JSON-representation ` + "`" + `stageId` + "`" + ` is used as key.",
-                    "type": "string"
-                },
-                "stageType": {
-                    "description": "StageType is the type of the stage, e.g. \"MAIN\", \"SUB\", \"ACTIVITY\" and \"DAILY\".",
-                    "type": "string"
-                },
-                "zoneId": {
-                    "description": "ZoneID is the numerical ID of the zone the stage is in.",
-                    "type": "integer"
-                }
-            }
-        },
-        "models.Zone": {
-            "type": "object",
-            "properties": {
-                "background": {
-                    "description": "Background is the path of the background image of the zone, relative to the CDN endpoint.",
-                    "type": "string"
-                },
-                "category": {
-                    "description": "Category of the zone.",
                     "type": "string",
-                    "example": "MAINLINE"
+                    "example": "INVALID_REQUEST"
                 },
-                "existence": {
-                    "description": "Existence is a map with server code as key and the existence of the item in that server as value.",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                "extras": {
+                    "$ref": "#/definitions/pgerr.Extras"
                 },
-                "index": {
-                    "type": "integer"
-                },
-                "name": {
-                    "description": "Name is a map with language code as key and the name of the item in that language as value.",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "penguinZoneId": {
-                    "description": "ZoneID is the numerical ID of the zone.",
-                    "type": "integer"
-                },
-                "type": {
-                    "description": "Type of the zone, e.g. \"AWAKENING_HOUR\" or \"VISION_SHATTER\". Optional and only occurres when ` + "`" + `category` + "`" + ` is \"MAINLINE\".",
+                "message": {
                     "type": "string",
-                    "example": "AWAKENING_HOUR"
-                },
-                "zoneId": {
-                    "type": "string"
-                }
-            }
-        },
-        "null.Bool": {
-            "type": "object",
-            "properties": {
-                "bool": {
-                    "type": "boolean"
-                },
-                "valid": {
-                    "description": "Valid is true if Bool is not NULL",
-                    "type": "boolean"
-                }
-            }
-        },
-        "null.Int": {
-            "type": "object",
-            "properties": {
-                "int64": {
-                    "type": "integer"
-                },
-                "valid": {
-                    "description": "Valid is true if Int64 is not NULL",
-                    "type": "boolean"
+                    "example": "invalid request: some or all request parameters are invalid"
                 }
             }
         },
@@ -1514,22 +1146,25 @@ var doc = `{
             "type": "object",
             "properties": {
                 "end": {
-                    "$ref": "#/definitions/null.Int"
+                    "type": "integer"
                 },
                 "existence": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "label_i18n": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "start": {
                     "type": "integer"
+                }
+            }
+        },
+        "shims.AdvancedQueryResult": {
+            "type": "object",
+            "properties": {
+                "advanced_results": {
+                    "type": "array",
+                    "items": {}
                 }
             }
         },
@@ -1537,10 +1172,7 @@ var doc = `{
             "type": "object",
             "properties": {
                 "bounds": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "dropType": {
                     "type": "string"
@@ -1571,10 +1203,7 @@ var doc = `{
                     }
                 },
                 "existence": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "groupID": {
                     "type": "string"
@@ -1589,10 +1218,7 @@ var doc = `{
                     "type": "string"
                 },
                 "name_i18n": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "pron": {
                     "type": "array",
@@ -1614,6 +1240,14 @@ var doc = `{
                 }
             }
         },
+        "shims.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "userID": {
+                    "type": "string"
+                }
+            }
+        },
         "shims.OneDrop": {
             "type": "object",
             "properties": {
@@ -1629,7 +1263,7 @@ var doc = `{
             "type": "object",
             "properties": {
                 "end": {
-                    "$ref": "#/definitions/null.Int"
+                    "type": "integer"
                 },
                 "itemId": {
                     "type": "string"
@@ -1669,7 +1303,7 @@ var doc = `{
             "type": "object",
             "properties": {
                 "end": {
-                    "$ref": "#/definitions/null.Int"
+                    "type": "integer"
                 },
                 "pattern": {
                     "$ref": "#/definitions/shims.Pattern"
@@ -1710,11 +1344,27 @@ var doc = `{
                 }
             }
         },
+        "shims.RecognitionReportResponse": {
+            "type": "object",
+            "properties": {
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "taskId": {
+                    "type": "string",
+                    "example": "0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ"
+                }
+            }
+        },
         "shims.ReportResponse": {
             "type": "object",
             "properties": {
                 "reportHash": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ"
                 }
             }
         },
@@ -1748,16 +1398,13 @@ var doc = `{
             "type": "object",
             "properties": {
                 "apCost": {
-                    "type": "number"
+                    "type": "integer"
                 },
                 "code": {
                     "type": "string"
                 },
                 "code_i18n": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "dropInfos": {
                     "type": "array",
@@ -1766,13 +1413,10 @@ var doc = `{
                     }
                 },
                 "existence": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "minClearTime": {
-                    "type": "number"
+                    "type": "integer"
                 },
                 "recognitionOnly": {
                     "type": "array",
@@ -1845,10 +1489,7 @@ var doc = `{
                     "type": "string"
                 },
                 "existence": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "stages": {
                     "type": "array",
@@ -1872,10 +1513,7 @@ var doc = `{
                     "type": "string"
                 },
                 "zoneName_i18n": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 }
             }
         },
@@ -1887,13 +1525,13 @@ var doc = `{
             ],
             "properties": {
                 "end": {
-                    "$ref": "#/definitions/null.Int"
+                    "type": "integer"
                 },
                 "interval": {
-                    "$ref": "#/definitions/null.Int"
+                    "type": "integer"
                 },
                 "isPersonal": {
-                    "$ref": "#/definitions/null.Bool"
+                    "type": "boolean"
                 },
                 "itemIds": {
                     "type": "array",
@@ -1908,7 +1546,7 @@ var doc = `{
                     "type": "string"
                 },
                 "start": {
-                    "$ref": "#/definitions/null.Int"
+                    "type": "integer"
                 }
             }
         },
@@ -1927,6 +1565,89 @@ var doc = `{
                     }
                 }
             }
+        },
+        "types.ArkDrop": {
+            "type": "object",
+            "required": [
+                "dropType",
+                "itemId",
+                "quantity"
+            ],
+            "properties": {
+                "dropType": {
+                    "type": "string",
+                    "enum": [
+                        "REGULAR_DROP",
+                        "NORMAL_DROP",
+                        "SPECIAL_DROP",
+                        "EXTRA_DROP",
+                        "FURNITURE"
+                    ]
+                },
+                "itemId": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "maximum": 1000
+                }
+            }
+        },
+        "types.SingleReportRecallRequest": {
+            "type": "object",
+            "required": [
+                "reportHash"
+            ],
+            "properties": {
+                "reportHash": {
+                    "type": "string",
+                    "example": "0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ"
+                }
+            }
+        },
+        "types.SingleReportRequest": {
+            "type": "object",
+            "required": [
+                "server",
+                "source",
+                "stageId",
+                "version"
+            ],
+            "properties": {
+                "drops": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/types.ArkDrop"
+                    }
+                },
+                "server": {
+                    "type": "string",
+                    "example": "CN"
+                },
+                "source": {
+                    "description": "Source describes a source of the report. Third-party API consumers should change this to their own name.",
+                    "type": "string",
+                    "maxLength": 32,
+                    "example": "frontend-v2"
+                },
+                "stageId": {
+                    "type": "string",
+                    "example": "main_01-07"
+                },
+                "version": {
+                    "description": "Version describes the version of the source app used to submit this report. Third-party API consumers should change this to their own app version.",
+                    "type": "string",
+                    "maxLength": 32,
+                    "example": "v0.0.0+0000000"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "PenguinIDAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`
@@ -1942,10 +1663,10 @@ type swaggerInfo struct {
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = swaggerInfo{
-	Version:     "3.0.0-alpha.1",
-	Host:        "https://penguin-stats.io",
-	BasePath:    "/api",
-	Schemes:     []string{},
+	Version:     "3.0.0",
+	Host:        "penguin-stats.io",
+	BasePath:    "/",
+	Schemes:     []string{"https"},
 	Title:       "Penguin Statistics API",
 	Description: "This is the Penguin Statistics v3 API, re-designed to aim for lightweight on wire.",
 }

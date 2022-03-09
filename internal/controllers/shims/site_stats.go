@@ -24,11 +24,10 @@ func RegisterSiteStatsController(v2 *svr.V2, s *service.SiteStatsService) {
 // @Summary      Get Site Stats
 // @Tags         SiteStats
 // @Produce      json
-// @Param        server  query     string  true  "Server; default to CN"
+// @Param        server  query     string  true  "Server; default to CN" Enums(CN, US, JP, KR)
 // @Success      200     {array}   shims.SiteStats
-// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/stats [GET]
-// @Deprecated
 func (c *SiteStatsController) GetSiteStats(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 

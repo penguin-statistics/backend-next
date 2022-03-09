@@ -13,7 +13,7 @@ type OneDropMatrixElement struct {
 	Times     int      `json:"times"`
 	Quantity  int      `json:"quantity"`
 	StartTime int64    `json:"start"`
-	EndTime   null.Int `json:"end,omitempty"`
+	EndTime   null.Int `json:"end,omitempty" swaggertype:"integer"`
 }
 
 // DropPattern
@@ -27,7 +27,7 @@ type OnePatternMatrixElement struct {
 	Times     int      `json:"times"`
 	Quantity  int      `json:"quantity"`
 	StartTime int64    `json:"start"`
-	EndTime   null.Int `json:"end,omitempty"`
+	EndTime   null.Int `json:"end,omitempty" swaggertype:"integer"`
 }
 
 type Pattern struct {
