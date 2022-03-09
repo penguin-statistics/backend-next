@@ -21,7 +21,7 @@ type Zone struct {
 	// Name is a map with language code as key and the name of the item in that language as value.
 	Name json.RawMessage `json:"name"`
 	// Existence is a map with server code as key and the existence of the item in that server as value.
-	Existence json.RawMessage `json:"existence"`
+	Existence json.RawMessage `json:"existence" swaggertype:"object"`
 	// Background is the path of the background image of the zone, relative to the CDN endpoint.
 	Background null.String `json:"background,omitempty" swaggertype:"string"`
 }

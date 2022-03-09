@@ -23,9 +23,8 @@ func RegisterFormulaController(v2 *svr.V2, formulaService *service.FormulaServic
 // @Tags         Formula
 // @Produce      json
 // @Success      200
-// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/formula [GET]
-// @Deprecated
 func (c *FormulaController) GetFormula(ctx *fiber.Ctx) error {
 	formula, err := c.FormulaService.GetFormula(ctx.Context())
 	if err != nil {

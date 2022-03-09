@@ -27,9 +27,8 @@ func RegisterZoneController(v2 *svr.V2, zoneService *service.ZoneService) {
 // @Tags         Zone
 // @Produce      json
 // @Success      200     {array}  shims.Zone{existence=models.Existence,zoneName_i18n=models.I18nString}
-// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/zones [GET]
-// @Deprecated
 func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
 	zones, err := c.ZoneService.GetShimZones(ctx.Context())
 	if err != nil {
@@ -48,10 +47,9 @@ func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
 // @Produce      json
 // @Param        zoneId  path      int  true  "Zone ID"
 // @Success      200     {object}  shims.Zone{existence=models.Existence,zoneName_i18n=models.I18nString}
-// @Failure      400     {object}  errors.PenguinError "Invalid or missing zoneId. Notice that this shall be the **string ID** of the zone, instead of the v3 API internally used numerical ID of the zone."
-// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Failure      400     {object}  pgerr.PenguinError "Invalid or missing zoneId. Notice that this shall be the **string ID** of the zone, instead of the v3 API internally used numerical ID of the zone."
+// @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/zones/{zoneId} [GET]
-// @Deprecated
 func (c *ZoneController) GetZoneByArkId(ctx *fiber.Ctx) error {
 	zoneId := ctx.Params("zoneId")
 

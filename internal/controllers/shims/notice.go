@@ -26,9 +26,8 @@ func RegisterNoticeController(v2 *svr.V2, noticeService *service.NoticeService) 
 // @Tags         Notice
 // @Produce      json
 // @Success      200     {array}  models.Notice
-// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/notice [GET]
-// @Deprecated
 func (c *NoticeController) GetNotices(ctx *fiber.Ctx) error {
 	notices, err := c.NoticeService.GetNotices(ctx.Context())
 	if err != nil {

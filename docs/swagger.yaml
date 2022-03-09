@@ -1,22 +1,5 @@
-basePath: /api
+basePath: /
 definitions:
-  errors.Extras:
-    additionalProperties: true
-    type: object
-  errors.PenguinError:
-    properties:
-      errorCode:
-        example: INVALID_REQUEST
-        type: string
-      extras:
-        $ref: '#/definitions/errors.Extras'
-      message:
-        example: 'invalid request: some or all request parameters are invalid'
-        type: string
-      statusCode:
-        example: 400
-        type: integer
-    type: object
   models.Existence:
     properties:
       CN:
@@ -38,21 +21,6 @@ definitions:
     - KR
     - US
     type: object
-  models.I18nOptionalString:
-    properties:
-      en:
-        description: 'EN: English (en)'
-        type: string
-      ja:
-        description: 'JP: 日本語 (ja)'
-        type: string
-      ko:
-        description: 'KR: 한국어 (ko)'
-        type: string
-      zh:
-        description: 'ZH: 中文 (zh-CN)'
-        type: string
-    type: object
   models.I18nString:
     properties:
       en:
@@ -73,51 +41,6 @@ definitions:
     - ko
     - zh
     type: object
-  models.Item:
-    properties:
-      existence:
-        description: Existence is a map with server code as key and the existence
-          of the item in that server as value.
-        type: object
-      group:
-        description: Group is an identifier of what the item actually is. For example,
-          both orirock and orirock cube would have the same group, `orirock`.
-        type: string
-      itemId:
-        description: ArkItemID (itemId) is the previously used, string form ID of
-          the item; in JSON-representation `itemId` is used as key.
-        type: string
-      keywords:
-        description: Keywords is an arbitrary JSON object containing the keywords
-          of the item, for optimizing the results of the frontend built-in search
-          engine.
-        type: object
-      name:
-        description: Name is a map with language code as key and the name of the item
-          in that language as value.
-        type: object
-      penguinItemId:
-        description: ItemID (penguinItemId) is the numerical ID of the item.
-        type: integer
-      rarity:
-        type: integer
-      sortId:
-        description: SortID is the sort position of the item.
-        type: integer
-      sprite:
-        description: Sprite describes the location of the item's sprite on the sprite
-          image, in a form of Y:X.
-        type: string
-    type: object
-  models.Keywords:
-    properties:
-      alias:
-        $ref: '#/definitions/models.I18nOptionalString'
-        description: Alias of the item,
-      pron:
-        $ref: '#/definitions/models.I18nOptionalString'
-        description: Pronounciation hints of the item
-    type: object
   models.Notice:
     properties:
       content_i18n:
@@ -125,13 +48,11 @@ definitions:
           type: integer
         type: array
       existence:
-        items:
-          type: integer
-        type: array
+        type: object
       id:
         type: integer
       severity:
-        $ref: '#/definitions/null.Int'
+        type: integer
     type: object
   models.ServerExistence:
     properties:
@@ -144,118 +65,41 @@ definitions:
     required:
     - exist
     type: object
-  models.Stage:
+  pgerr.Extras:
+    additionalProperties: true
+    type: object
+  pgerr.PenguinError:
     properties:
       code:
-        description: Code is a map with language code as key and the code of the stage
-          in that language as value.
-        items:
-          type: integer
-        type: array
-      existence:
-        description: Existence is a map with server code as key and the existence
-          of the item in that server as value.
-        items:
-          type: integer
-        type: array
-      extraProcessType:
-        description: ExtraProcessType is the type of extra process that is used in
-          the stage, e.g. "GACHABOX".
+        example: INVALID_REQUEST
         type: string
-      minClearTime:
-        description: MinClearTime is the minimum time (in milliseconds as a duration)
-          it takes to clear the stage, referencing from prts.wiki
-        type: number
-      penguinStageId:
-        description: StageID (penguinStageId) is the numerical ID of the stage.
-        type: integer
-      sanity:
-        description: Sanity is the sanity requirement for a full clear of the stage.
-        type: number
-      stageId:
-        description: ArkStageID (stageId) is the previously used, string form ID of
-          the stage; in JSON-representation `stageId` is used as key.
+      extras:
+        $ref: '#/definitions/pgerr.Extras'
+      message:
+        example: 'invalid request: some or all request parameters are invalid'
         type: string
-      stageType:
-        description: StageType is the type of the stage, e.g. "MAIN", "SUB", "ACTIVITY"
-          and "DAILY".
-        type: string
-      zoneId:
-        description: ZoneID is the numerical ID of the zone the stage is in.
-        type: integer
-    type: object
-  models.Zone:
-    properties:
-      background:
-        description: Background is the path of the background image of the zone, relative
-          to the CDN endpoint.
-        type: string
-      category:
-        description: Category of the zone.
-        example: MAINLINE
-        type: string
-      existence:
-        description: Existence is a map with server code as key and the existence
-          of the item in that server as value.
-        items:
-          type: integer
-        type: array
-      index:
-        type: integer
-      name:
-        description: Name is a map with language code as key and the name of the item
-          in that language as value.
-        items:
-          type: integer
-        type: array
-      penguinZoneId:
-        description: ZoneID is the numerical ID of the zone.
-        type: integer
-      type:
-        description: Type of the zone, e.g. "AWAKENING_HOUR" or "VISION_SHATTER".
-          Optional and only occurres when `category` is "MAINLINE".
-        example: AWAKENING_HOUR
-        type: string
-      zoneId:
-        type: string
-    type: object
-  null.Bool:
-    properties:
-      bool:
-        type: boolean
-      valid:
-        description: Valid is true if Bool is not NULL
-        type: boolean
-    type: object
-  null.Int:
-    properties:
-      int64:
-        type: integer
-      valid:
-        description: Valid is true if Int64 is not NULL
-        type: boolean
     type: object
   shims.Activity:
     properties:
       end:
-        $ref: '#/definitions/null.Int'
+        type: integer
       existence:
-        items:
-          type: integer
-        type: array
+        type: object
       label_i18n:
-        items:
-          type: integer
-        type: array
+        type: object
       start:
         type: integer
+    type: object
+  shims.AdvancedQueryResult:
+    properties:
+      advanced_results:
+        items: {}
+        type: array
     type: object
   shims.DropInfo:
     properties:
       bounds:
-        items:
-          type: integer
-        type: array
+        type: object
       dropType:
         type: string
       itemId:
@@ -275,9 +119,7 @@ definitions:
           type: string
         type: array
       existence:
-        items:
-          type: integer
-        type: array
+        type: object
       groupID:
         type: string
       itemId:
@@ -287,9 +129,7 @@ definitions:
       name:
         type: string
       name_i18n:
-        items:
-          type: integer
-        type: array
+        type: object
       pron:
         items:
           type: string
@@ -303,6 +143,11 @@ definitions:
           type: integer
         type: array
     type: object
+  shims.LoginResponse:
+    properties:
+      userID:
+        type: string
+    type: object
   shims.OneDrop:
     properties:
       itemId:
@@ -313,7 +158,7 @@ definitions:
   shims.OneDropMatrixElement:
     properties:
       end:
-        $ref: '#/definitions/null.Int'
+        type: integer
       itemId:
         type: string
       quantity:
@@ -339,7 +184,7 @@ definitions:
   shims.OnePatternMatrixElement:
     properties:
       end:
-        $ref: '#/definitions/null.Int'
+        type: integer
       pattern:
         $ref: '#/definitions/shims.Pattern'
       quantity:
@@ -365,9 +210,20 @@ definitions:
           $ref: '#/definitions/shims.OnePatternMatrixElement'
         type: array
     type: object
+  shims.RecognitionReportResponse:
+    properties:
+      errors:
+        items:
+          type: string
+        type: array
+      taskId:
+        example: 0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ
+        type: string
+    type: object
   shims.ReportResponse:
     properties:
       reportHash:
+        example: 0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ
         type: string
     type: object
   shims.SiteStats:
@@ -390,23 +246,19 @@ definitions:
   shims.Stage:
     properties:
       apCost:
-        type: number
+        type: integer
       code:
         type: string
       code_i18n:
-        items:
-          type: integer
-        type: array
+        type: object
       dropInfos:
         items:
           $ref: '#/definitions/shims.DropInfo'
         type: array
       existence:
-        items:
-          type: integer
-        type: array
+        type: object
       minClearTime:
-        type: number
+        type: integer
       recognitionOnly:
         items:
           type: string
@@ -453,9 +305,7 @@ definitions:
       background:
         type: string
       existence:
-        items:
-          type: integer
-        type: array
+        type: object
       stages:
         items:
           type: string
@@ -471,18 +321,16 @@ definitions:
       zoneName:
         type: string
       zoneName_i18n:
-        items:
-          type: integer
-        type: array
+        type: object
     type: object
   types.AdvancedQuery:
     properties:
       end:
-        $ref: '#/definitions/null.Int'
+        type: integer
       interval:
-        $ref: '#/definitions/null.Int'
+        type: integer
       isPersonal:
-        $ref: '#/definitions/null.Bool'
+        type: boolean
       itemIds:
         items:
           type: string
@@ -492,7 +340,7 @@ definitions:
       stageId:
         type: string
       start:
-        $ref: '#/definitions/null.Int'
+        type: integer
     required:
     - server
     - stageId
@@ -508,7 +356,66 @@ definitions:
     required:
     - queries
     type: object
-host: https://penguin-stats.io
+  types.ArkDrop:
+    properties:
+      dropType:
+        enum:
+        - REGULAR_DROP
+        - NORMAL_DROP
+        - SPECIAL_DROP
+        - EXTRA_DROP
+        - FURNITURE
+        type: string
+      itemId:
+        type: string
+      quantity:
+        maximum: 1000
+        type: integer
+    required:
+    - dropType
+    - itemId
+    - quantity
+    type: object
+  types.SingleReportRecallRequest:
+    properties:
+      reportHash:
+        example: 0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ
+        type: string
+    required:
+    - reportHash
+    type: object
+  types.SingleReportRequest:
+    properties:
+      drops:
+        items:
+          $ref: '#/definitions/types.ArkDrop'
+        type: array
+      server:
+        example: CN
+        type: string
+      source:
+        description: Source describes a source of the report. Third-party API consumers
+          should change this to their own name.
+        example: frontend-v2
+        maxLength: 32
+        type: string
+      stageId:
+        example: main_01-07
+        type: string
+      version:
+        description: Version describes the version of the source app used to submit
+          this report. Third-party API consumers should change this to their own app
+          version.
+        example: v0.0.0+0000000
+        maxLength: 32
+        type: string
+    required:
+    - server
+    - source
+    - stageId
+    - version
+    type: object
+host: penguin-stats.io
 info:
   contact:
     email: alvissreimu@gmail.com
@@ -520,18 +427,25 @@ info:
     name: MIT License
     url: https://opensource.org/licenses/MIT
   title: Penguin Statistics API
-  version: 3.0.0-alpha.1
+  version: 3.0.0
 paths:
   /PenguinStats/api/v2/_private/result/matrix/{server}/{source}:
     get:
-      deprecated: true
       parameters:
       - description: Server; default to CN
+        enum:
+        - CN
+        - US
+        - JP
+        - KR
         in: path
         name: server
         required: true
         type: string
       - description: Global or Personal; default to global
+        enum:
+        - global
+        - personal
         in: path
         name: source
         required: true
@@ -546,20 +460,27 @@ paths:
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
-      summary: Get DropMatrix
+            $ref: '#/definitions/pgerr.PenguinError'
+      summary: Get Drop Matrix
       tags:
       - Private
   /PenguinStats/api/v2/_private/result/pattern/{server}/{source}:
     get:
-      deprecated: true
       parameters:
       - description: Server; default to CN
+        enum:
+        - CN
+        - US
+        - JP
+        - KR
         in: path
         name: server
         required: true
         type: string
       - description: Global or Personal; default to global
+        enum:
+        - global
+        - personal
         in: path
         name: source
         required: true
@@ -574,15 +495,19 @@ paths:
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
-      summary: Get PatternMatrix
+            $ref: '#/definitions/pgerr.PenguinError'
+      summary: Get Pattern Matrix
       tags:
       - Private
   /PenguinStats/api/v2/_private/result/trend/{server}:
     get:
-      deprecated: true
       parameters:
       - description: Server; default to CN
+        enum:
+        - CN
+        - US
+        - JP
+        - KR
         in: path
         name: server
         required: true
@@ -597,29 +522,57 @@ paths:
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
       summary: Get Trends
       tags:
       - Private
   /PenguinStats/api/v2/advanced:
     post:
+      parameters:
+      - description: Query
+        in: body
+        name: query
+        required: true
+        schema:
+          $ref: '#/definitions/types.AdvancedQueryRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: 'Drop Matrix Response: when `interval` has been left undefined.'
           schema:
-            $ref: '#/definitions/types.AdvancedQueryRequest'
+            allOf:
+            - $ref: '#/definitions/shims.AdvancedQueryResult'
+            - properties:
+                advanced_results:
+                  items:
+                    $ref: '#/definitions/shims.DropMatrixQueryResult'
+                  type: array
+              type: object
+        "202":
+          description: 'Trend Response: when `interval` has been defined a value greater
+            than `0`. Notice that this response still responds with a status code
+            of `200`, but due to swagger limitations, to denote a different response
+            with the same status code is not possible. Therefore, a status code of
+            `202` is used, only for the purpose of workaround.'
+          schema:
+            allOf:
+            - $ref: '#/definitions/shims.AdvancedQueryResult'
+            - properties:
+                advanced_results:
+                  items:
+                    $ref: '#/definitions/shims.TrendQueryResult'
+                  type: array
+              type: object
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
       summary: Execute Advanced Query
       tags:
       - Result
   /PenguinStats/api/v2/formula:
     get:
-      deprecated: true
       produces:
       - application/json
       responses:
@@ -628,13 +581,12 @@ paths:
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
       summary: Get Formula
       tags:
       - Formula
   /PenguinStats/api/v2/items:
     get:
-      deprecated: true
       produces:
       - application/json
       responses:
@@ -654,13 +606,12 @@ paths:
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
       summary: Get All Items
       tags:
       - Item
   /PenguinStats/api/v2/items/{itemId}:
     get:
-      deprecated: true
       parameters:
       - description: Item ID
         in: path
@@ -685,17 +636,16 @@ paths:
           description: Invalid or missing itemId. Notice that this shall be the **string
             ID** of the item, instead of the internally used numerical ID of the item.
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
       summary: Get an Item with ID
       tags:
       - Item
   /PenguinStats/api/v2/notice:
     get:
-      deprecated: true
       produces:
       - application/json
       responses:
@@ -708,13 +658,12 @@ paths:
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
       summary: Get All Notices
       tags:
       - Notice
   /PenguinStats/api/v2/period:
     get:
-      deprecated: true
       produces:
       - application/json
       responses:
@@ -734,7 +683,7 @@ paths:
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
       summary: Get All Event Periods
       tags:
       - EventPeriod
@@ -742,88 +691,111 @@ paths:
     post:
       consumes:
       - application/json
+      description: Submit a Drop Report. You can use the `reportHash` in the response
+        to recall the report in 24 hours after it has been submitted.
+      parameters:
+      - description: Report Request
+        in: body
+        name: report
+        required: true
+        schema:
+          $ref: '#/definitions/types.SingleReportRequest'
       produces:
       - application/json
       responses:
         "201":
-          description: Created
+          description: Report has been successfully submitted
           schema:
             $ref: '#/definitions/shims.ReportResponse'
         "400":
-          description: Invalid or missing itemId. Notice that this shall be the **string
-            ID** of the item, instead of the internally used numerical ID of the item.
+          description: Invalid request
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
-      summary: Submit an Item Drop Report
+            $ref: '#/definitions/pgerr.PenguinError'
+      security:
+      - PenguinIDAuth: []
+      summary: Submit a Drop Report
       tags:
       - Report
   /PenguinStats/api/v2/report/recall:
     post:
       consumes:
       - application/json
+      description: Recall a Drop Report by its `reportHash`. The farest report you
+        can recall is limited to 24 hours. Recalling a report after it has been already
+        recalled will result in an error.
+      parameters:
+      - description: Report Recall Request
+        in: body
+        name: report
+        required: true
+        schema:
+          $ref: '#/definitions/types.SingleReportRecallRequest'
       produces:
       - application/json
       responses:
         "204":
-          description: ""
+          description: Report has been successfully recalled
         "400":
-          description: Invalid or missing itemId. Notice that this shall be the **string
-            ID** of the item, instead of the internally used numerical ID of the item.
+          description: '`reportHash` is missing, invalid, or already been recalled.'
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
-      summary: Recall an Item Drop Report
+            $ref: '#/definitions/pgerr.PenguinError'
+      summary: Recall a Drop Report
       tags:
       - Report
   /PenguinStats/api/v2/report/recognition:
     post:
       description: Submit an Item Drop Report with Frontend Recognition. Notice that
-        this is a private API and is not designed for external use.
+        this is a **private API** and is not designed for external use.
+      parameters:
+      - description: Recognition Report Request
+        in: body
+        name: report
+        required: true
+        schema:
+          type: string
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Report has been successfully submitted for queue processing
           schema:
-            allOf:
-            - $ref: '#/definitions/models.Item'
-            - properties:
-                existence:
-                  $ref: '#/definitions/models.Existence'
-                keywords:
-                  $ref: '#/definitions/models.Keywords'
-                name:
-                  $ref: '#/definitions/models.I18nString'
-              type: object
+            $ref: '#/definitions/shims.RecognitionReportResponse'
         "400":
-          description: Invalid or missing itemId. Notice that this shall be the **string
-            ID** of the item, instead of the internally used numerical ID of the item.
+          description: Invalid request
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
+      security:
+      - PenguinIDAuth: []
       summary: Bulk Submit with Frontend Recognition
       tags:
       - Report
   /PenguinStats/api/v2/result/matrix:
     get:
-      deprecated: true
       parameters:
       - description: Server; default to CN
+        enum:
+        - CN
+        - US
+        - JP
+        - KR
         in: query
         name: server
         required: true
         type: string
-      - description: Whether to query for personal drop matrix or not
+      - description: Whether to query for personal drop matrix or not. If `is_personal`
+          equals to `true`, a valid PenguinID would be required to be provided (PenguinIDAuth)
         in: query
         name: is_personal
         type: boolean
@@ -831,38 +803,51 @@ paths:
         in: query
         name: show_closed_zones
         type: boolean
-      - description: Comma separated list of ark stage ids
+      - collectionFormat: csv
+        description: Comma separated list of stage IDs to filter
         in: query
+        items:
+          type: string
         name: stageFilter
-        type: string
-      - description: Comma separated list of ark item ids
+        type: array
+      - collectionFormat: csv
+        description: Comma separated list of item IDs to filter
         in: query
+        items:
+          type: string
         name: itemFilter
-        type: string
+        type: array
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Drop Matrix response
           schema:
             $ref: '#/definitions/shims.DropMatrixQueryResult'
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
-      summary: Get DropMatrix
+            $ref: '#/definitions/pgerr.PenguinError'
+      security:
+      - PenguinIDAuth: []
+      summary: Get Drop Matrix
       tags:
       - Result
   /PenguinStats/api/v2/result/pattern:
     get:
-      deprecated: true
       parameters:
       - description: Server; default to CN
+        enum:
+        - CN
+        - US
+        - JP
+        - KR
         in: query
         name: server
         required: true
         type: string
-      - description: Whether to query for personal pattern matrix or not
+      - description: Whether to query for personal drop matrix or not. If `is_personal`
+          equals to `true`, a valid PenguinID would be required to be provided (PenguinIDAuth)
         in: query
         name: is_personal
         type: boolean
@@ -876,15 +861,21 @@ paths:
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
-      summary: Get PatternMatrix
+            $ref: '#/definitions/pgerr.PenguinError'
+      security:
+      - PenguinIDAuth: []
+      summary: Get Pattern Matrix
       tags:
       - Result
   /PenguinStats/api/v2/result/trends:
     get:
-      deprecated: true
       parameters:
       - description: Server; default to CN
+        enum:
+        - CN
+        - US
+        - JP
+        - KR
         in: query
         name: server
         required: true
@@ -899,13 +890,12 @@ paths:
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
       summary: Get Trends
       tags:
       - Result
   /PenguinStats/api/v2/stages:
     get:
-      deprecated: true
       produces:
       - application/json
       responses:
@@ -925,13 +915,12 @@ paths:
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
       summary: Get All Stages
       tags:
       - Stage
   /PenguinStats/api/v2/stages/{stageId}:
     get:
-      deprecated: true
       parameters:
       - description: Stage ID
         in: path
@@ -957,19 +946,23 @@ paths:
             ID** of the stage, instead of the internally used numerical ID of the
             stage.
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
       summary: Get an Stage with ID
       tags:
       - Stage
   /PenguinStats/api/v2/stats:
     get:
-      deprecated: true
       parameters:
       - description: Server; default to CN
+        enum:
+        - CN
+        - US
+        - JP
+        - KR
         in: query
         name: server
         required: true
@@ -986,7 +979,7 @@ paths:
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
       summary: Get Site Stats
       tags:
       - SiteStats
@@ -994,7 +987,6 @@ paths:
     post:
       consumes:
       - text/plain
-      deprecated: true
       parameters:
       - description: User ID
         in: body
@@ -1006,21 +998,24 @@ paths:
       - text/plain
       responses:
         "200":
-          description: OK
+          description: 'User ID. In the deprecated backend this is, for some reason,
+            been implemented to return a JSON in the response body but with a `Content-Type:
+            text/plain` in the response header instead of the correct `Content-Type:
+            application/json`. So the v2 API has replicated this behavior to ensure
+            compatibility.'
           schema:
-            items:
-              $ref: '#/definitions/shims.SiteStats'
-            type: array
+            $ref: '#/definitions/shims.LoginResponse'
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
+      security:
+      - PenguinIDAuth: []
       summary: Login with PenguinID
       tags:
       - Account
   /PenguinStats/api/v2/zones:
     get:
-      deprecated: true
       produces:
       - application/json
       responses:
@@ -1040,13 +1035,12 @@ paths:
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
       summary: Get All Zones
       tags:
       - Zone
   /PenguinStats/api/v2/zones/{zoneId}:
     get:
-      deprecated: true
       parameters:
       - description: Zone ID
         in: path
@@ -1072,194 +1066,19 @@ paths:
             ID** of the zone, instead of the v3 API internally used numerical ID of
             the zone.
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
         "500":
           description: An unexpected error occurred
           schema:
-            $ref: '#/definitions/errors.PenguinError'
+            $ref: '#/definitions/pgerr.PenguinError'
       summary: Get a Zone with ID
       tags:
       - Zone
-  /v3/items:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              allOf:
-              - $ref: '#/definitions/models.Item'
-              - properties:
-                  existence:
-                    $ref: '#/definitions/models.Existence'
-                  keywords:
-                    $ref: '#/definitions/models.Keywords'
-                  name:
-                    $ref: '#/definitions/models.I18nString'
-                type: object
-            type: array
-        "500":
-          description: An unexpected error occurred
-          schema:
-            $ref: '#/definitions/errors.PenguinError'
-      summary: Get All Items
-      tags:
-      - Item
-  /v3/items/{itemId}:
-    get:
-      parameters:
-      - description: Item ID
-        in: path
-        name: itemId
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/models.Item'
-            - properties:
-                existence:
-                  $ref: '#/definitions/models.Existence'
-                keywords:
-                  $ref: '#/definitions/models.Keywords'
-                name:
-                  $ref: '#/definitions/models.I18nString'
-              type: object
-        "400":
-          description: Invalid or missing itemId. Notice that this shall be the **string
-            ID** of the item, instead of the internally used numerical ID of the item.
-          schema:
-            $ref: '#/definitions/errors.PenguinError'
-        "500":
-          description: An unexpected error occurred
-          schema:
-            $ref: '#/definitions/errors.PenguinError'
-      summary: Get an Item with ID
-      tags:
-      - Item
-  /v3/stages:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              allOf:
-              - $ref: '#/definitions/models.Stage'
-              - properties:
-                  code:
-                    $ref: '#/definitions/models.I18nString'
-                  existence:
-                    $ref: '#/definitions/models.Existence'
-                type: object
-            type: array
-        "500":
-          description: An unexpected error occurred
-          schema:
-            $ref: '#/definitions/errors.PenguinError'
-      summary: Get All Stages
-      tags:
-      - Stage
-  /v3/stages/{stageId}:
-    get:
-      parameters:
-      - description: Stage ID
-        in: path
-        name: stageId
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/models.Stage'
-            - properties:
-                code:
-                  $ref: '#/definitions/models.I18nString'
-                existence:
-                  $ref: '#/definitions/models.Existence'
-              type: object
-        "400":
-          description: Invalid or missing stageId. Notice that this shall be the **string
-            ID** of the stage, instead of the internally used numerical ID of the
-            stage.
-          schema:
-            $ref: '#/definitions/errors.PenguinError'
-        "500":
-          description: An unexpected error occurred
-          schema:
-            $ref: '#/definitions/errors.PenguinError'
-      summary: Get an Stage with ID
-      tags:
-      - Stage
-  /v3/zones:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              allOf:
-              - $ref: '#/definitions/models.Zone'
-              - properties:
-                  existence:
-                    $ref: '#/definitions/models.Existence'
-                  name:
-                    $ref: '#/definitions/models.I18nString'
-                type: object
-            type: array
-        "500":
-          description: An unexpected error occurred
-          schema:
-            $ref: '#/definitions/errors.PenguinError'
-      summary: Get All Zones
-      tags:
-      - Zone
-  /v3/zones/{zoneId}:
-    get:
-      parameters:
-      - description: Zone ID
-        in: path
-        name: zoneId
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/models.Zone'
-            - properties:
-                existence:
-                  $ref: '#/definitions/models.Existence'
-                name:
-                  $ref: '#/definitions/models.I18nString'
-              type: object
-        "400":
-          description: Invalid or missing zoneId. Notice that this shall be the **string
-            ID** of the zone, instead of the internally used numerical ID of the zone.
-          schema:
-            $ref: '#/definitions/errors.PenguinError'
-        "500":
-          description: An unexpected error occurred
-          schema:
-            $ref: '#/definitions/errors.PenguinError'
-      summary: Get a Zone with ID
-      tags:
-      - Zone
+schemes:
+- https
+securityDefinitions:
+  PenguinIDAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

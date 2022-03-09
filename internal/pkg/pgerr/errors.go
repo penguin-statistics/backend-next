@@ -26,9 +26,9 @@ var (
 type Extras map[string]interface{}
 
 type PenguinError struct {
-	StatusCode int    `example:"400"`
-	ErrorCode  string `example:"INVALID_REQUEST"`
-	Message    string `example:"invalid request: some or all request parameters are invalid"`
+	StatusCode int    `swaggerignore:"true"`
+	ErrorCode  string `json:"code" example:"INVALID_REQUEST"`
+	Message    string `json:"message" example:"invalid request: some or all request parameters are invalid"`
 	Extras     *Extras
 }
 

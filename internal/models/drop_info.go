@@ -13,7 +13,7 @@ type DropInfo struct {
 	DropID      int             `bun:",pk" json:"id"`
 	Server      string          `json:"server"`
 	StageID     int             `json:"stageId"`
-	ItemID      null.Int        `json:"itemId"`
+	ItemID      null.Int        `json:"itemId" swaggertype:"integer"`
 	DropType    string          `json:"dropType"`
 	RangeID     int             `json:"rangeId"`
 	Accumulable bool            `json:"accumulable"`

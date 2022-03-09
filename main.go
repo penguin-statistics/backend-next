@@ -5,15 +5,24 @@ import (
 )
 
 // @title          Penguin Statistics API
-// @version        3.0.0-alpha.1
+// @version 	   3.0.0
 // @description    This is the Penguin Statistics v3 API, re-designed to aim for lightweight on wire.
+
 // @contact.name   AlvISs_Reimu
 // @contact.email  alvissreimu@gmail.com
 // @contact.url    https://github.com/AlvISsReimu
+
 // @license.name   MIT License
 // @license.url    https://opensource.org/licenses/MIT
-// @host           https://penguin-stats.io
-// @BasePath       /api
+
+// @host           penguin-stats.io
+// @schemes        https
+// @BasePath       /
+
+// @securityDefinitions.apikey  PenguinIDAuth
+// @in                          header
+// @name                        Authorization
+
 func main() {
 	service.Bootstrap()
 }

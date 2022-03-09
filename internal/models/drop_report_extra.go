@@ -15,5 +15,5 @@ type DropReportExtra struct {
 	Source   string                       `json:"source" bun:"source_name"`
 	Version  string                       `json:"version"`
 	Metadata *types.ReportRequestMetadata `json:"metadata"`
-	MD5      null.String                  `json:"md5"`
+	MD5      null.String                  `json:"md5" swaggertype:"string"`
 }

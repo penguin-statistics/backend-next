@@ -52,18 +52,18 @@ func RegisterResultController(
 	v2.Post("/result/advanced", c.AdvancedQuery)
 }
 
-// @Summary      Get DropMatrix
+// @Summary      Get Drop Matrix
 // @Tags         Result
 // @Produce      json
-// @Param        server            query    string true  "Server; default to CN"
-// @Param        is_personal       query    bool   false "Whether to query for personal drop matrix or not"
-// @Param        show_closed_zones query    bool   false "Whether to show closed stages or not"
-// @Param        stageFilter       query    string false "Comma separated list of ark stage ids"
-// @Param        itemFilter        query    string false "Comma separated list of ark item ids"
-// @Success      200               {object} shims.DropMatrixQueryResult
-// @Failure      500               {object} errors.PenguinError "An unexpected error occurred"
+// @Param        server            query    string   true  "Server; default to CN" Enums(CN, US, JP, KR)
+// @Param        is_personal       query    bool     false "Whether to query for personal drop matrix or not. If `is_personal` equals to `true`, a valid PenguinID would be required to be provided (PenguinIDAuth)"
+// @Param        show_closed_zones query    bool     false "Whether to show closed stages or not"
+// @Param        stageFilter       query    []string false "Comma separated list of stage IDs to filter" collectionFormat(csv)
+// @Param        itemFilter        query    []string false "Comma separated list of item IDs to filter" collectionFormat(csv)
+// @Success      200               {object} shims.DropMatrixQueryResult "Drop Matrix response"
+// @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
+// @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/result/matrix [GET]
-// @Deprecated
 func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 	isPersonal, err := strconv.ParseBool(ctx.Query("is_personal", "false"))
@@ -105,15 +105,15 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 	return ctx.JSON(shimQueryResult)
 }
 
-// @Summary      Get PatternMatrix
+// @Summary      Get Pattern Matrix
 // @Tags         Result
 // @Produce      json
-// @Param        server            query    string true  "Server; default to CN"
-// @Param        is_personal       query bool   false "Whether to query for personal pattern matrix or not"
+// @Param        server            query string true  "Server; default to CN" Enums(CN, US, JP, KR)
+// @Param        is_personal       query bool   false "Whether to query for personal drop matrix or not. If `is_personal` equals to `true`, a valid PenguinID would be required to be provided (PenguinIDAuth)"
 // @Success      200               {object} shims.PatternMatrixQueryResult
-// @Failure      500               {object} errors.PenguinError "An unexpected error occurred"
+// @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
+// @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/result/pattern [GET]
-// @Deprecated
 func (c *ResultController) GetPatternMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 	isPersonal, err := strconv.ParseBool(ctx.Query("is_personal", "false"))
@@ -150,11 +150,10 @@ func (c *ResultController) GetPatternMatrix(ctx *fiber.Ctx) error {
 // @Summary      Get Trends
 // @Tags         Result
 // @Produce      json
-// @Param        server            query    string true  "Server; default to CN"
+// @Param        server            query    string true  "Server; default to CN" Enums(CN, US, JP, KR)
 // @Success      200               {object} shims.TrendQueryResult
-// @Failure      500               {object} errors.PenguinError "An unexpected error occurred"
+// @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/result/trends [GET]
-// @Deprecated
 func (c *ResultController) GetTrends(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 
@@ -175,8 +174,10 @@ func (c *ResultController) GetTrends(ctx *fiber.Ctx) error {
 // @Summary      Execute Advanced Query
 // @Tags         Result
 // @Produce      json
-// @Success      200     {object}  types.AdvancedQueryRequest
-// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Param        query   body      types.AdvancedQueryRequest true  "Query"
+// @Success      200     {object}  shims.AdvancedQueryResult{advanced_results=[]shims.DropMatrixQueryResult} "Drop Matrix Response: when `interval` has been left undefined."
+// @Success      202     {object}  shims.AdvancedQueryResult{advanced_results=[]shims.TrendQueryResult} "Trend Response: when `interval` has been defined a value greater than `0`. Notice that this response still responds with a status code of `200`, but due to swagger limitations, to denote a different response with the same status code is not possible. Therefore, a status code of `202` is used, only for the purpose of workaround."
+// @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/advanced [POST]
 func (c *ResultController) AdvancedQuery(ctx *fiber.Ctx) error {
 	var request types.AdvancedQueryRequest

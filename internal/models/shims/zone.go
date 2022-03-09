@@ -3,9 +3,10 @@ package shims
 import (
 	"encoding/json"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
+
+	"github.com/penguin-statistics/backend-next/internal/models"
 )
 
 type Zone struct {
@@ -17,8 +18,8 @@ type Zone struct {
 	Category     string          `json:"type"`
 	Type         null.String     `json:"subType" swaggertype:"string"`
 	ZoneName     string          `bun:"-" json:"zoneName"`
-	ZoneNameI18n json.RawMessage `bun:"name" json:"zoneName_i18n"`
-	Existence    json.RawMessage `json:"existence"`
+	ZoneNameI18n json.RawMessage `bun:"name" json:"zoneName_i18n" swaggertype:"object"`
+	Existence    json.RawMessage `json:"existence" swaggertype:"object"`
 	Background   null.String     `json:"background,omitempty" swaggertype:"string"`
 	StageIds     []string        `bun:"-" json:"stages"`
 

@@ -30,14 +30,16 @@ func RegisterReportController(v2 *svr.V2, v3 *svr.V3, c ReportController) {
 	v2.Post("/report/recognition", c.RecognitionReport)
 }
 
-// @Summary      Submit an Item Drop Report
-// @Description
+// @Summary      Submit a Drop Report
+// @Description  Submit a Drop Report. You can use the `reportHash` in the response to recall the report in 24 hours after it has been submitted.
 // @Tags         Report
 // @Accept	     json
 // @Produce      json
-// @Success      201     {object}  shims.ReportResponse
-// @Failure      400     {object}  errors.PenguinError "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item."
-// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Param		 report  body      types.SingleReportRequest true "Report Request"
+// @Success      201     {object}  shims.ReportResponse "Report has been successfully submitted"
+// @Failure      400     {object}  pgerr.PenguinError "Invalid request"
+// @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
+// @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/report [POST]
 func (c *ReportController) SingularReport(ctx *fiber.Ctx) error {
 	var report types.SingleReportRequest
@@ -52,14 +54,15 @@ func (c *ReportController) SingularReport(ctx *fiber.Ctx) error {
 	return ctx.JSON(shims.ReportResponse{ReportHash: taskId})
 }
 
-// @Summary      Recall an Item Drop Report
-// @Description
+// @Summary      Recall a Drop Report
+// @Description  Recall a Drop Report by its `reportHash`. The farest report you can recall is limited to 24 hours. Recalling a report after it has been already recalled will result in an error.
 // @Tags         Report
 // @Accept	     json
 // @Produce      json
-// @Success      204
-// @Failure      400     {object}  errors.PenguinError "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item."
-// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Param		 report  body      types.SingleReportRecallRequest true "Report Recall Request"
+// @Success      204     "Report has been successfully recalled"
+// @Failure      400     {object}  pgerr.PenguinError "`reportHash` is missing, invalid, or already been recalled."
+// @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/report/recall [POST]
 func (c *ReportController) RecallSingularReport(ctx *fiber.Ctx) error {
 	var req types.SingleReportRecallRequest
@@ -76,12 +79,14 @@ func (c *ReportController) RecallSingularReport(ctx *fiber.Ctx) error {
 }
 
 // @Summary      Bulk Submit with Frontend Recognition
-// @Description  Submit an Item Drop Report with Frontend Recognition. Notice that this is a private API and is not designed for external use.
+// @Description  Submit an Item Drop Report with Frontend Recognition. Notice that this is a **private API** and is not designed for external use.
 // @Tags         Report
 // @Produce      json
-// @Success      200     {object}  models.Item{name=models.I18nString,existence=models.Existence,keywords=models.Keywords}
-// @Failure      400     {object}  errors.PenguinError "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item."
-// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Param		 report  body      string true "Recognition Report Request"
+// @Success      200     {object}  shims.RecognitionReportResponse "Report has been successfully submitted for queue processing"
+// @Failure      400     {object}  pgerr.PenguinError "Invalid request"
+// @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
+// @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/report/recognition [POST]
 func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 	encrypted := string(ctx.Body())
@@ -124,8 +129,8 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	return ctx.JSON(fiber.Map{
-		"taskId": taskId,
-		"errors": []string{},
+	return ctx.JSON(shims.RecognitionReportResponse{
+		TaskID: taskId,
+		Errors: []string{},
 	})
 }

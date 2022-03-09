@@ -25,9 +25,8 @@ func RegisterEventPeriodController(v2 *svr.V2, c EventPeriodController) {
 // @Tags         EventPeriod
 // @Produce      json
 // @Success      200     {array}  shims.Activity{label_i18n=models.I18nString,existence=models.Existence}
-// @Failure      500     {object}  errors.PenguinError "An unexpected error occurred"
+// @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/period [GET]
-// @Deprecated
 func (c *EventPeriodController) GetEventPeriods(ctx *fiber.Ctx) error {
 	activities, err := c.ActivityService.GetShimActivities(ctx.Context())
 	if err != nil {

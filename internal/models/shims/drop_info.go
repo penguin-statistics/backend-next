@@ -19,8 +19,8 @@ type DropInfo struct {
 	ArkItemID  string          `bun:"-" json:"itemId,omitempty"`
 	DropType   string          `json:"dropType"`
 	RangeID    int             `json:"-"`
-	Bounds     json.RawMessage `json:"bounds"`
-	Extras     json.RawMessage `json:"-"`
+	Bounds     json.RawMessage `json:"bounds" swaggertype:"object"`
+	Extras     json.RawMessage `json:"-" swaggertype:"object"`
 
 	Item      *Item             `bun:"rel:belongs-to,join:item_id=item_id" json:"-"`
 	Stage     *Stage            `bun:"rel:belongs-to,join:stage_id=stage_id" json:"-"`
