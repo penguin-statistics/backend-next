@@ -9,7 +9,7 @@ import (
 type TrendElement struct {
 	bun.BaseModel `bun:"trend_elements,alias:te"`
 
-	ElementID int        `bun:",pk" json:"id"`
+	ElementID int        `bun:",pk,autoincrement" json:"id"`
 	StageID   int        `json:"stageId"`
 	ItemID    int        `json:"itemId"`
 	GroupID   int        `json:"groupId"`

@@ -11,7 +11,7 @@ type Stage struct {
 	bun.BaseModel `bun:"stages,alias:st"`
 
 	// StageID (penguinStageId) is the numerical ID of the stage.
-	StageID int `bun:",pk" json:"penguinStageId"`
+	StageID int `bun:",pk,autoincrement" json:"penguinStageId"`
 	// ArkStageID (stageId) is the previously used, string form ID of the stage; in JSON-representation `stageId` is used as key.
 	ArkStageID string `json:"stageId"`
 	// ZoneID is the numerical ID of the zone the stage is in.

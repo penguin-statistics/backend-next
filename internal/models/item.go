@@ -11,7 +11,7 @@ type Item struct {
 	bun.BaseModel `bun:"items,alias:it" swaggerignore:"true"`
 
 	// ItemID (penguinItemId) is the numerical ID of the item.
-	ItemID int `bun:",pk" json:"penguinItemId"`
+	ItemID int `bun:",pk,autoincrement" json:"penguinItemId"`
 	// ArkItemID (itemId) is the previously used, string form ID of the item; in JSON-representation `itemId` is used as key.
 	ArkItemID string `json:"itemId"`
 	// Name is a map with language code as key and the name of the item in that language as value.
