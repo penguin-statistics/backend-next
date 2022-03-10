@@ -33,6 +33,9 @@ func (c *Set) Get(key string, dest interface{}) error {
 	key = c.key(key)
 	result, ok := c.c.Get(key)
 	if !ok {
+		if l := log.Trace(); l.Enabled() {
+			l.Str("key", key).Msg("cache entry not found")
+		}
 		return ErrNotFound
 	}
 
@@ -48,8 +51,10 @@ func (c *Set) Get(key string, dest interface{}) error {
 }
 
 func (c *Set) Set(key string, value interface{}, expire time.Duration) error {
-	log.Trace().Str("key", key).Msg("setting value to cache")
 	key = c.key(key)
+	if l := log.Trace(); l.Enabled() {
+		l.Str("key", key).Msg("setting value to cache")
+	}
 	c.c.Set(key, value, expire)
 	return nil
 }
