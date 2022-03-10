@@ -1122,19 +1122,12 @@ var doc = `{
                 }
             }
         },
-        "pgerr.Extras": {
-            "type": "object",
-            "additionalProperties": true
-        },
         "pgerr.PenguinError": {
             "type": "object",
             "properties": {
                 "code": {
                     "type": "string",
                     "example": "INVALID_REQUEST"
-                },
-                "extras": {
-                    "$ref": "#/definitions/pgerr.Extras"
                 },
                 "message": {
                     "type": "string",

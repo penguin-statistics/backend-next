@@ -7,6 +7,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
+	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
@@ -36,6 +37,6 @@ func (c *EventPeriodController) GetEventPeriods(ctx *fiber.Ctx) error {
 	if err := cache.LastModifiedTime.Get("[shimActivities]", &lastModifiedTime); err != nil {
 		lastModifiedTime = time.Now()
 	}
-	ctx.Response().Header.SetLastModified(lastModifiedTime)
+	cachectrl.OptIn(ctx, lastModifiedTime)
 	return ctx.JSON(activities)
 }

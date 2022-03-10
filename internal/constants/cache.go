@@ -1,3 +1,3 @@
 package constants
 
-const RedisSeparator = "|"
+const CacheSep = "|"

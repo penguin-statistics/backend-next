@@ -85,7 +85,7 @@ func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx context.C
 
 	var results shims.DropMatrixQueryResult
 	if !accountId.Valid && stageFilterStr == "" && itemFilterStr == "" {
-		key := server + constants.RedisSeparator + strconv.FormatBool(showClosedZones)
+		key := server + constants.CacheSep + strconv.FormatBool(showClosedZones)
 		calculated, err := cache.ShimMaxAccumulableDropMatrixResults.MutexGetSet(key, &results, valueFunc, 24*time.Hour)
 		if err != nil {
 			return nil, err
@@ -159,10 +159,10 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx context.Context, se
 	if err := s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server); err != nil {
 		return err
 	}
-	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constants.RedisSeparator + "true"); err != nil {
+	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constants.CacheSep + "true"); err != nil {
 		return err
 	}
-	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constants.RedisSeparator + "false"); err != nil {
+	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constants.CacheSep + "false"); err != nil {
 		return err
 	}
 	return nil

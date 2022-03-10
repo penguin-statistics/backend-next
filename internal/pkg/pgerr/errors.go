@@ -26,10 +26,10 @@ var (
 type Extras map[string]interface{}
 
 type PenguinError struct {
-	StatusCode int    `swaggerignore:"true"`
-	ErrorCode  string `json:"code" example:"INVALID_REQUEST"`
-	Message    string `json:"message" example:"invalid request: some or all request parameters are invalid"`
-	Extras     *Extras
+	StatusCode int     `json:"-" swaggerignore:"true"`
+	ErrorCode  string  `json:"code" example:"INVALID_REQUEST"`
+	Message    string  `json:"message" example:"invalid request: some or all request parameters are invalid"`
+	Extras     *Extras `json:"-"`
 }
 
 func New(statusCode int, errorCode, message string) *PenguinError {

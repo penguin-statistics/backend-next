@@ -65,16 +65,11 @@ definitions:
     required:
     - exist
     type: object
-  pgerr.Extras:
-    additionalProperties: true
-    type: object
   pgerr.PenguinError:
     properties:
       code:
         example: INVALID_REQUEST
         type: string
-      extras:
-        $ref: '#/definitions/pgerr.Extras'
       message:
         example: 'invalid request: some or all request parameters are invalid'
         type: string

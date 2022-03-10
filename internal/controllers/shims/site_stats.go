@@ -6,8 +6,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
+	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
+	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
 )
 
 type SiteStatsController struct {
@@ -30,6 +32,9 @@ func RegisterSiteStatsController(v2 *svr.V2, s *service.SiteStatsService) {
 // @Router       /PenguinStats/api/v2/stats [GET]
 func (c *SiteStatsController) GetSiteStats(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
+	if err := rekuest.ValidServer(ctx, server); err != nil {
+		return err
+	}
 
 	siteStats, err := c.service.GetShimSiteStats(ctx.Context(), server)
 	if err != nil {
@@ -40,7 +45,7 @@ func (c *SiteStatsController) GetSiteStats(ctx *fiber.Ctx) error {
 	if err := cache.LastModifiedTime.Get("[shimSiteStats#server:"+server+"]", &lastModifiedTime); err != nil {
 		lastModifiedTime = time.Now()
 	}
-	ctx.Response().Header.SetLastModified(lastModifiedTime)
+	cachectrl.OptIn(ctx, lastModifiedTime)
 
 	return ctx.JSON(siteStats)
 }

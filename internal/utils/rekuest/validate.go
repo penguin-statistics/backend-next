@@ -147,12 +147,12 @@ func ValidVar(ctx *fiber.Ctx, field interface{}, tag string) error {
 	return nil
 }
 
-type serverRequest struct {
+type request struct {
 	Server string `validate:"required,alpha,oneof=CN US JP KR"`
 }
 
 func ValidServer(ctx *fiber.Ctx, server string) error {
-	if err := ValidStruct(ctx, serverRequest{server}); err != nil {
+	if err := ValidStruct(ctx, request{server}); err != nil {
 		return err
 	}
 
