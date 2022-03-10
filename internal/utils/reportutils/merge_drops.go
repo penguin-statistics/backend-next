@@ -28,7 +28,7 @@ func MergeDrops(drops []types.ArkDrop) (mergedDrops []types.ArkDrop) {
 
 func AggregateGachaBoxDrops(report *types.SingleReport) {
 	report.Times = int(linq.From(report.Drops).
-		SelectT(func(drop types.ArkDrop) int {
+		SelectT(func(drop *types.Drop) int {
 			return drop.Quantity
 		}).
 		SumInts())
