@@ -1,12 +1,12 @@
 package controllers
 
 import (
-	"net/http"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils"
@@ -29,7 +29,7 @@ func buildSanitizer(sanitizer ...func(string) bool) func(ctx *fiber.Ctx) error {
 
 		for _, sanitizer := range sanitizer {
 			if !sanitizer(itemId) {
-				return fiber.NewError(http.StatusBadRequest, "invalid or missing itemId")
+				return pgerr.ErrInvalidReq.Msg("invalid or missing itemId")
 			}
 		}
 

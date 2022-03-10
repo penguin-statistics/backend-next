@@ -37,7 +37,7 @@ func (s *DropInfoService) GetDropInfosWithFilters(ctx context.Context, server st
 // Cache: itemDropSet#server|stageId|rangeId:{server}|{stageId}|{rangeId}, 24 hrs
 func (s *DropInfoService) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server string, stageId int, rangeId int) ([]int, error) {
 	var itemDropSet []int
-	key := server + constants.RedisSeparator + strconv.Itoa(stageId) + constants.RedisSeparator + strconv.Itoa(rangeId)
+	key := server + constants.CacheSep + strconv.Itoa(stageId) + constants.CacheSep + strconv.Itoa(rangeId)
 	err := cache.ItemDropSetByStageIdAndRangeId.Get(key, &itemDropSet)
 	if err == nil {
 		return itemDropSet, nil
@@ -55,7 +55,7 @@ func (s *DropInfoService) GetItemDropSetByStageIdAndRangeId(ctx context.Context,
 // Cache: itemDropSet#server|stageId|startTime|endTime:{server}|{stageId}|{startTime}|{endTime}, 24 hrs
 func (s *DropInfoService) GetItemDropSetByStageIdAndTimeRange(ctx context.Context, server string, stageId int, startTime *time.Time, endTime *time.Time) ([]int, error) {
 	var itemDropSet []int
-	key := server + constants.RedisSeparator + strconv.Itoa(stageId) + constants.RedisSeparator + strconv.Itoa(int(startTime.UnixMilli())) + constants.RedisSeparator + strconv.Itoa(int(endTime.UnixMilli()))
+	key := server + constants.CacheSep + strconv.Itoa(stageId) + constants.CacheSep + strconv.Itoa(int(startTime.UnixMilli())) + constants.CacheSep + strconv.Itoa(int(endTime.UnixMilli()))
 	err := cache.ItemDropSetByStageIdAndTimeRange.Get(key, &itemDropSet)
 	if err == nil {
 		return itemDropSet, nil
