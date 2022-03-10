@@ -12,7 +12,7 @@ import (
 type Zone struct {
 	bun.BaseModel `bun:"zones"`
 
-	ZoneID       int             `bun:",pk" json:"-"`
+	ZoneID       int             `bun:",pk,autoincrement" json:"-"`
 	ArkZoneID    string          `json:"zoneId"`
 	Index        int             `json:"zoneIndex"`
 	Category     string          `json:"type"`

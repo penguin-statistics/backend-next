@@ -9,7 +9,7 @@ import (
 type DropReport struct {
 	bun.BaseModel `bun:"drop_reports,alias:dr"`
 
-	ReportID    int        `bun:",pk" json:"id"`
+	ReportID    int        `bun:",pk,autoincrement" json:"id"`
 	StageID     int        `json:"stageId"`
 	PatternID   int        `json:"patternId"`
 	Times       int        `json:"times"`

@@ -10,7 +10,7 @@ import (
 type Activity struct {
 	bun.BaseModel `bun:"activities"`
 
-	ActivityID int             `bun:",pk" json:"id"`
+	ActivityID int             `bun:",pk,autoincrement" json:"id"`
 	StartTime  *time.Time      `json:"startTime"`
 	EndTime    *time.Time      `json:"endTime"`
 	Name       json.RawMessage `json:"name"`

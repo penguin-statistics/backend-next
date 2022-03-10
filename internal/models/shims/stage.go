@@ -12,7 +12,7 @@ import (
 type Stage struct {
 	bun.BaseModel `bun:"stages"`
 
-	StageID         int             `bun:",pk" json:"-"`
+	StageID         int             `bun:",pk,autoincrement" json:"-"`
 	ArkStageID      string          `json:"stageId"`
 	ZoneID          int             `json:"-"`
 	ArkZoneID       string          `bun:"-" json:"zoneId"`

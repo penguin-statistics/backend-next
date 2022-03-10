@@ -11,7 +11,7 @@ type Zone struct {
 	bun.BaseModel `bun:"zones,alias:zo"`
 
 	// ZoneID is the numerical ID of the zone.
-	ZoneID    int    `bun:",pk" json:"penguinZoneId"`
+	ZoneID    int    `bun:",pk,autoincrement" json:"penguinZoneId"`
 	ArkZoneID string `json:"zoneId"`
 	Index     int    `json:"index"`
 	// Category of the zone.

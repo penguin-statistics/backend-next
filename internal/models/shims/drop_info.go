@@ -11,7 +11,7 @@ import (
 type DropInfo struct {
 	bun.BaseModel `bun:"drop_infos"`
 
-	DropID     int             `bun:",pk" json:"-"`
+	DropID     int             `bun:",pk,autoincrement" json:"-"`
 	Server     string          `json:"-"`
 	StageID    int             `json:"-"`
 	ItemID     int             `json:"-"`

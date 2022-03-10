@@ -12,7 +12,7 @@ import (
 type TimeRange struct {
 	bun.BaseModel `bun:"time_ranges,alias:tr"`
 
-	RangeID   int         `bun:",pk" json:"id"`
+	RangeID   int         `bun:",pk,autoincrement" json:"id"`
 	Name      null.String `json:"name,omitempty" swaggertype:"string"`
 	StartTime *time.Time  `json:"startTime"`
 	EndTime   *time.Time  `json:"endTime"`

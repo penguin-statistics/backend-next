@@ -7,7 +7,7 @@ import (
 type DropMatrixElement struct {
 	bun.BaseModel `bun:"drop_matrix_elements,alias:dme"`
 
-	ElementID int    `bun:",pk" json:"id"`
+	ElementID int    `bun:",pk,autoincrement" json:"id"`
 	StageID   int    `json:"stageId"`
 	ItemID    int    `json:"itemId"`
 	RangeID   int    `json:"rangeId"`

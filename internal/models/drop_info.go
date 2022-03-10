@@ -10,7 +10,7 @@ import (
 type DropInfo struct {
 	bun.BaseModel `bun:"drop_infos,alias:di"`
 
-	DropID      int             `bun:",pk" json:"id"`
+	DropID      int             `bun:",pk,autoincrement" json:"id"`
 	Server      string          `json:"server"`
 	StageID     int             `json:"stageId"`
 	ItemID      null.Int        `json:"itemId" swaggertype:"integer"`
