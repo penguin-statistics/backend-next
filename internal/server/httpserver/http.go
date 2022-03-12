@@ -132,7 +132,7 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 		app.Use(logger.New(logger.Config{
 			Format:     "${pid} ${locals:requestid} ${status} ${latency}\t${ip}\t- ${method} ${url}\n",
 			TimeFormat: time.RFC3339,
-			Output:     log.Logger,
+			Output:     log.Logger.With().Str("component", "httpreq").Logger(),
 		}))
 
 		// Cache requests with itemFilter and stageFilter as there appears to be an unknown source requesting

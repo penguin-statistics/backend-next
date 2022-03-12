@@ -33,9 +33,9 @@ func Postgres(conf *config.Config) (*bun.DB, error) {
 		return nil, err
 	}
 
-	pgdb.SetMaxOpenConns(runtime.NumCPU() * 16)
-	pgdb.SetMaxIdleConns(runtime.NumCPU() * 4)
-	pgdb.SetConnMaxIdleTime(time.Minute * 10)
+	pgdb.SetMaxOpenConns(runtime.NumCPU())
+	pgdb.SetMaxIdleConns(1)
+	pgdb.SetConnMaxIdleTime(time.Minute * 5)
 
 	return db, nil
 }
