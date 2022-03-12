@@ -6,7 +6,7 @@ import (
 
 // @title          Penguin Statistics API
 // @version 	   3.0.0
-// @description    This is the Penguin Statistics v3 API, re-designed to aim for lightweight on wire.
+// @description    This is the Penguin Statistics v3 Backend, implemented for best performance, scalability, and reliability.
 
 // @contact.name   AlvISs_Reimu
 // @contact.email  alvissreimu@gmail.com
