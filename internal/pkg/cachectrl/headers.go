@@ -14,7 +14,7 @@ func OptIn(ctx *fiber.Ctx, t time.Time) {
 
 func OptInCustom(ctx *fiber.Ctx, t time.Time, offset time.Duration) {
 	ctx.Set("Cache-Control", "public, max-age="+strconv.Itoa(int(offset.Seconds())))
-	ctx.Set("Expires", time.Now().Add(offset).Format(time.RFC1123))
+	ctx.Set("Expires", t.Add(offset).Format(time.RFC1123))
 
 	ctx.Response().Header.SetLastModified(t)
 }
