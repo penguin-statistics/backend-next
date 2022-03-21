@@ -20,6 +20,14 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
 )
 
+var (
+	// ErrIntervalLengthTooSmall is returned when the interval length is invalid
+	ErrIntervalLengthTooSmall = errors.New("interval length must be greater than 1 hour")
+
+	// ErrIntervalLengthTooLarge is returned when the interval length is invalid
+	ErrIntervalLengthTooLarge = errors.New("interval length is too long")
+)
+
 type ResultController struct {
 	DropMatrixService    *service.DropMatrixService
 	PatternMatrixService *service.PatternMatrixService
@@ -266,11 +274,11 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 		// interval originally is in milliseconds, so we need to convert it to nanoseconds
 		intervalLength := time.Duration(query.Interval.Int64 * 1e6).Round(time.Hour)
 		if intervalLength.Hours() < 1 {
-			return nil, errors.New("interval length must be greater than 1 hour")
+			return nil, ErrIntervalLengthTooSmall
 		}
 		intervalNum := c.calcIntervalNum(startTime, endTime, intervalLength)
 		if intervalNum > constants.MaxIntervalNum {
-			return nil, fmt.Errorf("interval length is too long, max interval length is %d sections", constants.MaxIntervalNum)
+			return nil, errors.Wrap(ErrIntervalLengthTooLarge, fmt.Sprintf("interval length is %.2f hours, which is larger than %d hours", intervalLength.Hours(), constants.MaxIntervalNum))
 		}
 
 		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx.Context(), query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, accountId)
