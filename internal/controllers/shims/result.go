@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -52,7 +53,16 @@ func RegisterResultController(
 	v2.Get("/result/matrix", c.GetDropMatrix)
 	v2.Get("/result/pattern", c.GetPatternMatrix)
 	v2.Get("/result/trends", c.GetTrends)
-	v2.Post("/result/advanced", c.AdvancedQuery)
+	v2.Post("/result/advanced", limiter.New(limiter.Config{
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"code":    "TOO_MANY_REQUESTS",
+				"message": "Your client is sending requests too frequently. The Penguin Stats advanced query API is limited to 30 requests per 5 minutes.",
+			})
+		},
+		Max:        30,
+		Expiration: time.Minute * 5,
+	}), c.AdvancedQuery)
 }
 
 // @Summary      Get Drop Matrix
