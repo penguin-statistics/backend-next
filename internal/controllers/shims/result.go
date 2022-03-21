@@ -1,12 +1,10 @@
 package shims
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -15,18 +13,14 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
 )
 
-var (
-	// ErrIntervalLengthTooSmall is returned when the interval length is invalid
-	ErrIntervalLengthTooSmall = errors.New("interval length must be greater than 1 hour")
-
-	// ErrIntervalLengthTooLarge is returned when the interval length is invalid
-	ErrIntervalLengthTooLarge = errors.New("interval length is too long")
-)
+// ErrIntervalLengthTooSmall is returned when the interval length is invalid
+var ErrIntervalLengthTooSmall = pgerr.ErrInvalidReq.Msg("interval length must be greater than 1 hour")
 
 type ResultController struct {
 	DropMatrixService    *service.DropMatrixService
@@ -278,7 +272,7 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 		}
 		intervalNum := c.calcIntervalNum(startTime, endTime, intervalLength)
 		if intervalNum > constants.MaxIntervalNum {
-			return nil, errors.Wrap(ErrIntervalLengthTooLarge, fmt.Sprintf("interval length is %.2f hours, which is larger than %d hours", intervalLength.Hours(), constants.MaxIntervalNum))
+			return nil, pgerr.ErrInvalidReq.Msg("interval length is too long: interval length is %.2f hours, which is larger than %d hours", intervalLength.Hours(), constants.MaxIntervalNum)
 		}
 
 		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx.Context(), query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, accountId)
