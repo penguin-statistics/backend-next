@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/pkg/errors"
-
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"

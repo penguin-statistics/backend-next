@@ -64,7 +64,7 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 
 	// Return default error handler
 	// Default 500 statuscode
-	re := pgerr.ErrInternalError
+	re := pgerr.ErrInternalErrorImmutable
 
 	if e, ok := err.(*fiber.Error); ok {
 		// Overwrite status code if fiber.Error type & provided code
@@ -95,7 +95,7 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 		sentry.CaptureException(err)
 	}
 
-	return handleCustomError(ctx, re)
+	return handleCustomError(ctx, &re)
 }
 
 func gentlelyGetHubFromContext(ctx *fiber.Ctx) *sentry.Hub {
