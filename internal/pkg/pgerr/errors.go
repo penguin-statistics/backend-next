@@ -21,6 +21,8 @@ var (
 
 	// ErrInternalError is returned when an internal error occurs.
 	ErrInternalError = New(fiber.StatusInternalServerError, CodeInternalError, "internal server error occurred")
+
+	ErrInternalErrorImmutable = NewImmutable(fiber.StatusInternalServerError, CodeInternalError, "internal server error occurred")
 )
 
 type Extras map[string]interface{}
@@ -34,6 +36,14 @@ type PenguinError struct {
 
 func New(statusCode int, errorCode, message string) *PenguinError {
 	return &PenguinError{
+		StatusCode: statusCode,
+		ErrorCode:  errorCode,
+		Message:    message,
+	}
+}
+
+func NewImmutable(statusCode int, errorCode, message string) PenguinError {
+	return PenguinError{
 		StatusCode: statusCode,
 		ErrorCode:  errorCode,
 		Message:    message,

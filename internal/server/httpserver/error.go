@@ -3,14 +3,16 @@ package httpserver
 import (
 	"strconv"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/getsentry/sentry-go"
-	"github.com/gofiber/contrib/fibersentry"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 )
+
+var sentryHubKey = "sentry-hub"
 
 func handleCustomError(ctx *fiber.Ctx, e *pgerr.PenguinError) error {
 	log.Warn().
@@ -36,6 +38,25 @@ func handleCustomError(ctx *fiber.Ctx, e *pgerr.PenguinError) error {
 }
 
 func ErrorHandler(ctx *fiber.Ctx, err error) error {
+	defer func() {
+		// Recover from panic: ErrorHandler panics will not be handled by fasthttp
+		// as the request pipeline might not yet reached any middlewares yet.
+		// e.g. a 431Request Header Fields Too Large error occurs.
+		if r := recover(); r != nil {
+			log.Error().
+				Str("recovered", spew.Sdump(r)).
+				Str("method", ctx.Method()).
+				Str("path", ctx.Path()).
+				Msg("Recovered from panic")
+
+			sentry.CaptureMessage(spew.Sdump(r))
+
+			ctx.Status(500).JSON(fiber.Map{
+				"code":    pgerr.CodeInternalError,
+				"message": "Internal server error",
+			})
+		}
+	}()
 	// Use custom error handler to return JSON error responses
 	if e, ok := err.(*pgerr.PenguinError); ok {
 		return handleCustomError(ctx, e)
@@ -43,7 +64,7 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 
 	// Return default error handler
 	// Default 500 statuscode
-	re := pgerr.ErrInternalError
+	re := pgerr.ErrInternalErrorImmutable
 
 	if e, ok := err.(*fiber.Error); ok {
 		// Overwrite status code if fiber.Error type & provided code
@@ -60,14 +81,26 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 		Int("status", re.StatusCode).
 		Msg("Internal Server Error")
 
-	hub := fibersentry.GetHubFromContext(ctx)
-	hub.Scope().SetTag("status", strconv.Itoa(re.StatusCode))
-	if u := pgid.Extract(ctx); u != "" {
-		hub.Scope().SetUser(sentry.User{
-			ID: u,
-		})
-	}
-	hub.CaptureException(err)
+	hub := gentlelyGetHubFromContext(ctx)
 
-	return handleCustomError(ctx, re)
+	if hub != nil {
+		hub.Scope().SetTag("status", strconv.Itoa(re.StatusCode))
+		if u := pgid.Extract(ctx); u != "" {
+			hub.Scope().SetUser(sentry.User{
+				ID: u,
+			})
+		}
+		hub.CaptureException(err)
+	} else {
+		sentry.CaptureException(err)
+	}
+
+	return handleCustomError(ctx, &re)
+}
+
+func gentlelyGetHubFromContext(ctx *fiber.Ctx) *sentry.Hub {
+	if hub, ok := ctx.Locals(sentryHubKey).(*sentry.Hub); ok {
+		return hub
+	}
+	return nil
 }

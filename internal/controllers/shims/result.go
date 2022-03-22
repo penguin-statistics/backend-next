@@ -1,12 +1,11 @@
 package shims
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/pkg/errors"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -15,10 +14,14 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
 )
+
+// ErrIntervalLengthTooSmall is returned when the interval length is invalid
+var ErrIntervalLengthTooSmall = pgerr.ErrInvalidReq.Msg("interval length must be greater than 1 hour")
 
 type ResultController struct {
 	DropMatrixService    *service.DropMatrixService
@@ -50,7 +53,16 @@ func RegisterResultController(
 	v2.Get("/result/matrix", c.GetDropMatrix)
 	v2.Get("/result/pattern", c.GetPatternMatrix)
 	v2.Get("/result/trends", c.GetTrends)
-	v2.Post("/result/advanced", c.AdvancedQuery)
+	v2.Post("/result/advanced", limiter.New(limiter.Config{
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"code":    "TOO_MANY_REQUESTS",
+				"message": "Your client is sending requests too frequently. The Penguin Stats advanced query API is limited to 30 requests per 5 minutes.",
+			})
+		},
+		Max:        30,
+		Expiration: time.Minute * 5,
+	}), c.AdvancedQuery)
 }
 
 // @Summary      Get Drop Matrix
@@ -266,11 +278,11 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 		// interval originally is in milliseconds, so we need to convert it to nanoseconds
 		intervalLength := time.Duration(query.Interval.Int64 * 1e6).Round(time.Hour)
 		if intervalLength.Hours() < 1 {
-			return nil, errors.New("interval length must be greater than 1 hour")
+			return nil, ErrIntervalLengthTooSmall
 		}
 		intervalNum := c.calcIntervalNum(startTime, endTime, intervalLength)
 		if intervalNum > constants.MaxIntervalNum {
-			return nil, fmt.Errorf("interval length is too long, max interval length is %d sections", constants.MaxIntervalNum)
+			return nil, pgerr.ErrInvalidReq.Msg("interval length is too long: interval length is %.2f sections, which is larger than %d sections", intervalNum, constants.MaxIntervalNum)
 		}
 
 		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx.Context(), query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, accountId)

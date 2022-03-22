@@ -41,8 +41,9 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 		ServerHeader: fmt.Sprintf("Penguin/%s", bininfo.Version),
 		// NOTICE: This will also affect WebSocket. Be aware if this fiber instance service is re-used
 		//         for long connection services.
-		ReadTimeout:  time.Second * 20,
-		WriteTimeout: time.Second * 20,
+		ReadTimeout:    time.Second * 20,
+		WriteTimeout:   time.Second * 20,
+		ReadBufferSize: 8192,
 		// allow possibility for graceful shutdown, otherwise app#Shutdown() will block forever
 		IdleTimeout:             conf.HTTPServerShutdownTimeout,
 		ProxyHeader:             fiber.HeaderXForwardedFor,

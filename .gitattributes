@@ -1,0 +1,3 @@
+internal/models/protos/messages.pb.go linguist-generated
+docs/* linguist-documentation
+vendors/* linguist-vendored
