@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cache"
+	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
@@ -12,14 +13,12 @@ import (
 )
 
 type MetaController struct {
+	fx.In
+
 	HealthService *service.HealthService
 }
 
-func RegisterMetaController(meta *svr.Meta, healthService *service.HealthService) {
-	c := &MetaController{
-		HealthService: healthService,
-	}
-
+func RegisterMetaController(meta *svr.Meta, c MetaController) {
 	meta.Get("/bininfo", c.BinInfo)
 
 	meta.Get("/health", cache.New(cache.Config{
