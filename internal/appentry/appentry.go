@@ -93,7 +93,6 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Invoke(shims.RegisterEventPeriodController),
 		fx.Invoke(controllers.RegisterMetaController),
 		fx.Invoke(controllers.RegisterAdminController),
-		fx.Invoke(controllers.RegisterHealthController),
 		fx.Invoke(controllers.RegisterShortURLController),
 		fx.Invoke(calcwkr.Start),
 		fx.StartTimeout(1 * time.Second),
