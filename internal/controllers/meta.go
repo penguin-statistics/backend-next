@@ -15,8 +15,10 @@ type MetaController struct {
 	HealthService *service.HealthService
 }
 
-func RegisterMetaController(meta *svr.Meta) {
-	c := &MetaController{}
+func RegisterMetaController(meta *svr.Meta, healthService *service.HealthService) {
+	c := &MetaController{
+		HealthService: healthService,
+	}
 
 	meta.Get("/bininfo", c.BinInfo)
 
