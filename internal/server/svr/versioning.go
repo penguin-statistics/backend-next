@@ -23,14 +23,20 @@ type Admin struct {
 	fiber.Router
 }
 
-func CreateVersioningEndpoints(app *fiber.App, conf *config.Config) (*V2, *V3, *Admin) {
+type Meta struct {
+	fiber.Router
+}
+
+func CreateVersioningEndpoints(app *fiber.App, conf *config.Config) (*V2, *V3, *Admin, *Meta) {
 	v2 := app.Group("/PenguinStats/api/v2", func(c *fiber.Ctx) error {
 		// add compatibility versioning header for v2 shims
 		c.Set(constants.ShimCompatibilityHeaderKey, constants.ShimCompatibilityHeaderValue)
 		return c.Next()
 	})
+
 	v3 := app.Group("/api/v3")
-	admin := app.Group("/api/_/admin", func(c *fiber.Ctx) error {
+
+	admin := app.Group("/api/admin/", func(c *fiber.Ctx) error {
 		if len(conf.AdminKey) < 64 {
 			log.Error().Msg("admin key is not set or is too short (at least should be 64 chars long), and a request has reached")
 			return c.SendStatus(fiber.StatusInternalServerError)
@@ -44,5 +50,7 @@ func CreateVersioningEndpoints(app *fiber.App, conf *config.Config) (*V2, *V3, *
 		return c.Next()
 	})
 
-	return &V2{Router: v2}, &V3{Router: v3}, &Admin{Router: admin}
+	meta := app.Group("/api/_/")
+
+	return &V2{Router: v2}, &V3{Router: v3}, &Admin{Router: admin}, &Meta{Router: meta}
 }

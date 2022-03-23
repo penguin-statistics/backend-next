@@ -9,10 +9,10 @@ import (
 
 type MetaController struct{}
 
-func RegisterMetaController(v3 *svr.V3) {
+func RegisterMetaController(meta *svr.Meta) {
 	c := &MetaController{}
 
-	v3.Get("/meta/bininfo", c.BinInfo)
+	meta.Get("/bininfo", c.BinInfo)
 }
 
 func (c *MetaController) BinInfo(ctx *fiber.Ctx) error {

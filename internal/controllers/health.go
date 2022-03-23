@@ -17,8 +17,8 @@ type HealthController struct {
 	HealthService *service.HealthService
 }
 
-func RegisterHealthController(v3 *svr.V3, c HealthController) {
-	v3.Get("/health", cache.New(cache.Config{
+func RegisterHealthController(meta *svr.Meta, c HealthController) {
+	meta.Get("/health", cache.New(cache.Config{
 		// cache it for a second to mitigate potential DDoS
 		Expiration: time.Second,
 	}), c.Health)
