@@ -22,6 +22,12 @@ func EnrichSentry() func(ctx *fiber.Ctx) error {
 			return err
 		}
 
+		spanIgnored := c.Get(constants.SlimHeaderKey) != ""
+
+		if spanIgnored {
+			return c.Next()
+		}
+
 		span := sentry.StartSpan(c.Context(), "backend", sentry.ContinueFromRequest(&r), sentry.TransactionName(c.Method()+" "+c.Path()))
 		span.SetTag("url", c.OriginalURL())
 		defer span.Finish()

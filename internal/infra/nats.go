@@ -10,7 +10,7 @@ import (
 )
 
 func NATS(conf *config.Config) (*nats.Conn, nats.JetStreamContext, error) {
-	nc, err := nats.Connect(conf.NatsURL)
+	nc, err := nats.Connect(conf.NatsURL, nats.PingInterval(time.Second*20))
 	if err != nil {
 		return nil, nil, err
 	}
