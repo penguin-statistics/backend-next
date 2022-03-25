@@ -1,8 +1,8 @@
 name: Build Docker Image (Check)
 
 on:
-  push:
-    # trigger on pull requests
+  # trigger on any pull requests
+  pull_request:
     branches:
       - "**"
 concurrency:
