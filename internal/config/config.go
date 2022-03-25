@@ -12,7 +12,7 @@ type Config struct {
 	Address string
 
 	// DevMode to indicate development mode. When true, the program would spin up utilities for debugging and
-	// provide a more contextual message when encountered a panic. See internal/server/svr/http/http.go for the
+	// provide a more contextual message when encountered a panic. See internal/server/httpserver/http.go for the
 	// actual implementation details.
 	DevMode bool `split_words:"true"`
 
