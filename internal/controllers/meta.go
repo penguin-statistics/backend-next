@@ -35,5 +35,11 @@ func (c *MetaController) BinInfo(ctx *fiber.Ctx) error {
 }
 
 func (c *MetaController) Health(ctx *fiber.Ctx) error {
-	return c.HealthService.Ping(ctx.Context())
+	if err := c.HealthService.Ping(ctx.Context()); err != nil {
+		return err
+	}
+
+	return ctx.JSON(fiber.Map{
+		"status": "ok",
+	})
 }
