@@ -6,7 +6,7 @@
 
 [![License](https://img.shields.io/github/license/penguin-statistics/backend-next)](https://github.com/penguin-statistics/backend-next/blob/dev/LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/penguin-statistics/backend-next)](https://github.com/penguin-statistics/backend-next/commits/dev)
-[![GitHub Actions Build Status](https://github.com/penguin-statistics/backend-next/actions/workflows/build.yml/badge.svg)](https://github.com/penguin-statistics/backend-next/actions/workflows/build.yml)
+[![GitHub Actions Status](https://github.com/penguin-statistics/backend-next/actions/workflows/build-release.yml/badge.svg)](https://github.com/penguin-statistics/backend-next/actions/workflows/build-release.yml)
 
 ![Alt](https://repobeats.axiom.co/api/embed/ae259f962b4d5fc542de420d31a237986d282765.svg "Repobeats analytics image")
 

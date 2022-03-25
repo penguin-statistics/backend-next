@@ -1,9 +1,9 @@
-name: Build Docker Image
+name: Build Docker Image (Check)
 
 on:
   push:
-    # trigger on any tag push
-    tags:
+    # trigger on pull requests
+    branches:
       - "**"
 concurrency:
   group: ${{ github.ref }}
@@ -23,14 +23,6 @@ jobs:
         with:
           args: --sarif-file-output=snyk.sarif
 
-      - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v1
-        with:
-          sarif_file: snyk.sarif
-
-      # - name: Run golangci-lint
-      #   uses: golangci/golangci-lint-action@v3.1.0
-
       - name: Get Tag Version
         id: get_version
         run: |
@@ -47,13 +39,4 @@ jobs:
           registry: ghcr.io
           tags: "latest,${{ env.GIT_TAG }}"
           buildargs: VERSION
-
-      - name: Create Sentry release
-        uses: getsentry/action-release@v1
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-        with:
-          environment: production
-          version: ${{ env.VERSION }}
+          no_push: true
