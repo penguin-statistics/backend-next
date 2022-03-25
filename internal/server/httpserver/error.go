@@ -1,11 +1,13 @@
 package httpserver
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/getsentry/sentry-go"
 	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
@@ -81,10 +83,21 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 		Int("status", re.StatusCode).
 		Msg("Internal Server Error")
 
+	reportSentry(ctx, err, re.StatusCode)
+
+	return handleCustomError(ctx, &re)
+}
+
+func reportSentry(ctx *fiber.Ctx, err error, status int) {
+	// pre-filter: ignore context cancelled
+	if errors.Is(err, context.Canceled) {
+		return
+	}
+
 	hub := gentlelyGetHubFromContext(ctx)
 
 	if hub != nil {
-		hub.Scope().SetTag("status", strconv.Itoa(re.StatusCode))
+		hub.Scope().SetTag("status", strconv.Itoa(status))
 		if u := pgid.Extract(ctx); u != "" {
 			hub.Scope().SetUser(sentry.User{
 				ID: u,
@@ -94,8 +107,6 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 	} else {
 		sentry.CaptureException(err)
 	}
-
-	return handleCustomError(ctx, &re)
 }
 
 func gentlelyGetHubFromContext(ctx *fiber.Ctx) *sentry.Hub {
