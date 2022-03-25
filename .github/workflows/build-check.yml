@@ -42,4 +42,4 @@ jobs:
         with:
           context: .
           push: false # for check workflow, we don't want to push
-          tags: penguin-statistics/backend-next:${{ github.ref }}
+          tags: penguin-statistics/backend-next:${{ github.sha }}
