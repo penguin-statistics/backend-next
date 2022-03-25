@@ -31,7 +31,7 @@ func (s *SiteStatsService) GetShimSiteStats(ctx context.Context, server string) 
 }
 
 func (s *SiteStatsService) RefreshShimSiteStats(ctx context.Context, server string) (*shims.SiteStats, error) {
-	valueFunc := func() (interface{}, error) {
+	valueFunc := func() (*shims.SiteStats, error) {
 		stageTimes, err := s.DropReportRepo.CalcTotalStageQuantityForShimSiteStats(ctx, server, false)
 		if err != nil {
 			return nil, err
@@ -52,7 +52,7 @@ func (s *SiteStatsService) RefreshShimSiteStats(ctx context.Context, server stri
 			return nil, err
 		}
 
-		return shims.SiteStats{
+		return &shims.SiteStats{
 			TotalStageTimes:     stageTimes,
 			TotalStageTimes24H:  stageTimes24h,
 			TotalItemQuantities: itemQuantity,

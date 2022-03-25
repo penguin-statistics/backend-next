@@ -52,7 +52,7 @@ func NewTrendService(
 
 // Cache: shimSavedTrendResults#server:{server}, 24hrs, records last modified time
 func (s *TrendService) GetShimSavedTrendResults(ctx context.Context, server string) (*shims.TrendQueryResult, error) {
-	valueFunc := func() (interface{}, error) {
+	valueFunc := func() (*shims.TrendQueryResult, error) {
 		queryResult, err := s.getSavedTrendResults(ctx, server)
 		if err != nil {
 			return nil, err
@@ -61,7 +61,7 @@ func (s *TrendService) GetShimSavedTrendResults(ctx context.Context, server stri
 		if err != nil {
 			return nil, err
 		}
-		return *slowShimResult, nil
+		return slowShimResult, nil
 	}
 
 	var shimResult shims.TrendQueryResult

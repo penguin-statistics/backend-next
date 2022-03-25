@@ -68,7 +68,7 @@ func (s *ItemService) GetItemByArkId(ctx context.Context, arkItemId string) (*mo
 	if err != nil {
 		return nil, err
 	}
-	go cache.ItemByArkId.Set(arkItemId, dbItem, 24*time.Hour)
+	go cache.ItemByArkId.Set(arkItemId, *dbItem, 24*time.Hour)
 	return dbItem, nil
 }
 
@@ -110,14 +110,14 @@ func (s *ItemService) GetShimItemByArkId(ctx context.Context, arkItemId string) 
 		return nil, err
 	}
 	s.applyShim(dbItem)
-	go cache.ShimItemByArkId.Set(arkItemId, dbItem, 24*time.Hour)
+	go cache.ShimItemByArkId.Set(arkItemId, *dbItem, 24*time.Hour)
 	return dbItem, nil
 }
 
 // Cache: (singular) itemsMapById, 24hrs
 func (s *ItemService) GetItemsMapById(ctx context.Context) (map[int]*models.Item, error) {
 	var itemsMapById map[int]*models.Item
-	cache.ItemsMapById.MutexGetSet(&itemsMapById, func() (interface{}, error) {
+	cache.ItemsMapById.MutexGetSet(&itemsMapById, func() (map[int]*models.Item, error) {
 		items, err := s.GetItems(ctx)
 		if err != nil {
 			return nil, err
@@ -134,7 +134,7 @@ func (s *ItemService) GetItemsMapById(ctx context.Context) (map[int]*models.Item
 // Cache: (singular) itemsMapByArkId, 24hrs
 func (s *ItemService) GetItemsMapByArkId(ctx context.Context) (map[string]*models.Item, error) {
 	var itemsMapByArkId map[string]*models.Item
-	cache.ItemsMapByArkId.MutexGetSet(&itemsMapByArkId, func() (interface{}, error) {
+	cache.ItemsMapByArkId.MutexGetSet(&itemsMapByArkId, func() (map[string]*models.Item, error) {
 		items, err := s.GetItems(ctx)
 		if err != nil {
 			return nil, err
@@ -172,6 +172,6 @@ func (s *ItemService) applyShim(item *shims.Item) {
 
 	keywords := gjson.ParseBytes(item.Keywords)
 
-	item.AliasMap = json.RawMessage(utils.Must(json.Marshal(keywords.Get("alias").Value().(map[string]interface{}))).([]byte))
-	item.PronMap = json.RawMessage(utils.Must(json.Marshal(keywords.Get("pron").Value().(map[string]interface{}))).([]byte))
+	item.AliasMap = json.RawMessage(utils.Must(json.Marshal(keywords.Get("alias").Value())))
+	item.PronMap = json.RawMessage(utils.Must(json.Marshal(keywords.Get("pron").Value())))
 }

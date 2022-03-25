@@ -40,7 +40,7 @@ func (s *AccountService) GetAccountById(ctx context.Context, accountId string) (
 	if err != nil {
 		return nil, err
 	}
-	go cache.AccountById.Set(accountId, dbAccount, time.Hour*24)
+	go cache.AccountById.Set(accountId, *dbAccount, time.Hour*24)
 	return dbAccount, nil
 }
 
@@ -56,7 +56,7 @@ func (s *AccountService) GetAccountByPenguinId(ctx context.Context, penguinId st
 	if err != nil {
 		return nil, err
 	}
-	go cache.AccountByPenguinId.Set(penguinId, dbAccount, time.Hour*24)
+	go cache.AccountByPenguinId.Set(penguinId, *dbAccount, time.Hour*24)
 	return dbAccount, nil
 }
 

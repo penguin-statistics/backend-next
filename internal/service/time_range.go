@@ -49,7 +49,7 @@ func (s *TimeRangeService) GetTimeRangeById(ctx context.Context, rangeId int) (*
 	}
 
 	slowTimeRange, err := s.TimeRangeRepo.GetTimeRangeById(ctx, rangeId)
-	go cache.TimeRangeById.Set(strconv.Itoa(rangeId), slowTimeRange, 24*time.Hour)
+	go cache.TimeRangeById.Set(strconv.Itoa(rangeId), *slowTimeRange, 24*time.Hour)
 	return slowTimeRange, err
 }
 
