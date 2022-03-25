@@ -43,7 +43,7 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 	defer func() {
 		// Recover from panic: ErrorHandler panics will not be handled by fasthttp
 		// as the request pipeline might not yet reached any middlewares yet.
-		// e.g. a 431Request Header Fields Too Large error occurs.
+		// e.g. a 431 Request Header Fields Too Large error occurs.
 		if r := recover(); r != nil {
 			log.Error().
 				Str("recovered", spew.Sdump(r)).
@@ -55,11 +55,12 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 
 			ctx.Status(500).JSON(fiber.Map{
 				"code":    pgerr.CodeInternalError,
-				"message": "Internal server error",
+				"message": pgerr.ErrInternalErrorImmutable.Message,
 			})
 		}
 	}()
-	// Use custom error handler to return JSON error responses
+
+	// Use custom error handler to return customized error responses
 	if e, ok := err.(*pgerr.PenguinError); ok {
 		return handleCustomError(ctx, e)
 	}
@@ -69,12 +70,11 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 	re := pgerr.ErrInternalErrorImmutable
 
 	if e, ok := err.(*fiber.Error); ok {
-		// Overwrite status code if fiber.Error type & provided code
-		re.StatusCode = e.Code
-		re.ErrorCode = "UNKNOWN_ERROR"
-		re.Message = e.Message
+		// Use default error handler if not a custom error
+		return fiber.DefaultErrorHandler(ctx, e)
 	}
 
+	// must be an unexpected runtime error then
 	log.Error().
 		Stack().
 		Err(err).
