@@ -18,10 +18,10 @@ import (
 type Flusher func() error
 
 var (
-	AccountById        *cache.Set[models.Account]
-	AccountByPenguinId *cache.Set[models.Account]
+	AccountByID        *cache.Set[models.Account]
+	AccountByPenguinID *cache.Set[models.Account]
 
-	ItemDropSetByStageIdAndRangeId   *cache.Set[[]int]
+	ItemDropSetByStageIDAndRangeID   *cache.Set[[]int]
 	ItemDropSetByStageIdAndTimeRange *cache.Set[[]int]
 
 	ShimMaxAccumulableDropMatrixResults *cache.Set[shims.DropMatrixQueryResult]
@@ -29,11 +29,11 @@ var (
 	Formula *cache.Singular[json.RawMessage]
 
 	Items           *cache.Singular[[]*models.Item]
-	ItemByArkId     *cache.Set[models.Item]
+	ItemByArkID     *cache.Set[models.Item]
 	ShimItems       *cache.Singular[[]*shims.Item]
-	ShimItemByArkId *cache.Set[shims.Item]
+	ShimItemByArkID *cache.Set[shims.Item]
 	ItemsMapById    *cache.Singular[map[int]*models.Item]
-	ItemsMapByArkId *cache.Singular[map[string]*models.Item]
+	ItemsMapByArkID *cache.Singular[map[string]*models.Item]
 
 	Notices *cache.Singular[[]*models.Notice]
 
@@ -45,25 +45,25 @@ var (
 	ShimSiteStats *cache.Set[shims.SiteStats]
 
 	Stages           *cache.Singular[[]*models.Stage]
-	StageByArkId     *cache.Set[models.Stage]
+	StageByArkID     *cache.Set[models.Stage]
 	ShimStages       *cache.Set[[]*shims.Stage]
-	ShimStageByArkId *cache.Set[shims.Stage]
-	StagesMapById    *cache.Singular[map[int]*models.Stage]
-	StagesMapByArkId *cache.Singular[map[string]*models.Stage]
+	ShimStageByArkID *cache.Set[shims.Stage]
+	StagesMapByID    *cache.Singular[map[int]*models.Stage]
+	StagesMapByArkID *cache.Singular[map[string]*models.Stage]
 
 	TimeRanges               *cache.Set[[]*models.TimeRange]
-	TimeRangeById            *cache.Set[models.TimeRange]
+	TimeRangeByID            *cache.Set[models.TimeRange]
 	TimeRangesMap            *cache.Set[map[int]*models.TimeRange]
 	MaxAccumulableTimeRanges *cache.Set[map[int]map[int][]*models.TimeRange]
 
 	ShimSavedTrendResults *cache.Set[shims.TrendQueryResult]
 
 	Zones           *cache.Singular[[]*models.Zone]
-	ZoneByArkId     *cache.Set[models.Zone]
+	ZoneByArkID     *cache.Set[models.Zone]
 	ShimZones       *cache.Singular[[]*shims.Zone]
-	ShimZoneByArkId *cache.Set[shims.Zone]
+	ShimZoneByArkID *cache.Set[shims.Zone]
 
-	DropPatternElementsByPatternId *cache.Set[[]*models.DropPatternElement]
+	DropPatternElementsByPatternID *cache.Set[[]*models.DropPatternElement]
 
 	LastModifiedTime *cache.Set[time.Time]
 
@@ -108,17 +108,17 @@ func initializeCaches(client *redis.Client) {
 	CacheSingularFlusherMap = make(map[string]Flusher)
 
 	// account
-	AccountById = cache.NewSet[models.Account]("account#accountId")
-	AccountByPenguinId = cache.NewSet[models.Account]("account#penguinId")
+	AccountByID = cache.NewSet[models.Account]("account#accountId")
+	AccountByPenguinID = cache.NewSet[models.Account]("account#penguinId")
 
-	CacheSetMap["account#accountId"] = AccountById.Flush
-	CacheSetMap["account#penguinId"] = AccountByPenguinId.Flush
+	CacheSetMap["account#accountId"] = AccountByID.Flush
+	CacheSetMap["account#penguinId"] = AccountByPenguinID.Flush
 
 	// drop_info
-	ItemDropSetByStageIdAndRangeId = cache.NewSet[[]int]("itemDropSet#server|stageId|rangeId")
+	ItemDropSetByStageIDAndRangeID = cache.NewSet[[]int]("itemDropSet#server|stageId|rangeId")
 	ItemDropSetByStageIdAndTimeRange = cache.NewSet[[]int]("itemDropSet#server|stageId|startTime|endTime")
 
-	CacheSetMap["itemDropSet#server|stageId|rangeId"] = ItemDropSetByStageIdAndRangeId.Flush
+	CacheSetMap["itemDropSet#server|stageId|rangeId"] = ItemDropSetByStageIDAndRangeID.Flush
 	CacheSetMap["itemDropSet#server|stageId|startTime|endTime"] = ItemDropSetByStageIdAndTimeRange.Flush
 
 	// drop_matrix
@@ -132,18 +132,18 @@ func initializeCaches(client *redis.Client) {
 
 	// item
 	Items = cache.NewSingular[[]*models.Item]("items")
-	ItemByArkId = cache.NewSet[models.Item]("item#arkItemId")
+	ItemByArkID = cache.NewSet[models.Item]("item#arkItemId")
 	ShimItems = cache.NewSingular[[]*shims.Item]("shimItems")
-	ShimItemByArkId = cache.NewSet[shims.Item]("shimItem#arkItemId")
+	ShimItemByArkID = cache.NewSet[shims.Item]("shimItem#arkItemId")
 	ItemsMapById = cache.NewSingular[map[int]*models.Item]("itemsMapById")
-	ItemsMapByArkId = cache.NewSingular[map[string]*models.Item]("itemsMapByArkId")
+	ItemsMapByArkID = cache.NewSingular[map[string]*models.Item]("itemsMapByArkId")
 
 	CacheSingularFlusherMap["items"] = Items.Delete
-	CacheSetMap["item#arkItemId"] = ItemByArkId.Flush
+	CacheSetMap["item#arkItemId"] = ItemByArkID.Flush
 	CacheSingularFlusherMap["shimItems"] = ShimItems.Delete
-	CacheSetMap["shimItem#arkItemId"] = ShimItemByArkId.Flush
+	CacheSetMap["shimItem#arkItemId"] = ShimItemByArkID.Flush
 	CacheSingularFlusherMap["itemsMapById"] = ItemsMapById.Delete
-	CacheSingularFlusherMap["itemsMapByArkId"] = ItemsMapByArkId.Delete
+	CacheSingularFlusherMap["itemsMapByArkId"] = ItemsMapByArkID.Delete
 
 	// notice
 	Notices = cache.NewSingular[[]*models.Notice]("notices")
@@ -169,27 +169,27 @@ func initializeCaches(client *redis.Client) {
 
 	// stage
 	Stages = cache.NewSingular[[]*models.Stage]("stages")
-	StageByArkId = cache.NewSet[models.Stage]("stage#arkStageId")
+	StageByArkID = cache.NewSet[models.Stage]("stage#arkStageId")
 	ShimStages = cache.NewSet[[]*shims.Stage]("shimStages#server")
-	ShimStageByArkId = cache.NewSet[shims.Stage]("shimStage#server|arkStageId")
-	StagesMapById = cache.NewSingular[map[int]*models.Stage]("stagesMapById")
-	StagesMapByArkId = cache.NewSingular[map[string]*models.Stage]("stagesMapByArkId")
+	ShimStageByArkID = cache.NewSet[shims.Stage]("shimStage#server|arkStageId")
+	StagesMapByID = cache.NewSingular[map[int]*models.Stage]("stagesMapById")
+	StagesMapByArkID = cache.NewSingular[map[string]*models.Stage]("stagesMapByArkId")
 
 	CacheSingularFlusherMap["stages"] = Stages.Delete
-	CacheSetMap["stage#arkStageId"] = StageByArkId.Flush
+	CacheSetMap["stage#arkStageId"] = StageByArkID.Flush
 	CacheSetMap["shimStages#server"] = ShimStages.Flush
-	CacheSetMap["shimStage#server|arkStageId"] = ShimStageByArkId.Flush
-	CacheSingularFlusherMap["stagesMapById"] = StagesMapById.Delete
-	CacheSingularFlusherMap["stagesMapByArkId"] = StagesMapByArkId.Delete
+	CacheSetMap["shimStage#server|arkStageId"] = ShimStageByArkID.Flush
+	CacheSingularFlusherMap["stagesMapById"] = StagesMapByID.Delete
+	CacheSingularFlusherMap["stagesMapByArkId"] = StagesMapByArkID.Delete
 
 	// time_range
 	TimeRanges = cache.NewSet[[]*models.TimeRange]("timeRanges#server")
-	TimeRangeById = cache.NewSet[models.TimeRange]("timeRange#rangeId")
+	TimeRangeByID = cache.NewSet[models.TimeRange]("timeRange#rangeId")
 	TimeRangesMap = cache.NewSet[map[int]*models.TimeRange]("timeRangesMap#server")
 	MaxAccumulableTimeRanges = cache.NewSet[map[int]map[int][]*models.TimeRange]("maxAccumulableTimeRanges#server")
 
 	CacheSetMap["timeRanges#server"] = TimeRanges.Flush
-	CacheSetMap["timeRange#rangeId"] = TimeRangeById.Flush
+	CacheSetMap["timeRange#rangeId"] = TimeRangeByID.Flush
 	CacheSetMap["timeRangesMap#server"] = TimeRangesMap.Flush
 	CacheSetMap["maxAccumulableTimeRanges#server"] = MaxAccumulableTimeRanges.Flush
 
@@ -200,19 +200,19 @@ func initializeCaches(client *redis.Client) {
 
 	// zone
 	Zones = cache.NewSingular[[]*models.Zone]("zones")
-	ZoneByArkId = cache.NewSet[models.Zone]("zone#arkZoneId")
+	ZoneByArkID = cache.NewSet[models.Zone]("zone#arkZoneId")
 	ShimZones = cache.NewSingular[[]*shims.Zone]("shimZones")
-	ShimZoneByArkId = cache.NewSet[shims.Zone]("shimZone#arkZoneId")
+	ShimZoneByArkID = cache.NewSet[shims.Zone]("shimZone#arkZoneId")
 
 	CacheSingularFlusherMap["zones"] = Zones.Delete
-	CacheSetMap["zone#arkZoneId"] = ZoneByArkId.Flush
+	CacheSetMap["zone#arkZoneId"] = ZoneByArkID.Flush
 	CacheSingularFlusherMap["shimZones"] = ShimZones.Delete
-	CacheSetMap["shimZone#arkZoneId"] = ShimZoneByArkId.Flush
+	CacheSetMap["shimZone#arkZoneId"] = ShimZoneByArkID.Flush
 
 	// drop_pattern_elements
-	DropPatternElementsByPatternId = cache.NewSet[[]*models.DropPatternElement]("dropPatternElements#patternId")
+	DropPatternElementsByPatternID = cache.NewSet[[]*models.DropPatternElement]("dropPatternElements#patternId")
 
-	CacheSetMap["dropPatternElements#patternId"] = DropPatternElementsByPatternId.Flush
+	CacheSetMap["dropPatternElements#patternId"] = DropPatternElementsByPatternID.Flush
 
 	// others
 	LastModifiedTime = cache.NewSet[time.Time]("lastModifiedTime#key")

@@ -38,7 +38,7 @@ func (s *DropInfoService) GetDropInfosWithFilters(ctx context.Context, server st
 func (s *DropInfoService) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server string, stageId int, rangeId int) ([]int, error) {
 	var itemDropSet []int
 	key := server + constants.CacheSep + strconv.Itoa(stageId) + constants.CacheSep + strconv.Itoa(rangeId)
-	err := cache.ItemDropSetByStageIdAndRangeId.Get(key, &itemDropSet)
+	err := cache.ItemDropSetByStageIDAndRangeID.Get(key, &itemDropSet)
 	if err == nil {
 		return itemDropSet, nil
 	}
@@ -48,7 +48,7 @@ func (s *DropInfoService) GetItemDropSetByStageIdAndRangeId(ctx context.Context,
 		return nil, err
 	}
 
-	go cache.ItemDropSetByStageIdAndRangeId.Set(key, itemDropSet, 24*time.Hour)
+	go cache.ItemDropSetByStageIDAndRangeID.Set(key, itemDropSet, 24*time.Hour)
 	return itemDropSet, nil
 }
 

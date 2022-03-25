@@ -54,7 +54,7 @@ func (s *StageService) GetStageById(ctx context.Context, stageId int) (*models.S
 // Cache: stage#arkStageId:{arkStageId}, 24hrs
 func (s *StageService) GetStageByArkId(ctx context.Context, arkStageId string) (*models.Stage, error) {
 	var stage models.Stage
-	err := cache.StageByArkId.Get(arkStageId, &stage)
+	err := cache.StageByArkID.Get(arkStageId, &stage)
 	if err == nil {
 		return &stage, nil
 	}
@@ -63,7 +63,7 @@ func (s *StageService) GetStageByArkId(ctx context.Context, arkStageId string) (
 	if err != nil {
 		return nil, err
 	}
-	go cache.StageByArkId.Set(arkStageId, *dbStage, 24*time.Hour)
+	go cache.StageByArkID.Set(arkStageId, *dbStage, 24*time.Hour)
 	return dbStage, nil
 }
 
@@ -95,7 +95,7 @@ func (s *StageService) GetShimStages(ctx context.Context, server string) ([]*shi
 // Cache: shimStage#server|arkStageId:{server}|{arkStageId}, 24hrs
 func (s *StageService) GetShimStageByArkId(ctx context.Context, arkStageId string, server string) (*shims.Stage, error) {
 	var stage shims.Stage
-	err := cache.ShimStageByArkId.Get(arkStageId, &stage)
+	err := cache.ShimStageByArkID.Get(arkStageId, &stage)
 	if err == nil {
 		return &stage, nil
 	}
@@ -105,7 +105,7 @@ func (s *StageService) GetShimStageByArkId(ctx context.Context, arkStageId strin
 		return nil, err
 	}
 	s.applyShim(dbStage)
-	go cache.ShimStageByArkId.Set(arkStageId, *dbStage, 24*time.Hour)
+	go cache.ShimStageByArkID.Set(arkStageId, *dbStage, 24*time.Hour)
 	return dbStage, nil
 }
 
@@ -116,7 +116,7 @@ func (s *StageService) GetStageExtraProcessTypeByArkId(ctx context.Context, arkS
 // Cache: (singular) stagesMapById, 24hrs
 func (s *StageService) GetStagesMapById(ctx context.Context) (map[int]*models.Stage, error) {
 	var stagesMapById map[int]*models.Stage
-	cache.StagesMapById.MutexGetSet(&stagesMapById, func() (map[int]*models.Stage, error) {
+	cache.StagesMapByID.MutexGetSet(&stagesMapById, func() (map[int]*models.Stage, error) {
 		stages, err := s.GetStages(ctx)
 		if err != nil {
 			return nil, err
@@ -133,7 +133,7 @@ func (s *StageService) GetStagesMapById(ctx context.Context) (map[int]*models.St
 // Cache: (singular) stagesMapByArkId, 24hrs
 func (s *StageService) GetStagesMapByArkId(ctx context.Context) (map[string]*models.Stage, error) {
 	var stagesMapByArkId map[string]*models.Stage
-	cache.StagesMapByArkId.MutexGetSet(&stagesMapByArkId, func() (map[string]*models.Stage, error) {
+	cache.StagesMapByArkID.MutexGetSet(&stagesMapByArkId, func() (map[string]*models.Stage, error) {
 		stages, err := s.GetStages(ctx)
 		if err != nil {
 			return nil, err

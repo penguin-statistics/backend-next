@@ -74,7 +74,7 @@ func (c *AdminController) UpdateNewEvent(ctx *fiber.Ctx) error {
 	}
 
 	info := &gamedata.NewEventBasicInfo{
-		ArkZoneID:    request.ArkZoneID,
+		ArkZoneId:    request.ArkZoneId,
 		ZoneName:     request.ZoneName,
 		ZoneCategory: request.ZoneCategory,
 		ZoneType:     request.ZoneType,

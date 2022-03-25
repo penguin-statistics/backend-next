@@ -130,7 +130,7 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 	}
 
 	return ctx.JSON(shims.RecognitionReportResponse{
-		TaskID: taskId,
+		TaskId: taskId,
 		Errors: []string{},
 	})
 }

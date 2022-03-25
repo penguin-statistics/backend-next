@@ -9,7 +9,7 @@ import (
 )
 
 type NewEventBasicInfo struct {
-	ArkZoneID    string
+	ArkZoneId    string
 	ZoneName     string
 	ZoneCategory string
 	ZoneType     null.String

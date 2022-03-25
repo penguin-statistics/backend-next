@@ -5,6 +5,6 @@ type ReportResponse struct {
 }
 
 type RecognitionReportResponse struct {
-	TaskID string   `json:"taskId" example:"0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ"`
+	TaskId string   `json:"taskId" example:"0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ"`
 	Errors []string `json:"errors"`
 }

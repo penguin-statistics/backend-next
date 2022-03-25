@@ -57,7 +57,7 @@ func (s *GamedataService) UpdateNewEvent(ctx context.Context, info *gamedata.New
 		return nil, err
 	}
 
-	importStages, err := s.fetchLatestStages(ctx, []string{info.ArkZoneID})
+	importStages, err := s.fetchLatestStages(ctx, []string{info.ArkZoneId})
 	if err != nil {
 		return nil, err
 	}
@@ -113,11 +113,11 @@ func (s *GamedataService) renderNewZone(info *gamedata.NewEventBasicInfo) (*mode
 		return nil, err
 	}
 
-	backgroundStr := constants.ZoneBackgroundPath + info.ArkZoneID + constants.ZoneBackgroundExtension
+	backgroundStr := constants.ZoneBackgroundPath + info.ArkZoneId + constants.ZoneBackgroundExtension
 	background := null.StringFrom(backgroundStr)
 
 	return &models.Zone{
-		ArkZoneID:  info.ArkZoneID,
+		ArkZoneID:  info.ArkZoneId,
 		Index:      0,
 		Category:   info.ZoneCategory,
 		Type:       info.ZoneType,
@@ -134,7 +134,7 @@ func (s *GamedataService) renderNewTimeRange(info *gamedata.NewEventBasicInfo) *
 		endTime = info.EndTime
 	}
 
-	name := null.StringFrom(utils.GetZonePrefixFromArkZoneID(info.ArkZoneID))
+	name := null.StringFrom(utils.GetZonePrefixFromArkZoneID(info.ArkZoneId))
 	startTimeInComment := info.StartTime.In(constants.LocMap[info.Server]).Format("2006/1/2 15:04")
 	endTimeInComment := "?"
 	if info.EndTime != nil {

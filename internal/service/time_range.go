@@ -43,13 +43,13 @@ func (s *TimeRangeService) GetTimeRangesByServer(ctx context.Context, server str
 // Cache: timeRange#rangeId:{rangeId}, 24hrs
 func (s *TimeRangeService) GetTimeRangeById(ctx context.Context, rangeId int) (*models.TimeRange, error) {
 	var timeRange models.TimeRange
-	err := cache.TimeRangeById.Get(strconv.Itoa(rangeId), &timeRange)
+	err := cache.TimeRangeByID.Get(strconv.Itoa(rangeId), &timeRange)
 	if err == nil {
 		return &timeRange, nil
 	}
 
 	slowTimeRange, err := s.TimeRangeRepo.GetTimeRangeById(ctx, rangeId)
-	go cache.TimeRangeById.Set(strconv.Itoa(rangeId), *slowTimeRange, 24*time.Hour)
+	go cache.TimeRangeByID.Set(strconv.Itoa(rangeId), *slowTimeRange, 24*time.Hour)
 	return slowTimeRange, err
 }
 
