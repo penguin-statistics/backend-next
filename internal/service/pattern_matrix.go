@@ -245,8 +245,8 @@ func (s *PatternMatrixService) combineQuantityAndTimesResults(
 		resultsMap := make(map[int]int)
 		linq.From(firstGroupElements.Group).
 			ToMapByT(&resultsMap,
-				func(el interface{}) int { return el.(*models.TotalQuantityResultForPatternMatrix).PatternID },
-				func(el interface{}) int { return el.(*models.TotalQuantityResultForPatternMatrix).TotalQuantity })
+				func(el any) int { return el.(*models.TotalQuantityResultForPatternMatrix).PatternID },
+				func(el any) int { return el.(*models.TotalQuantityResultForPatternMatrix).TotalQuantity })
 		quantityResultsMap[stageId] = resultsMap
 	}
 

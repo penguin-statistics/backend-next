@@ -20,9 +20,8 @@ func GetDropMatrixElementsMap(elements []*models.DropMatrixElement) map[int]map[
 		var groupedResults2 []linq.Group
 		linq.From(el.Group).
 			GroupByT(
-				func(el interface{}) int { return el.(*models.DropMatrixElement).ItemID },
-				func(el interface{}) *models.DropMatrixElement { return el.(*models.DropMatrixElement) },
-			).
+				func(el any) int { return el.(*models.DropMatrixElement).ItemID },
+				func(el any) *models.DropMatrixElement { return el.(*models.DropMatrixElement) }).
 			ToSlice(&groupedResults2)
 		for _, el2 := range groupedResults2 {
 			itemId := el2.Key.(int)

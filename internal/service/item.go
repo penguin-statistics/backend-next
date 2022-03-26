@@ -156,13 +156,13 @@ func (s *ItemService) applyShim(item *shims.Item) {
 	if item.Sprite.Valid {
 		segments := strings.SplitN(item.Sprite.String, ":", 2)
 
-		linq.From(segments).Select(func(i interface{}) interface{} {
+		linq.From(segments).Select(func(i any) any {
 			num, err := strconv.Atoi(i.(string))
 			if err != nil {
 				return -1
 			}
 			return num
-		}).Where(func(i interface{}) bool {
+		}).Where(func(i any) bool {
 			return i.(int) != -1
 		}).ToSlice(&coordSegments)
 	}

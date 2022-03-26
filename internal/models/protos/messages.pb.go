@@ -767,7 +767,7 @@ func file_messages_proto_rawDescGZIP() []byte {
 var (
 	file_messages_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 	file_messages_proto_msgTypes  = make([]protoimpl.MessageInfo, 9)
-	file_messages_proto_goTypes   = []interface{}{
+	file_messages_proto_goTypes   = []any{
 		(MessageType)(0),                            // 0: MessageType
 		(*Ping)(nil),                                // 1: Ping
 		(*Pong)(nil),                                // 2: Pong
@@ -804,7 +804,7 @@ func file_messages_proto_init() {
 		return
 	}
 	if !protoimpl.UnsafeEnabled {
-		file_messages_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+		file_messages_proto_msgTypes[0].Exporter = func(v any, i int) any {
 			switch v := v.(*Ping); i {
 			case 0:
 				return &v.state
@@ -816,7 +816,7 @@ func file_messages_proto_init() {
 				return nil
 			}
 		}
-		file_messages_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+		file_messages_proto_msgTypes[1].Exporter = func(v any, i int) any {
 			switch v := v.(*Pong); i {
 			case 0:
 				return &v.state
@@ -828,7 +828,7 @@ func file_messages_proto_init() {
 				return nil
 			}
 		}
-		file_messages_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_messages_proto_msgTypes[2].Exporter = func(v any, i int) any {
 			switch v := v.(*Skeleton); i {
 			case 0:
 				return &v.state
@@ -840,7 +840,7 @@ func file_messages_proto_init() {
 				return nil
 			}
 		}
-		file_messages_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+		file_messages_proto_msgTypes[3].Exporter = func(v any, i int) any {
 			switch v := v.(*Header); i {
 			case 0:
 				return &v.state
@@ -852,7 +852,7 @@ func file_messages_proto_init() {
 				return nil
 			}
 		}
-		file_messages_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+		file_messages_proto_msgTypes[4].Exporter = func(v any, i int) any {
 			switch v := v.(*MatrixUpdateMessage); i {
 			case 0:
 				return &v.state
@@ -864,7 +864,7 @@ func file_messages_proto_init() {
 				return nil
 			}
 		}
-		file_messages_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+		file_messages_proto_msgTypes[5].Exporter = func(v any, i int) any {
 			switch v := v.(*MatrixUpdateSubscribeReq); i {
 			case 0:
 				return &v.state
@@ -876,7 +876,7 @@ func file_messages_proto_init() {
 				return nil
 			}
 		}
-		file_messages_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+		file_messages_proto_msgTypes[6].Exporter = func(v any, i int) any {
 			switch v := v.(*MatrixUpdateSubscribeResp); i {
 			case 0:
 				return &v.state
@@ -888,7 +888,7 @@ func file_messages_proto_init() {
 				return nil
 			}
 		}
-		file_messages_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
+		file_messages_proto_msgTypes[7].Exporter = func(v any, i int) any {
 			switch v := v.(*MatrixUpdateMessage_Segment); i {
 			case 0:
 				return &v.state
@@ -900,7 +900,7 @@ func file_messages_proto_init() {
 				return nil
 			}
 		}
-		file_messages_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+		file_messages_proto_msgTypes[8].Exporter = func(v any, i int) any {
 			switch v := v.(*MatrixUpdateMessage_Segment_Element); i {
 			case 0:
 				return &v.state
@@ -913,15 +913,15 @@ func file_messages_proto_init() {
 			}
 		}
 	}
-	file_messages_proto_msgTypes[5].OneofWrappers = []interface{}{
+	file_messages_proto_msgTypes[5].OneofWrappers = []any{
 		(*MatrixUpdateSubscribeReq_StageId)(nil),
 		(*MatrixUpdateSubscribeReq_ItemId)(nil),
 	}
-	file_messages_proto_msgTypes[7].OneofWrappers = []interface{}{
+	file_messages_proto_msgTypes[7].OneofWrappers = []any{
 		(*MatrixUpdateMessage_Segment_StageId)(nil),
 		(*MatrixUpdateMessage_Segment_ItemId)(nil),
 	}
-	file_messages_proto_msgTypes[8].OneofWrappers = []interface{}{
+	file_messages_proto_msgTypes[8].OneofWrappers = []any{
 		(*MatrixUpdateMessage_Segment_Element_StageId)(nil),
 		(*MatrixUpdateMessage_Segment_Element_ItemId)(nil),
 	}

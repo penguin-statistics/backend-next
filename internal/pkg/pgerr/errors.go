@@ -25,7 +25,7 @@ var (
 	ErrInternalErrorImmutable = NewImmutable(fiber.StatusInternalServerError, CodeInternalError, "internal server error occurred")
 )
 
-type Extras map[string]interface{}
+type Extras map[string]any
 
 type PenguinError struct {
 	StatusCode int     `json:"-" swaggerignore:"true"`
@@ -50,7 +50,7 @@ func NewImmutable(statusCode int, errorCode, message string) PenguinError {
 	}
 }
 
-func (e PenguinError) Msg(format string, parts ...interface{}) *PenguinError {
+func (e PenguinError) Msg(format string, parts ...any) *PenguinError {
 	e.Message = fmt.Sprintf(format, parts...)
 	return &e
 }
@@ -60,7 +60,7 @@ func (e PenguinError) WithExtras(extras Extras) *PenguinError {
 	return &e
 }
 
-func NewInvalidViolations(violations interface{}) *PenguinError {
+func NewInvalidViolations(violations any) *PenguinError {
 	// copy ErrInvalidRequest as e
 	e := *ErrInvalidReq
 	e.Extras = &Extras{

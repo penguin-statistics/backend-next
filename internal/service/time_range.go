@@ -118,8 +118,8 @@ func (s *TimeRangeService) GetMaxAccumulableTimeRangesByServer(ctx context.Conte
 		var groupedResults2 []linq.Group
 		linq.From(el.Group).
 			GroupByT(
-				func(dropInfo interface{}) int { return int(dropInfo.(*models.DropInfo).ItemID.Int64) },
-				func(dropInfo interface{}) *models.DropInfo { return dropInfo.(*models.DropInfo) },
+				func(dropInfo any) int { return int(dropInfo.(*models.DropInfo).ItemID.Int64) },
+				func(dropInfo any) *models.DropInfo { return dropInfo.(*models.DropInfo) },
 			).
 			ToSlice(&groupedResults2)
 		maxAccumulableTimeRangesForOneStage := make(map[int][]*models.TimeRange)

@@ -338,8 +338,8 @@ func (s *DropMatrixService) combineQuantityAndTimesResults(
 		resultsMap := make(map[int]int)
 		linq.From(firstGroupElements.Group).
 			ToMapByT(&resultsMap,
-				func(el interface{}) int { return el.(*models.TotalQuantityResultForDropMatrix).ItemID },
-				func(el interface{}) int { return el.(*models.TotalQuantityResultForDropMatrix).TotalQuantity })
+				func(el any) int { return el.(*models.TotalQuantityResultForDropMatrix).ItemID },
+				func(el any) int { return el.(*models.TotalQuantityResultForDropMatrix).TotalQuantity })
 		quantityResultsMap[stageId] = resultsMap
 	}
 

@@ -92,9 +92,9 @@ func (s *GamedataService) renderNewZone(info *gamedata.NewEventBasicInfo) (*mode
 		return nil, err
 	}
 
-	existenceMap := make(map[string]map[string]interface{})
+	existenceMap := make(map[string]map[string]any)
 	for _, s := range constants.Servers {
-		existenceMap[s] = map[string]interface{}{
+		existenceMap[s] = map[string]any{
 			"exist": false,
 		}
 		if s == info.Server {
@@ -166,9 +166,9 @@ func (s *GamedataService) renderNewActivity(info *gamedata.NewEventBasicInfo) (*
 		return nil, err
 	}
 
-	existenceMap := make(map[string]map[string]interface{})
+	existenceMap := make(map[string]map[string]any)
 	for _, s := range constants.Servers {
-		existenceMap[s] = map[string]interface{}{
+		existenceMap[s] = map[string]any{
 			"exist": false,
 		}
 		if s == info.Server {
@@ -249,9 +249,9 @@ func (s *GamedataService) genStageAndDropInfosFromGameData(ctx context.Context, 
 		return nil, nil, err
 	}
 
-	existenceMap := make(map[string]map[string]interface{})
+	existenceMap := make(map[string]map[string]any)
 	for _, s := range constants.Servers {
-		existenceMap[s] = map[string]interface{}{
+		existenceMap[s] = map[string]any{
 			"exist": false,
 		}
 		if s == server {

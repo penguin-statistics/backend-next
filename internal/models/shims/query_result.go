@@ -56,5 +56,5 @@ type OneItemTrend struct {
 
 // Advanced Query
 type AdvancedQueryResult struct {
-	AdvancedResults []interface{} `json:"advanced_results"`
+	AdvancedResults []any `json:"advanced_results"`
 }

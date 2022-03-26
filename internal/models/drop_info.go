@@ -27,6 +27,6 @@ type Bounds struct {
 	Exceptions []int `json:"exceptions,omitempty"`
 }
 
-func (b *Bounds) Scan(src interface{}) error {
+func (b *Bounds) Scan(src any) error {
 	return json.Unmarshal(src.([]byte), b)
 }

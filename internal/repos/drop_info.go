@@ -105,7 +105,7 @@ func (s *DropInfoRepo) GetForCurrentTimeRange(ctx context.Context, query *DropIn
 }
 
 func (s *DropInfoRepo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server string, stageId int, rangeId int) ([]int, error) {
-	var results []interface{}
+	var results []any
 	err := pgqry.New(
 		s.DB.NewSelect().
 			Column("di.item_id").
@@ -123,7 +123,7 @@ func (s *DropInfoRepo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, se
 	}
 
 	linq.From(results).
-		SelectT(func(el interface{}) int { return int(el.(int64)) }).
+		SelectT(func(el any) int { return int(el.(int64)) }).
 		Distinct().
 		SortT(func(a int, b int) bool { return a < b }).
 		ToSlice(&results)
