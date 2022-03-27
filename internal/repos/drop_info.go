@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -105,16 +106,15 @@ func (s *DropInfoRepo) GetForCurrentTimeRange(ctx context.Context, query *DropIn
 }
 
 func (s *DropInfoRepo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server string, stageId int, rangeId int) ([]int, error) {
-	var results []any
-	err := pgqry.New(
-		s.DB.NewSelect().
-			Column("di.item_id").
-			Model((*models.DropInfo)(nil)).
-			Where("di.server = ?", server).
-			Where("di.stage_id = ?", stageId).
-			Where("di.item_id IS NOT NULL").
-			Where("di.range_id = ?", rangeId),
-	).Q.Scan(ctx, &results)
+	var results []int
+	err := s.DB.NewSelect().
+		Column("di.item_id").
+		Model((*models.DropInfo)(nil)).
+		Where("di.server = ?", server).
+		Where("di.stage_id = ?", stageId).
+		Where("di.item_id IS NOT NULL").
+		Where("di.range_id = ?", rangeId).
+		Scan(ctx, &results)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
@@ -122,17 +122,8 @@ func (s *DropInfoRepo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, se
 		return nil, err
 	}
 
-	linq.From(results).
-		SelectT(func(el any) int { return int(el.(int64)) }).
-		Distinct().
-		SortT(func(a int, b int) bool { return a < b }).
-		ToSlice(&results)
-
-	itemIds := make([]int, len(results))
-	for i := range results {
-		itemIds[i] = results[i].(int)
-	}
-	return itemIds, nil
+	results = sort.IntSlice(results)
+	return results, nil
 }
 
 func (s *DropInfoRepo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) (itemDropInfos, typeDropInfos []*models.DropInfo, err error) {
