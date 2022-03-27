@@ -64,7 +64,6 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(service.NewFormulaService),
 		fx.Provide(service.NewActivityService),
 		fx.Provide(service.NewDropInfoService),
-		fx.Provide(service.NewGamedataService),
 		fx.Provide(service.NewShortURLService),
 		fx.Provide(service.NewTimeRangeService),
 		fx.Provide(service.NewSiteStatsService),

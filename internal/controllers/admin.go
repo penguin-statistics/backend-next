@@ -1,13 +1,13 @@
 package controllers
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/gamedata"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
@@ -21,8 +21,8 @@ const TimeLayout = "2006-01-02 15:04:05 -07:00"
 type AdminController struct {
 	fx.In
 
-	GamedataService      *service.GamedataService
 	AdminService         *service.AdminService
+	ItemService          *service.ItemService
 	DropMatrixService    *service.DropMatrixService
 	PatternMatrixService *service.PatternMatrixService
 	TrendService         *service.TrendService
@@ -33,10 +33,27 @@ func RegisterAdminController(admin *svr.Admin, c AdminController) {
 	admin.Post("/save", c.SaveRenderedObjects)
 	admin.Post("/purge", c.PurgeCache)
 
+	admin.Get("/cli/gamedata/seed", c.GetCliGameDataSeed)
+
 	admin.Get("/refresh/matrix/:server", c.RefreshAllDropMatrixElements)
 	admin.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
 	admin.Get("/refresh/trend/:server", c.RefreshAllTrendElements)
 	admin.Get("/refresh/sitestats/:server", c.RefreshAllSiteStats)
+}
+
+type CliGameDataSeedResponse struct {
+	Items []*models.Item `json:"items"`
+}
+
+func (c AdminController) GetCliGameDataSeed(ctx *fiber.Ctx) error {
+	items, err := c.ItemService.GetItems(ctx.Context())
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(CliGameDataSeedResponse{
+		Items: items,
+	})
 }
 
 func (c *AdminController) SaveRenderedObjects(ctx *fiber.Ctx) error {
@@ -59,40 +76,6 @@ func (c *AdminController) PurgeCache(ctx *fiber.Ctx) error {
 		return err
 	}
 	return cache.Delete(request.Name, request.Key)
-}
-
-// FIXME: Should be moved to a proper place
-func (c *AdminController) UpdateNewEvent(ctx *fiber.Ctx) error {
-	var request types.UpdateNewEventRequest
-	if err := rekuest.ValidBody(ctx, &request); err != nil {
-		return err
-	}
-
-	startTime, endTime, err := getTimeFromString(request.TimeRange)
-	if err != nil {
-		return err
-	}
-
-	info := &gamedata.NewEventBasicInfo{
-		ArkZoneId:    request.ArkZoneId,
-		ZoneName:     request.ZoneName,
-		ZoneCategory: request.ZoneCategory,
-		ZoneType:     request.ZoneType,
-		Server:       request.Server,
-		StartTime:    startTime,
-		EndTime:      endTime,
-	}
-
-	renderedObjects, err := c.GamedataService.UpdateNewEvent(ctx.Context(), info)
-	if err != nil {
-		return err
-	}
-	marshalResult, err := json.MarshalIndent(renderedObjects, "", "  ")
-	if err != nil {
-		return err
-	}
-	ctx.Set(fiber.HeaderContentType, fiber.MIMEApplicationJSON)
-	return ctx.Send(marshalResult)
 }
 
 func (c *AdminController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {

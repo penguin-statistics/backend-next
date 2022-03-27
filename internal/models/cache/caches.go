@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
@@ -75,10 +74,10 @@ var (
 	CacheSingularFlusherMap map[string]Flusher
 )
 
-func Initialize(client *redis.Client, propertiesRepo *repos.PropertyRepo) {
+func Initialize(propertyRepo *repos.PropertyRepo) {
 	once.Do(func() {
-		initializeCaches(client)
-		populateProperties(propertiesRepo)
+		initializeCaches()
+		populateProperties(propertyRepo)
 	})
 }
 
@@ -103,7 +102,7 @@ func Delete(name string, key null.String) error {
 	return nil
 }
 
-func initializeCaches(client *redis.Client) {
+func initializeCaches() {
 	CacheSetMap = make(map[string]Flusher)
 	CacheSingularFlusherMap = make(map[string]Flusher)
 
