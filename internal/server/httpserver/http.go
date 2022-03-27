@@ -84,7 +84,6 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 		ReferrerPolicy:     "strict-origin-when-cross-origin",
 		PermissionPolicy:   "interest-cohort=()",
 	}))
-	app.Use(middlewares.EnrichSentry())
 	app.Use(middlewares.InjectI18n())
 	app.Use(recover.New(recover.Config{
 		EnableStackTrace: true,
@@ -126,6 +125,7 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 	}
 
 	if !conf.DevMode {
+		app.Use(middlewares.EnrichSentry())
 		// app.Use(limiter.New(limiter.Config{
 		// 	Max:        30,
 		// 	Expiration: time.Minute,
