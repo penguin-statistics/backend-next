@@ -120,8 +120,8 @@ func (s *AdminService) SaveRenderedObjects(ctx context.Context, objects *gamedat
 		// stage
 		if len(objects.Stages) > 0 {
 			cache.Stages.Delete()
-			cache.StagesMapById.Delete()
-			cache.StagesMapByArkId.Delete()
+			cache.StagesMapByID.Delete()
+			cache.StagesMapByArkID.Delete()
 			for _, server := range constants.Servers {
 				cache.ShimStages.Delete(server)
 			}

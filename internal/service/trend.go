@@ -52,7 +52,7 @@ func NewTrendService(
 
 // Cache: shimSavedTrendResults#server:{server}, 24hrs, records last modified time
 func (s *TrendService) GetShimSavedTrendResults(ctx context.Context, server string) (*shims.TrendQueryResult, error) {
-	valueFunc := func() (interface{}, error) {
+	valueFunc := func() (*shims.TrendQueryResult, error) {
 		queryResult, err := s.getSavedTrendResults(ctx, server)
 		if err != nil {
 			return nil, err
@@ -61,7 +61,7 @@ func (s *TrendService) GetShimSavedTrendResults(ctx context.Context, server stri
 		if err != nil {
 			return nil, err
 		}
-		return *slowShimResult, nil
+		return slowShimResult, nil
 	}
 
 	var shimResult shims.TrendQueryResult
@@ -98,7 +98,7 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 		return err
 	}
 
-	calcq := make([]map[string]interface{}, 0)
+	calcq := make([]map[string]any, 0)
 	for stageId, maxAccumulableTimeRangesForOneStage := range maxAccumulableTimeRanges {
 		itemIdsMapByTimeRange := make(map[string][]int)
 		for itemId, timeRanges := range maxAccumulableTimeRangesForOneStage {
@@ -150,7 +150,7 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 				startTime = endTime.Add(time.Hour * time.Duration((-1)*24*intervalNum))
 			}
 
-			calcq = append(calcq, map[string]interface{}{
+			calcq = append(calcq, map[string]any{
 				"stageId":     stageId,
 				"itemIds":     itemIds,
 				"startTime":   startTime,
@@ -178,7 +178,7 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 	wg.Add(len(calcq))
 	for _, el := range calcq {
 		limiter <- struct{}{}
-		go func(el map[string]interface{}) {
+		go func(el map[string]any) {
 			startTime := el["startTime"].(time.Time)
 			intervalNum := el["intervalNum"].(int)
 			stageId := el["stageId"].(int)
@@ -280,8 +280,8 @@ func (s *TrendService) combineQuantityAndTimesResults(
 			resultsMap := make(map[int]int)
 			linq.From(secondGroupElements.Group).
 				ToMapByT(&resultsMap,
-					func(el interface{}) int { return el.(*models.TotalQuantityResultForTrend).ItemID },
-					func(el interface{}) int { return el.(*models.TotalQuantityResultForTrend).TotalQuantity })
+					func(el any) int { return el.(*models.TotalQuantityResultForTrend).ItemID },
+					func(el any) int { return el.(*models.TotalQuantityResultForTrend).TotalQuantity })
 			quantityResultsMap[stageId] = resultsMap
 		}
 		groupResultsMap[groupId] = quantityResultsMap

@@ -59,7 +59,7 @@ func (s *ItemService) GetItemById(ctx context.Context, itemId int) (*models.Item
 // Cache: item#arkItemId:{arkItemId}, 24hrs
 func (s *ItemService) GetItemByArkId(ctx context.Context, arkItemId string) (*models.Item, error) {
 	var item models.Item
-	err := cache.ItemByArkId.Get(arkItemId, &item)
+	err := cache.ItemByArkID.Get(arkItemId, &item)
 	if err == nil {
 		return &item, nil
 	}
@@ -68,7 +68,7 @@ func (s *ItemService) GetItemByArkId(ctx context.Context, arkItemId string) (*mo
 	if err != nil {
 		return nil, err
 	}
-	go cache.ItemByArkId.Set(arkItemId, dbItem, 24*time.Hour)
+	go cache.ItemByArkID.Set(arkItemId, *dbItem, 24*time.Hour)
 	return dbItem, nil
 }
 
@@ -100,7 +100,7 @@ func (s *ItemService) GetShimItems(ctx context.Context) ([]*shims.Item, error) {
 // Cache: shimItem#arkItemId:{arkItemId}, 24hrs
 func (s *ItemService) GetShimItemByArkId(ctx context.Context, arkItemId string) (*shims.Item, error) {
 	var item shims.Item
-	err := cache.ShimItemByArkId.Get(arkItemId, &item)
+	err := cache.ShimItemByArkID.Get(arkItemId, &item)
 	if err == nil {
 		return &item, nil
 	}
@@ -110,14 +110,14 @@ func (s *ItemService) GetShimItemByArkId(ctx context.Context, arkItemId string) 
 		return nil, err
 	}
 	s.applyShim(dbItem)
-	go cache.ShimItemByArkId.Set(arkItemId, dbItem, 24*time.Hour)
+	go cache.ShimItemByArkID.Set(arkItemId, *dbItem, 24*time.Hour)
 	return dbItem, nil
 }
 
 // Cache: (singular) itemsMapById, 24hrs
 func (s *ItemService) GetItemsMapById(ctx context.Context) (map[int]*models.Item, error) {
 	var itemsMapById map[int]*models.Item
-	cache.ItemsMapById.MutexGetSet(&itemsMapById, func() (interface{}, error) {
+	cache.ItemsMapById.MutexGetSet(&itemsMapById, func() (map[int]*models.Item, error) {
 		items, err := s.GetItems(ctx)
 		if err != nil {
 			return nil, err
@@ -134,7 +134,7 @@ func (s *ItemService) GetItemsMapById(ctx context.Context) (map[int]*models.Item
 // Cache: (singular) itemsMapByArkId, 24hrs
 func (s *ItemService) GetItemsMapByArkId(ctx context.Context) (map[string]*models.Item, error) {
 	var itemsMapByArkId map[string]*models.Item
-	cache.ItemsMapByArkId.MutexGetSet(&itemsMapByArkId, func() (interface{}, error) {
+	cache.ItemsMapByArkID.MutexGetSet(&itemsMapByArkId, func() (map[string]*models.Item, error) {
 		items, err := s.GetItems(ctx)
 		if err != nil {
 			return nil, err
@@ -156,13 +156,13 @@ func (s *ItemService) applyShim(item *shims.Item) {
 	if item.Sprite.Valid {
 		segments := strings.SplitN(item.Sprite.String, ":", 2)
 
-		linq.From(segments).Select(func(i interface{}) interface{} {
+		linq.From(segments).Select(func(i any) any {
 			num, err := strconv.Atoi(i.(string))
 			if err != nil {
 				return -1
 			}
 			return num
-		}).Where(func(i interface{}) bool {
+		}).Where(func(i any) bool {
 			return i.(int) != -1
 		}).ToSlice(&coordSegments)
 	}
@@ -172,6 +172,6 @@ func (s *ItemService) applyShim(item *shims.Item) {
 
 	keywords := gjson.ParseBytes(item.Keywords)
 
-	item.AliasMap = json.RawMessage(utils.Must(json.Marshal(keywords.Get("alias").Value().(map[string]interface{}))).([]byte))
-	item.PronMap = json.RawMessage(utils.Must(json.Marshal(keywords.Get("pron").Value().(map[string]interface{}))).([]byte))
+	item.AliasMap = json.RawMessage(utils.Must(json.Marshal(keywords.Get("alias").Value())))
+	item.PronMap = json.RawMessage(utils.Must(json.Marshal(keywords.Get("pron").Value())))
 }

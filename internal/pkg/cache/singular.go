@@ -9,14 +9,14 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func NewSingular(key string) *Singular {
-	return &Singular{
+func NewSingular[T any](key string) *Singular[T] {
+	return &Singular[T]{
 		key: key,
 		c:   cache.New(cache.NoExpiration, time.Minute*10),
 	}
 }
 
-type Singular struct {
+type Singular[T any] struct {
 	// m is a mutex for MutexGetSet for concurrent prevention
 	m sync.Mutex
 
@@ -25,7 +25,7 @@ type Singular struct {
 	c *cache.Cache
 }
 
-func (c *Singular) Get(dest interface{}) error {
+func (c *Singular[T]) Get(dest *T) error {
 	result, ok := c.c.Get(c.key)
 	if !ok {
 		return ErrNotFound
@@ -42,7 +42,7 @@ func (c *Singular) Get(dest interface{}) error {
 	return nil
 }
 
-func (c *Singular) Set(value interface{}, expire time.Duration) error {
+func (c *Singular[T]) Set(value T, expire time.Duration) error {
 	c.c.Set(c.key, value, expire)
 	return nil
 }
@@ -51,7 +51,7 @@ func (c *Singular) Set(value interface{}, expire time.Duration) error {
 // to get cache value if the key still not exists when serially dispatched, sets value to cache and
 // writes value to dest.
 // The first return value means whether the value is got from cache or not. True means calculated; False means got from cache.
-func (c *Singular) MutexGetSet(dest interface{}, valueFunc func() (interface{}, error), expire time.Duration) error {
+func (c *Singular[T]) MutexGetSet(dest *T, valueFunc func() (T, error), expire time.Duration) error {
 	err := c.Get(dest)
 	if err == nil {
 		return nil
@@ -61,7 +61,7 @@ func (c *Singular) MutexGetSet(dest interface{}, valueFunc func() (interface{}, 
 	return c.slowMutexGetSet(dest, valueFunc, expire)
 }
 
-func (c *Singular) slowMutexGetSet(dest interface{}, valueFunc func() (interface{}, error), expire time.Duration) error {
+func (c *Singular[T]) slowMutexGetSet(dest *T, valueFunc func() (T, error), expire time.Duration) error {
 	c.m.Lock()
 	defer c.m.Unlock()
 	err := c.Get(dest)
@@ -95,7 +95,7 @@ func (c *Singular) slowMutexGetSet(dest interface{}, valueFunc func() (interface
 	return nil
 }
 
-func (c *Singular) Delete() error {
+func (c *Singular[T]) Delete() error {
 	c.c.Flush()
 	return nil
 }

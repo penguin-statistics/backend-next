@@ -92,7 +92,7 @@ func translate(utt ut.Translator, ve validator.ValidationErrors) []*ErrorRespons
 	return trans
 }
 
-func validateVar(ctx *fiber.Ctx, s interface{}, tag string) []*ErrorResponse {
+func validateVar(ctx *fiber.Ctx, s any, tag string) []*ErrorResponse {
 	tr := TranslatorFromCtx(ctx)
 	err := Validate.Var(s, tag)
 	if err != nil {
@@ -102,7 +102,7 @@ func validateVar(ctx *fiber.Ctx, s interface{}, tag string) []*ErrorResponse {
 	return nil
 }
 
-func validateStruct(ctx *fiber.Ctx, s interface{}) []*ErrorResponse {
+func validateStruct(ctx *fiber.Ctx, s any) []*ErrorResponse {
 	tr := TranslatorFromCtx(ctx)
 	err := Validate.Struct(s)
 	if err != nil {
@@ -119,7 +119,7 @@ func validateStruct(ctx *fiber.Ctx, s interface{}) []*ErrorResponse {
 // and validate it using the validator singleton. If the validation passed it will write the unmarshalled body
 // to dest and return a nil, otherwise it will return an error. Notice that dest shall
 // always be a pointer.
-func ValidBody(ctx *fiber.Ctx, dest interface{}) error {
+func ValidBody(ctx *fiber.Ctx, dest any) error {
 	if err := ctx.BodyParser(dest); err != nil {
 		return pgerr.ErrInvalidReq.Msg("invalid request: %s", err)
 	}
@@ -131,7 +131,7 @@ func ValidBody(ctx *fiber.Ctx, dest interface{}) error {
 	return nil
 }
 
-func ValidStruct(ctx *fiber.Ctx, dest interface{}) error {
+func ValidStruct(ctx *fiber.Ctx, dest any) error {
 	if err := validateStruct(ctx, dest); err != nil {
 		return pgerr.NewInvalidViolations(err)
 	}
@@ -139,7 +139,7 @@ func ValidStruct(ctx *fiber.Ctx, dest interface{}) error {
 	return nil
 }
 
-func ValidVar(ctx *fiber.Ctx, field interface{}, tag string) error {
+func ValidVar(ctx *fiber.Ctx, field any, tag string) error {
 	if err := validateVar(ctx, field, tag); err != nil {
 		return pgerr.NewInvalidViolations(err)
 	}

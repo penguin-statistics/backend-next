@@ -5,7 +5,7 @@ import (
 )
 
 type UpdateNewEventRequest struct {
-	ArkZoneID    string      `json:"arkZoneId"`
+	ArkZoneId    string      `json:"arkZoneId"`
 	ZoneName     string      `json:"zoneName"`
 	ZoneCategory string      `json:"zoneCategory"`
 	ZoneType     null.String `json:"zoneType" swaggertype:"string"`

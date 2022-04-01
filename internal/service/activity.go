@@ -26,7 +26,7 @@ func NewActivityService(activityRepo *repos.ActivityRepo) *ActivityService {
 // Cache: (singular) activities, 24hrs; records last modified time
 func (s *ActivityService) GetActivities(ctx context.Context) ([]*models.Activity, error) {
 	var activities []*models.Activity
-	err := cache.Activities.Get(activities)
+	err := cache.Activities.Get(&activities)
 	if err == nil {
 		return activities, nil
 	}

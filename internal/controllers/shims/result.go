@@ -209,7 +209,7 @@ func (c *ResultController) AdvancedQuery(ctx *fiber.Ctx) error {
 		return err
 	}
 	result := &shims.AdvancedQueryResult{
-		AdvancedResults: make([]interface{}, 0),
+		AdvancedResults: make([]any, 0),
 	}
 	for _, query := range request.Queries {
 		oneResult, err := c.handleAdvancedQuery(ctx, query)
@@ -221,7 +221,7 @@ func (c *ResultController) AdvancedQuery(ctx *fiber.Ctx) error {
 	return ctx.JSON(result)
 }
 
-func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery) (interface{}, error) {
+func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery) (any, error) {
 	// handle isPersonal (might be null) and account
 	isPersonal := false
 	if query.IsPersonal.Valid {

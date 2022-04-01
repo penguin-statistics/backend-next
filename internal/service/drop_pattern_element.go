@@ -23,7 +23,7 @@ func NewDropPatternElementService(dropPatternElementRepo *repos.DropPatternEleme
 // Cache: dropPatternElements#patternId:{patternId}, 24hrs
 func (s *DropPatternElementService) GetDropPatternElementsByPatternId(ctx context.Context, patternId int) ([]*models.DropPatternElement, error) {
 	var dropPatternElements []*models.DropPatternElement
-	err := cache.DropPatternElementsByPatternId.Get(strconv.Itoa(patternId), &dropPatternElements)
+	err := cache.DropPatternElementsByPatternID.Get(strconv.Itoa(patternId), &dropPatternElements)
 	if err == nil {
 		return dropPatternElements, nil
 	}
@@ -32,6 +32,6 @@ func (s *DropPatternElementService) GetDropPatternElementsByPatternId(ctx contex
 	if err != nil {
 		return nil, err
 	}
-	go cache.DropPatternElementsByPatternId.Set(strconv.Itoa(patternId), dbDropPatternElements, 24*time.Hour)
+	go cache.DropPatternElementsByPatternID.Set(strconv.Itoa(patternId), dbDropPatternElements, 24*time.Hour)
 	return dbDropPatternElements, nil
 }

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
+	"github.com/samber/lo"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
@@ -54,23 +54,14 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, r
 }
 
 func (d *DropVerifier) verifyDropType(report *types.SingleReport, dropInfos []*models.DropInfo) (errs []error) {
+	grouped := lo.GroupBy(report.Drops, func(drop *types.Drop) string {
+		return drop.DropType
+	})
+
 	// dropTypeAmountMap: key is drop type, value is amount (how many kinds of items are dropped under this type)
-	dropTypeAmountMap := make(map[string]int)
-	linq.From(report.Drops).
-		SelectT(func(drop *types.Drop) string {
-			// only pick dropType
-			return drop.DropType
-		}).
-		GroupByT(func(dropType string) string {
-			return dropType
-		}, func(dropType string) string {
-			return dropType
-		}).
-		ToMapByT(&dropTypeAmountMap, func(dropTypeGroup linq.Group) string {
-			return dropTypeGroup.Key.(string)
-		}, func(dropTypeGroup linq.Group) int {
-			return len(dropTypeGroup.Group)
-		})
+	dropTypeAmountMap := lo.MapValues(grouped, func(drops []*types.Drop, _ string) int {
+		return len(drops)
+	})
 
 	for _, dropInfo := range dropInfos {
 		count := dropTypeAmountMap[dropInfo.DropType]
@@ -79,9 +70,7 @@ func (d *DropVerifier) verifyDropType(report *types.SingleReport, dropInfos []*m
 		} else if dropInfo.Bounds.Upper < count {
 			errs = append(errs, errors.Wrap(ErrInvalidDropType, fmt.Sprintf("drop type `%s`: expected at most %d, but got %d", dropInfo.DropType, dropInfo.Bounds.Upper, count)))
 		} else if dropInfo.Bounds.Exceptions != nil {
-			if linq.From(dropInfo.Bounds.Exceptions).AnyWithT(func(exception int) bool {
-				return exception == count
-			}) {
+			if lo.Contains(dropInfo.Bounds.Exceptions, count) {
 				errs = append(errs, errors.Wrap(ErrInvalidDropType, fmt.Sprintf("drop type `%s`: expected not to have (%v), but got %d", dropInfo.DropType, dropInfo.Bounds.Exceptions, count)))
 			}
 		}
@@ -126,9 +115,7 @@ func (d *DropVerifier) verifyDropItem(report *types.SingleReport, dropInfos []*m
 		} else if dropInfo.Bounds.Upper < count {
 			errs = append(errs, errors.Wrap(ErrInvalidDropItem, fmt.Sprintf("item %d in drop type `%s`: expected at most %d, but got %d", itemId, dropInfo.DropType, dropInfo.Bounds.Upper, count)))
 		} else if dropInfo.Bounds.Exceptions != nil {
-			if linq.From(dropInfo.Bounds.Exceptions).AnyWithT(func(exception int) bool {
-				return exception == count
-			}) {
+			if lo.Contains(dropInfo.Bounds.Exceptions, count) {
 				errs = append(errs, errors.Wrap(ErrInvalidDropItem, fmt.Sprintf("item %d in drop type `%s`: expected not to have (%v), but got %d", itemId, dropInfo.DropType, dropInfo.Bounds.Exceptions, count)))
 			}
 		}

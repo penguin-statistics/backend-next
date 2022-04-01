@@ -31,7 +31,7 @@ func (s *AccountService) CreateAccountWithRandomPenguinId(ctx context.Context) (
 // Cache: account#accountId:{accountId}, 24hrs
 func (s *AccountService) GetAccountById(ctx context.Context, accountId string) (*models.Account, error) {
 	var account models.Account
-	err := cache.AccountById.Get(accountId, &account)
+	err := cache.AccountByID.Get(accountId, &account)
 	if err == nil {
 		return &account, nil
 	}
@@ -40,14 +40,14 @@ func (s *AccountService) GetAccountById(ctx context.Context, accountId string) (
 	if err != nil {
 		return nil, err
 	}
-	go cache.AccountById.Set(accountId, dbAccount, time.Hour*24)
+	go cache.AccountByID.Set(accountId, *dbAccount, time.Hour*24)
 	return dbAccount, nil
 }
 
 // Cache: account#penguinId:{penguinId}, 24hrs
 func (s *AccountService) GetAccountByPenguinId(ctx context.Context, penguinId string) (*models.Account, error) {
 	var account models.Account
-	err := cache.AccountByPenguinId.Get(penguinId, &account)
+	err := cache.AccountByPenguinID.Get(penguinId, &account)
 	if err == nil {
 		return &account, nil
 	}
@@ -56,7 +56,7 @@ func (s *AccountService) GetAccountByPenguinId(ctx context.Context, penguinId st
 	if err != nil {
 		return nil, err
 	}
-	go cache.AccountByPenguinId.Set(penguinId, dbAccount, time.Hour*24)
+	go cache.AccountByPenguinID.Set(penguinId, *dbAccount, time.Hour*24)
 	return dbAccount, nil
 }
 

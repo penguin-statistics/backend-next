@@ -71,7 +71,7 @@ func NewDropMatrixService(
 
 // Cache: shimMaxAccumulableDropMatrixResults#server|showClosedZoned:{server}|{showClosedZones}, 24 hrs, records last modified time
 func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId null.Int) (*shims.DropMatrixQueryResult, error) {
-	valueFunc := func() (interface{}, error) {
+	valueFunc := func() (*shims.DropMatrixQueryResult, error) {
 		savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId)
 		if err != nil {
 			return nil, err
@@ -80,7 +80,7 @@ func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx context.C
 		if err != nil {
 			return nil, err
 		}
-		return *slowResults, nil
+		return slowResults, nil
 	}
 
 	var results shims.DropMatrixQueryResult
@@ -94,12 +94,7 @@ func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx context.C
 		}
 		return &results, nil
 	} else {
-		r, err := valueFunc()
-		if err != nil {
-			return nil, err
-		}
-		results = r.(shims.DropMatrixQueryResult)
-		return &results, nil
+		return valueFunc()
 	}
 }
 
@@ -343,8 +338,8 @@ func (s *DropMatrixService) combineQuantityAndTimesResults(
 		resultsMap := make(map[int]int)
 		linq.From(firstGroupElements.Group).
 			ToMapByT(&resultsMap,
-				func(el interface{}) int { return el.(*models.TotalQuantityResultForDropMatrix).ItemID },
-				func(el interface{}) int { return el.(*models.TotalQuantityResultForDropMatrix).TotalQuantity })
+				func(el any) int { return el.(*models.TotalQuantityResultForDropMatrix).ItemID },
+				func(el any) int { return el.(*models.TotalQuantityResultForDropMatrix).TotalQuantity })
 		quantityResultsMap[stageId] = resultsMap
 	}
 

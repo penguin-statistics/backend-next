@@ -9,14 +9,14 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func NewSet(prefix string) *Set {
-	return &Set{
+func NewSet[T any](prefix string) *Set[T] {
+	return &Set[T]{
 		prefix: prefix + ":",
 		c:      cache.New(cache.NoExpiration, time.Minute*10),
 	}
 }
 
-type Set struct {
+type Set[T any] struct {
 	// m is a mutex for MutexGetSet for concurrent prevention
 	m sync.Mutex
 
@@ -25,11 +25,11 @@ type Set struct {
 	c *cache.Cache
 }
 
-func (c *Set) key(key string) string {
+func (c *Set[T]) key(key string) string {
 	return c.prefix + key
 }
 
-func (c *Set) Get(key string, dest interface{}) error {
+func (c *Set[T]) Get(key string, dest *T) error {
 	key = c.key(key)
 	result, ok := c.c.Get(key)
 	if !ok {
@@ -50,7 +50,7 @@ func (c *Set) Get(key string, dest interface{}) error {
 	return nil
 }
 
-func (c *Set) Set(key string, value interface{}, expire time.Duration) error {
+func (c *Set[T]) Set(key string, value T, expire time.Duration) error {
 	key = c.key(key)
 	if l := log.Trace(); l.Enabled() {
 		l.Str("key", key).Msg("setting value to cache")
@@ -63,7 +63,7 @@ func (c *Set) Set(key string, value interface{}, expire time.Duration) error {
 // to get cache value if the key still not exists when serially dispatched, sets value to cache and
 // writes value to dest.
 // The first return value means whether the value is got from cache or not. True means calculated; False means got from cache.
-func (c *Set) MutexGetSet(key string, dest interface{}, valueFunc func() (interface{}, error), expire time.Duration) (bool, error) {
+func (c *Set[T]) MutexGetSet(key string, dest *T, valueFunc func() (*T, error), expire time.Duration) (bool, error) {
 	err := c.Get(key, dest)
 	if err == nil {
 		return false, nil
@@ -73,7 +73,7 @@ func (c *Set) MutexGetSet(key string, dest interface{}, valueFunc func() (interf
 	return true, c.slowMutexGetSet(key, dest, valueFunc, expire)
 }
 
-func (c *Set) slowMutexGetSet(key string, dest interface{}, valueFunc func() (interface{}, error), expire time.Duration) error {
+func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, error), expire time.Duration) error {
 	c.m.Lock()
 	defer c.m.Unlock()
 	err := c.Get(key, dest)
@@ -88,7 +88,7 @@ func (c *Set) slowMutexGetSet(key string, dest interface{}, valueFunc func() (in
 		return err
 	}
 
-	err = c.Set(key, value, expire)
+	err = c.Set(key, *value, expire)
 	if err != nil {
 		log.Error().Err(err).Str("key", key).Msg("failed to set value to cache in MutexGetSet")
 		return err
@@ -106,7 +106,7 @@ func (c *Set) slowMutexGetSet(key string, dest interface{}, valueFunc func() (in
 	return nil
 }
 
-func (c *Set) Delete(key string) error {
+func (c *Set[T]) Delete(key string) error {
 	key = c.key(key)
 	if l := log.Trace(); l.Enabled() {
 		l.Str("key", key).Msg("deleting value from cache")
@@ -116,7 +116,7 @@ func (c *Set) Delete(key string) error {
 	return nil
 }
 
-func (c *Set) Clear() error {
+func (c *Set[T]) Flush() error {
 	c.c.Flush()
 	return nil
 }

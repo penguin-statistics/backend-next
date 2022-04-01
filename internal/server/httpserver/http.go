@@ -84,11 +84,10 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 		ReferrerPolicy:     "strict-origin-when-cross-origin",
 		PermissionPolicy:   "interest-cohort=()",
 	}))
-	app.Use(middlewares.EnrichSentry())
 	app.Use(middlewares.InjectI18n())
 	app.Use(recover.New(recover.Config{
 		EnableStackTrace: true,
-		StackTraceHandler: func(c *fiber.Ctx, e interface{}) {
+		StackTraceHandler: func(c *fiber.Ctx, e any) {
 			buf := make([]byte, 4096)
 			buf = buf[:runtime.Stack(buf, false)]
 			log.Error().Msgf("panic: %v\n%s\n", e, buf)
@@ -126,6 +125,7 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 	}
 
 	if !conf.DevMode {
+		app.Use(middlewares.EnrichSentry())
 		// app.Use(limiter.New(limiter.Config{
 		// 	Max:        30,
 		// 	Expiration: time.Minute,

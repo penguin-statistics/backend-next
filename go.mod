@@ -45,7 +45,9 @@ require (
 require (
 	github.com/fasthttp/websocket v1.5.0 // indirect
 	github.com/gofiber/websocket/v2 v2.0.18 // indirect
+	github.com/samber/lo v1.11.0 // indirect
 	github.com/savsgio/gotils v0.0.0-20220201163454-d252f0a44d5b // indirect
+	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 )
 
 require (
@@ -94,10 +96,10 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
-	golang.org/x/mod v0.5.1-0.20210830214625-1b1db11ec8f4 // indirect
+	golang.org/x/mod v0.6.0-dev.0.20211013180041-c96bc1413d57 // indirect
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
 	golang.org/x/sys v0.0.0-20220310020820-b874c991c1a5 // indirect
-	golang.org/x/tools v0.1.7 // indirect
+	golang.org/x/tools v0.1.8-0.20211029000441-d6a9af8af023 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 	honnef.co/go/tools v0.1.3 // indirect

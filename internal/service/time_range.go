@@ -43,13 +43,13 @@ func (s *TimeRangeService) GetTimeRangesByServer(ctx context.Context, server str
 // Cache: timeRange#rangeId:{rangeId}, 24hrs
 func (s *TimeRangeService) GetTimeRangeById(ctx context.Context, rangeId int) (*models.TimeRange, error) {
 	var timeRange models.TimeRange
-	err := cache.TimeRangeById.Get(strconv.Itoa(rangeId), &timeRange)
+	err := cache.TimeRangeByID.Get(strconv.Itoa(rangeId), &timeRange)
 	if err == nil {
 		return &timeRange, nil
 	}
 
 	slowTimeRange, err := s.TimeRangeRepo.GetTimeRangeById(ctx, rangeId)
-	go cache.TimeRangeById.Set(strconv.Itoa(rangeId), slowTimeRange, 24*time.Hour)
+	go cache.TimeRangeByID.Set(strconv.Itoa(rangeId), *slowTimeRange, 24*time.Hour)
 	return slowTimeRange, err
 }
 
@@ -118,8 +118,8 @@ func (s *TimeRangeService) GetMaxAccumulableTimeRangesByServer(ctx context.Conte
 		var groupedResults2 []linq.Group
 		linq.From(el.Group).
 			GroupByT(
-				func(dropInfo interface{}) int { return int(dropInfo.(*models.DropInfo).ItemID.Int64) },
-				func(dropInfo interface{}) *models.DropInfo { return dropInfo.(*models.DropInfo) },
+				func(dropInfo any) int { return int(dropInfo.(*models.DropInfo).ItemID.Int64) },
+				func(dropInfo any) *models.DropInfo { return dropInfo.(*models.DropInfo) },
 			).
 			ToSlice(&groupedResults2)
 		maxAccumulableTimeRangesForOneStage := make(map[int][]*models.TimeRange)

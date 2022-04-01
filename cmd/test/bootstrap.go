@@ -8,7 +8,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/appentry"
 )
 
-func populate(targets ...interface{}) {
+func populate(targets ...any) {
 	// for testing, logger is too annoying. therefore we use a NopLogger here
 	opts := []fx.Option{fx.NopLogger}
 	opts = append(opts, appentry.ProvideOptions(false)...)
