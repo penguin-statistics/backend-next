@@ -11,6 +11,7 @@ import (
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
+	"github.com/samber/lo"
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -122,6 +123,7 @@ func (s *DropInfoRepo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, se
 		return nil, err
 	}
 
+	results = lo.Uniq(results)
 	results = sort.IntSlice(results)
 	return results, nil
 }
