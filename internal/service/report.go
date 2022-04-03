@@ -16,7 +16,7 @@ import (
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
@@ -113,7 +113,7 @@ func (s *ReportService) pipelineMergeDropsAndMapDropTypes(ctx context.Context, d
 
 		convertedDrops = append(convertedDrops, &types.Drop{
 			// maps DropType to DB DropType
-			DropType: constants.DropTypeMap[drop.DropType],
+			DropType: constant.DropTypeMap[drop.DropType],
 			ItemID:   item.ItemID,
 			Quantity: drop.Quantity,
 		})
@@ -176,7 +176,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 	if err != nil {
 		return "", err
 	}
-	if category.Valid && category.String == constants.ExtraProcessTypeGachaBox {
+	if category.Valid && category.String == constant.ExtraProcessTypeGachaBox {
 		reportutil.AggregateGachaBoxDrops(singleReport)
 	}
 

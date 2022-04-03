@@ -6,7 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
@@ -33,9 +33,9 @@ func (s *ShortURLService) siteURL(ctx *fiber.Ctx, toPath string) string {
 	ip := util.ExtractIP(ctx)
 	var host string
 	if s.GeoIPService.InChinaMainland(ip) {
-		host = constants.SiteChinaMainlandMirrorHost
+		host = constant.SiteChinaMainlandMirrorHost
 	} else {
-		host = constants.SiteGlobalMirrorHost
+		host = constant.SiteGlobalMirrorHost
 	}
 
 	return "https://" + host + toPath

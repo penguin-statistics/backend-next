@@ -8,13 +8,13 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 )
 
 func EnrichSentry() func(ctx *fiber.Ctx) error {
 	return func(c *fiber.Ctx) error {
 		if hub := fibersentry.GetHubFromContext(c); hub != nil {
-			hub.Scope().SetTag("request_id", c.Locals(constants.ContextKeyRequestID).(string))
+			hub.Scope().SetTag("request_id", c.Locals(constant.ContextKeyRequestID).(string))
 		}
 
 		var r http.Request
@@ -22,7 +22,7 @@ func EnrichSentry() func(ctx *fiber.Ctx) error {
 			return err
 		}
 
-		spanIgnored := c.Get(constants.SlimHeaderKey) != ""
+		spanIgnored := c.Get(constant.SlimHeaderKey) != ""
 
 		if spanIgnored {
 			return c.Next()

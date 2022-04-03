@@ -7,7 +7,7 @@ import (
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
 	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
@@ -60,7 +60,7 @@ func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 	}
 
 	if !accountId.Valid {
-		key := server + constants.CacheSep + "true"
+		key := server + constant.CacheSep + "true"
 		var lastModifiedTime time.Time
 		if err := cache.LastModifiedTime.Get("[shimMaxAccumulableDropMatrixResults#server|showClosedZoned:"+key+"]", &lastModifiedTime); err != nil {
 			lastModifiedTime = time.Now()

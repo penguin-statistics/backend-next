@@ -6,7 +6,7 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
@@ -69,7 +69,7 @@ func (s *ActivityService) applyShim(activity *model.Activity) *modelv2.Activity 
 		LabelI18n: activity.Name,
 		Start:     activity.StartTime.UnixMilli(),
 	}
-	if activity.EndTime != nil && activity.EndTime.UnixMilli() != constants.FakeEndTimeMilli {
+	if activity.EndTime != nil && activity.EndTime.UnixMilli() != constant.FakeEndTimeMilli {
 		endTime := null.NewInt(activity.EndTime.UnixMilli(), true)
 		shimActivity.End = endTime
 	}

@@ -8,7 +8,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
@@ -68,7 +68,7 @@ func (w *Worker) do() {
 
 				errChan := make(chan error)
 				go func() {
-					for _, server := range constants.Servers {
+					for _, server := range constant.Servers {
 						log.Info().Str("server", server).Str("service", "DropMatrixService").Msg("worker microtask started calculating")
 						if err := w.DropMatrixService.RefreshAllDropMatrixElements(sessCtx, server); err != nil {
 							log.Error().Err(err).Str("server", server).Str("service", "DropMatrixService").Msg("worker microtask failed")

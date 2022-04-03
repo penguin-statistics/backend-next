@@ -1,3 +1,3 @@
-package constants
+package constant
 
 const CacheSep = "|"

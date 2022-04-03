@@ -8,7 +8,7 @@ import (
 	"github.com/tidwall/gjson"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
@@ -166,20 +166,20 @@ func (s *StageService) applyShim(stage *modelv2.Stage) {
 	}
 
 	if !stage.Sanity.Valid {
-		stage.Sanity = null.NewInt(constants.DefaultNullSanity, true)
+		stage.Sanity = null.NewInt(constant.DefaultNullSanity, true)
 	}
 
 	recognitionOnlyArkItemIds := make([]string, 0)
 	linq.From(stage.DropInfos).
 		WhereT(func(dropInfo *modelv2.DropInfo) bool {
-			if dropInfo.DropType == constants.DropTypeRecognitionOnly {
+			if dropInfo.DropType == constant.DropTypeRecognitionOnly {
 				extras := gjson.ParseBytes(dropInfo.Extras)
 				if !extras.IsObject() {
 					return false
 				}
 				recognitionOnlyArkItemIds = append(recognitionOnlyArkItemIds, extras.Get("arkItemId").Value().(string))
 			}
-			return dropInfo.DropType != constants.DropTypeRecognitionOnly
+			return dropInfo.DropType != constant.DropTypeRecognitionOnly
 		}).
 		ToSlice(&stage.DropInfos)
 	stage.RecognitionOnly = recognitionOnlyArkItemIds
@@ -191,6 +191,6 @@ func (s *StageService) applyShim(stage *modelv2.Stage) {
 		if i.Stage != nil {
 			i.ArkStageID = i.Stage.ArkStageID
 		}
-		i.DropType = constants.DropTypeReversedMap[i.DropType]
+		i.DropType = constant.DropTypeReversedMap[i.DropType]
 	}
 }

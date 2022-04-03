@@ -10,7 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 )
 
 func TestV2Result(t *testing.T) {
@@ -24,7 +24,7 @@ func TestV2Result(t *testing.T) {
 		}
 
 		testSource := func(path, source string, requestChanger func(*http.Request) *http.Request) {
-			for _, server := range constants.Servers {
+			for _, server := range constant.Servers {
 				replacedPath := strings.Replace(path, ":server", server, 1)
 				replacedPath = strings.Replace(replacedPath, ":source", source, 1)
 
@@ -66,7 +66,7 @@ func TestV2Result(t *testing.T) {
 		}
 
 		testServer := func(path string, isPersonal bool, requestChanger func(*http.Request) *http.Request) {
-			for _, server := range constants.Servers {
+			for _, server := range constant.Servers {
 				replacedPath := strings.Replace(path, ":server", server, 1)
 				replacedPath = strings.Replace(replacedPath, ":isPersonal", strconv.FormatBool(isPersonal), 1)
 

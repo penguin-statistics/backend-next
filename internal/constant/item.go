@@ -1,4 +1,4 @@
-package constants
+package constant
 
 const (
 	ItemTypeCardExp    = "CARD_EXP"

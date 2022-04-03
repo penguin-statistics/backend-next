@@ -1,4 +1,4 @@
-package constants
+package constant
 
 const (
 	FakeEndTimeMilli int64 = 62141368179000

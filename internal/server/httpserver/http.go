@@ -30,7 +30,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
 	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
 )
@@ -75,7 +75,7 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 				id := flake.Generate().IntBytes()
 				return hex.EncodeToString(id[:])
 			},
-			ContextKey: constants.ContextKeyRequestID,
+			ContextKey: constant.ContextKeyRequestID,
 		},
 	))
 	app.Use(helmet.New(helmet.Config{

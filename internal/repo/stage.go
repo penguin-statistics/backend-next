@@ -10,7 +10,7 @@ import (
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
@@ -178,7 +178,7 @@ func (c *Stage) GetGachaBoxStages(ctx context.Context) ([]*model.Stage, error) {
 	var stages []*model.Stage
 	err := c.db.NewSelect().
 		Model(&stages).
-		Where("extra_process_type = ?", constants.ExtraProcessTypeGachaBox).
+		Where("extra_process_type = ?", constant.ExtraProcessTypeGachaBox).
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {

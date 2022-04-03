@@ -1,4 +1,4 @@
-package constants
+package constant
 
 var Languages = []string{
 	"zh",

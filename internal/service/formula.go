@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
@@ -28,7 +28,7 @@ func (s *FormulaService) GetFormula(ctx context.Context) (json.RawMessage, error
 		return formula, nil
 	}
 
-	property, err := s.PropertyRepo.GetPropertyByKey(ctx, constants.FormulaPropertyKey)
+	property, err := s.PropertyRepo.GetPropertyByKey(ctx, constant.FormulaPropertyKey)
 	if err != nil {
 		return nil, err
 	}

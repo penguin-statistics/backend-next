@@ -14,7 +14,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgqry"
@@ -134,7 +134,7 @@ func (s *DropInfo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, quer
 		return nil, nil, err
 	}
 	for _, dropInfo := range allDropInfos {
-		if dropInfo.DropType != constants.DropTypeRecognitionOnly {
+		if dropInfo.DropType != constant.DropTypeRecognitionOnly {
 			if dropInfo.ItemID.Valid {
 				itemDropInfos = append(itemDropInfos, dropInfo)
 			} else {
@@ -187,7 +187,7 @@ func (s *DropInfo) GetDropInfosWithFilters(ctx context.Context, server string, t
 		}
 	}
 	if err := s.DB.NewSelect().TableExpr("drop_infos as di").Column("di.stage_id", "di.item_id", "di.accumulable").
-		Where(whereBuilder.String(), server, constants.DropTypeRecognitionOnly, bun.In(stageIdFilter), bun.In(itemIdFilter)).
+		Where(whereBuilder.String(), server, constant.DropTypeRecognitionOnly, bun.In(stageIdFilter), bun.In(itemIdFilter)).
 		Join("JOIN time_ranges AS tr ON tr.range_id = di.range_id").
 		Scan(ctx, &results); err != nil {
 		return nil, err

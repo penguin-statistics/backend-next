@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
@@ -85,7 +85,7 @@ func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx context.C
 
 	var results modelv2.DropMatrixQueryResult
 	if !accountId.Valid && stageFilterStr == "" && itemFilterStr == "" {
-		key := server + constants.CacheSep + strconv.FormatBool(showClosedZones)
+		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones)
 		calculated, err := cache.ShimMaxAccumulableDropMatrixResults.MutexGetSet(key, &results, valueFunc, 24*time.Hour)
 		if err != nil {
 			return nil, err
@@ -154,10 +154,10 @@ func (s *DropMatrixService) RefreshAllDropMatrixElements(ctx context.Context, se
 	if err := s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server); err != nil {
 		return err
 	}
-	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constants.CacheSep + "true"); err != nil {
+	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constant.CacheSep + "true"); err != nil {
 		return err
 	}
-	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constants.CacheSep + "false"); err != nil {
+	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constant.CacheSep + "false"); err != nil {
 		return err
 	}
 	return nil
@@ -552,7 +552,7 @@ func (s *DropMatrixService) applyShimForDropMatrixQuery(ctx context.Context, ser
 			StartTime: el.TimeRange.StartTime.UnixMilli(),
 			EndTime:   endTime,
 		}
-		if oneDropMatrixElement.EndTime.Int64 == constants.FakeEndTimeMilli {
+		if oneDropMatrixElement.EndTime.Int64 == constant.FakeEndTimeMilli {
 			oneDropMatrixElement.EndTime = null.NewInt(0, false)
 		}
 		results.Matrix = append(results.Matrix, &oneDropMatrixElement)

@@ -6,7 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/model/gamedata"
@@ -104,7 +104,7 @@ func getTimeFromString(timeRange types.TimeRange) (startTime *time.Time, endTime
 	if err != nil {
 		return nil, nil, err
 	}
-	end := time.UnixMilli(constants.FakeEndTimeMilli)
+	end := time.UnixMilli(constant.FakeEndTimeMilli)
 	if timeRange.EndTime.Valid {
 		end, err = time.Parse(TimeLayout, timeRange.EndTime.String)
 		if err != nil {

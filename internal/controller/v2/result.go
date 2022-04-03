@@ -9,7 +9,7 @@ import (
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
@@ -97,7 +97,7 @@ func (c *Result) GetDropMatrix(ctx *fiber.Ctx) error {
 
 	useCache := !accountId.Valid && stageFilterStr == "" && itemFilterStr == ""
 	if useCache {
-		key := server + constants.CacheSep + strconv.FormatBool(showClosedZones)
+		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones)
 		var lastModifiedTime time.Time
 		if err := cache.LastModifiedTime.Get("[shimMaxAccumulableDropMatrixResults#server|showClosedZoned:"+key+"]", &lastModifiedTime); err != nil {
 			lastModifiedTime = time.Now()
@@ -224,14 +224,14 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 	}
 
 	// handle start time (might be null)
-	startTimeMilli := constants.ServerStartTimeMapMillis[query.Server]
+	startTimeMilli := constant.ServerStartTimeMapMillis[query.Server]
 	if query.StartTime.Valid {
 		startTimeMilli = query.StartTime.Int64
 	}
 	startTime := time.UnixMilli(startTimeMilli)
 
 	// handle end time (might be null)
-	endTimeMilli := constants.FakeEndTimeMilli
+	endTimeMilli := constant.FakeEndTimeMilli
 	if query.EndTime.Valid {
 		endTimeMilli = query.EndTime.Int64
 	}
@@ -267,8 +267,8 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 			return nil, ErrIntervalLengthTooSmall
 		}
 		intervalNum := c.calcIntervalNum(startTime, endTime, intervalLength)
-		if intervalNum > constants.MaxIntervalNum {
-			return nil, pgerr.ErrInvalidReq.Msg("interval length is too long: interval length is %.2f sections, which is larger than %d sections", intervalNum, constants.MaxIntervalNum)
+		if intervalNum > constant.MaxIntervalNum {
+			return nil, pgerr.ErrInvalidReq.Msg("interval length is too long: interval length is %.2f sections, which is larger than %d sections", intervalNum, constant.MaxIntervalNum)
 		}
 
 		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx.Context(), query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, accountId)

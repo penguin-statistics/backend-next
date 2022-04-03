@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
@@ -135,7 +135,7 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 			if !util.IsGameDayStartTime(server, endTime) {
 				endTime = util.GetGameDayEndTime(server, endTime)
 			} else {
-				loc := constants.LocMap[server]
+				loc := constant.LocMap[server]
 				endTime = endTime.In(loc)
 			}
 
@@ -145,8 +145,8 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 				intervalNum++
 			}
 
-			if intervalNum > constants.DefaultIntervalNum {
-				intervalNum = constants.DefaultIntervalNum
+			if intervalNum > constant.DefaultIntervalNum {
+				intervalNum = constant.DefaultIntervalNum
 				startTime = endTime.Add(time.Hour * time.Duration((-1)*24*intervalNum))
 			}
 
@@ -416,7 +416,7 @@ func (s *TrendService) applyShimForCustomizedTrendQuery(ctx context.Context, que
 }
 
 func (s *TrendService) applyShimForSavedTrendQuery(ctx context.Context, server string, queryResult *model.TrendQueryResult) (*modelv2.TrendQueryResult, error) {
-	shimMinStartTime := util.GetGameDayEndTime(server, time.Now()).Add(-1 * constants.DefaultIntervalNum * 24 * time.Hour)
+	shimMinStartTime := util.GetGameDayEndTime(server, time.Now()).Add(-1 * constant.DefaultIntervalNum * 24 * time.Hour)
 	currentGameDayEndTime := util.GetGameDayEndTime(server, time.Now())
 
 	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)

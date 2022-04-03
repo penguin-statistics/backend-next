@@ -13,7 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
@@ -364,7 +364,7 @@ func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx context.Contex
 				EndTime:   endTime,
 				Pattern:   &pattern,
 			}
-			if onePatternMatrixElement.EndTime.Int64 == constants.FakeEndTimeMilli {
+			if onePatternMatrixElement.EndTime.Int64 == constant.FakeEndTimeMilli {
 				onePatternMatrixElement.EndTime = null.NewInt(0, false)
 			}
 			results.PatternMatrix = append(results.PatternMatrix, &onePatternMatrixElement)

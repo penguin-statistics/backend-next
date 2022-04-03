@@ -10,7 +10,7 @@ import (
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgqry"
@@ -335,7 +335,7 @@ func (s *DropReport) CalcTotalStageQuantityForShimSiteStats(ctx context.Context,
 func (s *DropReport) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelv2.TotalItemQuantity, error) {
 	results := make([]*modelv2.TotalItemQuantity, 0)
 
-	types := []string{constants.ItemTypeMaterial, constants.ItemTypeFurniture, constants.ItemTypeChip}
+	types := []string{constant.ItemTypeMaterial, constant.ItemTypeFurniture, constant.ItemTypeChip}
 	err := pgqry.New(
 		s.DB.NewSelect().
 			TableExpr("drop_reports AS dr").
