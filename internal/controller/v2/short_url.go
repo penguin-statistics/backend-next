@@ -1,4 +1,4 @@
-package controller
+package v2
 
 import (
 	"github.com/gofiber/fiber/v2"

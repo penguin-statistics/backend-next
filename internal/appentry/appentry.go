@@ -6,8 +6,8 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/controller"
 	controllerv2 "github.com/penguin-statistics/backend-next/internal/controller/v2"
+	controllermeta "github.com/penguin-statistics/backend-next/internal/controller/meta"
 	"github.com/penguin-statistics/backend-next/internal/infra"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/crypto"
@@ -90,10 +90,10 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Invoke(controllerv2.RegisterPrivate),
 		fx.Invoke(controllerv2.RegisterSiteStats),
 		fx.Invoke(controllerv2.RegisterEventPeriod),
-		fx.Invoke(controller.RegisterMetaController),
-		fx.Invoke(controller.RegisterIndexController),
-		fx.Invoke(controller.RegisterAdminController),
-		fx.Invoke(controller.RegisterShortURLController),
+		fx.Invoke(controllerv2.RegisterShortURLController),
+		fx.Invoke(controllermeta.RegisterMetaController),
+		fx.Invoke(controllermeta.RegisterIndexController),
+		fx.Invoke(controllermeta.RegisterAdminController),
 		fx.Invoke(calcwkr.Start),
 		fx.StartTimeout(1 * time.Second),
 		// StopTimeout is not typically needed, since we're using fiber's Shutdown(),
@@ -103,7 +103,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 	}
 
 	if includeSwagger {
-		opts = append(opts, fx.Invoke(controller.RegisterSwaggerController))
+		opts = append(opts, fx.Invoke(controllermeta.RegisterSwaggerController))
 	}
 
 	return opts
