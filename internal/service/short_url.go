@@ -14,7 +14,6 @@ type ShortURLService struct {
 	ItemService  *ItemService
 	StageService *StageService
 	ZoneService  *ZoneService
-
 	GeoIPService *GeoIPService
 }
 
@@ -41,7 +40,7 @@ func (s *ShortURLService) siteURL(ctx *fiber.Ctx, toPath string) string {
 	return "https://" + host + toPath
 }
 
-func (s *ShortURLService) ResolveShortURL(ctx *fiber.Ctx, path string) string {
+func (s *ShortURLService) Resolve(ctx *fiber.Ctx, path string) string {
 	defaultPath := "/?utm_source=exusiai&utm_medium=root&utm_campaign=root"
 	if path == "" || len(path) > 128 {
 		return s.siteURL(ctx, defaultPath)

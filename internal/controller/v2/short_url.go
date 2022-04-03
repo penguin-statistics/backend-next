@@ -8,18 +8,18 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
-type ShortURLController struct {
+type ShortURL struct {
 	fx.In
 
 	ShortURLService *service.ShortURLService
 }
 
-func RegisterShortURLController(v2 *svr.V2, c ShortURLController) {
-	v2.Get("/short", c.ResolveShortURL)
-	v2.Get("/short/:word", c.ResolveShortURL)
+func RegisterShortURL(v2 *svr.V2, c ShortURL) {
+	v2.Get("/short", c.Resolve)
+	v2.Get("/short/:word", c.Resolve)
 }
 
-func (c *ShortURLController) ResolveShortURL(ctx *fiber.Ctx) error {
+func (c *ShortURL) Resolve(ctx *fiber.Ctx) error {
 	word := ctx.Params("word")
-	return ctx.Redirect(c.ShortURLService.ResolveShortURL(ctx, word))
+	return ctx.Redirect(c.ShortURLService.Resolve(ctx, word))
 }
