@@ -3,7 +3,7 @@ package reportutil
 import (
 	"github.com/ahmetb/go-linq/v3"
 
-	"github.com/penguin-statistics/backend-next/internal/models/types"
+	"github.com/penguin-statistics/backend-next/internal/model/types"
 )
 
 // MergeDrops merges drops with same (DropType, ItemID) pair into one drop, summing up their Quantity values.

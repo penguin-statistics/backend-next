@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
@@ -17,7 +17,7 @@ func NewPatternMatrixElementService(patternMatrixElementRepo *repo.PatternMatrix
 	}
 }
 
-func (s *PatternMatrixElementService) BatchSaveElements(ctx context.Context, elements []*models.PatternMatrixElement, server string) error {
+func (s *PatternMatrixElementService) BatchSaveElements(ctx context.Context, elements []*model.PatternMatrixElement, server string) error {
 	return s.PatternMatrixElementRepo.BatchSaveElements(ctx, elements, server)
 }
 
@@ -25,6 +25,6 @@ func (s *PatternMatrixElementService) DeleteByServer(ctx context.Context, server
 	return s.PatternMatrixElementRepo.DeleteByServer(ctx, server)
 }
 
-func (s *PatternMatrixElementService) GetElementsByServer(ctx context.Context, server string) ([]*models.PatternMatrixElement, error) {
+func (s *PatternMatrixElementService) GetElementsByServer(ctx context.Context, server string) ([]*model.PatternMatrixElement, error) {
 	return s.PatternMatrixElementRepo.GetElementsByServer(ctx, server)
 }

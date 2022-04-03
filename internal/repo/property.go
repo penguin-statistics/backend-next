@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
@@ -19,8 +19,8 @@ func NewPropertyRepo(db *bun.DB) *Property {
 	return &Property{db: db}
 }
 
-func (c *Property) GetProperties(ctx context.Context) ([]*models.Property, error) {
-	var properties []*models.Property
+func (c *Property) GetProperties(ctx context.Context) ([]*model.Property, error) {
+	var properties []*model.Property
 	err := c.db.NewSelect().
 		Model(&properties).
 		Scan(ctx)
@@ -34,8 +34,8 @@ func (c *Property) GetProperties(ctx context.Context) ([]*models.Property, error
 	return properties, nil
 }
 
-func (c *Property) GetPropertyByKey(ctx context.Context, key string) (*models.Property, error) {
-	var property models.Property
+func (c *Property) GetPropertyByKey(ctx context.Context, key string) (*model.Property, error) {
+	var property model.Property
 	err := c.db.NewSelect().
 		Model(&property).
 		Where("key = ?", key).

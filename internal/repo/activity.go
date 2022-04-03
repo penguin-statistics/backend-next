@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/model"
 )
 
 type Activity struct {
@@ -18,8 +18,8 @@ func NewActivity(db *bun.DB) *Activity {
 	return &Activity{DB: db}
 }
 
-func (c *Activity) GetActivities(ctx context.Context) ([]*models.Activity, error) {
-	var activities []*models.Activity
+func (c *Activity) GetActivities(ctx context.Context) ([]*model.Activity, error) {
+	var activities []*model.Activity
 	err := c.DB.NewSelect().
 		Model(&activities).
 		Scan(ctx)

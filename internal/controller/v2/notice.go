@@ -5,7 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
@@ -26,7 +26,7 @@ func RegisterNoticeController(v2 *svr.V2, noticeService *service.NoticeService) 
 // @Summary      Get All Notices
 // @Tags         Notice
 // @Produce      json
-// @Success      200     {array}  models.Notice
+// @Success      200     {array}  model.Notice
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/notice [GET]
 func (c *NoticeController) GetNotices(ctx *fiber.Ctx) error {

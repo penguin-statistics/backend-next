@@ -7,9 +7,9 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
@@ -24,8 +24,8 @@ func NewActivityService(activityRepo *repo.Activity) *ActivityService {
 }
 
 // Cache: (singular) activities, 24hrs; records last modified time
-func (s *ActivityService) GetActivities(ctx context.Context) ([]*models.Activity, error) {
-	var activities []*models.Activity
+func (s *ActivityService) GetActivities(ctx context.Context) ([]*model.Activity, error) {
+	var activities []*model.Activity
 	err := cache.Activities.Get(&activities)
 	if err == nil {
 		return activities, nil
@@ -63,7 +63,7 @@ func (s *ActivityService) GetShimActivities(ctx context.Context) ([]*modelv2.Act
 	return shimActivities, nil
 }
 
-func (s *ActivityService) applyShim(activity *models.Activity) *modelv2.Activity {
+func (s *ActivityService) applyShim(activity *model.Activity) *modelv2.Activity {
 	shimActivity := &modelv2.Activity{
 		Existence: activity.Existence,
 		LabelI18n: activity.Name,

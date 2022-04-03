@@ -12,8 +12,8 @@ import (
 	"github.com/uptrace/bun"
 	"github.com/zeebo/xxh3"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/types"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
@@ -25,8 +25,8 @@ func NewDropPattern(db *bun.DB) *DropPattern {
 	return &DropPattern{DB: db}
 }
 
-func (s *DropPattern) GetDropPatternById(ctx context.Context, id int) (*models.DropPattern, error) {
-	var dropPattern models.DropPattern
+func (s *DropPattern) GetDropPatternById(ctx context.Context, id int) (*model.DropPattern, error) {
+	var dropPattern model.DropPattern
 	err := s.DB.NewSelect().
 		Model(&dropPattern).
 		Where("id = ?", id).
@@ -41,8 +41,8 @@ func (s *DropPattern) GetDropPatternById(ctx context.Context, id int) (*models.D
 	return &dropPattern, nil
 }
 
-func (s *DropPattern) GetDropPatternByHash(ctx context.Context, hash string) (*models.DropPattern, error) {
-	var dropPattern models.DropPattern
+func (s *DropPattern) GetDropPatternByHash(ctx context.Context, hash string) (*model.DropPattern, error) {
+	var dropPattern model.DropPattern
 	err := s.DB.NewSelect().
 		Model(&dropPattern).
 		Where("hash = ?", hash).
@@ -57,9 +57,9 @@ func (s *DropPattern) GetDropPatternByHash(ctx context.Context, hash string) (*m
 	return &dropPattern, nil
 }
 
-func (s *DropPattern) GetOrCreateDropPatternFromDrops(ctx context.Context, tx bun.Tx, drops []*types.Drop) (*models.DropPattern, bool, error) {
+func (s *DropPattern) GetOrCreateDropPatternFromDrops(ctx context.Context, tx bun.Tx, drops []*types.Drop) (*model.DropPattern, bool, error) {
 	originalFingerprint, hash := s.calculateDropPatternHash(drops)
-	dropPattern := &models.DropPattern{
+	dropPattern := &model.DropPattern{
 		Hash:                hash,
 		OriginalFingerprint: originalFingerprint,
 	}

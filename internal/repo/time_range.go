@@ -5,7 +5,7 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/model"
 )
 
 type TimeRange struct {
@@ -16,8 +16,8 @@ func NewTimeRange(db *bun.DB) *TimeRange {
 	return &TimeRange{db: db}
 }
 
-func (c *TimeRange) GetTimeRangesByServer(ctx context.Context, server string) ([]*models.TimeRange, error) {
-	var timeRanges []*models.TimeRange
+func (c *TimeRange) GetTimeRangesByServer(ctx context.Context, server string) ([]*model.TimeRange, error) {
+	var timeRanges []*model.TimeRange
 	if err := c.db.NewSelect().
 		Model(&timeRanges).
 		Where("tr.server = ?", server).
@@ -27,8 +27,8 @@ func (c *TimeRange) GetTimeRangesByServer(ctx context.Context, server string) ([
 	return timeRanges, nil
 }
 
-func (c *TimeRange) GetTimeRangeById(ctx context.Context, rangeId int) (*models.TimeRange, error) {
-	var timeRange models.TimeRange
+func (c *TimeRange) GetTimeRangeById(ctx context.Context, rangeId int) (*model.TimeRange, error) {
+	var timeRange model.TimeRange
 	if err := c.db.NewSelect().
 		Model(&timeRange).
 		Where("tr.range_id = ?", rangeId).

@@ -9,7 +9,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/controller"
 	controllerv2 "github.com/penguin-statistics/backend-next/internal/controller/v2"
 	"github.com/penguin-statistics/backend-next/internal/infra"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/flake"
 	"github.com/penguin-statistics/backend-next/internal/pkg/logger"
 	"github.com/penguin-statistics/backend-next/internal/repo"

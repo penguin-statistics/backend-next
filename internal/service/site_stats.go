@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 

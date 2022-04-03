@@ -11,8 +11,8 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
-	"github.com/penguin-statistics/backend-next/internal/models"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgqry"
 	"github.com/penguin-statistics/backend-next/internal/util"
 )
@@ -27,7 +27,7 @@ func NewDropReport(db *bun.DB) *DropReport {
 	}
 }
 
-func (s *DropReport) CreateDropReport(ctx context.Context, tx bun.Tx, dropReport *models.DropReport) error {
+func (s *DropReport) CreateDropReport(ctx context.Context, tx bun.Tx, dropReport *model.DropReport) error {
 	_, err := tx.NewInsert().
 		Model(dropReport).
 		ExcludeColumn("created_at").
@@ -37,7 +37,7 @@ func (s *DropReport) CreateDropReport(ctx context.Context, tx bun.Tx, dropReport
 
 func (s *DropReport) DeleteDropReport(ctx context.Context, reportId int) error {
 	_, err := s.DB.NewUpdate().
-		Model((*models.DropReport)(nil)).
+		Model((*model.DropReport)(nil)).
 		Set("reliability = ?", -1).
 		Where("report_id = ?", reportId).
 		Exec(ctx)
@@ -45,9 +45,9 @@ func (s *DropReport) DeleteDropReport(ctx context.Context, reportId int) error {
 }
 
 func (s *DropReport) CalcTotalQuantityForDropMatrix(
-	ctx context.Context, server string, timeRange *models.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int,
-) ([]*models.TotalQuantityResultForDropMatrix, error) {
-	results := make([]*models.TotalQuantityResultForDropMatrix, 0)
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int,
+) ([]*model.TotalQuantityResultForDropMatrix, error) {
+	results := make([]*model.TotalQuantityResultForDropMatrix, 0)
 	if len(stageIdItemIdMap) == 0 {
 		return results, nil
 	}
@@ -91,9 +91,9 @@ func (s *DropReport) CalcTotalQuantityForDropMatrix(
 }
 
 func (s *DropReport) CalcTotalQuantityForPatternMatrix(
-	ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId null.Int,
-) ([]*models.TotalQuantityResultForPatternMatrix, error) {
-	results := make([]*models.TotalQuantityResultForPatternMatrix, 0)
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int,
+) ([]*model.TotalQuantityResultForPatternMatrix, error) {
+	results := make([]*model.TotalQuantityResultForPatternMatrix, 0)
 	if len(stageIds) == 0 {
 		return results, nil
 	}
@@ -130,9 +130,9 @@ func (s *DropReport) CalcTotalQuantityForPatternMatrix(
 }
 
 func (s *DropReport) CalcTotalTimes(
-	ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId null.Int, excludeNonOneTimes bool,
-) ([]*models.TotalTimesResult, error) {
-	results := make([]*models.TotalTimesResult, 0)
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int, excludeNonOneTimes bool,
+) ([]*model.TotalTimesResult, error) {
+	results := make([]*model.TotalTimesResult, 0)
 	if len(stageIds) == 0 {
 		return results, nil
 	}
@@ -173,8 +173,8 @@ func (s *DropReport) CalcTotalTimes(
 
 func (s *DropReport) CalcTotalQuantityForTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int,
-) ([]*models.TotalQuantityResultForTrend, error) {
-	results := make([]*models.TotalQuantityResultForTrend, 0)
+) ([]*model.TotalQuantityResultForTrend, error) {
+	results := make([]*model.TotalQuantityResultForTrend, 0)
 	if len(stageIdItemIdMap) == 0 {
 		return results, nil
 	}
@@ -238,8 +238,8 @@ func (s *DropReport) CalcTotalQuantityForTrend(
 
 func (s *DropReport) CalcTotalTimesForTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId null.Int,
-) ([]*models.TotalTimesResultForTrend, error) {
-	results := make([]*models.TotalTimesResultForTrend, 0)
+) ([]*model.TotalTimesResultForTrend, error) {
+	results := make([]*model.TotalTimesResultForTrend, 0)
 	if len(stageIds) == 0 {
 		return results, nil
 	}

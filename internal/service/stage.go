@@ -9,9 +9,9 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
@@ -27,8 +27,8 @@ func NewStageService(stageRepo *repo.Stage) *StageService {
 }
 
 // Cache: (singular) stages, 24hrs
-func (s *StageService) GetStages(ctx context.Context) ([]*models.Stage, error) {
-	var stages []*models.Stage
+func (s *StageService) GetStages(ctx context.Context) ([]*model.Stage, error) {
+	var stages []*model.Stage
 	err := cache.Stages.Get(&stages)
 	if err == nil {
 		return stages, nil
@@ -39,7 +39,7 @@ func (s *StageService) GetStages(ctx context.Context) ([]*models.Stage, error) {
 	return stages, err
 }
 
-func (s *StageService) GetStageById(ctx context.Context, stageId int) (*models.Stage, error) {
+func (s *StageService) GetStageById(ctx context.Context, stageId int) (*model.Stage, error) {
 	stagesMapById, err := s.GetStagesMapById(ctx)
 	if err != nil {
 		return nil, err
@@ -52,8 +52,8 @@ func (s *StageService) GetStageById(ctx context.Context, stageId int) (*models.S
 }
 
 // Cache: stage#arkStageId:{arkStageId}, 24hrs
-func (s *StageService) GetStageByArkId(ctx context.Context, arkStageId string) (*models.Stage, error) {
-	var stage models.Stage
+func (s *StageService) GetStageByArkId(ctx context.Context, arkStageId string) (*model.Stage, error) {
+	var stage model.Stage
 	err := cache.StageByArkID.Get(arkStageId, &stage)
 	if err == nil {
 		return &stage, nil
@@ -67,7 +67,7 @@ func (s *StageService) GetStageByArkId(ctx context.Context, arkStageId string) (
 	return dbStage, nil
 }
 
-func (s *StageService) SearchStageByCode(ctx context.Context, code string) (*models.Stage, error) {
+func (s *StageService) SearchStageByCode(ctx context.Context, code string) (*model.Stage, error) {
 	return s.StageRepo.SearchStageByCode(ctx, code)
 }
 
@@ -114,14 +114,14 @@ func (s *StageService) GetStageExtraProcessTypeByArkId(ctx context.Context, arkS
 }
 
 // Cache: (singular) stagesMapById, 24hrs
-func (s *StageService) GetStagesMapById(ctx context.Context) (map[int]*models.Stage, error) {
-	var stagesMapById map[int]*models.Stage
-	cache.StagesMapByID.MutexGetSet(&stagesMapById, func() (map[int]*models.Stage, error) {
+func (s *StageService) GetStagesMapById(ctx context.Context) (map[int]*model.Stage, error) {
+	var stagesMapById map[int]*model.Stage
+	cache.StagesMapByID.MutexGetSet(&stagesMapById, func() (map[int]*model.Stage, error) {
 		stages, err := s.GetStages(ctx)
 		if err != nil {
 			return nil, err
 		}
-		s := make(map[int]*models.Stage)
+		s := make(map[int]*model.Stage)
 		for _, stage := range stages {
 			s[stage.StageID] = stage
 		}
@@ -131,14 +131,14 @@ func (s *StageService) GetStagesMapById(ctx context.Context) (map[int]*models.St
 }
 
 // Cache: (singular) stagesMapByArkId, 24hrs
-func (s *StageService) GetStagesMapByArkId(ctx context.Context) (map[string]*models.Stage, error) {
-	var stagesMapByArkId map[string]*models.Stage
-	cache.StagesMapByArkID.MutexGetSet(&stagesMapByArkId, func() (map[string]*models.Stage, error) {
+func (s *StageService) GetStagesMapByArkId(ctx context.Context) (map[string]*model.Stage, error) {
+	var stagesMapByArkId map[string]*model.Stage
+	cache.StagesMapByArkID.MutexGetSet(&stagesMapByArkId, func() (map[string]*model.Stage, error) {
 		stages, err := s.GetStages(ctx)
 		if err != nil {
 			return nil, err
 		}
-		s := make(map[string]*models.Stage)
+		s := make(map[string]*model.Stage)
 		for _, stage := range stages {
 			s[stage.ArkStageID] = stage
 		}
@@ -147,10 +147,10 @@ func (s *StageService) GetStagesMapByArkId(ctx context.Context) (map[string]*mod
 	return stagesMapByArkId, nil
 }
 
-func (s *StageService) GetGachaBoxStages(ctx context.Context) ([]*models.Stage, error) {
+func (s *StageService) GetGachaBoxStages(ctx context.Context) ([]*model.Stage, error) {
 	stages, err := s.StageRepo.GetGachaBoxStages(ctx)
 	if err == pgerr.ErrNotFound {
-		return make([]*models.Stage, 0), nil
+		return make([]*model.Stage, 0), nil
 	} else if err != nil {
 		return nil, err
 	}

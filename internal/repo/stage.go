@@ -11,8 +11,8 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
-	"github.com/penguin-statistics/backend-next/internal/models"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
@@ -24,8 +24,8 @@ func NewStageRepo(db *bun.DB) *Stage {
 	return &Stage{db: db}
 }
 
-func (c *Stage) GetStages(ctx context.Context) ([]*models.Stage, error) {
-	var stages []*models.Stage
+func (c *Stage) GetStages(ctx context.Context) ([]*model.Stage, error) {
+	var stages []*model.Stage
 	err := c.db.NewSelect().
 		Model(&stages).
 		Order("stage_id ASC").
@@ -40,8 +40,8 @@ func (c *Stage) GetStages(ctx context.Context) ([]*models.Stage, error) {
 	return stages, nil
 }
 
-func (c *Stage) GetStageById(ctx context.Context, stageId int) (*models.Stage, error) {
-	var stage models.Stage
+func (c *Stage) GetStageById(ctx context.Context, stageId int) (*model.Stage, error) {
+	var stage model.Stage
 	err := c.db.NewSelect().
 		Model(&stage).
 		Where("stage_id = ?", stageId).
@@ -56,8 +56,8 @@ func (c *Stage) GetStageById(ctx context.Context, stageId int) (*models.Stage, e
 	return &stage, nil
 }
 
-func (c *Stage) GetStageByArkId(ctx context.Context, arkStageId string) (*models.Stage, error) {
-	var stage models.Stage
+func (c *Stage) GetStageByArkId(ctx context.Context, arkStageId string) (*model.Stage, error) {
+	var stage model.Stage
 	err := c.db.NewSelect().
 		Model(&stage).
 		Where("ark_stage_id = ?", arkStageId).
@@ -142,7 +142,7 @@ func (c *Stage) GetShimStageByArkId(ctx context.Context, arkStageId string, serv
 }
 
 func (c *Stage) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId string) (null.String, error) {
-	var stage models.Stage
+	var stage model.Stage
 	err := c.db.NewSelect().
 		Model(&stage).
 		Column("st.extra_process_type").
@@ -158,8 +158,8 @@ func (c *Stage) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId 
 	return stage.ExtraProcessType, nil
 }
 
-func (c *Stage) SearchStageByCode(ctx context.Context, code string) (*models.Stage, error) {
-	var stage models.Stage
+func (c *Stage) SearchStageByCode(ctx context.Context, code string) (*model.Stage, error) {
+	var stage model.Stage
 	err := c.db.NewSelect().
 		Model(&stage).
 		Where("\"code\"::TEXT ILIKE ?", "%"+code+"%").
@@ -174,8 +174,8 @@ func (c *Stage) SearchStageByCode(ctx context.Context, code string) (*models.Sta
 	return &stage, nil
 }
 
-func (c *Stage) GetGachaBoxStages(ctx context.Context) ([]*models.Stage, error) {
-	var stages []*models.Stage
+func (c *Stage) GetGachaBoxStages(ctx context.Context) ([]*model.Stage, error) {
+	var stages []*model.Stage
 	err := c.db.NewSelect().
 		Model(&stages).
 		Where("extra_process_type = ?", constants.ExtraProcessTypeGachaBox).

@@ -5,7 +5,7 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/model"
 )
 
 type DropInfo struct {
@@ -24,5 +24,5 @@ type DropInfo struct {
 
 	Item      *Item             `bun:"rel:belongs-to,join:item_id=item_id" json:"-"`
 	Stage     *Stage            `bun:"rel:belongs-to,join:stage_id=stage_id" json:"-"`
-	TimeRange *models.TimeRange `bun:"rel:belongs-to,join:range_id=range_id" json:"-"`
+	TimeRange *model.TimeRange `bun:"rel:belongs-to,join:range_id=range_id" json:"-"`
 }

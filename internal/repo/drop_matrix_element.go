@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/model"
 )
 
 type DropMatrixElement struct {
@@ -18,9 +18,9 @@ func NewDropMatrixElement(db *bun.DB) *DropMatrixElement {
 	return &DropMatrixElement{db: db}
 }
 
-func (s *DropMatrixElement) BatchSaveElements(ctx context.Context, elements []*models.DropMatrixElement, server string) error {
+func (s *DropMatrixElement) BatchSaveElements(ctx context.Context, elements []*model.DropMatrixElement, server string) error {
 	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := tx.NewDelete().Model((*models.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
+		_, err := tx.NewDelete().Model((*model.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
 		if err != nil {
 			return err
 		}
@@ -34,12 +34,12 @@ func (s *DropMatrixElement) BatchSaveElements(ctx context.Context, elements []*m
 }
 
 func (s *DropMatrixElement) DeleteByServer(ctx context.Context, server string) error {
-	_, err := s.db.NewDelete().Model((*models.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
+	_, err := s.db.NewDelete().Model((*model.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
 	return err
 }
 
-func (s *DropMatrixElement) GetElementsByServer(ctx context.Context, server string) ([]*models.DropMatrixElement, error) {
-	var elements []*models.DropMatrixElement
+func (s *DropMatrixElement) GetElementsByServer(ctx context.Context, server string) ([]*model.DropMatrixElement, error) {
+	var elements []*model.DropMatrixElement
 	err := s.db.NewSelect().Model(&elements).Where("server = ?", server).Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil

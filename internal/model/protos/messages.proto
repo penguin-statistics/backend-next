@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/penguin-statistics/backend-next/internal/models/protos";
+option go_package = "github.com/penguin-statistics/backend-next/internal/model/protos";
 
 message Ping {
     Header header = 1;

@@ -3,7 +3,7 @@ package reportutil
 import (
 	"context"
 
-	"github.com/penguin-statistics/backend-next/internal/models/types"
+	"github.com/penguin-statistics/backend-next/internal/model/types"
 )
 
 type VerifyViolation struct {

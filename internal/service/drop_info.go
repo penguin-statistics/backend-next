@@ -9,8 +9,8 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
@@ -26,11 +26,11 @@ func NewDropInfoService(dropInfoRepo *repo.DropInfo, timeRangeService *TimeRange
 	}
 }
 
-func (s *DropInfoService) GetDropInfosByServer(ctx context.Context, server string) ([]*models.DropInfo, error) {
+func (s *DropInfoService) GetDropInfosByServer(ctx context.Context, server string) ([]*model.DropInfo, error) {
 	return s.DropInfoRepo.GetDropInfosByServer(ctx, server)
 }
 
-func (s *DropInfoService) GetDropInfosWithFilters(ctx context.Context, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*models.DropInfo, error) {
+func (s *DropInfoService) GetDropInfosWithFilters(ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*model.DropInfo, error) {
 	return s.DropInfoRepo.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, itemIdFilter)
 }
 
@@ -61,16 +61,16 @@ func (s *DropInfoService) GetItemDropSetByStageIdAndTimeRange(ctx context.Contex
 		return itemDropSet, nil
 	}
 
-	timeRange := &models.TimeRange{
+	timeRange := &model.TimeRange{
 		StartTime: startTime,
 		EndTime:   endTime,
 	}
-	dropInfos, err := s.DropInfoRepo.GetDropInfosWithFilters(ctx, server, []*models.TimeRange{timeRange}, []int{stageId}, nil)
+	dropInfos, err := s.DropInfoRepo.GetDropInfosWithFilters(ctx, server, []*model.TimeRange{timeRange}, []int{stageId}, nil)
 	if err != nil {
 		return nil, err
 	}
 	linq.From(dropInfos).
-		SelectT(func(dropInfo *models.DropInfo) null.Int { return dropInfo.ItemID }).
+		SelectT(func(dropInfo *model.DropInfo) null.Int { return dropInfo.ItemID }).
 		WhereT(func(itemID null.Int) bool { return itemID.Valid }).
 		SelectT(func(itemID null.Int) int { return int(itemID.Int64) }).
 		Distinct().
@@ -86,11 +86,11 @@ func (s *DropInfoService) GetAppearStageIdsByServer(ctx context.Context, server 
 		return nil, err
 	}
 	var stageIds []int
-	linq.From(dropInfos).SelectT(func(dropInfo *models.DropInfo) int { return dropInfo.StageID }).Distinct().ToSlice(&stageIds)
+	linq.From(dropInfos).SelectT(func(dropInfo *model.DropInfo) int { return dropInfo.StageID }).Distinct().ToSlice(&stageIds)
 	return stageIds, nil
 }
 
-func (s *DropInfoService) GetCurrentDropInfosByServer(ctx context.Context, server string) ([]*models.DropInfo, error) {
+func (s *DropInfoService) GetCurrentDropInfosByServer(ctx context.Context, server string) ([]*model.DropInfo, error) {
 	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
 	if err != nil {
 		return nil, err
@@ -99,11 +99,11 @@ func (s *DropInfoService) GetCurrentDropInfosByServer(ctx context.Context, serve
 	if err != nil {
 		return nil, err
 	}
-	currentTimeRangesMap := make(map[int]*models.TimeRange)
+	currentTimeRangesMap := make(map[int]*model.TimeRange)
 	for _, timeRange := range currentTimeRanges {
 		currentTimeRangesMap[timeRange.RangeID] = timeRange
 	}
-	linq.From(dropInfos).WhereT(func(dropInfo *models.DropInfo) bool {
+	linq.From(dropInfos).WhereT(func(dropInfo *model.DropInfo) bool {
 		return currentTimeRangesMap[dropInfo.RangeID] != nil
 	}).ToSlice(&dropInfos)
 	return dropInfos, nil

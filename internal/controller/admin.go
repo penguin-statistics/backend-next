@@ -7,10 +7,10 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/models/gamedata"
-	"github.com/penguin-statistics/backend-next/internal/models/types"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	"github.com/penguin-statistics/backend-next/internal/model/gamedata"
+	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/util/rekuest"
@@ -42,7 +42,7 @@ func RegisterAdminController(admin *svr.Admin, c AdminController) {
 }
 
 type CliGameDataSeedResponse struct {
-	Items []*models.Item `json:"items"`
+	Items []*model.Item `json:"items"`
 }
 
 func (c AdminController) GetCliGameDataSeed(ctx *fiber.Ctx) error {

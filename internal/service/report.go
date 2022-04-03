@@ -17,8 +17,8 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/types"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 	"github.com/penguin-statistics/backend-next/internal/repo"
@@ -363,7 +363,7 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 		if times == 0 {
 			times = 1
 		}
-		dropReport := &models.DropReport{
+		dropReport := &model.DropReport{
 			StageID:     stage.StageID,
 			PatternID:   dropPattern.PatternID,
 			Times:       times,
@@ -383,7 +383,7 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 			// FIXME: temporary hack; find why ip is empty
 			reportTask.IP = "127.0.0.1"
 		}
-		if err = s.DropReportExtraRepo.CreateDropReportExtra(ctx, tx, &models.DropReportExtra{
+		if err = s.DropReportExtraRepo.CreateDropReportExtra(ctx, tx, &model.DropReportExtra{
 			ReportID: dropReport.ReportID,
 			IP:       reportTask.IP,
 			Source:   reportTask.Source,

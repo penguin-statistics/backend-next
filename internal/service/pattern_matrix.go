@@ -14,9 +14,9 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
@@ -79,7 +79,7 @@ func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx context.Con
 }
 
 func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx context.Context, server string) error {
-	toSave := []*models.PatternMatrixElement{}
+	toSave := []*model.PatternMatrixElement{}
 	timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
 	if err != nil {
 		return err
@@ -90,7 +90,7 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx context.Conte
 	}
 	stageIdsMap := s.getStageIdsMapByTimeRange(allTimeRanges)
 
-	ch := make(chan []*models.PatternMatrixElement, 15)
+	ch := make(chan []*model.PatternMatrixElement, 15)
 	var wg sync.WaitGroup
 
 	go func() {
@@ -116,7 +116,7 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx context.Conte
 				<-limiter
 			}()
 
-			timeRanges := []*models.TimeRange{timeRangesMap[rangeId]}
+			timeRanges := []*model.TimeRange{timeRangesMap[rangeId]}
 			currentBatch, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, stageIds, null.NewInt(0, false))
 			if err != nil {
 				log.Error().Err(err).Msg("failed to calculate pattern matrix")
@@ -140,7 +140,7 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx context.Conte
 	return cache.ShimLatestPatternMatrixResults.Delete(server)
 }
 
-func (s *PatternMatrixService) getLatestPatternMatrixResults(ctx context.Context, server string, accountId null.Int) (*models.PatternMatrixQueryResult, error) {
+func (s *PatternMatrixService) getLatestPatternMatrixResults(ctx context.Context, server string, accountId null.Int) (*model.PatternMatrixQueryResult, error) {
 	patternMatrixElements, err := s.getLatestPatternMatrixElements(ctx, server, accountId)
 	if err != nil {
 		return nil, err
@@ -148,7 +148,7 @@ func (s *PatternMatrixService) getLatestPatternMatrixResults(ctx context.Context
 	return s.convertPatternMatrixElementsToDropPatternQueryResult(ctx, server, patternMatrixElements)
 }
 
-func (s *PatternMatrixService) getLatestPatternMatrixElements(ctx context.Context, server string, accountId null.Int) ([]*models.PatternMatrixElement, error) {
+func (s *PatternMatrixService) getLatestPatternMatrixElements(ctx context.Context, server string, accountId null.Int) ([]*model.PatternMatrixElement, error) {
 	if accountId.Valid {
 		timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
 		if err != nil {
@@ -159,9 +159,9 @@ func (s *PatternMatrixService) getLatestPatternMatrixElements(ctx context.Contex
 			return nil, err
 		}
 		stageIdsMap := s.getStageIdsMapByTimeRange(allTimeRanges)
-		elements := make([]*models.PatternMatrixElement, 0)
+		elements := make([]*model.PatternMatrixElement, 0)
 		for rangeId, stageIds := range stageIdsMap {
-			timeRanges := []*models.TimeRange{timeRangesMap[rangeId]}
+			timeRanges := []*model.TimeRange{timeRangesMap[rangeId]}
 			currentBatch, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, stageIds, accountId)
 			if err != nil {
 				return nil, err
@@ -175,9 +175,9 @@ func (s *PatternMatrixService) getLatestPatternMatrixElements(ctx context.Contex
 }
 
 func (s *PatternMatrixService) calcPatternMatrixForTimeRanges(
-	ctx context.Context, server string, timeRanges []*models.TimeRange, stageIdFilter []int, accountId null.Int,
-) ([]*models.PatternMatrixElement, error) {
-	results := make([]*models.PatternMatrixElement, 0)
+	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, accountId null.Int,
+) ([]*model.PatternMatrixElement, error) {
+	results := make([]*model.PatternMatrixElement, 0)
 
 	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, nil)
 	if err != nil {
@@ -214,7 +214,7 @@ func (s *PatternMatrixService) calcPatternMatrixForTimeRanges(
 		}
 		combinedResults := s.combineQuantityAndTimesResults(quantityResults, timesResults)
 		for _, result := range combinedResults {
-			results = append(results, &models.PatternMatrixElement{
+			results = append(results, &model.PatternMatrixElement{
 				StageID:   result.StageID,
 				PatternID: result.PatternID,
 				RangeID:   timeRange.RangeID,
@@ -228,14 +228,14 @@ func (s *PatternMatrixService) calcPatternMatrixForTimeRanges(
 }
 
 func (s *PatternMatrixService) combineQuantityAndTimesResults(
-	quantityResults []*models.TotalQuantityResultForPatternMatrix, timesResults []*models.TotalTimesResult,
-) []*models.CombinedResultForDropPattern {
+	quantityResults []*model.TotalQuantityResultForPatternMatrix, timesResults []*model.TotalTimesResult,
+) []*model.CombinedResultForDropPattern {
 	var firstGroupResults []linq.Group
-	combinedResults := make([]*models.CombinedResultForDropPattern, 0)
+	combinedResults := make([]*model.CombinedResultForDropPattern, 0)
 	linq.From(quantityResults).
 		GroupByT(
-			func(result *models.TotalQuantityResultForPatternMatrix) int { return result.StageID },
-			func(result *models.TotalQuantityResultForPatternMatrix) *models.TotalQuantityResultForPatternMatrix {
+			func(result *model.TotalQuantityResultForPatternMatrix) int { return result.StageID },
+			func(result *model.TotalQuantityResultForPatternMatrix) *model.TotalQuantityResultForPatternMatrix {
 				return result
 			}).
 		ToSlice(&firstGroupResults)
@@ -245,24 +245,24 @@ func (s *PatternMatrixService) combineQuantityAndTimesResults(
 		resultsMap := make(map[int]int)
 		linq.From(firstGroupElements.Group).
 			ToMapByT(&resultsMap,
-				func(el any) int { return el.(*models.TotalQuantityResultForPatternMatrix).PatternID },
-				func(el any) int { return el.(*models.TotalQuantityResultForPatternMatrix).TotalQuantity })
+				func(el any) int { return el.(*model.TotalQuantityResultForPatternMatrix).PatternID },
+				func(el any) int { return el.(*model.TotalQuantityResultForPatternMatrix).TotalQuantity })
 		quantityResultsMap[stageId] = resultsMap
 	}
 
 	var secondGroupResults []linq.Group
 	linq.From(timesResults).
 		GroupByT(
-			func(result *models.TotalTimesResult) int { return result.StageID },
-			func(result *models.TotalTimesResult) *models.TotalTimesResult { return result }).
+			func(result *model.TotalTimesResult) int { return result.StageID },
+			func(result *model.TotalTimesResult) *model.TotalTimesResult { return result }).
 		ToSlice(&secondGroupResults)
 	for _, secondGroupResults := range secondGroupResults {
 		stageId := secondGroupResults.Key.(int)
 		quantityResultsMapForOneStage := quantityResultsMap[stageId]
 		for _, el := range secondGroupResults.Group {
-			times := el.(*models.TotalTimesResult).TotalTimes
+			times := el.(*model.TotalTimesResult).TotalTimes
 			for patternId, quantity := range quantityResultsMapForOneStage {
-				combinedResults = append(combinedResults, &models.CombinedResultForDropPattern{
+				combinedResults = append(combinedResults, &model.CombinedResultForDropPattern{
 					StageID:   stageId,
 					PatternID: patternId,
 					Quantity:  quantity,
@@ -274,7 +274,7 @@ func (s *PatternMatrixService) combineQuantityAndTimesResults(
 	return combinedResults
 }
 
-func (s *PatternMatrixService) getStageIdsMapByTimeRange(timeRangesMap map[int]*models.TimeRange) map[int][]int {
+func (s *PatternMatrixService) getStageIdsMapByTimeRange(timeRangesMap map[int]*model.TimeRange) map[int][]int {
 	results := make(map[int][]int)
 	for stageId, timeRange := range timeRangesMap {
 		if _, ok := results[timeRange.RangeID]; !ok {
@@ -286,19 +286,19 @@ func (s *PatternMatrixService) getStageIdsMapByTimeRange(timeRangesMap map[int]*
 }
 
 func (s *PatternMatrixService) convertPatternMatrixElementsToDropPatternQueryResult(
-	ctx context.Context, server string, patternMatrixElements []*models.PatternMatrixElement,
-) (*models.PatternMatrixQueryResult, error) {
+	ctx context.Context, server string, patternMatrixElements []*model.PatternMatrixElement,
+) (*model.PatternMatrixQueryResult, error) {
 	timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
 	if err != nil {
 		return nil, err
 	}
 
-	result := &models.PatternMatrixQueryResult{
-		PatternMatrix: make([]*models.OnePatternMatrixElement, 0),
+	result := &model.PatternMatrixQueryResult{
+		PatternMatrix: make([]*model.OnePatternMatrixElement, 0),
 	}
 	for _, patternMatrixElement := range patternMatrixElements {
 		timeRange := timeRangesMap[patternMatrixElement.RangeID]
-		result.PatternMatrix = append(result.PatternMatrix, &models.OnePatternMatrixElement{
+		result.PatternMatrix = append(result.PatternMatrix, &model.OnePatternMatrixElement{
 			StageID:   patternMatrixElement.StageID,
 			PatternID: patternMatrixElement.PatternID,
 			Quantity:  patternMatrixElement.Quantity,
@@ -309,7 +309,7 @@ func (s *PatternMatrixService) convertPatternMatrixElementsToDropPatternQueryRes
 	return result, nil
 }
 
-func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx context.Context, queryResult *models.PatternMatrixQueryResult) (*modelv2.PatternMatrixQueryResult, error) {
+func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx context.Context, queryResult *model.PatternMatrixQueryResult) (*modelv2.PatternMatrixQueryResult, error) {
 	results := &modelv2.PatternMatrixQueryResult{
 		PatternMatrix: make([]*modelv2.OnePatternMatrixElement, 0),
 	}
@@ -327,13 +327,13 @@ func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx context.Contex
 	var groupedResults []linq.Group
 	linq.From(queryResult.PatternMatrix).
 		GroupByT(
-			func(el *models.OnePatternMatrixElement) int { return el.PatternID },
-			func(el *models.OnePatternMatrixElement) *models.OnePatternMatrixElement { return el },
+			func(el *model.OnePatternMatrixElement) int { return el.PatternID },
+			func(el *model.OnePatternMatrixElement) *model.OnePatternMatrixElement { return el },
 		).ToSlice(&groupedResults)
 	for _, group := range groupedResults {
 		patternId := group.Key.(int)
 		for _, el := range group.Group {
-			oneDropPattern := el.(*models.OnePatternMatrixElement)
+			oneDropPattern := el.(*model.OnePatternMatrixElement)
 			stage := stagesMapById[oneDropPattern.StageID]
 			endTime := null.NewInt(oneDropPattern.TimeRange.EndTime.UnixMilli(), true)
 			dropPatternElements, err := s.DropPatternElementService.GetDropPatternElementsByPatternId(ctx, patternId)
@@ -344,7 +344,7 @@ func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx context.Contex
 			pattern := modelv2.Pattern{
 				Drops: make([]*modelv2.OneDrop, 0),
 			}
-			linq.From(dropPatternElements).SortT(func(el1, el2 *models.DropPatternElement) bool {
+			linq.From(dropPatternElements).SortT(func(el1, el2 *model.DropPatternElement) bool {
 				item1 := itemsMapById[el1.ItemID]
 				item2 := itemsMapById[el2.ItemID]
 				return item1.SortID < item2.SortID

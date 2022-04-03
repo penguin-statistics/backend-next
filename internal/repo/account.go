@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
@@ -31,10 +31,10 @@ func generateRandomPenguinId() string {
 	return fmt.Sprintf("%08d", rand.Intn(1e8))
 }
 
-func (c *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*models.Account, error) {
+func (c *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.Account, error) {
 	// retry if account already exists
 	for i := 0; i < AccountMaxRetries; i++ {
-		account := &models.Account{
+		account := &model.Account{
 			PenguinID: generateRandomPenguinId(),
 		}
 		_, err := c.db.NewInsert().
@@ -56,8 +56,8 @@ func (c *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*models
 	return nil, pgerr.ErrInternalError.Msg("failed to create account")
 }
 
-func (c *Account) GetAccountById(ctx context.Context, accountId string) (*models.Account, error) {
-	var account models.Account
+func (c *Account) GetAccountById(ctx context.Context, accountId string) (*model.Account, error) {
+	var account model.Account
 
 	err := c.db.NewSelect().
 		Model(&account).
@@ -74,8 +74,8 @@ func (c *Account) GetAccountById(ctx context.Context, accountId string) (*models
 	return &account, nil
 }
 
-func (c *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (*models.Account, error) {
-	var account models.Account
+func (c *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (*model.Account, error) {
+	var account model.Account
 
 	err := c.db.NewSelect().
 		Model(&account).
@@ -92,7 +92,7 @@ func (c *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (
 }
 
 func (c *Account) IsAccountExistWithId(ctx context.Context, accountId int) bool {
-	var account models.Account
+	var account model.Account
 
 	count, err := c.db.NewSelect().
 		Model(&account).

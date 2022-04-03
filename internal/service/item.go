@@ -10,9 +10,9 @@ import (
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/tidwall/gjson"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/util"
@@ -29,8 +29,8 @@ func NewItemService(itemRepo *repo.Item) *ItemService {
 }
 
 // Cache: items, 24hrs
-func (s *ItemService) GetItems(ctx context.Context) ([]*models.Item, error) {
-	var items []*models.Item
+func (s *ItemService) GetItems(ctx context.Context) ([]*model.Item, error) {
+	var items []*model.Item
 	err := cache.Items.Get(&items)
 	if err == nil {
 		return items, nil
@@ -44,7 +44,7 @@ func (s *ItemService) GetItems(ctx context.Context) ([]*models.Item, error) {
 	return items, nil
 }
 
-func (s *ItemService) GetItemById(ctx context.Context, itemId int) (*models.Item, error) {
+func (s *ItemService) GetItemById(ctx context.Context, itemId int) (*model.Item, error) {
 	itemsMapById, err := s.GetItemsMapById(ctx)
 	if err != nil {
 		return nil, err
@@ -57,8 +57,8 @@ func (s *ItemService) GetItemById(ctx context.Context, itemId int) (*models.Item
 }
 
 // Cache: item#arkItemId:{arkItemId}, 24hrs
-func (s *ItemService) GetItemByArkId(ctx context.Context, arkItemId string) (*models.Item, error) {
-	var item models.Item
+func (s *ItemService) GetItemByArkId(ctx context.Context, arkItemId string) (*model.Item, error) {
+	var item model.Item
 	err := cache.ItemByArkID.Get(arkItemId, &item)
 	if err == nil {
 		return &item, nil
@@ -72,7 +72,7 @@ func (s *ItemService) GetItemByArkId(ctx context.Context, arkItemId string) (*mo
 	return dbItem, nil
 }
 
-func (s *ItemService) SearchItemByName(ctx context.Context, name string) (*models.Item, error) {
+func (s *ItemService) SearchItemByName(ctx context.Context, name string) (*model.Item, error) {
 	return s.ItemRepo.SearchItemByName(ctx, name)
 }
 
@@ -115,14 +115,14 @@ func (s *ItemService) GetShimItemByArkId(ctx context.Context, arkItemId string) 
 }
 
 // Cache: (singular) itemsMapById, 24hrs
-func (s *ItemService) GetItemsMapById(ctx context.Context) (map[int]*models.Item, error) {
-	var itemsMapById map[int]*models.Item
-	cache.ItemsMapById.MutexGetSet(&itemsMapById, func() (map[int]*models.Item, error) {
+func (s *ItemService) GetItemsMapById(ctx context.Context) (map[int]*model.Item, error) {
+	var itemsMapById map[int]*model.Item
+	cache.ItemsMapById.MutexGetSet(&itemsMapById, func() (map[int]*model.Item, error) {
 		items, err := s.GetItems(ctx)
 		if err != nil {
 			return nil, err
 		}
-		s := make(map[int]*models.Item)
+		s := make(map[int]*model.Item)
 		for _, item := range items {
 			s[item.ItemID] = item
 		}
@@ -132,14 +132,14 @@ func (s *ItemService) GetItemsMapById(ctx context.Context) (map[int]*models.Item
 }
 
 // Cache: (singular) itemsMapByArkId, 24hrs
-func (s *ItemService) GetItemsMapByArkId(ctx context.Context) (map[string]*models.Item, error) {
-	var itemsMapByArkId map[string]*models.Item
-	cache.ItemsMapByArkID.MutexGetSet(&itemsMapByArkId, func() (map[string]*models.Item, error) {
+func (s *ItemService) GetItemsMapByArkId(ctx context.Context) (map[string]*model.Item, error) {
+	var itemsMapByArkId map[string]*model.Item
+	cache.ItemsMapByArkID.MutexGetSet(&itemsMapByArkId, func() (map[string]*model.Item, error) {
 		items, err := s.GetItems(ctx)
 		if err != nil {
 			return nil, err
 		}
-		s := make(map[string]*models.Item)
+		s := make(map[string]*model.Item)
 		for _, item := range items {
 			s[item.ArkItemID] = item
 		}

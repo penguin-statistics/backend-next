@@ -3,17 +3,17 @@ package util
 import (
 	"github.com/ahmetb/go-linq/v3"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/model"
 )
 
-func GetStageIdItemIdMapFromDropInfos(dropInfos []*models.DropInfo) map[int][]int {
+func GetStageIdItemIdMapFromDropInfos(dropInfos []*model.DropInfo) map[int][]int {
 	stageIdItemIdMap := make(map[int][]int)
 	var groupedResults []linq.Group
 	linq.From(dropInfos).
-		WhereT(func(dropInfo *models.DropInfo) bool { return dropInfo.ItemID.Valid }).
+		WhereT(func(dropInfo *model.DropInfo) bool { return dropInfo.ItemID.Valid }).
 		GroupByT(
-			func(dropInfo *models.DropInfo) int { return dropInfo.StageID },
-			func(dropInfo *models.DropInfo) int { return int(dropInfo.ItemID.Int64) },
+			func(dropInfo *model.DropInfo) int { return dropInfo.StageID },
+			func(dropInfo *model.DropInfo) int { return int(dropInfo.ItemID.Int64) },
 		).ToSlice(&groupedResults)
 	for _, groupedResult := range groupedResults {
 		stageId := groupedResult.Key.(int)
@@ -26,8 +26,8 @@ func GetStageIdItemIdMapFromDropInfos(dropInfos []*models.DropInfo) map[int][]in
 	return stageIdItemIdMap
 }
 
-func GetStageIdsFromDropInfos(dropInfos []*models.DropInfo) []int {
+func GetStageIdsFromDropInfos(dropInfos []*model.DropInfo) []int {
 	stageIds := make([]int, 0)
-	linq.From(dropInfos).SelectT(func(dropInfo *models.DropInfo) int { return dropInfo.StageID }).Distinct().ToSlice(&stageIds)
+	linq.From(dropInfos).SelectT(func(dropInfo *model.DropInfo) int { return dropInfo.StageID }).Distinct().ToSlice(&stageIds)
 	return stageIds
 }

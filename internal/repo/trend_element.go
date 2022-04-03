@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/model"
 )
 
 type TrendElement struct {
@@ -18,9 +18,9 @@ func NewTrendElement(db *bun.DB) *TrendElement {
 	return &TrendElement{db: db}
 }
 
-func (s *TrendElement) BatchSaveElements(ctx context.Context, elements []*models.TrendElement, server string) error {
+func (s *TrendElement) BatchSaveElements(ctx context.Context, elements []*model.TrendElement, server string) error {
 	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := tx.NewDelete().Model((*models.TrendElement)(nil)).Where("server = ?", server).Exec(ctx)
+		_, err := tx.NewDelete().Model((*model.TrendElement)(nil)).Where("server = ?", server).Exec(ctx)
 		if err != nil {
 			return err
 		}
@@ -34,12 +34,12 @@ func (s *TrendElement) BatchSaveElements(ctx context.Context, elements []*models
 }
 
 func (s *TrendElement) DeleteByServer(ctx context.Context, server string) error {
-	_, err := s.db.NewDelete().Model((*models.TrendElement)(nil)).Where("server = ?", server).Exec(ctx)
+	_, err := s.db.NewDelete().Model((*model.TrendElement)(nil)).Where("server = ?", server).Exec(ctx)
 	return err
 }
 
-func (s *TrendElement) GetElementsByServer(ctx context.Context, server string) ([]*models.TrendElement, error) {
-	var elements []*models.TrendElement
+func (s *TrendElement) GetElementsByServer(ctx context.Context, server string) ([]*model.TrendElement, error) {
+	var elements []*model.TrendElement
 	err := s.db.NewSelect().Model(&elements).Where("server = ?", server).Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil

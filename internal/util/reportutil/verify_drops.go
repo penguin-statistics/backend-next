@@ -7,8 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/types"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
@@ -53,7 +53,7 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, r
 	return errs
 }
 
-func (d *DropVerifier) verifyDropType(report *types.SingleReport, dropInfos []*models.DropInfo) (errs []error) {
+func (d *DropVerifier) verifyDropType(report *types.SingleReport, dropInfos []*model.DropInfo) (errs []error) {
 	grouped := lo.GroupBy(report.Drops, func(drop *types.Drop) string {
 		return drop.DropType
 	})
@@ -84,7 +84,7 @@ func (d *DropVerifier) verifyDropType(report *types.SingleReport, dropInfos []*m
  * Check 1: iterate drops, check if any item is not in dropInfos
  * Check 2: iterate dropInfos, check if quantity is within bounds
  */
-func (d *DropVerifier) verifyDropItem(report *types.SingleReport, dropInfos []*models.DropInfo) (errs []error) {
+func (d *DropVerifier) verifyDropItem(report *types.SingleReport, dropInfos []*model.DropInfo) (errs []error) {
 	itemIdSetFromDropInfos := make(map[int]struct{})
 	for _, dropInfo := range dropInfos {
 		itemIdSetFromDropInfos[int(dropInfo.ItemID.Int64)] = struct{}{}

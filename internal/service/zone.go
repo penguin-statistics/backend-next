@@ -6,9 +6,9 @@ import (
 
 	"github.com/tidwall/gjson"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
@@ -23,8 +23,8 @@ func NewZoneService(zoneRepo *repo.Zone) *ZoneService {
 }
 
 // Cache: (singular) zones, 24hrs
-func (s *ZoneService) GetZones(ctx context.Context) ([]*models.Zone, error) {
-	var zones []*models.Zone
+func (s *ZoneService) GetZones(ctx context.Context) ([]*model.Zone, error) {
+	var zones []*model.Zone
 	err := cache.Zones.Get(&zones)
 	if err == nil {
 		return zones, nil
@@ -38,13 +38,13 @@ func (s *ZoneService) GetZones(ctx context.Context) ([]*models.Zone, error) {
 	return zones, nil
 }
 
-func (s *ZoneService) GetZoneById(ctx context.Context, id int) (*models.Zone, error) {
+func (s *ZoneService) GetZoneById(ctx context.Context, id int) (*model.Zone, error) {
 	return s.ZoneRepo.GetZoneById(ctx, id)
 }
 
 // Cache: zone#arkZoneId:{arkZoneId}, 24hrs
-func (s *ZoneService) GetZoneByArkId(ctx context.Context, arkZoneId string) (*models.Zone, error) {
-	var zone models.Zone
+func (s *ZoneService) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model.Zone, error) {
+	var zone model.Zone
 	err := cache.ZoneByArkID.Get(arkZoneId, &zone)
 	if err == nil {
 		return &zone, nil

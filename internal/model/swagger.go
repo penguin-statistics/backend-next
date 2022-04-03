@@ -1,4 +1,4 @@
-package models
+package model
 
 // this file is mainly for providing swagger with correct types
 

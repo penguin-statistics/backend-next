@@ -15,7 +15,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgqry"
 )
@@ -28,8 +28,8 @@ func NewDropInfo(db *bun.DB) *DropInfo {
 	return &DropInfo{DB: db}
 }
 
-func (s *DropInfo) GetDropInfo(ctx context.Context, id int) (*models.DropInfo, error) {
-	var dropInfo models.DropInfo
+func (s *DropInfo) GetDropInfo(ctx context.Context, id int) (*model.DropInfo, error) {
+	var dropInfo model.DropInfo
 	err := s.DB.NewSelect().
 		Model(&dropInfo).
 		Where("id = ?", id).
@@ -44,8 +44,8 @@ func (s *DropInfo) GetDropInfo(ctx context.Context, id int) (*models.DropInfo, e
 	return &dropInfo, nil
 }
 
-func (s *DropInfo) GetDropInfosByServerAndStageId(ctx context.Context, server string, stageId int) ([]*models.DropInfo, error) {
-	var dropInfo []*models.DropInfo
+func (s *DropInfo) GetDropInfosByServerAndStageId(ctx context.Context, server string, stageId int) ([]*model.DropInfo, error) {
+	var dropInfo []*model.DropInfo
 	err := s.DB.NewSelect().
 		Model(&dropInfo).
 		Where("stage_id = ?", stageId).
@@ -61,8 +61,8 @@ func (s *DropInfo) GetDropInfosByServerAndStageId(ctx context.Context, server st
 	return dropInfo, nil
 }
 
-func (s *DropInfo) GetDropInfosByServer(ctx context.Context, server string) ([]*models.DropInfo, error) {
-	var dropInfo []*models.DropInfo
+func (s *DropInfo) GetDropInfosByServer(ctx context.Context, server string) ([]*model.DropInfo, error) {
+	var dropInfo []*model.DropInfo
 	err := s.DB.NewSelect().
 		Model(&dropInfo).
 		Where("server = ?", server).
@@ -83,8 +83,8 @@ type DropInfoQuery struct {
 }
 
 // GetDropInfoByArkId returns a drop info by its ark id.
-func (s *DropInfo) GetForCurrentTimeRange(ctx context.Context, query *DropInfoQuery) ([]*models.DropInfo, error) {
-	var dropInfo []*models.DropInfo
+func (s *DropInfo) GetForCurrentTimeRange(ctx context.Context, query *DropInfoQuery) ([]*model.DropInfo, error) {
+	var dropInfo []*model.DropInfo
 	err := pgqry.New(
 		s.DB.NewSelect().
 			Model(&dropInfo).
@@ -110,7 +110,7 @@ func (s *DropInfo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server
 	var results []int
 	err := s.DB.NewSelect().
 		Column("di.item_id").
-		Model((*models.DropInfo)(nil)).
+		Model((*model.DropInfo)(nil)).
 		Where("di.server = ?", server).
 		Where("di.stage_id = ?", stageId).
 		Where("di.item_id IS NOT NULL").
@@ -128,7 +128,7 @@ func (s *DropInfo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server
 	return results, nil
 }
 
-func (s *DropInfo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) (itemDropInfos, typeDropInfos []*models.DropInfo, err error) {
+func (s *DropInfo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) (itemDropInfos, typeDropInfos []*model.DropInfo, err error) {
 	allDropInfos, err := s.GetForCurrentTimeRange(ctx, query)
 	if err != nil {
 		return nil, nil, err
@@ -146,8 +146,8 @@ func (s *DropInfo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, quer
 	return itemDropInfos, typeDropInfos, nil
 }
 
-func (s *DropInfo) GetDropInfosWithFilters(ctx context.Context, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*models.DropInfo, error) {
-	results := make([]*models.DropInfo, 0)
+func (s *DropInfo) GetDropInfosWithFilters(ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*model.DropInfo, error) {
+	results := make([]*model.DropInfo, 0)
 	var whereBuilder strings.Builder
 	fmt.Fprintf(&whereBuilder, "di.server = ? AND di.drop_type != ? AND di.item_id IS NOT NULL")
 
@@ -181,7 +181,7 @@ func (s *DropInfo) GetDropInfosWithFilters(ctx context.Context, server string, t
 				fmt.Fprintf(&whereBuilder, " AND di.range_id = %d", timeRanges[0].RangeID)
 			} else {
 				rangeIdStr := make([]string, len(timeRanges))
-				linq.From(timeRanges).SelectT(func(timeRange *models.TimeRange) string { return strconv.Itoa(timeRange.RangeID) }).ToSlice(&rangeIdStr)
+				linq.From(timeRanges).SelectT(func(timeRange *model.TimeRange) string { return strconv.Itoa(timeRange.RangeID) }).ToSlice(&rangeIdStr)
 				fmt.Fprintf(&whereBuilder, " AND di.range_id IN (%s)", strings.Join(rangeIdStr, ","))
 			}
 		}

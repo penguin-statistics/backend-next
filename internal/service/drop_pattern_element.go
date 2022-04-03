@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
@@ -21,8 +21,8 @@ func NewDropPatternElementService(dropPatternElementRepo *repo.DropPatternElemen
 }
 
 // Cache: dropPatternElements#patternId:{patternId}, 24hrs
-func (s *DropPatternElementService) GetDropPatternElementsByPatternId(ctx context.Context, patternId int) ([]*models.DropPatternElement, error) {
-	var dropPatternElements []*models.DropPatternElement
+func (s *DropPatternElementService) GetDropPatternElementsByPatternId(ctx context.Context, patternId int) ([]*model.DropPatternElement, error) {
+	var dropPatternElements []*model.DropPatternElement
 	err := cache.DropPatternElementsByPatternID.Get(strconv.Itoa(patternId), &dropPatternElements)
 	if err == nil {
 		return dropPatternElements, nil

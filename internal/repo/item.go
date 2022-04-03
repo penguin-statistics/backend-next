@@ -7,8 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
@@ -20,8 +20,8 @@ func NewItem(db *bun.DB) *Item {
 	return &Item{DB: db}
 }
 
-func (c *Item) GetItems(ctx context.Context) ([]*models.Item, error) {
-	var items []*models.Item
+func (c *Item) GetItems(ctx context.Context) ([]*model.Item, error) {
+	var items []*model.Item
 	err := c.DB.NewSelect().
 		Model(&items).
 		Scan(ctx)
@@ -35,8 +35,8 @@ func (c *Item) GetItems(ctx context.Context) ([]*models.Item, error) {
 	return items, nil
 }
 
-func (c *Item) GetItemById(ctx context.Context, itemId int) (*models.Item, error) {
-	var item models.Item
+func (c *Item) GetItemById(ctx context.Context, itemId int) (*model.Item, error) {
+	var item model.Item
 	err := c.DB.NewSelect().
 		Model(&item).
 		Where("item_id = ?", itemId).
@@ -51,8 +51,8 @@ func (c *Item) GetItemById(ctx context.Context, itemId int) (*models.Item, error
 	return &item, nil
 }
 
-func (c *Item) GetItemByArkId(ctx context.Context, arkItemId string) (*models.Item, error) {
-	var item models.Item
+func (c *Item) GetItemByArkId(ctx context.Context, arkItemId string) (*model.Item, error) {
+	var item model.Item
 	err := c.DB.NewSelect().
 		Model(&item).
 		Where("ark_item_id = ?", arkItemId).
@@ -99,8 +99,8 @@ func (c *Item) GetShimItemByArkId(ctx context.Context, itemId string) (*modelv2.
 	return &item, nil
 }
 
-func (c *Item) SearchItemByName(ctx context.Context, name string) (*models.Item, error) {
-	var item models.Item
+func (c *Item) SearchItemByName(ctx context.Context, name string) (*model.Item, error) {
+	var item model.Item
 	err := c.DB.NewSelect().
 		Model(&item).
 		Where("\"name\"::TEXT ILIKE ?", "%"+name+"%").

@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
@@ -19,8 +19,8 @@ func NewDropReportExtra(db *bun.DB) *DropReportExtra {
 	return &DropReportExtra{DB: db}
 }
 
-func (c *DropReportExtra) GetDropReportExtraById(ctx context.Context, id int) (*models.DropReportExtra, error) {
-	var dropReportExtra models.DropReportExtra
+func (c *DropReportExtra) GetDropReportExtraById(ctx context.Context, id int) (*model.DropReportExtra, error) {
+	var dropReportExtra model.DropReportExtra
 
 	err := c.DB.NewSelect().
 		Model(&dropReportExtra).
@@ -37,7 +37,7 @@ func (c *DropReportExtra) GetDropReportExtraById(ctx context.Context, id int) (*
 }
 
 func (c *DropReportExtra) IsDropReportExtraMD5Exist(ctx context.Context, md5 string) bool {
-	var dropReportExtra models.DropReportExtra
+	var dropReportExtra model.DropReportExtra
 
 	count, err := c.DB.NewSelect().
 		Model(&dropReportExtra).
@@ -50,7 +50,7 @@ func (c *DropReportExtra) IsDropReportExtraMD5Exist(ctx context.Context, md5 str
 	return count > 0
 }
 
-func (c *DropReportExtra) CreateDropReportExtra(ctx context.Context, tx bun.Tx, report *models.DropReportExtra) error {
+func (c *DropReportExtra) CreateDropReportExtra(ctx context.Context, tx bun.Tx, report *model.DropReportExtra) error {
 	_, err := tx.NewInsert().
 		Model(report).
 		Exec(ctx)

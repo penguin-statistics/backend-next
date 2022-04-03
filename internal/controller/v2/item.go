@@ -5,7 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
@@ -27,7 +27,7 @@ func RegisterItemController(v2 *svr.V2, itemService *service.ItemService) {
 // @Summary      Get All Items
 // @Tags         Item
 // @Produce      json
-// @Success      200     {array}  v2.Item{name_i18n=models.I18nString,existence=models.Existence}
+// @Success      200     {array}  v2.Item{name_i18n=model.I18nString,existence=model.Existence}
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/items [GET]
 func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
@@ -47,7 +47,7 @@ func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
 // @Tags         Item
 // @Produce      json
 // @Param        itemId  path      string  true  "Item ID"
-// @Success      200     {object}  v2.Item{name_i18n=models.I18nString,existence=models.Existence}
+// @Success      200     {object}  v2.Item{name_i18n=model.I18nString,existence=model.Existence}
 // @Failure      400     {object}  pgerr.PenguinError "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item."
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/items/{itemId} [GET]

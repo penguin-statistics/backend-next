@@ -7,8 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
@@ -20,8 +20,8 @@ func NewZone(db *bun.DB) *Zone {
 	return &Zone{db: db}
 }
 
-func (c *Zone) GetZones(ctx context.Context) ([]*models.Zone, error) {
-	var zones []*models.Zone
+func (c *Zone) GetZones(ctx context.Context) ([]*model.Zone, error) {
+	var zones []*model.Zone
 	err := c.db.NewSelect().
 		Model(&zones).
 		Scan(ctx)
@@ -35,8 +35,8 @@ func (c *Zone) GetZones(ctx context.Context) ([]*models.Zone, error) {
 	return zones, nil
 }
 
-func (c *Zone) GetZoneById(ctx context.Context, id int) (*models.Zone, error) {
-	var zone models.Zone
+func (c *Zone) GetZoneById(ctx context.Context, id int) (*model.Zone, error) {
+	var zone model.Zone
 	err := c.db.NewSelect().
 		Model(&zone).
 		Where("zone_id = ?", id).
@@ -51,8 +51,8 @@ func (c *Zone) GetZoneById(ctx context.Context, id int) (*models.Zone, error) {
 	return &zone, nil
 }
 
-func (c *Zone) GetZoneByArkId(ctx context.Context, arkZoneId string) (*models.Zone, error) {
-	var zone models.Zone
+func (c *Zone) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model.Zone, error) {
+	var zone model.Zone
 	err := c.db.NewSelect().
 		Model(&zone).
 		Where("ark_zone_id = ?", arkZoneId).

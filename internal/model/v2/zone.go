@@ -6,7 +6,7 @@ import (
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/model"
 )
 
 type Zone struct {
@@ -23,5 +23,5 @@ type Zone struct {
 	Background   null.String     `json:"background,omitempty" swaggertype:"string"`
 	StageIds     []string        `bun:"-" json:"stages"`
 
-	Stages []*models.Stage `bun:"rel:has-many,join:zone_id=zone_id" json:"-"`
+	Stages []*model.Stage `bun:"rel:has-many,join:zone_id=zone_id" json:"-"`
 }

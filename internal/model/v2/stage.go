@@ -6,7 +6,7 @@ import (
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/model"
 )
 
 type Stage struct {
@@ -24,7 +24,7 @@ type Stage struct {
 	MinClearTime    null.Int        `json:"minClearTime" swaggertype:"integer"`
 	RecognitionOnly []string        `bun:"-" json:"recognitionOnly,omitempty"`
 
-	Zone *models.Zone `bun:"rel:belongs-to,join:zone_id=zone_id" json:"-"`
+	Zone *model.Zone `bun:"rel:belongs-to,join:zone_id=zone_id" json:"-"`
 
 	DropInfos []*DropInfo `bun:"rel:has-many,join:stage_id=stage_id" json:"dropInfos,omitempty"`
 }

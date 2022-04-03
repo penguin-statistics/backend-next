@@ -7,8 +7,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 	"github.com/penguin-statistics/backend-next/internal/repo"
@@ -24,13 +24,13 @@ func NewAccountService(accountRepo *repo.Account) *AccountService {
 	}
 }
 
-func (s *AccountService) CreateAccountWithRandomPenguinId(ctx context.Context) (*models.Account, error) {
+func (s *AccountService) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.Account, error) {
 	return s.AccountRepo.CreateAccountWithRandomPenguinId(ctx)
 }
 
 // Cache: account#accountId:{accountId}, 24hrs
-func (s *AccountService) GetAccountById(ctx context.Context, accountId string) (*models.Account, error) {
-	var account models.Account
+func (s *AccountService) GetAccountById(ctx context.Context, accountId string) (*model.Account, error) {
+	var account model.Account
 	err := cache.AccountByID.Get(accountId, &account)
 	if err == nil {
 		return &account, nil
@@ -45,8 +45,8 @@ func (s *AccountService) GetAccountById(ctx context.Context, accountId string) (
 }
 
 // Cache: account#penguinId:{penguinId}, 24hrs
-func (s *AccountService) GetAccountByPenguinId(ctx context.Context, penguinId string) (*models.Account, error) {
-	var account models.Account
+func (s *AccountService) GetAccountByPenguinId(ctx context.Context, penguinId string) (*model.Account, error) {
+	var account model.Account
 	err := cache.AccountByPenguinID.Get(penguinId, &account)
 	if err == nil {
 		return &account, nil
@@ -64,7 +64,7 @@ func (s *AccountService) IsAccountExistWithId(ctx context.Context, accountId int
 	return s.AccountRepo.IsAccountExistWithId(ctx, accountId)
 }
 
-func (s *AccountService) GetAccountFromRequest(ctx *fiber.Ctx) (*models.Account, error) {
+func (s *AccountService) GetAccountFromRequest(ctx *fiber.Ctx) (*model.Account, error) {
 	// get PenguinID from HTTP header in form of Authorization: PenguinID ########
 	penguinId := pgid.Extract(ctx)
 	if penguinId == "" {

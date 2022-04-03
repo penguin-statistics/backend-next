@@ -1,10 +1,10 @@
-package models
+package model
 
 import (
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/models/types"
+	"github.com/penguin-statistics/backend-next/internal/model/types"
 )
 
 type DropReportExtra struct {
