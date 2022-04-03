@@ -16,7 +16,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
@@ -51,8 +51,8 @@ func NewPatternMatrixService(
 }
 
 // Cache: shimLatestPatternMatrixResults#server:{server}, 24hrs, records last modified time
-func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx context.Context, server string, accountId null.Int) (*modelsv2.PatternMatrixQueryResult, error) {
-	valueFunc := func() (*modelsv2.PatternMatrixQueryResult, error) {
+func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx context.Context, server string, accountId null.Int) (*modelv2.PatternMatrixQueryResult, error) {
+	valueFunc := func() (*modelv2.PatternMatrixQueryResult, error) {
 		queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId)
 		if err != nil {
 			return nil, err
@@ -64,7 +64,7 @@ func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx context.Con
 		return slowResults, nil
 	}
 
-	var results modelsv2.PatternMatrixQueryResult
+	var results modelv2.PatternMatrixQueryResult
 	if !accountId.Valid {
 		calculated, err := cache.ShimLatestPatternMatrixResults.MutexGetSet(server, &results, valueFunc, 24*time.Hour)
 		if err != nil {
@@ -309,9 +309,9 @@ func (s *PatternMatrixService) convertPatternMatrixElementsToDropPatternQueryRes
 	return result, nil
 }
 
-func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx context.Context, queryResult *models.PatternMatrixQueryResult) (*modelsv2.PatternMatrixQueryResult, error) {
-	results := &modelsv2.PatternMatrixQueryResult{
-		PatternMatrix: make([]*modelsv2.OnePatternMatrixElement, 0),
+func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx context.Context, queryResult *models.PatternMatrixQueryResult) (*modelv2.PatternMatrixQueryResult, error) {
+	results := &modelv2.PatternMatrixQueryResult{
+		PatternMatrix: make([]*modelv2.OnePatternMatrixElement, 0),
 	}
 
 	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
@@ -341,8 +341,8 @@ func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx context.Contex
 				return nil, err
 			}
 			// create pattern object from dropPatternElements
-			pattern := modelsv2.Pattern{
-				Drops: make([]*modelsv2.OneDrop, 0),
+			pattern := modelv2.Pattern{
+				Drops: make([]*modelv2.OneDrop, 0),
 			}
 			linq.From(dropPatternElements).SortT(func(el1, el2 *models.DropPatternElement) bool {
 				item1 := itemsMapById[el1.ItemID]
@@ -351,12 +351,12 @@ func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx context.Contex
 			}).ToSlice(&dropPatternElements)
 			for _, dropPatternElement := range dropPatternElements {
 				item := itemsMapById[dropPatternElement.ItemID]
-				pattern.Drops = append(pattern.Drops, &modelsv2.OneDrop{
+				pattern.Drops = append(pattern.Drops, &modelv2.OneDrop{
 					ItemID:   item.ArkItemID,
 					Quantity: dropPatternElement.Quantity,
 				})
 			}
-			onePatternMatrixElement := modelsv2.OnePatternMatrixElement{
+			onePatternMatrixElement := modelv2.OnePatternMatrixElement{
 				StageID:   stage.ArkStageID,
 				Times:     oneDropPattern.Times,
 				Quantity:  oneDropPattern.Quantity,

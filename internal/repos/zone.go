@@ -8,7 +8,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
@@ -67,8 +67,8 @@ func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model
 	return &zone, nil
 }
 
-func (c *ZoneRepo) GetShimZones(ctx context.Context) ([]*modelsv2.Zone, error) {
-	var zones []*modelsv2.Zone
+func (c *ZoneRepo) GetShimZones(ctx context.Context) ([]*modelv2.Zone, error) {
+	var zones []*modelv2.Zone
 
 	err := c.db.NewSelect().
 		Model(&zones).
@@ -89,8 +89,8 @@ func (c *ZoneRepo) GetShimZones(ctx context.Context) ([]*modelsv2.Zone, error) {
 	return zones, nil
 }
 
-func (c *ZoneRepo) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*modelsv2.Zone, error) {
-	var zone modelsv2.Zone
+func (c *ZoneRepo) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*modelv2.Zone, error) {
+	var zone modelv2.Zone
 	err := c.db.NewSelect().
 		Model(&zone).
 		Relation("Stages", func(q *bun.SelectQuery) *bun.SelectQuery {

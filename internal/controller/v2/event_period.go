@@ -7,7 +7,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
@@ -30,7 +30,7 @@ func RegisterEventPeriodController(v2 *svr.V2, c EventPeriodController) {
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/period [GET]
 func (c *EventPeriodController) GetEventPeriods(ctx *fiber.Ctx) (err error) {
-	var activities []*modelsv2.Activity
+	var activities []*modelv2.Activity
 	activities, err = c.ActivityService.GetShimActivities(ctx.Context())
 	if err != nil {
 		return err

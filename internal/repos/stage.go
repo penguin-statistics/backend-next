@@ -12,7 +12,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
-	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
@@ -72,8 +72,8 @@ func (c *StageRepo) GetStageByArkId(ctx context.Context, arkStageId string) (*mo
 	return &stage, nil
 }
 
-func (c *StageRepo) GetShimStages(ctx context.Context, server string) ([]*modelsv2.Stage, error) {
-	var stages []*modelsv2.Stage
+func (c *StageRepo) GetShimStages(ctx context.Context, server string) ([]*modelv2.Stage, error) {
+	var stages []*modelv2.Stage
 
 	err := c.db.NewSelect().
 		Model(&stages).
@@ -105,8 +105,8 @@ func (c *StageRepo) GetShimStages(ctx context.Context, server string) ([]*models
 	return stages, nil
 }
 
-func (c *StageRepo) GetShimStageByArkId(ctx context.Context, arkStageId string, server string) (*modelsv2.Stage, error) {
-	var stage modelsv2.Stage
+func (c *StageRepo) GetShimStageByArkId(ctx context.Context, arkStageId string, server string) (*modelv2.Stage, error) {
+	var stage modelv2.Stage
 	err := c.db.NewSelect().
 		Model(&stage).
 		Relation("Zone", func(q *bun.SelectQuery) *bun.SelectQuery {

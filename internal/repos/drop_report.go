@@ -12,7 +12,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
-	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgqry"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
@@ -306,8 +306,8 @@ func (s *DropReportRepo) CalcTotalSanityCostForShimSiteStats(ctx context.Context
 	return sanity, err
 }
 
-func (s *DropReportRepo) CalcTotalStageQuantityForShimSiteStats(ctx context.Context, server string, isRecent24h bool) ([]*modelsv2.TotalStageTime, error) {
-	results := make([]*modelsv2.TotalStageTime, 0)
+func (s *DropReportRepo) CalcTotalStageQuantityForShimSiteStats(ctx context.Context, server string, isRecent24h bool) ([]*modelv2.TotalStageTime, error) {
+	results := make([]*modelv2.TotalStageTime, 0)
 
 	err := pgqry.New(
 		s.DB.NewSelect().
@@ -332,8 +332,8 @@ func (s *DropReportRepo) CalcTotalStageQuantityForShimSiteStats(ctx context.Cont
 	return results, nil
 }
 
-func (s *DropReportRepo) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelsv2.TotalItemQuantity, error) {
-	results := make([]*modelsv2.TotalItemQuantity, 0)
+func (s *DropReportRepo) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelv2.TotalItemQuantity, error) {
+	results := make([]*modelv2.TotalItemQuantity, 0)
 
 	types := []string{constants.ItemTypeMaterial, constants.ItemTypeFurniture, constants.ItemTypeChip}
 	err := pgqry.New(

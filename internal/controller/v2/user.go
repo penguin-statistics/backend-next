@@ -5,7 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
@@ -45,7 +45,7 @@ func (c *AccountController) Login(ctx *fiber.Ctx) error {
 	// for some reasons the response for the login API is in format of
 	// text/plain so I'd have to manually convert it to JSON and use ctx#Send to respond
 	// to ensure compatibility
-	resp, err := json.Marshal(&modelsv2.LoginResponse{
+	resp, err := json.Marshal(&modelv2.LoginResponse{
 		UserID: account.PenguinID,
 	})
 	if err != nil {

@@ -12,7 +12,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
-	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
@@ -199,8 +199,8 @@ func (c *ResultController) GetTrends(ctx *fiber.Ctx) error {
 // @Tags         Result
 // @Produce      json
 // @Param        query   body      types.AdvancedQueryRequest true  "Query"
-// @Success      200     {object}  modelsv2.AdvancedQueryResult{advanced_results=[]v2.DropMatrixQueryResult} "Drop Matrix Response: when `interval` has been left undefined."
-// @Success      202     {object}  modelsv2.AdvancedQueryResult{advanced_results=[]v2.TrendQueryResult} "Trend Response: when `interval` has been defined a value greater than `0`. Notice that this response still responds with a status code of `200`, but due to swagger limitations, to denote a different response with the same status code is not possible. Therefore, a status code of `202` is used, only for the purpose of workaround."
+// @Success      200     {object}  modelv2.AdvancedQueryResult{advanced_results=[]v2.DropMatrixQueryResult} "Drop Matrix Response: when `interval` has been left undefined."
+// @Success      202     {object}  modelv2.AdvancedQueryResult{advanced_results=[]v2.TrendQueryResult} "Trend Response: when `interval` has been defined a value greater than `0`. Notice that this response still responds with a status code of `200`, but due to swagger limitations, to denote a different response with the same status code is not possible. Therefore, a status code of `202` is used, only for the purpose of workaround."
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/advanced [POST]
 func (c *ResultController) AdvancedQuery(ctx *fiber.Ctx) error {
@@ -208,7 +208,7 @@ func (c *ResultController) AdvancedQuery(ctx *fiber.Ctx) error {
 	if err := rekuest.ValidBody(ctx, &request); err != nil {
 		return err
 	}
-	result := &modelsv2.AdvancedQueryResult{
+	result := &modelv2.AdvancedQueryResult{
 		AdvancedResults: make([]any, 0),
 	}
 	for _, query := range request.Queries {

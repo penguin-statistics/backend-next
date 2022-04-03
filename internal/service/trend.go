@@ -13,7 +13,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
@@ -51,8 +51,8 @@ func NewTrendService(
 }
 
 // Cache: shimSavedTrendResults#server:{server}, 24hrs, records last modified time
-func (s *TrendService) GetShimSavedTrendResults(ctx context.Context, server string) (*modelsv2.TrendQueryResult, error) {
-	valueFunc := func() (*modelsv2.TrendQueryResult, error) {
+func (s *TrendService) GetShimSavedTrendResults(ctx context.Context, server string) (*modelv2.TrendQueryResult, error) {
+	valueFunc := func() (*modelv2.TrendQueryResult, error) {
 		queryResult, err := s.getSavedTrendResults(ctx, server)
 		if err != nil {
 			return nil, err
@@ -64,7 +64,7 @@ func (s *TrendService) GetShimSavedTrendResults(ctx context.Context, server stri
 		return slowShimResult, nil
 	}
 
-	var shimResult modelsv2.TrendQueryResult
+	var shimResult modelv2.TrendQueryResult
 	calculated, err := cache.ShimSavedTrendResults.MutexGetSet(server, &shimResult, valueFunc, 24*time.Hour)
 	if err != nil {
 		return nil, err
@@ -74,7 +74,7 @@ func (s *TrendService) GetShimSavedTrendResults(ctx context.Context, server stri
 	return &shimResult, nil
 }
 
-func (s *TrendService) GetShimCustomizedTrendResults(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, itemIds []int, accountId null.Int) (*modelsv2.TrendQueryResult, error) {
+func (s *TrendService) GetShimCustomizedTrendResults(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, itemIds []int, accountId null.Int) (*modelv2.TrendQueryResult, error) {
 	trendQueryResult, err := s.QueryTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, itemIds, accountId)
 	if err != nil {
 		return nil, err
@@ -380,7 +380,7 @@ func (s *TrendService) convertTrendElementsToTrendQueryResult(trendElements []*m
 	return trendQueryResult, nil
 }
 
-func (s *TrendService) applyShimForCustomizedTrendQuery(ctx context.Context, queryResult *models.TrendQueryResult, startTime *time.Time) (*modelsv2.TrendQueryResult, error) {
+func (s *TrendService) applyShimForCustomizedTrendQuery(ctx context.Context, queryResult *models.TrendQueryResult, startTime *time.Time) (*modelv2.TrendQueryResult, error) {
 	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
 	if err != nil {
 		return nil, err
@@ -391,19 +391,19 @@ func (s *TrendService) applyShimForCustomizedTrendQuery(ctx context.Context, que
 		return nil, err
 	}
 
-	results := &modelsv2.TrendQueryResult{
-		Trend: make(map[string]*modelsv2.StageTrend),
+	results := &modelv2.TrendQueryResult{
+		Trend: make(map[string]*modelv2.StageTrend),
 	}
 	for _, stageTrend := range queryResult.Trends {
 		stage := stagesMapById[stageTrend.StageID]
-		shimStageTrend := modelsv2.StageTrend{
-			Results:   make(map[string]*modelsv2.OneItemTrend),
+		shimStageTrend := modelv2.StageTrend{
+			Results:   make(map[string]*modelv2.OneItemTrend),
 			StartTime: startTime.UnixMilli(),
 		}
 
 		for _, itemTrend := range stageTrend.Results {
 			item := itemsMapById[itemTrend.ItemID]
-			shimStageTrend.Results[item.ArkItemID] = &modelsv2.OneItemTrend{
+			shimStageTrend.Results[item.ArkItemID] = &modelv2.OneItemTrend{
 				Quantity: itemTrend.Quantity,
 				Times:    itemTrend.Times,
 			}
@@ -415,7 +415,7 @@ func (s *TrendService) applyShimForCustomizedTrendQuery(ctx context.Context, que
 	return results, nil
 }
 
-func (s *TrendService) applyShimForSavedTrendQuery(ctx context.Context, server string, queryResult *models.TrendQueryResult) (*modelsv2.TrendQueryResult, error) {
+func (s *TrendService) applyShimForSavedTrendQuery(ctx context.Context, server string, queryResult *models.TrendQueryResult) (*modelv2.TrendQueryResult, error) {
 	shimMinStartTime := utils.GetGameDayEndTime(server, time.Now()).Add(-1 * constants.DefaultIntervalNum * 24 * time.Hour)
 	currentGameDayEndTime := utils.GetGameDayEndTime(server, time.Now())
 
@@ -429,13 +429,13 @@ func (s *TrendService) applyShimForSavedTrendQuery(ctx context.Context, server s
 		return nil, err
 	}
 
-	results := &modelsv2.TrendQueryResult{
-		Trend: make(map[string]*modelsv2.StageTrend),
+	results := &modelv2.TrendQueryResult{
+		Trend: make(map[string]*modelv2.StageTrend),
 	}
 	for _, stageTrend := range queryResult.Trends {
 		stage := stagesMapById[stageTrend.StageID]
-		shimStageTrend := modelsv2.StageTrend{
-			Results: make(map[string]*modelsv2.OneItemTrend),
+		shimStageTrend := modelv2.StageTrend{
+			Results: make(map[string]*modelv2.OneItemTrend),
 		}
 		var stageTrendStartTime *time.Time
 
@@ -482,7 +482,7 @@ func (s *TrendService) applyShimForSavedTrendQuery(ctx context.Context, server s
 				itemTrend.Times = append(itemTrend.Times, make([]int, tailZeroNum)...)
 			}
 
-			shimStageTrend.Results[item.ArkItemID] = &modelsv2.OneItemTrend{
+			shimStageTrend.Results[item.ArkItemID] = &modelv2.OneItemTrend{
 				Quantity: itemTrend.Quantity,
 				Times:    itemTrend.Times,
 			}

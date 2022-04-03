@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
 
@@ -20,8 +20,8 @@ func NewSiteStatsService(dropReportRepo *repos.DropReportRepo) *SiteStatsService
 }
 
 // Cache: shimSiteStats#server:{server}, 24hrs
-func (s *SiteStatsService) GetShimSiteStats(ctx context.Context, server string) (*modelsv2.SiteStats, error) {
-	var results modelsv2.SiteStats
+func (s *SiteStatsService) GetShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
+	var results modelv2.SiteStats
 	err := cache.ShimSiteStats.Get(server, &results)
 	if err == nil {
 		return &results, nil
@@ -30,8 +30,8 @@ func (s *SiteStatsService) GetShimSiteStats(ctx context.Context, server string) 
 	return s.RefreshShimSiteStats(ctx, server)
 }
 
-func (s *SiteStatsService) RefreshShimSiteStats(ctx context.Context, server string) (*modelsv2.SiteStats, error) {
-	valueFunc := func() (*modelsv2.SiteStats, error) {
+func (s *SiteStatsService) RefreshShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
+	valueFunc := func() (*modelv2.SiteStats, error) {
 		stageTimes, err := s.DropReportRepo.CalcTotalStageQuantityForShimSiteStats(ctx, server, false)
 		if err != nil {
 			return nil, err
@@ -52,7 +52,7 @@ func (s *SiteStatsService) RefreshShimSiteStats(ctx context.Context, server stri
 			return nil, err
 		}
 
-		return &modelsv2.SiteStats{
+		return &modelv2.SiteStats{
 			TotalStageTimes:     stageTimes,
 			TotalStageTimes24H:  stageTimes24h,
 			TotalItemQuantities: itemQuantity,
@@ -60,7 +60,7 @@ func (s *SiteStatsService) RefreshShimSiteStats(ctx context.Context, server stri
 		}, nil
 	}
 
-	var results modelsv2.SiteStats
+	var results modelv2.SiteStats
 	cache.ShimSiteStats.Delete(server)
 	_, err := cache.ShimSiteStats.MutexGetSet(server, &results, valueFunc, 24*time.Hour)
 	if err != nil {

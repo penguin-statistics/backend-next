@@ -9,7 +9,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/models/types"
-	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
@@ -51,7 +51,7 @@ func (c *ReportController) SingularReport(ctx *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return ctx.JSON(modelsv2.ReportResponse{ReportHash: taskId})
+	return ctx.JSON(modelv2.ReportResponse{ReportHash: taskId})
 }
 
 // @Summary      Recall a Drop Report
@@ -129,7 +129,7 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	return ctx.JSON(modelsv2.RecognitionReportResponse{
+	return ctx.JSON(modelv2.RecognitionReportResponse{
 		TaskId: taskId,
 		Errors: []string{},
 	})
