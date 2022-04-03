@@ -10,10 +10,10 @@ import (
 )
 
 type NoticeService struct {
-	NoticeRepo *repo.NoticeRepo
+	NoticeRepo *repo.Notice
 }
 
-func NewNoticeService(noticeRepo *repo.NoticeRepo) *NoticeService {
+func NewNoticeService(noticeRepo *repo.Notice) *NoticeService {
 	return &NoticeService{
 		NoticeRepo: noticeRepo,
 	}

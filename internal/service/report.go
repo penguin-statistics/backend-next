@@ -38,15 +38,15 @@ type ReportService struct {
 	ItemService            *ItemService
 	StageService           *StageService
 	AccountService         *AccountService
-	DropInfoRepo           *repo.DropInfoRepo
-	DropReportRepo         *repo.DropReportRepo
-	DropPatternRepo        *repo.DropPatternRepo
-	DropReportExtraRepo    *repo.DropReportExtraRepo
-	DropPatternElementRepo *repo.DropPatternElementRepo
+	DropInfoRepo           *repo.DropInfo
+	DropReportRepo         *repo.DropReport
+	DropPatternRepo        *repo.DropPattern
+	DropReportExtraRepo    *repo.DropReportExtra
+	DropPatternElementRepo *repo.DropPatternElement
 	ReportVerifier         *reportutils.ReportVerifier
 }
 
-func NewReportService(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *ItemService, stageService *StageService, dropInfoRepo *repo.DropInfoRepo, dropReportRepo *repo.DropReportRepo, dropReportExtraRepo *repo.DropReportExtraRepo, dropPatternRepo *repo.DropPatternRepo, dropPatternElementRepo *repo.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
+func NewReportService(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *ItemService, stageService *StageService, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
 	service := &ReportService{
 		DB:                     db,
 		Redis:                  redisClient,

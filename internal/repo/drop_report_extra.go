@@ -5,22 +5,21 @@ import (
 	"database/sql"
 
 	"github.com/pkg/errors"
-
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
-type DropReportExtraRepo struct {
+type DropReportExtra struct {
 	DB *bun.DB
 }
 
-func NewDropReportExtraRepo(db *bun.DB) *DropReportExtraRepo {
-	return &DropReportExtraRepo{DB: db}
+func NewDropReportExtra(db *bun.DB) *DropReportExtra {
+	return &DropReportExtra{DB: db}
 }
 
-func (c *DropReportExtraRepo) GetDropReportExtraById(ctx context.Context, id int) (*models.DropReportExtra, error) {
+func (c *DropReportExtra) GetDropReportExtraById(ctx context.Context, id int) (*models.DropReportExtra, error) {
 	var dropReportExtra models.DropReportExtra
 
 	err := c.DB.NewSelect().
@@ -37,7 +36,7 @@ func (c *DropReportExtraRepo) GetDropReportExtraById(ctx context.Context, id int
 	return &dropReportExtra, nil
 }
 
-func (c *DropReportExtraRepo) IsDropReportExtraMD5Exist(ctx context.Context, md5 string) bool {
+func (c *DropReportExtra) IsDropReportExtraMD5Exist(ctx context.Context, md5 string) bool {
 	var dropReportExtra models.DropReportExtra
 
 	count, err := c.DB.NewSelect().
@@ -51,7 +50,7 @@ func (c *DropReportExtraRepo) IsDropReportExtraMD5Exist(ctx context.Context, md5
 	return count > 0
 }
 
-func (c *DropReportExtraRepo) CreateDropReportExtra(ctx context.Context, tx bun.Tx, report *models.DropReportExtra) error {
+func (c *DropReportExtra) CreateDropReportExtra(ctx context.Context, tx bun.Tx, report *models.DropReportExtra) error {
 	_, err := tx.NewInsert().
 		Model(report).
 		Exec(ctx)

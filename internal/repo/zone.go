@@ -12,15 +12,15 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
-type ZoneRepo struct {
+type Zone struct {
 	db *bun.DB
 }
 
-func NewZoneRepo(db *bun.DB) *ZoneRepo {
-	return &ZoneRepo{db: db}
+func NewZone(db *bun.DB) *Zone {
+	return &Zone{db: db}
 }
 
-func (c *ZoneRepo) GetZones(ctx context.Context) ([]*models.Zone, error) {
+func (c *Zone) GetZones(ctx context.Context) ([]*models.Zone, error) {
 	var zones []*models.Zone
 	err := c.db.NewSelect().
 		Model(&zones).
@@ -35,7 +35,7 @@ func (c *ZoneRepo) GetZones(ctx context.Context) ([]*models.Zone, error) {
 	return zones, nil
 }
 
-func (c *ZoneRepo) GetZoneById(ctx context.Context, id int) (*models.Zone, error) {
+func (c *Zone) GetZoneById(ctx context.Context, id int) (*models.Zone, error) {
 	var zone models.Zone
 	err := c.db.NewSelect().
 		Model(&zone).
@@ -51,7 +51,7 @@ func (c *ZoneRepo) GetZoneById(ctx context.Context, id int) (*models.Zone, error
 	return &zone, nil
 }
 
-func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*models.Zone, error) {
+func (c *Zone) GetZoneByArkId(ctx context.Context, arkZoneId string) (*models.Zone, error) {
 	var zone models.Zone
 	err := c.db.NewSelect().
 		Model(&zone).
@@ -67,7 +67,7 @@ func (c *ZoneRepo) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model
 	return &zone, nil
 }
 
-func (c *ZoneRepo) GetShimZones(ctx context.Context) ([]*modelv2.Zone, error) {
+func (c *Zone) GetShimZones(ctx context.Context) ([]*modelv2.Zone, error) {
 	var zones []*modelv2.Zone
 
 	err := c.db.NewSelect().
@@ -89,7 +89,7 @@ func (c *ZoneRepo) GetShimZones(ctx context.Context) ([]*modelv2.Zone, error) {
 	return zones, nil
 }
 
-func (c *ZoneRepo) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*modelv2.Zone, error) {
+func (c *Zone) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*modelv2.Zone, error) {
 	var zone modelv2.Zone
 	err := c.db.NewSelect().
 		Model(&zone).

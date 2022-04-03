@@ -15,10 +15,10 @@ var (
 )
 
 type UserVerifier struct {
-	AccountRepo *repo.AccountRepo
+	AccountRepo *repo.Account
 }
 
-func NewUserVerifier(accountRepo *repo.AccountRepo) *UserVerifier {
+func NewUserVerifier(accountRepo *repo.Account) *UserVerifier {
 	return &UserVerifier{
 		AccountRepo: accountRepo,
 	}

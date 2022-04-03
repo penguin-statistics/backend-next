@@ -17,15 +17,15 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
-type DropPatternRepo struct {
+type DropPattern struct {
 	DB *bun.DB
 }
 
-func NewDropPatternRepo(db *bun.DB) *DropPatternRepo {
-	return &DropPatternRepo{DB: db}
+func NewDropPattern(db *bun.DB) *DropPattern {
+	return &DropPattern{DB: db}
 }
 
-func (s *DropPatternRepo) GetDropPatternById(ctx context.Context, id int) (*models.DropPattern, error) {
+func (s *DropPattern) GetDropPatternById(ctx context.Context, id int) (*models.DropPattern, error) {
 	var dropPattern models.DropPattern
 	err := s.DB.NewSelect().
 		Model(&dropPattern).
@@ -41,7 +41,7 @@ func (s *DropPatternRepo) GetDropPatternById(ctx context.Context, id int) (*mode
 	return &dropPattern, nil
 }
 
-func (s *DropPatternRepo) GetDropPatternByHash(ctx context.Context, hash string) (*models.DropPattern, error) {
+func (s *DropPattern) GetDropPatternByHash(ctx context.Context, hash string) (*models.DropPattern, error) {
 	var dropPattern models.DropPattern
 	err := s.DB.NewSelect().
 		Model(&dropPattern).
@@ -57,7 +57,7 @@ func (s *DropPatternRepo) GetDropPatternByHash(ctx context.Context, hash string)
 	return &dropPattern, nil
 }
 
-func (s *DropPatternRepo) GetOrCreateDropPatternFromDrops(ctx context.Context, tx bun.Tx, drops []*types.Drop) (*models.DropPattern, bool, error) {
+func (s *DropPattern) GetOrCreateDropPatternFromDrops(ctx context.Context, tx bun.Tx, drops []*types.Drop) (*models.DropPattern, bool, error) {
 	originalFingerprint, hash := s.calculateDropPatternHash(drops)
 	dropPattern := &models.DropPattern{
 		Hash:                hash,
@@ -84,7 +84,7 @@ func (s *DropPatternRepo) GetOrCreateDropPatternFromDrops(ctx context.Context, t
 	return dropPattern, true, nil
 }
 
-func (s *DropPatternRepo) calculateDropPatternHash(drops []*types.Drop) (originalFingerprint, hexHash string) {
+func (s *DropPattern) calculateDropPatternHash(drops []*types.Drop) (originalFingerprint, hexHash string) {
 	segments := make([]string, len(drops))
 
 	for i, drop := range drops {

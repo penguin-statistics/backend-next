@@ -12,10 +12,10 @@ import (
 var ErrMD5Conflict = errors.New("report with specified md5 has already exited")
 
 type MD5Verifier struct {
-	DropReportExtraRepo *repo.DropReportExtraRepo
+	DropReportExtraRepo *repo.DropReportExtra
 }
 
-func NewMD5Verifier(dropReportExtraRepo *repo.DropReportExtraRepo) *MD5Verifier {
+func NewMD5Verifier(dropReportExtraRepo *repo.DropReportExtra) *MD5Verifier {
 	return &MD5Verifier{
 		DropReportExtraRepo: dropReportExtraRepo,
 	}

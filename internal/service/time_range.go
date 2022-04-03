@@ -13,11 +13,11 @@ import (
 )
 
 type TimeRangeService struct {
-	TimeRangeRepo *repo.TimeRangeRepo
-	DropInfoRepo  *repo.DropInfoRepo
+	TimeRangeRepo *repo.TimeRange
+	DropInfoRepo  *repo.DropInfo
 }
 
-func NewTimeRangeService(timeRangeRepo *repo.TimeRangeRepo, dropInfoRepo *repo.DropInfoRepo) *TimeRangeService {
+func NewTimeRangeService(timeRangeRepo *repo.TimeRange, dropInfoRepo *repo.DropInfo) *TimeRangeService {
 	return &TimeRangeService{
 		TimeRangeRepo: timeRangeRepo,
 		DropInfoRepo:  dropInfoRepo,

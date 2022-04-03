@@ -11,10 +11,10 @@ import (
 )
 
 type FormulaService struct {
-	PropertyRepo *repo.PropertyRepo
+	PropertyRepo *repo.Property
 }
 
-func NewFormulaService(propertyRepo *repo.PropertyRepo) *FormulaService {
+func NewFormulaService(propertyRepo *repo.Property) *FormulaService {
 	return &FormulaService{
 		PropertyRepo: propertyRepo,
 	}

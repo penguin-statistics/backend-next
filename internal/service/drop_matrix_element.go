@@ -8,10 +8,10 @@ import (
 )
 
 type DropMatrixElementService struct {
-	DropMatrixElementRepo *repo.DropMatrixElementRepo
+	DropMatrixElementRepo *repo.DropMatrixElement
 }
 
-func NewDropMatrixElementService(dropMatrixElementRepo *repo.DropMatrixElementRepo) *DropMatrixElementService {
+func NewDropMatrixElementService(dropMatrixElementRepo *repo.DropMatrixElement) *DropMatrixElementService {
 	return &DropMatrixElementService{
 		DropMatrixElementRepo: dropMatrixElementRepo,
 	}

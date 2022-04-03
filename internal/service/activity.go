@@ -14,10 +14,10 @@ import (
 )
 
 type ActivityService struct {
-	ActivityRepo *repo.ActivityRepo
+	ActivityRepo *repo.Activity
 }
 
-func NewActivityService(activityRepo *repo.ActivityRepo) *ActivityService {
+func NewActivityService(activityRepo *repo.Activity) *ActivityService {
 	return &ActivityService{
 		ActivityRepo: activityRepo,
 	}

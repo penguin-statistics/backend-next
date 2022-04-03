@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/pkg/errors"
-
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
@@ -13,15 +12,15 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
-type DropPatternElementRepo struct {
+type DropPatternElement struct {
 	DB *bun.DB
 }
 
-func NewDropPatternElementRepo(db *bun.DB) *DropPatternElementRepo {
-	return &DropPatternElementRepo{DB: db}
+func NewDropPatternElement(db *bun.DB) *DropPatternElement {
+	return &DropPatternElement{DB: db}
 }
 
-func (r *DropPatternElementRepo) GetDropPatternElementById(ctx context.Context, id int) (*models.DropPatternElement, error) {
+func (r *DropPatternElement) GetDropPatternElementById(ctx context.Context, id int) (*models.DropPatternElement, error) {
 	var DropPatternElement models.DropPatternElement
 	err := r.DB.NewSelect().
 		Model(&DropPatternElement).
@@ -37,7 +36,7 @@ func (r *DropPatternElementRepo) GetDropPatternElementById(ctx context.Context, 
 	return &DropPatternElement, nil
 }
 
-func (r *DropPatternElementRepo) GetDropPatternElementByHash(ctx context.Context, hash string) (*models.DropPatternElement, error) {
+func (r *DropPatternElement) GetDropPatternElementByHash(ctx context.Context, hash string) (*models.DropPatternElement, error) {
 	var DropPatternElement models.DropPatternElement
 	err := r.DB.NewSelect().
 		Model(&DropPatternElement).
@@ -53,7 +52,7 @@ func (r *DropPatternElementRepo) GetDropPatternElementByHash(ctx context.Context
 	return &DropPatternElement, nil
 }
 
-func (r *DropPatternElementRepo) CreateDropPatternElements(ctx context.Context, tx bun.Tx, patternId int, drops []*types.Drop) ([]*models.DropPatternElement, error) {
+func (r *DropPatternElement) CreateDropPatternElements(ctx context.Context, tx bun.Tx, patternId int, drops []*types.Drop) ([]*models.DropPatternElement, error) {
 	elements := make([]models.DropPatternElement, 0, len(drops))
 	for _, drop := range drops {
 		element := models.DropPatternElement{
@@ -79,7 +78,7 @@ func (r *DropPatternElementRepo) CreateDropPatternElements(ctx context.Context, 
 	return ptrElements, nil
 }
 
-func (r *DropPatternElementRepo) GetDropPatternElementsByPatternId(ctx context.Context, patternId int) ([]*models.DropPatternElement, error) {
+func (r *DropPatternElement) GetDropPatternElementsByPatternId(ctx context.Context, patternId int) ([]*models.DropPatternElement, error) {
 	var elements []*models.DropPatternElement
 	err := r.DB.NewSelect().
 		Model(&elements).

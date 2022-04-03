@@ -5,21 +5,20 @@ import (
 	"database/sql"
 
 	"github.com/pkg/errors"
-
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 )
 
-type PatternMatrixElementRepo struct {
+type PatternMatrixElement struct {
 	db *bun.DB
 }
 
-func NewPatternMatrixElementRepo(db *bun.DB) *PatternMatrixElementRepo {
-	return &PatternMatrixElementRepo{db: db}
+func NewPatternMatrixElement(db *bun.DB) *PatternMatrixElement {
+	return &PatternMatrixElement{db: db}
 }
 
-func (s *PatternMatrixElementRepo) BatchSaveElements(ctx context.Context, elements []*models.PatternMatrixElement, server string) error {
+func (s *PatternMatrixElement) BatchSaveElements(ctx context.Context, elements []*models.PatternMatrixElement, server string) error {
 	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		_, err := tx.NewDelete().Model((*models.PatternMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
 		if err != nil {
@@ -34,12 +33,12 @@ func (s *PatternMatrixElementRepo) BatchSaveElements(ctx context.Context, elemen
 	return nil
 }
 
-func (s *PatternMatrixElementRepo) DeleteByServer(ctx context.Context, server string) error {
+func (s *PatternMatrixElement) DeleteByServer(ctx context.Context, server string) error {
 	_, err := s.db.NewDelete().Model((*models.PatternMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
 	return err
 }
 
-func (s *PatternMatrixElementRepo) GetElementsByServer(ctx context.Context, server string) ([]*models.PatternMatrixElement, error) {
+func (s *PatternMatrixElement) GetElementsByServer(ctx context.Context, server string) ([]*models.PatternMatrixElement, error) {
 	var elements []*models.PatternMatrixElement
 	err := s.db.NewSelect().Model(&elements).Where("server = ?", server).Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {

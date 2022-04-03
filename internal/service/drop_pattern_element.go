@@ -11,10 +11,10 @@ import (
 )
 
 type DropPatternElementService struct {
-	DropPatternElementRepo *repo.DropPatternElementRepo
+	DropPatternElementRepo *repo.DropPatternElement
 }
 
-func NewDropPatternElementService(dropPatternElementRepo *repo.DropPatternElementRepo) *DropPatternElementService {
+func NewDropPatternElementService(dropPatternElementRepo *repo.DropPatternElement) *DropPatternElementService {
 	return &DropPatternElementService{
 		DropPatternElementRepo: dropPatternElementRepo,
 	}

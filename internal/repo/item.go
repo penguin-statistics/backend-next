@@ -12,15 +12,15 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
-type ItemRepo struct {
+type Item struct {
 	DB *bun.DB
 }
 
-func NewItemRepo(db *bun.DB) *ItemRepo {
-	return &ItemRepo{DB: db}
+func NewItem(db *bun.DB) *Item {
+	return &Item{DB: db}
 }
 
-func (c *ItemRepo) GetItems(ctx context.Context) ([]*models.Item, error) {
+func (c *Item) GetItems(ctx context.Context) ([]*models.Item, error) {
 	var items []*models.Item
 	err := c.DB.NewSelect().
 		Model(&items).
@@ -35,7 +35,7 @@ func (c *ItemRepo) GetItems(ctx context.Context) ([]*models.Item, error) {
 	return items, nil
 }
 
-func (c *ItemRepo) GetItemById(ctx context.Context, itemId int) (*models.Item, error) {
+func (c *Item) GetItemById(ctx context.Context, itemId int) (*models.Item, error) {
 	var item models.Item
 	err := c.DB.NewSelect().
 		Model(&item).
@@ -51,7 +51,7 @@ func (c *ItemRepo) GetItemById(ctx context.Context, itemId int) (*models.Item, e
 	return &item, nil
 }
 
-func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*models.Item, error) {
+func (c *Item) GetItemByArkId(ctx context.Context, arkItemId string) (*models.Item, error) {
 	var item models.Item
 	err := c.DB.NewSelect().
 		Model(&item).
@@ -67,7 +67,7 @@ func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*model
 	return &item, nil
 }
 
-func (c *ItemRepo) GetShimItems(ctx context.Context) ([]*modelv2.Item, error) {
+func (c *Item) GetShimItems(ctx context.Context) ([]*modelv2.Item, error) {
 	var items []*modelv2.Item
 
 	err := c.DB.NewSelect().
@@ -83,7 +83,7 @@ func (c *ItemRepo) GetShimItems(ctx context.Context) ([]*modelv2.Item, error) {
 	return items, nil
 }
 
-func (c *ItemRepo) GetShimItemByArkId(ctx context.Context, itemId string) (*modelv2.Item, error) {
+func (c *Item) GetShimItemByArkId(ctx context.Context, itemId string) (*modelv2.Item, error) {
 	var item modelv2.Item
 	err := c.DB.NewSelect().
 		Model(&item).
@@ -99,7 +99,7 @@ func (c *ItemRepo) GetShimItemByArkId(ctx context.Context, itemId string) (*mode
 	return &item, nil
 }
 
-func (c *ItemRepo) SearchItemByName(ctx context.Context, name string) (*models.Item, error) {
+func (c *Item) SearchItemByName(ctx context.Context, name string) (*models.Item, error) {
 	var item models.Item
 	err := c.DB.NewSelect().
 		Model(&item).

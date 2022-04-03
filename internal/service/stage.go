@@ -17,10 +17,10 @@ import (
 )
 
 type StageService struct {
-	StageRepo *repo.StageRepo
+	StageRepo *repo.Stage
 }
 
-func NewStageService(stageRepo *repo.StageRepo) *StageService {
+func NewStageService(stageRepo *repo.Stage) *StageService {
 	return &StageService{
 		StageRepo: stageRepo,
 	}

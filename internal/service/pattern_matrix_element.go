@@ -8,10 +8,10 @@ import (
 )
 
 type PatternMatrixElementService struct {
-	PatternMatrixElementRepo *repo.PatternMatrixElementRepo
+	PatternMatrixElementRepo *repo.PatternMatrixElement
 }
 
-func NewPatternMatrixElementService(patternMatrixElementRepo *repo.PatternMatrixElementRepo) *PatternMatrixElementService {
+func NewPatternMatrixElementService(patternMatrixElementRepo *repo.PatternMatrixElement) *PatternMatrixElementService {
 	return &PatternMatrixElementService{
 		PatternMatrixElementRepo: patternMatrixElementRepo,
 	}

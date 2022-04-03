@@ -20,15 +20,15 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgqry"
 )
 
-type DropInfoRepo struct {
+type DropInfo struct {
 	DB *bun.DB
 }
 
-func NewDropInfoRepo(db *bun.DB) *DropInfoRepo {
-	return &DropInfoRepo{DB: db}
+func NewDropInfo(db *bun.DB) *DropInfo {
+	return &DropInfo{DB: db}
 }
 
-func (s *DropInfoRepo) GetDropInfo(ctx context.Context, id int) (*models.DropInfo, error) {
+func (s *DropInfo) GetDropInfo(ctx context.Context, id int) (*models.DropInfo, error) {
 	var dropInfo models.DropInfo
 	err := s.DB.NewSelect().
 		Model(&dropInfo).
@@ -44,7 +44,7 @@ func (s *DropInfoRepo) GetDropInfo(ctx context.Context, id int) (*models.DropInf
 	return &dropInfo, nil
 }
 
-func (s *DropInfoRepo) GetDropInfosByServerAndStageId(ctx context.Context, server string, stageId int) ([]*models.DropInfo, error) {
+func (s *DropInfo) GetDropInfosByServerAndStageId(ctx context.Context, server string, stageId int) ([]*models.DropInfo, error) {
 	var dropInfo []*models.DropInfo
 	err := s.DB.NewSelect().
 		Model(&dropInfo).
@@ -61,7 +61,7 @@ func (s *DropInfoRepo) GetDropInfosByServerAndStageId(ctx context.Context, serve
 	return dropInfo, nil
 }
 
-func (s *DropInfoRepo) GetDropInfosByServer(ctx context.Context, server string) ([]*models.DropInfo, error) {
+func (s *DropInfo) GetDropInfosByServer(ctx context.Context, server string) ([]*models.DropInfo, error) {
 	var dropInfo []*models.DropInfo
 	err := s.DB.NewSelect().
 		Model(&dropInfo).
@@ -83,7 +83,7 @@ type DropInfoQuery struct {
 }
 
 // GetDropInfoByArkId returns a drop info by its ark id.
-func (s *DropInfoRepo) GetForCurrentTimeRange(ctx context.Context, query *DropInfoQuery) ([]*models.DropInfo, error) {
+func (s *DropInfo) GetForCurrentTimeRange(ctx context.Context, query *DropInfoQuery) ([]*models.DropInfo, error) {
 	var dropInfo []*models.DropInfo
 	err := pgqry.New(
 		s.DB.NewSelect().
@@ -106,7 +106,7 @@ func (s *DropInfoRepo) GetForCurrentTimeRange(ctx context.Context, query *DropIn
 	return dropInfo, nil
 }
 
-func (s *DropInfoRepo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server string, stageId int, rangeId int) ([]int, error) {
+func (s *DropInfo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server string, stageId int, rangeId int) ([]int, error) {
 	var results []int
 	err := s.DB.NewSelect().
 		Column("di.item_id").
@@ -128,7 +128,7 @@ func (s *DropInfoRepo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, se
 	return results, nil
 }
 
-func (s *DropInfoRepo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) (itemDropInfos, typeDropInfos []*models.DropInfo, err error) {
+func (s *DropInfo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) (itemDropInfos, typeDropInfos []*models.DropInfo, err error) {
 	allDropInfos, err := s.GetForCurrentTimeRange(ctx, query)
 	if err != nil {
 		return nil, nil, err
@@ -146,7 +146,7 @@ func (s *DropInfoRepo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, 
 	return itemDropInfos, typeDropInfos, nil
 }
 
-func (s *DropInfoRepo) GetDropInfosWithFilters(ctx context.Context, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*models.DropInfo, error) {
+func (s *DropInfo) GetDropInfosWithFilters(ctx context.Context, server string, timeRanges []*models.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*models.DropInfo, error) {
 	results := make([]*models.DropInfo, 0)
 	var whereBuilder strings.Builder
 	fmt.Fprintf(&whereBuilder, "di.server = ? AND di.drop_type != ? AND di.item_id IS NOT NULL")

@@ -5,22 +5,21 @@ import (
 	"database/sql"
 
 	"github.com/pkg/errors"
-
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
-type PropertyRepo struct {
+type Property struct {
 	db *bun.DB
 }
 
-func NewPropertyRepo(db *bun.DB) *PropertyRepo {
-	return &PropertyRepo{db: db}
+func NewPropertyRepo(db *bun.DB) *Property {
+	return &Property{db: db}
 }
 
-func (c *PropertyRepo) GetProperties(ctx context.Context) ([]*models.Property, error) {
+func (c *Property) GetProperties(ctx context.Context) ([]*models.Property, error) {
 	var properties []*models.Property
 	err := c.db.NewSelect().
 		Model(&properties).
@@ -35,7 +34,7 @@ func (c *PropertyRepo) GetProperties(ctx context.Context) ([]*models.Property, e
 	return properties, nil
 }
 
-func (c *PropertyRepo) GetPropertyByKey(ctx context.Context, key string) (*models.Property, error) {
+func (c *Property) GetPropertyByKey(ctx context.Context, key string) (*models.Property, error) {
 	var property models.Property
 	err := c.db.NewSelect().
 		Model(&property).

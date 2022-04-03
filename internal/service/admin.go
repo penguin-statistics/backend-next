@@ -15,10 +15,10 @@ import (
 
 type AdminService struct {
 	DB        *bun.DB
-	AdminRepo *repo.AdminRepo
+	AdminRepo *repo.Admin
 }
 
-func NewAdminService(db *bun.DB, adminRepo *repo.AdminRepo) *AdminService {
+func NewAdminService(db *bun.DB, adminRepo *repo.Admin) *AdminService {
 	return &AdminService{
 		DB:        db,
 		AdminRepo: adminRepo,

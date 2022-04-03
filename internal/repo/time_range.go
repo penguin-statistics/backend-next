@@ -8,15 +8,15 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 )
 
-type TimeRangeRepo struct {
+type TimeRange struct {
 	db *bun.DB
 }
 
-func NewTimeRangeRepo(db *bun.DB) *TimeRangeRepo {
-	return &TimeRangeRepo{db: db}
+func NewTimeRange(db *bun.DB) *TimeRange {
+	return &TimeRange{db: db}
 }
 
-func (c *TimeRangeRepo) GetTimeRangesByServer(ctx context.Context, server string) ([]*models.TimeRange, error) {
+func (c *TimeRange) GetTimeRangesByServer(ctx context.Context, server string) ([]*models.TimeRange, error) {
 	var timeRanges []*models.TimeRange
 	if err := c.db.NewSelect().
 		Model(&timeRanges).
@@ -27,7 +27,7 @@ func (c *TimeRangeRepo) GetTimeRangesByServer(ctx context.Context, server string
 	return timeRanges, nil
 }
 
-func (c *TimeRangeRepo) GetTimeRangeById(ctx context.Context, rangeId int) (*models.TimeRange, error) {
+func (c *TimeRange) GetTimeRangeById(ctx context.Context, rangeId int) (*models.TimeRange, error) {
 	var timeRange models.TimeRange
 	if err := c.db.NewSelect().
 		Model(&timeRange).

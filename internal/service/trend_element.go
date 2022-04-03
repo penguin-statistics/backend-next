@@ -8,10 +8,10 @@ import (
 )
 
 type TrendElementService struct {
-	TrendElementRepo *repo.TrendElementRepo
+	TrendElementRepo *repo.TrendElement
 }
 
-func NewTrendElementService(trendElementRepo *repo.TrendElementRepo) *TrendElementService {
+func NewTrendElementService(trendElementRepo *repo.TrendElement) *TrendElementService {
 	return &TrendElementService{
 		TrendElementRepo: trendElementRepo,
 	}

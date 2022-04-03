@@ -20,10 +20,10 @@ var (
 )
 
 type DropVerifier struct {
-	DropInfoRepo *repo.DropInfoRepo
+	DropInfoRepo *repo.DropInfo
 }
 
-func NewDropVerifier(dropInfoRepo *repo.DropInfoRepo) *DropVerifier {
+func NewDropVerifier(dropInfoRepo *repo.DropInfo) *DropVerifier {
 	return &DropVerifier{
 		DropInfoRepo: dropInfoRepo,
 	}

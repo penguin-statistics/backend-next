@@ -19,10 +19,10 @@ import (
 )
 
 type ItemService struct {
-	ItemRepo *repo.ItemRepo
+	ItemRepo *repo.Item
 }
 
-func NewItemService(itemRepo *repo.ItemRepo) *ItemService {
+func NewItemService(itemRepo *repo.Item) *ItemService {
 	return &ItemService{
 		ItemRepo: itemRepo,
 	}

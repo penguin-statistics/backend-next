@@ -10,10 +10,10 @@ import (
 )
 
 type SiteStatsService struct {
-	DropReportRepo *repo.DropReportRepo
+	DropReportRepo *repo.DropReport
 }
 
-func NewSiteStatsService(dropReportRepo *repo.DropReportRepo) *SiteStatsService {
+func NewSiteStatsService(dropReportRepo *repo.DropReport) *SiteStatsService {
 	return &SiteStatsService{
 		DropReportRepo: dropReportRepo,
 	}

@@ -15,11 +15,11 @@ import (
 )
 
 type DropInfoService struct {
-	DropInfoRepo     *repo.DropInfoRepo
+	DropInfoRepo     *repo.DropInfo
 	TimeRangeService *TimeRangeService
 }
 
-func NewDropInfoService(dropInfoRepo *repo.DropInfoRepo, timeRangeService *TimeRangeService) *DropInfoService {
+func NewDropInfoService(dropInfoRepo *repo.DropInfo, timeRangeService *TimeRangeService) *DropInfoService {
 	return &DropInfoService{
 		DropInfoRepo:     dropInfoRepo,
 		TimeRangeService: timeRangeService,

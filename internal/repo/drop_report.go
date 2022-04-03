@@ -17,17 +17,17 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
-type DropReportRepo struct {
+type DropReport struct {
 	DB *bun.DB
 }
 
-func NewDropReportRepo(db *bun.DB) *DropReportRepo {
-	return &DropReportRepo{
+func NewDropReport(db *bun.DB) *DropReport {
+	return &DropReport{
 		DB: db,
 	}
 }
 
-func (s *DropReportRepo) CreateDropReport(ctx context.Context, tx bun.Tx, dropReport *models.DropReport) error {
+func (s *DropReport) CreateDropReport(ctx context.Context, tx bun.Tx, dropReport *models.DropReport) error {
 	_, err := tx.NewInsert().
 		Model(dropReport).
 		ExcludeColumn("created_at").
@@ -35,7 +35,7 @@ func (s *DropReportRepo) CreateDropReport(ctx context.Context, tx bun.Tx, dropRe
 	return err
 }
 
-func (s *DropReportRepo) DeleteDropReport(ctx context.Context, reportId int) error {
+func (s *DropReport) DeleteDropReport(ctx context.Context, reportId int) error {
 	_, err := s.DB.NewUpdate().
 		Model((*models.DropReport)(nil)).
 		Set("reliability = ?", -1).
@@ -44,7 +44,7 @@ func (s *DropReportRepo) DeleteDropReport(ctx context.Context, reportId int) err
 	return err
 }
 
-func (s *DropReportRepo) CalcTotalQuantityForDropMatrix(
+func (s *DropReport) CalcTotalQuantityForDropMatrix(
 	ctx context.Context, server string, timeRange *models.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int,
 ) ([]*models.TotalQuantityResultForDropMatrix, error) {
 	results := make([]*models.TotalQuantityResultForDropMatrix, 0)
@@ -90,7 +90,7 @@ func (s *DropReportRepo) CalcTotalQuantityForDropMatrix(
 	return results, nil
 }
 
-func (s *DropReportRepo) CalcTotalQuantityForPatternMatrix(
+func (s *DropReport) CalcTotalQuantityForPatternMatrix(
 	ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId null.Int,
 ) ([]*models.TotalQuantityResultForPatternMatrix, error) {
 	results := make([]*models.TotalQuantityResultForPatternMatrix, 0)
@@ -129,7 +129,7 @@ func (s *DropReportRepo) CalcTotalQuantityForPatternMatrix(
 	return results, nil
 }
 
-func (s *DropReportRepo) CalcTotalTimes(
+func (s *DropReport) CalcTotalTimes(
 	ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId null.Int, excludeNonOneTimes bool,
 ) ([]*models.TotalTimesResult, error) {
 	results := make([]*models.TotalTimesResult, 0)
@@ -171,7 +171,7 @@ func (s *DropReportRepo) CalcTotalTimes(
 	return results, nil
 }
 
-func (s *DropReportRepo) CalcTotalQuantityForTrend(
+func (s *DropReport) CalcTotalQuantityForTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int,
 ) ([]*models.TotalQuantityResultForTrend, error) {
 	results := make([]*models.TotalQuantityResultForTrend, 0)
@@ -236,7 +236,7 @@ func (s *DropReportRepo) CalcTotalQuantityForTrend(
 	return results, nil
 }
 
-func (s *DropReportRepo) CalcTotalTimesForTrend(
+func (s *DropReport) CalcTotalTimesForTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId null.Int,
 ) ([]*models.TotalTimesResultForTrend, error) {
 	results := make([]*models.TotalTimesResultForTrend, 0)
@@ -294,7 +294,7 @@ func (s *DropReportRepo) CalcTotalTimesForTrend(
 	return results, nil
 }
 
-func (s *DropReportRepo) CalcTotalSanityCostForShimSiteStats(ctx context.Context, server string) (sanity int, err error) {
+func (s *DropReport) CalcTotalSanityCostForShimSiteStats(ctx context.Context, server string) (sanity int, err error) {
 	err = pgqry.New(
 		s.DB.NewSelect().
 			TableExpr("drop_reports AS dr").
@@ -306,7 +306,7 @@ func (s *DropReportRepo) CalcTotalSanityCostForShimSiteStats(ctx context.Context
 	return sanity, err
 }
 
-func (s *DropReportRepo) CalcTotalStageQuantityForShimSiteStats(ctx context.Context, server string, isRecent24h bool) ([]*modelv2.TotalStageTime, error) {
+func (s *DropReport) CalcTotalStageQuantityForShimSiteStats(ctx context.Context, server string, isRecent24h bool) ([]*modelv2.TotalStageTime, error) {
 	results := make([]*modelv2.TotalStageTime, 0)
 
 	err := pgqry.New(
@@ -332,7 +332,7 @@ func (s *DropReportRepo) CalcTotalStageQuantityForShimSiteStats(ctx context.Cont
 	return results, nil
 }
 
-func (s *DropReportRepo) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelv2.TotalItemQuantity, error) {
+func (s *DropReport) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelv2.TotalItemQuantity, error) {
 	results := make([]*modelv2.TotalItemQuantity, 0)
 
 	types := []string{constants.ItemTypeMaterial, constants.ItemTypeFurniture, constants.ItemTypeChip}

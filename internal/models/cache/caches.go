@@ -74,7 +74,7 @@ var (
 	CacheSingularFlusherMap map[string]Flusher
 )
 
-func Initialize(propertyRepo *repo.PropertyRepo) {
+func Initialize(propertyRepo *repo.Property) {
 	once.Do(func() {
 		initializeCaches()
 		populateProperties(propertyRepo)
@@ -219,7 +219,7 @@ func initializeCaches() {
 	CacheSetMap["lastModifiedTime#key"] = LastModifiedTime.Flush
 }
 
-func populateProperties(repo *repo.PropertyRepo) {
+func populateProperties(repo *repo.Property) {
 	Properties = make(map[string]string)
 	properties, err := repo.GetProperties(context.Background())
 	if err != nil {

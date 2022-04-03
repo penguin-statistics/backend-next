@@ -8,15 +8,15 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 )
 
-type AdminRepo struct {
+type Admin struct {
 	db *bun.DB
 }
 
-func NewAdminRepo(db *bun.DB) *AdminRepo {
-	return &AdminRepo{db: db}
+func NewAdmin(db *bun.DB) *Admin {
+	return &Admin{db: db}
 }
 
-func (r *AdminRepo) SaveZones(ctx context.Context, tx bun.Tx, zones *[]*models.Zone) error {
+func (r *Admin) SaveZones(ctx context.Context, tx bun.Tx, zones *[]*models.Zone) error {
 	_, err := tx.NewInsert().
 		On("CONFLICT (ark_zone_id) DO UPDATE").
 		Model(zones).
@@ -24,7 +24,7 @@ func (r *AdminRepo) SaveZones(ctx context.Context, tx bun.Tx, zones *[]*models.Z
 	return err
 }
 
-func (r *AdminRepo) SaveActivities(ctx context.Context, tx bun.Tx, activities *[]*models.Activity) error {
+func (r *Admin) SaveActivities(ctx context.Context, tx bun.Tx, activities *[]*models.Activity) error {
 	_, err := tx.NewInsert().
 		On("CONFLICT (activity_id) DO UPDATE").
 		Model(activities).
@@ -32,7 +32,7 @@ func (r *AdminRepo) SaveActivities(ctx context.Context, tx bun.Tx, activities *[
 	return err
 }
 
-func (r *AdminRepo) SaveTimeRanges(ctx context.Context, tx bun.Tx, timeRanges *[]*models.TimeRange) error {
+func (r *Admin) SaveTimeRanges(ctx context.Context, tx bun.Tx, timeRanges *[]*models.TimeRange) error {
 	_, err := tx.NewInsert().
 		On("CONFLICT (range_id) DO UPDATE").
 		Model(timeRanges).
@@ -40,7 +40,7 @@ func (r *AdminRepo) SaveTimeRanges(ctx context.Context, tx bun.Tx, timeRanges *[
 	return err
 }
 
-func (r *AdminRepo) SaveStages(ctx context.Context, tx bun.Tx, stages *[]*models.Stage) error {
+func (r *Admin) SaveStages(ctx context.Context, tx bun.Tx, stages *[]*models.Stage) error {
 	_, err := tx.NewInsert().
 		On("CONFLICT (ark_stage_id) DO UPDATE").
 		Model(stages).
@@ -48,7 +48,7 @@ func (r *AdminRepo) SaveStages(ctx context.Context, tx bun.Tx, stages *[]*models
 	return err
 }
 
-func (r *AdminRepo) SaveDropInfos(ctx context.Context, tx bun.Tx, dropInfos *[]*models.DropInfo) error {
+func (r *Admin) SaveDropInfos(ctx context.Context, tx bun.Tx, dropInfos *[]*models.DropInfo) error {
 	_, err := tx.NewInsert().
 		On("CONFLICT (drop_id) DO UPDATE").
 		Model(dropInfos).

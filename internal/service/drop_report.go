@@ -11,10 +11,10 @@ import (
 )
 
 type DropReportService struct {
-	DropReportRepo *repo.DropReportRepo
+	DropReportRepo *repo.DropReport
 }
 
-func NewDropReportService(dropReportRepo *repo.DropReportRepo) *DropReportService {
+func NewDropReportService(dropReportRepo *repo.DropReport) *DropReportService {
 	return &DropReportService{
 		DropReportRepo: dropReportRepo,
 	}

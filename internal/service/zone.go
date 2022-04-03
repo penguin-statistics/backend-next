@@ -13,10 +13,10 @@ import (
 )
 
 type ZoneService struct {
-	ZoneRepo *repo.ZoneRepo
+	ZoneRepo *repo.Zone
 }
 
-func NewZoneService(zoneRepo *repo.ZoneRepo) *ZoneService {
+func NewZoneService(zoneRepo *repo.Zone) *ZoneService {
 	return &ZoneService{
 		ZoneRepo: zoneRepo,
 	}
