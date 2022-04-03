@@ -1,4 +1,4 @@
-package shims
+package v2
 
 import (
 	"time"

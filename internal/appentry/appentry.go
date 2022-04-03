@@ -6,8 +6,8 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/controllers"
-	"github.com/penguin-statistics/backend-next/internal/controllers/shims"
+	"github.com/penguin-statistics/backend-next/internal/controller"
+	controllerv2 "github.com/penguin-statistics/backend-next/internal/controller/v2"
 	"github.com/penguin-statistics/backend-next/internal/infra"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/flake"
@@ -79,21 +79,21 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Invoke(logger.Configure),
 		fx.Invoke(infra.SentryInit),
 		fx.Invoke(cache.Initialize),
-		fx.Invoke(shims.RegisterItemController),
-		fx.Invoke(shims.RegisterZoneController),
-		fx.Invoke(shims.RegisterStageController),
-		fx.Invoke(shims.RegisterNoticeController),
-		fx.Invoke(shims.RegisterResultController),
-		fx.Invoke(shims.RegisterReportController),
-		fx.Invoke(shims.RegisterAccountController),
-		fx.Invoke(shims.RegisterFormulaController),
-		fx.Invoke(shims.RegisterPrivateController),
-		fx.Invoke(shims.RegisterSiteStatsController),
-		fx.Invoke(shims.RegisterEventPeriodController),
-		fx.Invoke(controllers.RegisterMetaController),
-		fx.Invoke(controllers.RegisterIndexController),
-		fx.Invoke(controllers.RegisterAdminController),
-		fx.Invoke(controllers.RegisterShortURLController),
+		fx.Invoke(controllerv2.RegisterItemController),
+		fx.Invoke(controllerv2.RegisterZoneController),
+		fx.Invoke(controllerv2.RegisterStageController),
+		fx.Invoke(controllerv2.RegisterNoticeController),
+		fx.Invoke(controllerv2.RegisterResultController),
+		fx.Invoke(controllerv2.RegisterReportController),
+		fx.Invoke(controllerv2.RegisterAccountController),
+		fx.Invoke(controllerv2.RegisterFormulaController),
+		fx.Invoke(controllerv2.RegisterPrivateController),
+		fx.Invoke(controllerv2.RegisterSiteStatsController),
+		fx.Invoke(controllerv2.RegisterEventPeriodController),
+		fx.Invoke(controller.RegisterMetaController),
+		fx.Invoke(controller.RegisterIndexController),
+		fx.Invoke(controller.RegisterAdminController),
+		fx.Invoke(controller.RegisterShortURLController),
 		fx.Invoke(calcwkr.Start),
 		fx.StartTimeout(1 * time.Second),
 		// StopTimeout is not typically needed, since we're using fiber's Shutdown(),
@@ -103,7 +103,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 	}
 
 	if includeSwagger {
-		opts = append(opts, fx.Invoke(controllers.RegisterSwaggerController))
+		opts = append(opts, fx.Invoke(controller.RegisterSwaggerController))
 	}
 
 	return opts
