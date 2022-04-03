@@ -6,8 +6,8 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
-	controllerv2 "github.com/penguin-statistics/backend-next/internal/controller/v2"
 	controllermeta "github.com/penguin-statistics/backend-next/internal/controller/meta"
+	controllerv2 "github.com/penguin-statistics/backend-next/internal/controller/v2"
 	"github.com/penguin-statistics/backend-next/internal/infra"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/crypto"
@@ -36,12 +36,13 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(reportutil.NewReportVerifier),
 		fx.Provide(repo.NewItem),
 		fx.Provide(repo.NewZone),
-		fx.Provide(repo.NewStageRepo),
+		fx.Provide(repo.NewAdmin),
+		fx.Provide(repo.NewStage),
 		fx.Provide(repo.NewNotice),
 		fx.Provide(repo.NewActivity),
 		fx.Provide(repo.NewAccount),
 		fx.Provide(repo.NewDropInfo),
-		fx.Provide(repo.NewPropertyRepo),
+		fx.Provide(repo.NewProperty),
 		fx.Provide(repo.NewTimeRange),
 		fx.Provide(repo.NewDropReport),
 		fx.Provide(repo.NewDropPattern),
@@ -50,7 +51,6 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(repo.NewDropMatrixElement),
 		fx.Provide(repo.NewDropPatternElement),
 		fx.Provide(repo.NewPatternMatrixElement),
-		fx.Provide(repo.NewAdmin),
 		fx.Provide(service.NewItemService),
 		fx.Provide(service.NewZoneService),
 		fx.Provide(service.NewStageService),

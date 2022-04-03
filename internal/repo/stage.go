@@ -20,7 +20,7 @@ type Stage struct {
 	db *bun.DB
 }
 
-func NewStageRepo(db *bun.DB) *Stage {
+func NewStage(db *bun.DB) *Stage {
 	return &Stage{db: db}
 }
 

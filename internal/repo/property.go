@@ -15,7 +15,7 @@ type Property struct {
 	db *bun.DB
 }
 
-func NewPropertyRepo(db *bun.DB) *Property {
+func NewProperty(db *bun.DB) *Property {
 	return &Property{db: db}
 }
 
