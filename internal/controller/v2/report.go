@@ -10,21 +10,21 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
+	"github.com/penguin-statistics/backend-next/internal/pkg/crypto"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/util"
 	"github.com/penguin-statistics/backend-next/internal/util/rekuest"
 )
 
-type ReportController struct {
+type Report struct {
 	fx.In
 
-	Crypto        *util.Crypto
+	Crypto        *crypto.Crypto
 	ReportService *service.ReportService
 }
 
-func RegisterReportController(v2 *svr.V2, v3 *svr.V3, c ReportController) {
+func RegisterReport(v2 *svr.V2, v3 *svr.V3, c Report) {
 	v2.Post("/report", c.SingularReport)
 	v2.Post("/report/recall", c.RecallSingularReport)
 	v2.Post("/report/recognition", c.RecognitionReport)
@@ -41,7 +41,7 @@ func RegisterReportController(v2 *svr.V2, v3 *svr.V3, c ReportController) {
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/report [POST]
-func (c *ReportController) SingularReport(ctx *fiber.Ctx) error {
+func (c *Report) SingularReport(ctx *fiber.Ctx) error {
 	var report types.SingleReportRequest
 	if err := rekuest.ValidBody(ctx, &report); err != nil {
 		return err
@@ -64,7 +64,7 @@ func (c *ReportController) SingularReport(ctx *fiber.Ctx) error {
 // @Failure      400     {object}  pgerr.PenguinError "`reportHash` is missing, invalid, or already been recalled."
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/report/recall [POST]
-func (c *ReportController) RecallSingularReport(ctx *fiber.Ctx) error {
+func (c *Report) RecallSingularReport(ctx *fiber.Ctx) error {
 	var req types.SingleReportRecallRequest
 	if err := rekuest.ValidBody(ctx, &req); err != nil {
 		return err
@@ -88,7 +88,7 @@ func (c *ReportController) RecallSingularReport(ctx *fiber.Ctx) error {
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/report/recognition [POST]
-func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
+func (c *Report) RecognitionReport(ctx *fiber.Ctx) error {
 	encrypted := string(ctx.Body())
 
 	segments := strings.SplitN(encrypted, ":", 2)

@@ -10,13 +10,13 @@ import (
 	controllerv2 "github.com/penguin-statistics/backend-next/internal/controller/v2"
 	"github.com/penguin-statistics/backend-next/internal/infra"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	"github.com/penguin-statistics/backend-next/internal/pkg/crypto"
 	"github.com/penguin-statistics/backend-next/internal/pkg/flake"
 	"github.com/penguin-statistics/backend-next/internal/pkg/logger"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/server/httpserver"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/util"
 	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
 	"github.com/penguin-statistics/backend-next/internal/workers/calcwkr"
 )
@@ -75,21 +75,21 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(service.NewDropPatternElementService),
 		fx.Provide(service.NewPatternMatrixElementService),
 		fx.Provide(svr.CreateVersioningEndpoints),
-		fx.Provide(util.NewCrypto),
+		fx.Provide(crypto.NewCrypto),
 		fx.Invoke(logger.Configure),
 		fx.Invoke(infra.SentryInit),
 		fx.Invoke(cache.Initialize),
-		fx.Invoke(controllerv2.RegisterItemController),
-		fx.Invoke(controllerv2.RegisterZoneController),
-		fx.Invoke(controllerv2.RegisterStageController),
-		fx.Invoke(controllerv2.RegisterNoticeController),
-		fx.Invoke(controllerv2.RegisterResultController),
-		fx.Invoke(controllerv2.RegisterReportController),
-		fx.Invoke(controllerv2.RegisterAccountController),
-		fx.Invoke(controllerv2.RegisterFormulaController),
-		fx.Invoke(controllerv2.RegisterPrivateController),
-		fx.Invoke(controllerv2.RegisterSiteStatsController),
-		fx.Invoke(controllerv2.RegisterEventPeriodController),
+		fx.Invoke(controllerv2.RegisterItem),
+		fx.Invoke(controllerv2.RegisterZone),
+		fx.Invoke(controllerv2.RegisterStage),
+		fx.Invoke(controllerv2.RegisterNotice),
+		fx.Invoke(controllerv2.RegisterResult),
+		fx.Invoke(controllerv2.RegisterReport),
+		fx.Invoke(controllerv2.RegisterAccount),
+		fx.Invoke(controllerv2.RegisterFormula),
+		fx.Invoke(controllerv2.RegisterPrivate),
+		fx.Invoke(controllerv2.RegisterSiteStats),
+		fx.Invoke(controllerv2.RegisterEventPeriod),
 		fx.Invoke(controller.RegisterMetaController),
 		fx.Invoke(controller.RegisterIndexController),
 		fx.Invoke(controller.RegisterAdminController),

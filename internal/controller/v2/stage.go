@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
@@ -11,15 +12,13 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
-type StageController struct {
+type Stage struct {
+	fx.In
+
 	StageService *service.StageService
 }
 
-func RegisterStageController(v2 *svr.V2, stageService *service.StageService) {
-	c := &StageController{
-		StageService: stageService,
-	}
-
+func RegisterStage(v2 *svr.V2, c Stage) {
 	v2.Get("/stages", c.GetStages)
 	v2.Get("/stages/:stageId", c.GetStageByArkId)
 }
@@ -30,7 +29,7 @@ func RegisterStageController(v2 *svr.V2, stageService *service.StageService) {
 // @Success      200     {array}  v2.Stage{existence=model.Existence,code_i18n=model.I18nString}
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/stages [GET]
-func (c *StageController) GetStages(ctx *fiber.Ctx) error {
+func (c *Stage) GetStages(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 
 	stages, err := c.StageService.GetShimStages(ctx.Context(), server)
@@ -53,7 +52,7 @@ func (c *StageController) GetStages(ctx *fiber.Ctx) error {
 // @Failure      400     {object}  pgerr.PenguinError "Invalid or missing stageId. Notice that this shall be the **string ID** of the stage, instead of the internally used numerical ID of the stage."
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/stages/{stageId} [GET]
-func (c *StageController) GetStageByArkId(ctx *fiber.Ctx) error {
+func (c *Stage) GetStageByArkId(ctx *fiber.Ctx) error {
 	stageId := ctx.Params("stageId")
 	server := ctx.Query("server", "CN")
 

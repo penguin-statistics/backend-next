@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -14,7 +15,9 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
-type PrivateController struct {
+type Private struct {
+	fx.In
+
 	DropMatrixService    *service.DropMatrixService
 	PatternMatrixService *service.PatternMatrixService
 	TrendService         *service.TrendService
@@ -23,24 +26,7 @@ type PrivateController struct {
 	StageService         *service.StageService
 }
 
-func RegisterPrivateController(
-	v2 *svr.V2,
-	dropMatrixService *service.DropMatrixService,
-	patternMatrixService *service.PatternMatrixService,
-	trendService *service.TrendService,
-	accountService *service.AccountService,
-	itemService *service.ItemService,
-	stageService *service.StageService,
-) {
-	c := &PrivateController{
-		DropMatrixService:    dropMatrixService,
-		PatternMatrixService: patternMatrixService,
-		TrendService:         trendService,
-		AccountService:       accountService,
-		ItemService:          itemService,
-		StageService:         stageService,
-	}
-
+func RegisterPrivate(v2 *svr.V2, c Private) {
 	v2.Get("/_private/result/matrix/:server/:source", middlewares.ValidateServer, c.GetDropMatrix)
 	v2.Get("/_private/result/pattern/:server/:source", middlewares.ValidateServer, c.GetPatternMatrix)
 	v2.Get("/_private/result/trend/:server", middlewares.ValidateServer, c.GetTrends)
@@ -54,7 +40,7 @@ func RegisterPrivateController(
 // @Success      200               {object} v2.DropMatrixQueryResult
 // @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/_private/result/matrix/{server}/{source} [GET]
-func (c *PrivateController) GetDropMatrix(ctx *fiber.Ctx) error {
+func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	isPersonal := ctx.Params("source") == "personal"
 
@@ -93,7 +79,7 @@ func (c *PrivateController) GetDropMatrix(ctx *fiber.Ctx) error {
 // @Success      200               {object} v2.PatternMatrixQueryResult
 // @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/_private/result/pattern/{server}/{source} [GET]
-func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
+func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	isPersonal := ctx.Params("source") == "personal"
 
@@ -130,7 +116,7 @@ func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
 // @Success      200               {object} v2.TrendQueryResult
 // @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/_private/result/trend/{server} [GET]
-func (c *PrivateController) GetTrends(ctx *fiber.Ctx) error {
+func (c *Private) GetTrends(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	shimResult, err := c.TrendService.GetShimSavedTrendResults(ctx.Context(), server)
 	if err != nil {

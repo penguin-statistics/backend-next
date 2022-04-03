@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
@@ -11,15 +12,13 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
-type ItemController struct {
+type Item struct {
+	fx.In
+
 	ItemService *service.ItemService
 }
 
-func RegisterItemController(v2 *svr.V2, itemService *service.ItemService) {
-	c := &ItemController{
-		ItemService: itemService,
-	}
-
+func RegisterItem(v2 *svr.V2, c Item) {
 	v2.Get("/items", c.GetItems)
 	v2.Get("/items/:itemId", c.GetItemByArkId)
 }
@@ -30,7 +29,7 @@ func RegisterItemController(v2 *svr.V2, itemService *service.ItemService) {
 // @Success      200     {array}  v2.Item{name_i18n=model.I18nString,existence=model.Existence}
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/items [GET]
-func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
+func (c *Item) GetItems(ctx *fiber.Ctx) error {
 	items, err := c.ItemService.GetShimItems(ctx.Context())
 	if err != nil {
 		return err
@@ -51,7 +50,7 @@ func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
 // @Failure      400     {object}  pgerr.PenguinError "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item."
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/items/{itemId} [GET]
-func (c *ItemController) GetItemByArkId(ctx *fiber.Ctx) error {
+func (c *Item) GetItemByArkId(ctx *fiber.Ctx) error {
 	itemId := ctx.Params("itemId")
 
 	item, err := c.ItemService.GetShimItemByArkId(ctx.Context(), itemId)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
@@ -23,7 +24,9 @@ import (
 // ErrIntervalLengthTooSmall is returned when the interval length is invalid
 var ErrIntervalLengthTooSmall = pgerr.ErrInvalidReq.Msg("interval length must be greater than 1 hour")
 
-type ResultController struct {
+type Result struct {
+	fx.In
+
 	DropMatrixService    *service.DropMatrixService
 	PatternMatrixService *service.PatternMatrixService
 	TrendService         *service.TrendService
@@ -32,24 +35,7 @@ type ResultController struct {
 	StageService         *service.StageService
 }
 
-func RegisterResultController(
-	v2 *svr.V2,
-	dropMatrixService *service.DropMatrixService,
-	patternMatrixService *service.PatternMatrixService,
-	trendService *service.TrendService,
-	accountService *service.AccountService,
-	itemService *service.ItemService,
-	stageService *service.StageService,
-) {
-	c := &ResultController{
-		DropMatrixService:    dropMatrixService,
-		PatternMatrixService: patternMatrixService,
-		TrendService:         trendService,
-		AccountService:       accountService,
-		ItemService:          itemService,
-		StageService:         stageService,
-	}
-
+func RegisterResult(v2 *svr.V2, c Result) {
 	v2.Get("/result/matrix", c.GetDropMatrix)
 	v2.Get("/result/pattern", c.GetPatternMatrix)
 	v2.Get("/result/trends", c.GetTrends)
@@ -77,7 +63,7 @@ func RegisterResultController(
 // @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/result/matrix [GET]
-func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
+func (c *Result) GetDropMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 	if err := rekuest.ValidServer(ctx, server); err != nil {
 		return err
@@ -131,7 +117,7 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 // @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/result/pattern [GET]
-func (c *ResultController) GetPatternMatrix(ctx *fiber.Ctx) error {
+func (c *Result) GetPatternMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 	if err := rekuest.ValidServer(ctx, server); err != nil {
 		return err
@@ -175,7 +161,7 @@ func (c *ResultController) GetPatternMatrix(ctx *fiber.Ctx) error {
 // @Success      200               {object} v2.TrendQueryResult
 // @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/result/trends [GET]
-func (c *ResultController) GetTrends(ctx *fiber.Ctx) error {
+func (c *Result) GetTrends(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 	if err := rekuest.ValidServer(ctx, server); err != nil {
 		return err
@@ -203,7 +189,7 @@ func (c *ResultController) GetTrends(ctx *fiber.Ctx) error {
 // @Success      202     {object}  modelv2.AdvancedQueryResult{advanced_results=[]v2.TrendQueryResult} "Trend Response: when `interval` has been defined a value greater than `0`. Notice that this response still responds with a status code of `200`, but due to swagger limitations, to denote a different response with the same status code is not possible. Therefore, a status code of `202` is used, only for the purpose of workaround."
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/advanced [POST]
-func (c *ResultController) AdvancedQuery(ctx *fiber.Ctx) error {
+func (c *Result) AdvancedQuery(ctx *fiber.Ctx) error {
 	var request types.AdvancedQueryRequest
 	if err := rekuest.ValidBody(ctx, &request); err != nil {
 		return err
@@ -221,7 +207,7 @@ func (c *ResultController) AdvancedQuery(ctx *fiber.Ctx) error {
 	return ctx.JSON(result)
 }
 
-func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery) (any, error) {
+func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery) (any, error) {
 	// handle isPersonal (might be null) and account
 	isPersonal := false
 	if query.IsPersonal.Valid {
@@ -293,7 +279,7 @@ func (c *ResultController) handleAdvancedQuery(ctx *fiber.Ctx, query *types.Adva
 	}
 }
 
-func (c *ResultController) calcIntervalNum(startTime, endTime time.Time, intervalLength time.Duration) int {
+func (c *Result) calcIntervalNum(startTime, endTime time.Time, intervalLength time.Duration) int {
 	diff := endTime.Sub(startTime)
 	// implicit float64 to int: drops fractional part (truncates towards 0)
 	return int(diff.Hours()) / int(intervalLength.Hours())

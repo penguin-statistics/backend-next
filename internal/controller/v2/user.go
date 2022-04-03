@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/gofiber/fiber/v2"
+	"go.uber.org/fx"
 
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
@@ -12,14 +13,13 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
-type AccountController struct {
-	service *service.AccountService
+type Account struct {
+	fx.In
+
+	AccountService *service.AccountService
 }
 
-func RegisterAccountController(v2 *svr.V2, s *service.AccountService) {
-	c := &AccountController{
-		service: s,
-	}
+func RegisterAccount(v2 *svr.V2, c Account) {
 	v2.Post("/users", c.Login)
 }
 
@@ -32,10 +32,10 @@ func RegisterAccountController(v2 *svr.V2, s *service.AccountService) {
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/users [POST]
-func (c *AccountController) Login(ctx *fiber.Ctx) error {
+func (c *Account) Login(ctx *fiber.Ctx) error {
 	inputPenguinId := ctx.Body()
 
-	account, err := c.service.GetAccountByPenguinId(ctx.Context(), string(inputPenguinId))
+	account, err := c.AccountService.GetAccountByPenguinId(ctx.Context(), string(inputPenguinId))
 	if err != nil {
 		return err
 	}

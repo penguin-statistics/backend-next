@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
@@ -11,15 +12,13 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
-type NoticeController struct {
+type Notice struct {
+	fx.In
+
 	NoticeService *service.NoticeService
 }
 
-func RegisterNoticeController(v2 *svr.V2, noticeService *service.NoticeService) {
-	c := &NoticeController{
-		NoticeService: noticeService,
-	}
-
+func RegisterNotice(v2 *svr.V2, c Notice) {
 	v2.Get("/notice", c.GetNotices)
 }
 
@@ -29,7 +28,7 @@ func RegisterNoticeController(v2 *svr.V2, noticeService *service.NoticeService) 
 // @Success      200     {array}  model.Notice
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/notice [GET]
-func (c *NoticeController) GetNotices(ctx *fiber.Ctx) error {
+func (c *Notice) GetNotices(ctx *fiber.Ctx) error {
 	notices, err := c.NoticeService.GetNotices(ctx.Context())
 	if err != nil {
 		return err

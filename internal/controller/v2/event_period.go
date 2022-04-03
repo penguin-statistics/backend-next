@@ -13,13 +13,13 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
-type EventPeriodController struct {
+type EventPeriod struct {
 	fx.In
 
 	ActivityService *service.ActivityService
 }
 
-func RegisterEventPeriodController(v2 *svr.V2, c EventPeriodController) {
+func RegisterEventPeriod(v2 *svr.V2, c EventPeriod) {
 	v2.Get("/period", c.GetEventPeriods)
 }
 
@@ -29,7 +29,7 @@ func RegisterEventPeriodController(v2 *svr.V2, c EventPeriodController) {
 // @Success      200     {array}  v2.Activity{label_i18n=model.I18nString,existence=model.Existence}
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/period [GET]
-func (c *EventPeriodController) GetEventPeriods(ctx *fiber.Ctx) (err error) {
+func (c *EventPeriod) GetEventPeriods(ctx *fiber.Ctx) (err error) {
 	var activities []*modelv2.Activity
 	activities, err = c.ActivityService.GetShimActivities(ctx.Context())
 	if err != nil {

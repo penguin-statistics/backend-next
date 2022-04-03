@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
@@ -11,15 +12,13 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
-type ZoneController struct {
+type Zone struct {
+	fx.In
+
 	ZoneService *service.ZoneService
 }
 
-func RegisterZoneController(v2 *svr.V2, zoneService *service.ZoneService) {
-	c := &ZoneController{
-		ZoneService: zoneService,
-	}
-
+func RegisterZone(v2 *svr.V2, c Zone) {
 	v2.Get("/zones", c.GetZones)
 	v2.Get("/zones/:zoneId", c.GetZoneByArkId)
 }
@@ -30,7 +29,7 @@ func RegisterZoneController(v2 *svr.V2, zoneService *service.ZoneService) {
 // @Success      200     {array}  v2.Zone{existence=model.Existence,zoneName_i18n=model.I18nString}
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/zones [GET]
-func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
+func (c *Zone) GetZones(ctx *fiber.Ctx) error {
 	zones, err := c.ZoneService.GetShimZones(ctx.Context())
 	if err != nil {
 		return err
@@ -51,7 +50,7 @@ func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
 // @Failure      400     {object}  pgerr.PenguinError "Invalid or missing zoneId. Notice that this shall be the **string ID** of the zone, instead of the v3 API internally used numerical ID of the zone."
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/zones/{zoneId} [GET]
-func (c *ZoneController) GetZoneByArkId(ctx *fiber.Ctx) error {
+func (c *Zone) GetZoneByArkId(ctx *fiber.Ctx) error {
 	zoneId := ctx.Params("zoneId")
 
 	zone, err := c.ZoneService.GetShimZoneByArkId(ctx.Context(), zoneId)
