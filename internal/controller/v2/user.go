@@ -16,7 +16,7 @@ import (
 type Account struct {
 	fx.In
 
-	AccountService *service.AccountService
+	AccountService *service.Account
 }
 
 func RegisterAccount(v2 *svr.V2, c Account) {

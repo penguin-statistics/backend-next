@@ -18,12 +18,12 @@ import (
 type Private struct {
 	fx.In
 
-	DropMatrixService    *service.DropMatrixService
-	PatternMatrixService *service.PatternMatrixService
-	TrendService         *service.TrendService
-	AccountService       *service.AccountService
-	ItemService          *service.ItemService
-	StageService         *service.StageService
+	DropMatrixService    *service.DropMatrix
+	PatternMatrixService *service.PatternMatrix
+	TrendService         *service.Trend
+	AccountService       *service.Account
+	ItemService          *service.Item
+	StageService         *service.Stage
 }
 
 func RegisterPrivate(v2 *svr.V2, c Private) {

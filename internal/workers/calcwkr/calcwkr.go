@@ -14,10 +14,10 @@ import (
 
 type WorkerDeps struct {
 	fx.In
-	DropMatrixService    *service.DropMatrixService
-	PatternMatrixService *service.PatternMatrixService
-	TrendService         *service.TrendService
-	SiteStatsService     *service.SiteStatsService
+	DropMatrixService    *service.DropMatrix
+	PatternMatrixService *service.PatternMatrix
+	TrendService         *service.Trend
+	SiteStatsService     *service.SiteStats
 }
 
 type Worker struct {

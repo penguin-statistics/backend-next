@@ -20,26 +20,26 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
-type PatternMatrixService struct {
-	TimeRangeService            *TimeRangeService
-	DropReportService           *DropReportService
-	DropInfoService             *DropInfoService
-	PatternMatrixElementService *PatternMatrixElementService
-	DropPatternElementService   *DropPatternElementService
-	StageService                *StageService
-	ItemService                 *ItemService
+type PatternMatrix struct {
+	TimeRangeService            *TimeRange
+	DropReportService           *DropReport
+	DropInfoService             *DropInfo
+	PatternMatrixElementService *PatternMatrixElement
+	DropPatternElementService   *DropPatternElement
+	StageService                *Stage
+	ItemService                 *Item
 }
 
-func NewPatternMatrixService(
-	timeRangeService *TimeRangeService,
-	dropReportService *DropReportService,
-	dropInfoService *DropInfoService,
-	patternMatrixElementService *PatternMatrixElementService,
-	dropPatternElementService *DropPatternElementService,
-	stageService *StageService,
-	itemService *ItemService,
-) *PatternMatrixService {
-	return &PatternMatrixService{
+func NewPatternMatrix(
+	timeRangeService *TimeRange,
+	dropReportService *DropReport,
+	dropInfoService *DropInfo,
+	patternMatrixElementService *PatternMatrixElement,
+	dropPatternElementService *DropPatternElement,
+	stageService *Stage,
+	itemService *Item,
+) *PatternMatrix {
+	return &PatternMatrix{
 		TimeRangeService:            timeRangeService,
 		DropReportService:           dropReportService,
 		DropInfoService:             dropInfoService,
@@ -51,7 +51,7 @@ func NewPatternMatrixService(
 }
 
 // Cache: shimLatestPatternMatrixResults#server:{server}, 24hrs, records last modified time
-func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx context.Context, server string, accountId null.Int) (*modelv2.PatternMatrixQueryResult, error) {
+func (s *PatternMatrix) GetShimLatestPatternMatrixResults(ctx context.Context, server string, accountId null.Int) (*modelv2.PatternMatrixQueryResult, error) {
 	valueFunc := func() (*modelv2.PatternMatrixQueryResult, error) {
 		queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId)
 		if err != nil {
@@ -78,7 +78,7 @@ func (s *PatternMatrixService) GetShimLatestPatternMatrixResults(ctx context.Con
 	}
 }
 
-func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx context.Context, server string) error {
+func (s *PatternMatrix) RefreshAllPatternMatrixElements(ctx context.Context, server string) error {
 	toSave := []*model.PatternMatrixElement{}
 	timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
 	if err != nil {
@@ -140,7 +140,7 @@ func (s *PatternMatrixService) RefreshAllPatternMatrixElements(ctx context.Conte
 	return cache.ShimLatestPatternMatrixResults.Delete(server)
 }
 
-func (s *PatternMatrixService) getLatestPatternMatrixResults(ctx context.Context, server string, accountId null.Int) (*model.PatternMatrixQueryResult, error) {
+func (s *PatternMatrix) getLatestPatternMatrixResults(ctx context.Context, server string, accountId null.Int) (*model.PatternMatrixQueryResult, error) {
 	patternMatrixElements, err := s.getLatestPatternMatrixElements(ctx, server, accountId)
 	if err != nil {
 		return nil, err
@@ -148,7 +148,7 @@ func (s *PatternMatrixService) getLatestPatternMatrixResults(ctx context.Context
 	return s.convertPatternMatrixElementsToDropPatternQueryResult(ctx, server, patternMatrixElements)
 }
 
-func (s *PatternMatrixService) getLatestPatternMatrixElements(ctx context.Context, server string, accountId null.Int) ([]*model.PatternMatrixElement, error) {
+func (s *PatternMatrix) getLatestPatternMatrixElements(ctx context.Context, server string, accountId null.Int) ([]*model.PatternMatrixElement, error) {
 	if accountId.Valid {
 		timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
 		if err != nil {
@@ -174,7 +174,7 @@ func (s *PatternMatrixService) getLatestPatternMatrixElements(ctx context.Contex
 	}
 }
 
-func (s *PatternMatrixService) calcPatternMatrixForTimeRanges(
+func (s *PatternMatrix) calcPatternMatrixForTimeRanges(
 	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, accountId null.Int,
 ) ([]*model.PatternMatrixElement, error) {
 	results := make([]*model.PatternMatrixElement, 0)
@@ -227,7 +227,7 @@ func (s *PatternMatrixService) calcPatternMatrixForTimeRanges(
 	return results, nil
 }
 
-func (s *PatternMatrixService) combineQuantityAndTimesResults(
+func (s *PatternMatrix) combineQuantityAndTimesResults(
 	quantityResults []*model.TotalQuantityResultForPatternMatrix, timesResults []*model.TotalTimesResult,
 ) []*model.CombinedResultForDropPattern {
 	var firstGroupResults []linq.Group
@@ -274,7 +274,7 @@ func (s *PatternMatrixService) combineQuantityAndTimesResults(
 	return combinedResults
 }
 
-func (s *PatternMatrixService) getStageIdsMapByTimeRange(timeRangesMap map[int]*model.TimeRange) map[int][]int {
+func (s *PatternMatrix) getStageIdsMapByTimeRange(timeRangesMap map[int]*model.TimeRange) map[int][]int {
 	results := make(map[int][]int)
 	for stageId, timeRange := range timeRangesMap {
 		if _, ok := results[timeRange.RangeID]; !ok {
@@ -285,7 +285,7 @@ func (s *PatternMatrixService) getStageIdsMapByTimeRange(timeRangesMap map[int]*
 	return results
 }
 
-func (s *PatternMatrixService) convertPatternMatrixElementsToDropPatternQueryResult(
+func (s *PatternMatrix) convertPatternMatrixElementsToDropPatternQueryResult(
 	ctx context.Context, server string, patternMatrixElements []*model.PatternMatrixElement,
 ) (*model.PatternMatrixQueryResult, error) {
 	timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
@@ -309,7 +309,7 @@ func (s *PatternMatrixService) convertPatternMatrixElementsToDropPatternQueryRes
 	return result, nil
 }
 
-func (s *PatternMatrixService) applyShimForPatternMatrixQuery(ctx context.Context, queryResult *model.PatternMatrixQueryResult) (*modelv2.PatternMatrixQueryResult, error) {
+func (s *PatternMatrix) applyShimForPatternMatrixQuery(ctx context.Context, queryResult *model.PatternMatrixQueryResult) (*modelv2.PatternMatrixQueryResult, error) {
 	results := &modelv2.PatternMatrixQueryResult{
 		PatternMatrix: make([]*modelv2.OnePatternMatrixElement, 0),
 	}

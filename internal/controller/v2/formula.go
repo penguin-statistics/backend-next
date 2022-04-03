@@ -11,7 +11,7 @@ import (
 type Formula struct {
 	fx.In
 
-	FormulaService *service.FormulaService
+	FormulaService *service.Formula
 }
 
 func RegisterFormula(v2 *svr.V2, c Formula) {

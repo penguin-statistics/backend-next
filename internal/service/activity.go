@@ -13,18 +13,18 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type ActivityService struct {
+type Activity struct {
 	ActivityRepo *repo.Activity
 }
 
-func NewActivityService(activityRepo *repo.Activity) *ActivityService {
-	return &ActivityService{
+func NewActivity(activityRepo *repo.Activity) *Activity {
+	return &Activity{
 		ActivityRepo: activityRepo,
 	}
 }
 
 // Cache: (singular) activities, 24hrs; records last modified time
-func (s *ActivityService) GetActivities(ctx context.Context) ([]*model.Activity, error) {
+func (s *Activity) GetActivities(ctx context.Context) ([]*model.Activity, error) {
 	var activities []*model.Activity
 	err := cache.Activities.Get(&activities)
 	if err == nil {
@@ -42,7 +42,7 @@ func (s *ActivityService) GetActivities(ctx context.Context) ([]*model.Activity,
 }
 
 // Cache: (singular) shimActivities, 24hrs; records last modified time
-func (s *ActivityService) GetShimActivities(ctx context.Context) ([]*modelv2.Activity, error) {
+func (s *Activity) GetShimActivities(ctx context.Context) ([]*modelv2.Activity, error) {
 	var shimActivitiesFromCache []*modelv2.Activity
 	err := cache.ShimActivities.Get(&shimActivitiesFromCache)
 	if err == nil {
@@ -63,7 +63,7 @@ func (s *ActivityService) GetShimActivities(ctx context.Context) ([]*modelv2.Act
 	return shimActivities, nil
 }
 
-func (s *ActivityService) applyShim(activity *model.Activity) *modelv2.Activity {
+func (s *Activity) applyShim(activity *model.Activity) *modelv2.Activity {
 	shimActivity := &modelv2.Activity{
 		Existence: activity.Existence,
 		LabelI18n: activity.Name,

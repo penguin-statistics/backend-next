@@ -10,15 +10,15 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
-type ShortURLService struct {
-	ItemService  *ItemService
-	StageService *StageService
-	ZoneService  *ZoneService
-	GeoIPService *GeoIPService
+type ShortURL struct {
+	ItemService  *Item
+	StageService *Stage
+	ZoneService  *Zone
+	GeoIPService *GeoIP
 }
 
-func NewShortURLService(itemService *ItemService, stageService *StageService, zoneService *ZoneService, geoIPService *GeoIPService) *ShortURLService {
-	return &ShortURLService{
+func NewShortURL(itemService *Item, stageService *Stage, zoneService *Zone, geoIPService *GeoIP) *ShortURL {
+	return &ShortURL{
 		ItemService:  itemService,
 		StageService: stageService,
 		ZoneService:  zoneService,
@@ -28,7 +28,7 @@ func NewShortURLService(itemService *ItemService, stageService *StageService, zo
 
 // siteURL returns the site URL with path appended from toPath.
 // toPath is expected to always start with a slash.
-func (s *ShortURLService) siteURL(ctx *fiber.Ctx, toPath string) string {
+func (s *ShortURL) siteURL(ctx *fiber.Ctx, toPath string) string {
 	ip := util.ExtractIP(ctx)
 	var host string
 	if s.GeoIPService.InChinaMainland(ip) {
@@ -40,7 +40,7 @@ func (s *ShortURLService) siteURL(ctx *fiber.Ctx, toPath string) string {
 	return "https://" + host + toPath
 }
 
-func (s *ShortURLService) Resolve(ctx *fiber.Ctx, path string) string {
+func (s *ShortURL) Resolve(ctx *fiber.Ctx, path string) string {
 	defaultPath := "/?utm_source=exusiai&utm_medium=root&utm_campaign=root"
 	if path == "" || len(path) > 128 {
 		return s.siteURL(ctx, defaultPath)
@@ -80,7 +80,7 @@ func (s *ShortURLService) Resolve(ctx *fiber.Ctx, path string) string {
 	return s.resolveUnknown(path)
 }
 
-func (s *ShortURLService) resolveByItemName(ctx context.Context, path string) (string, error) {
+func (s *ShortURL) resolveByItemName(ctx context.Context, path string) (string, error) {
 	item, err := s.ItemService.SearchItemByName(ctx, path)
 	if err != nil {
 		return "", err
@@ -89,7 +89,7 @@ func (s *ShortURLService) resolveByItemName(ctx context.Context, path string) (s
 	return "/result/item/" + item.ArkItemID + "?utm_source=exusiai&utm_medium=item&utm_campaign=name", nil
 }
 
-func (s *ShortURLService) resolveByStageCode(ctx context.Context, path string) (string, error) {
+func (s *ShortURL) resolveByStageCode(ctx context.Context, path string) (string, error) {
 	stage, err := s.StageService.SearchStageByCode(ctx, path)
 	if err != nil {
 		return "", err
@@ -103,7 +103,7 @@ func (s *ShortURLService) resolveByStageCode(ctx context.Context, path string) (
 	return "/result/stage/" + zone.ArkZoneID + "/" + stage.ArkStageID + "?utm_source=exusiai&utm_medium=stage&utm_campaign=code", nil
 }
 
-func (s *ShortURLService) resolveByStageId(ctx context.Context, path string) (string, error) {
+func (s *ShortURL) resolveByStageId(ctx context.Context, path string) (string, error) {
 	stage, err := s.StageService.GetStageByArkId(ctx, path)
 	if err != nil {
 		return "", err
@@ -117,7 +117,7 @@ func (s *ShortURLService) resolveByStageId(ctx context.Context, path string) (st
 	return "/result/stage/" + zone.ArkZoneID + "/" + stage.ArkStageID + "?utm_source=exusiai&utm_medium=stage&utm_campaign=id", nil
 }
 
-func (s *ShortURLService) resolveByItemId(ctx context.Context, path string) (string, error) {
+func (s *ShortURL) resolveByItemId(ctx context.Context, path string) (string, error) {
 	item, err := s.ItemService.GetItemByArkId(ctx, path)
 	if err != nil {
 		return "", err
@@ -126,6 +126,6 @@ func (s *ShortURLService) resolveByItemId(ctx context.Context, path string) (str
 	return "/result/item/" + item.ArkItemID + "?utm_source=exusiai&utm_medium=item&utm_campaign=id", nil
 }
 
-func (s *ShortURLService) resolveUnknown(path string) string {
+func (s *ShortURL) resolveUnknown(path string) string {
 	return "/search?utm_source=exusiai&utm_medium=search&utm_campaign=fallback&q=" + url.QueryEscape(path)
 }

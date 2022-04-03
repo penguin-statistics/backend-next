@@ -11,7 +11,7 @@ import (
 type ShortURL struct {
 	fx.In
 
-	ShortURLService *service.ShortURLService
+	ShortURLService *service.ShortURL
 }
 
 func RegisterShortURL(v2 *svr.V2, c ShortURL) {

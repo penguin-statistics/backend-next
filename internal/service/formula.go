@@ -10,18 +10,18 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type FormulaService struct {
+type Formula struct {
 	PropertyRepo *repo.Property
 }
 
-func NewFormulaService(propertyRepo *repo.Property) *FormulaService {
-	return &FormulaService{
+func NewFormula(propertyRepo *repo.Property) *Formula {
+	return &Formula{
 		PropertyRepo: propertyRepo,
 	}
 }
 
 // Cache: (singular) formula, 24hrs
-func (s *FormulaService) GetFormula(ctx context.Context) (json.RawMessage, error) {
+func (s *Formula) GetFormula(ctx context.Context) (json.RawMessage, error) {
 	var formula json.RawMessage
 	err := cache.Formula.Get(&formula)
 	if err == nil {

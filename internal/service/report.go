@@ -31,13 +31,13 @@ var (
 	ErrNatsTimeout    = errors.New("timeout waiting for NATS response")
 )
 
-type ReportService struct {
+type Report struct {
 	DB                     *bun.DB
 	Redis                  *redis.Client
 	NatsJS                 nats.JetStreamContext
-	ItemService            *ItemService
-	StageService           *StageService
-	AccountService         *AccountService
+	ItemService            *Item
+	StageService           *Stage
+	AccountService         *Account
 	DropInfoRepo           *repo.DropInfo
 	DropReportRepo         *repo.DropReport
 	DropPatternRepo        *repo.DropPattern
@@ -46,8 +46,8 @@ type ReportService struct {
 	ReportVerifier         *reportutil.ReportVerifier
 }
 
-func NewReportService(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *ItemService, stageService *StageService, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *AccountService, reportVerifier *reportutil.ReportVerifier) *ReportService {
-	service := &ReportService{
+func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *Item, stageService *Stage, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *Account, reportVerifier *reportutil.ReportVerifier) *Report {
+	service := &Report{
 		DB:                     db,
 		Redis:                  redisClient,
 		NatsJS:                 natsJs,
@@ -85,7 +85,7 @@ func NewReportService(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStre
 	return service
 }
 
-func (s *ReportService) pipelineAccount(ctx *fiber.Ctx) (accountId int, err error) {
+func (s *Report) pipelineAccount(ctx *fiber.Ctx) (accountId int, err error) {
 	account, err := s.AccountService.GetAccountFromRequest(ctx)
 	if err != nil {
 		createdAccount, err := s.AccountService.CreateAccountWithRandomPenguinId(ctx.Context())
@@ -101,7 +101,7 @@ func (s *ReportService) pipelineAccount(ctx *fiber.Ctx) (accountId int, err erro
 	return accountId, nil
 }
 
-func (s *ReportService) pipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []types.ArkDrop) ([]*types.Drop, error) {
+func (s *Report) pipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []types.ArkDrop) ([]*types.Drop, error) {
 	drops = reportutil.MergeDrops(drops)
 
 	convertedDrops := make([]*types.Drop, 0, len(drops))
@@ -122,11 +122,11 @@ func (s *ReportService) pipelineMergeDropsAndMapDropTypes(ctx context.Context, d
 	return convertedDrops, nil
 }
 
-func (s *ReportService) pipelineTaskId(ctx *fiber.Ctx) string {
+func (s *Report) pipelineTaskId(ctx *fiber.Ctx) string {
 	return ctx.Locals("requestid").(string) + "-" + uniuri.NewLen(32)
 }
 
-func (s *ReportService) commitReportTask(ctx *fiber.Ctx, subject string, task *types.ReportTask) (taskId string, err error) {
+func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.ReportTask) (taskId string, err error) {
 	taskId = s.pipelineTaskId(ctx)
 	task.TaskID = taskId
 
@@ -153,7 +153,7 @@ func (s *ReportService) commitReportTask(ctx *fiber.Ctx, subject string, task *t
 }
 
 // returns taskID and error, if any
-func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingleReportRequest) (taskId string, err error) {
+func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingleReportRequest) (taskId string, err error) {
 	// if account is not found, create new account
 	accountId, err := s.pipelineAccount(ctx)
 	if err != nil {
@@ -195,7 +195,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 	return s.commitReportTask(ctx, "REPORT.SINGLE", reportTask)
 }
 
-func (s *ReportService) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchReportRequest) (taskId string, err error) {
+func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchReportRequest) (taskId string, err error) {
 	// if account is not found, create new account
 	accountId, err := s.pipelineAccount(ctx)
 	if err != nil {
@@ -233,7 +233,7 @@ func (s *ReportService) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types
 	return s.commitReportTask(ctx, "REPORT.BATCH", reportTask)
 }
 
-func (s *ReportService) RecallSingularReport(ctx context.Context, req *types.SingleReportRecallRequest) error {
+func (s *Report) RecallSingularReport(ctx context.Context, req *types.SingleReportRecallRequest) error {
 	var reportId int
 	r := s.Redis.Get(ctx, req.ReportHash)
 
@@ -258,7 +258,7 @@ func (s *ReportService) RecallSingularReport(ctx context.Context, req *types.Sin
 	return nil
 }
 
-func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) error {
+func (s *Report) ReportConsumeWorker(ctx context.Context, ch chan error) error {
 	msgChan := make(chan *nats.Msg, 16)
 
 	_, err := s.NatsJS.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.AckWait(time.Second*10), nats.MaxAckPending(128))
@@ -310,7 +310,7 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 	}
 }
 
-func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types.ReportTask) error {
+func (s *Report) consumeReportTask(ctx context.Context, reportTask *types.ReportTask) error {
 	L := log.With().
 		Interface("task", reportTask).
 		Logger()

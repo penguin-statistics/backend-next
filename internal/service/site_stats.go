@@ -9,18 +9,18 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type SiteStatsService struct {
+type SiteStats struct {
 	DropReportRepo *repo.DropReport
 }
 
-func NewSiteStatsService(dropReportRepo *repo.DropReport) *SiteStatsService {
-	return &SiteStatsService{
+func NewSiteStats(dropReportRepo *repo.DropReport) *SiteStats {
+	return &SiteStats{
 		DropReportRepo: dropReportRepo,
 	}
 }
 
 // Cache: shimSiteStats#server:{server}, 24hrs
-func (s *SiteStatsService) GetShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
+func (s *SiteStats) GetShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
 	var results modelv2.SiteStats
 	err := cache.ShimSiteStats.Get(server, &results)
 	if err == nil {
@@ -30,7 +30,7 @@ func (s *SiteStatsService) GetShimSiteStats(ctx context.Context, server string) 
 	return s.RefreshShimSiteStats(ctx, server)
 }
 
-func (s *SiteStatsService) RefreshShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
+func (s *SiteStats) RefreshShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
 	valueFunc := func() (*modelv2.SiteStats, error) {
 		stageTimes, err := s.DropReportRepo.CalcTotalStageQuantityForShimSiteStats(ctx, server, false)
 		if err != nil {

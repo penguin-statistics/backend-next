@@ -15,7 +15,7 @@ import (
 type Item struct {
 	fx.In
 
-	ItemService *service.ItemService
+	ItemService *service.Item
 }
 
 func RegisterItem(v2 *svr.V2, c Item) {

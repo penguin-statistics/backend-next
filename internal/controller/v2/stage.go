@@ -15,7 +15,7 @@ import (
 type Stage struct {
 	fx.In
 
-	StageService *service.StageService
+	StageService *service.Stage
 }
 
 func RegisterStage(v2 *svr.V2, c Stage) {

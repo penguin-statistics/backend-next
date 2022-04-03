@@ -13,19 +13,19 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type AdminService struct {
+type Admin struct {
 	DB        *bun.DB
 	AdminRepo *repo.Admin
 }
 
-func NewAdminService(db *bun.DB, adminRepo *repo.Admin) *AdminService {
-	return &AdminService{
+func NewAdmin(db *bun.DB, adminRepo *repo.Admin) *Admin {
+	return &Admin{
 		DB:        db,
 		AdminRepo: adminRepo,
 	}
 }
 
-func (s *AdminService) SaveRenderedObjects(ctx context.Context, objects *gamedata.RenderedObjects) error {
+func (s *Admin) SaveRenderedObjects(ctx context.Context, objects *gamedata.RenderedObjects) error {
 	var innerErr error
 	err := s.DB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var zoneId int

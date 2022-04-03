@@ -16,7 +16,7 @@ import (
 type EventPeriod struct {
 	fx.In
 
-	ActivityService *service.ActivityService
+	ActivityService *service.Activity
 }
 
 func RegisterEventPeriod(v2 *svr.V2, c EventPeriod) {

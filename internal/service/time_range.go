@@ -12,20 +12,20 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type TimeRangeService struct {
+type TimeRange struct {
 	TimeRangeRepo *repo.TimeRange
 	DropInfoRepo  *repo.DropInfo
 }
 
-func NewTimeRangeService(timeRangeRepo *repo.TimeRange, dropInfoRepo *repo.DropInfo) *TimeRangeService {
-	return &TimeRangeService{
+func NewTimeRange(timeRangeRepo *repo.TimeRange, dropInfoRepo *repo.DropInfo) *TimeRange {
+	return &TimeRange{
 		TimeRangeRepo: timeRangeRepo,
 		DropInfoRepo:  dropInfoRepo,
 	}
 }
 
 // Cache: timeRanges#server:{server}, 24hrs
-func (s *TimeRangeService) GetTimeRangesByServer(ctx context.Context, server string) ([]*model.TimeRange, error) {
+func (s *TimeRange) GetTimeRangesByServer(ctx context.Context, server string) ([]*model.TimeRange, error) {
 	var timeRanges []*model.TimeRange
 	err := cache.TimeRanges.Get(server, &timeRanges)
 	if err == nil {
@@ -41,7 +41,7 @@ func (s *TimeRangeService) GetTimeRangesByServer(ctx context.Context, server str
 }
 
 // Cache: timeRange#rangeId:{rangeId}, 24hrs
-func (s *TimeRangeService) GetTimeRangeById(ctx context.Context, rangeId int) (*model.TimeRange, error) {
+func (s *TimeRange) GetTimeRangeById(ctx context.Context, rangeId int) (*model.TimeRange, error) {
 	var timeRange model.TimeRange
 	err := cache.TimeRangeByID.Get(strconv.Itoa(rangeId), &timeRange)
 	if err == nil {
@@ -53,7 +53,7 @@ func (s *TimeRangeService) GetTimeRangeById(ctx context.Context, rangeId int) (*
 	return slowTimeRange, err
 }
 
-func (s *TimeRangeService) GetCurrentTimeRangesByServer(ctx context.Context, server string) ([]*model.TimeRange, error) {
+func (s *TimeRange) GetCurrentTimeRangesByServer(ctx context.Context, server string) ([]*model.TimeRange, error) {
 	timeRanges, err := s.TimeRangeRepo.GetTimeRangesByServer(ctx, server)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (s *TimeRangeService) GetCurrentTimeRangesByServer(ctx context.Context, ser
 }
 
 // Cache: timeRangesMap#server:{server}, 24hrs
-func (s *TimeRangeService) GetTimeRangesMap(ctx context.Context, server string) (map[int]*model.TimeRange, error) {
+func (s *TimeRange) GetTimeRangesMap(ctx context.Context, server string) (map[int]*model.TimeRange, error) {
 	var timeRangesMap map[int]*model.TimeRange
 	err := cache.TimeRangesMap.Get(server, &timeRangesMap)
 	if err == nil {
@@ -89,7 +89,7 @@ func (s *TimeRangeService) GetTimeRangesMap(ctx context.Context, server string) 
 }
 
 // Cache: maxAccumulableTimeRanges#server:{server}, 24hrs
-func (s *TimeRangeService) GetMaxAccumulableTimeRangesByServer(ctx context.Context, server string) (map[int]map[int][]*model.TimeRange, error) {
+func (s *TimeRange) GetMaxAccumulableTimeRangesByServer(ctx context.Context, server string) (map[int]map[int][]*model.TimeRange, error) {
 	var maxAccumulableTimeRanges map[int]map[int][]*model.TimeRange
 	err := cache.MaxAccumulableTimeRanges.Get(server, &maxAccumulableTimeRanges)
 	if err == nil {
@@ -162,7 +162,7 @@ func (s *TimeRangeService) GetMaxAccumulableTimeRangesByServer(ctx context.Conte
 	return maxAccumulableTimeRanges, nil
 }
 
-func (s *TimeRangeService) GetLatestTimeRangesByServer(ctx context.Context, server string) (map[int]*model.TimeRange, error) {
+func (s *TimeRange) GetLatestTimeRangesByServer(ctx context.Context, server string) (map[int]*model.TimeRange, error) {
 	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
 	if err != nil {
 		return nil, err

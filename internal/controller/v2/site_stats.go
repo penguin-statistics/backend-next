@@ -16,7 +16,7 @@ import (
 type SiteStats struct {
 	fx.In
 
-	SiteStatsService *service.SiteStatsService
+	SiteStatsService *service.SiteStats
 }
 
 func RegisterSiteStats(v2 *svr.V2, c SiteStats) {

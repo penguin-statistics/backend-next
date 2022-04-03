@@ -9,18 +9,18 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type NoticeService struct {
+type Notice struct {
 	NoticeRepo *repo.Notice
 }
 
-func NewNoticeService(noticeRepo *repo.Notice) *NoticeService {
-	return &NoticeService{
+func NewNotice(noticeRepo *repo.Notice) *Notice {
+	return &Notice{
 		NoticeRepo: noticeRepo,
 	}
 }
 
 // Cache: (singular) notices, 24hrs; records last modified time
-func (s *NoticeService) GetNotices(ctx context.Context) ([]*model.Notice, error) {
+func (s *Notice) GetNotices(ctx context.Context) ([]*model.Notice, error) {
 	var noticesFromCache []*model.Notice
 	err := cache.Notices.Get(&noticesFromCache)
 	if err == nil {

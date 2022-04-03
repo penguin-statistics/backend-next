@@ -10,18 +10,18 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type DropPatternElementService struct {
+type DropPatternElement struct {
 	DropPatternElementRepo *repo.DropPatternElement
 }
 
-func NewDropPatternElementService(dropPatternElementRepo *repo.DropPatternElement) *DropPatternElementService {
-	return &DropPatternElementService{
+func NewDropPatternElement(dropPatternElementRepo *repo.DropPatternElement) *DropPatternElement {
+	return &DropPatternElement{
 		DropPatternElementRepo: dropPatternElementRepo,
 	}
 }
 
 // Cache: dropPatternElements#patternId:{patternId}, 24hrs
-func (s *DropPatternElementService) GetDropPatternElementsByPatternId(ctx context.Context, patternId int) ([]*model.DropPatternElement, error) {
+func (s *DropPatternElement) GetDropPatternElementsByPatternId(ctx context.Context, patternId int) ([]*model.DropPatternElement, error) {
 	var dropPatternElements []*model.DropPatternElement
 	err := cache.DropPatternElementsByPatternID.Get(strconv.Itoa(patternId), &dropPatternElements)
 	if err == nil {

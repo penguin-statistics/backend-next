@@ -15,21 +15,21 @@ var (
 	ErrNATSNotReachable     = errors.New("nats not reachable")
 )
 
-type HealthService struct {
+type Health struct {
 	DB    *bun.DB
 	Redis *redis.Client
 	NATS  *nats.Conn
 }
 
-func NewHealthService(db *bun.DB, redis *redis.Client, nats *nats.Conn) *HealthService {
-	return &HealthService{
+func NewHealth(db *bun.DB, redis *redis.Client, nats *nats.Conn) *Health {
+	return &Health{
 		DB:    db,
 		Redis: redis,
 		NATS:  nats,
 	}
 }
 
-func (s *HealthService) Ping(ctx context.Context) error {
+func (s *Health) Ping(ctx context.Context) error {
 	if err := s.DB.PingContext(ctx); err != nil {
 		return errors.Wrap(ErrDatabaseNotReachable, err.Error())
 	}

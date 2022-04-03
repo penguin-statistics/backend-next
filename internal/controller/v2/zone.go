@@ -15,7 +15,7 @@ import (
 type Zone struct {
 	fx.In
 
-	ZoneService *service.ZoneService
+	ZoneService *service.Zone
 }
 
 func RegisterZone(v2 *svr.V2, c Zone) {

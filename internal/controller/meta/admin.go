@@ -21,12 +21,12 @@ const TimeLayout = "2006-01-02 15:04:05 -07:00"
 type AdminController struct {
 	fx.In
 
-	AdminService         *service.AdminService
-	ItemService          *service.ItemService
-	DropMatrixService    *service.DropMatrixService
-	PatternMatrixService *service.PatternMatrixService
-	TrendService         *service.TrendService
-	SiteStatsService     *service.SiteStatsService
+	AdminService         *service.Admin
+	ItemService          *service.Item
+	DropMatrixService    *service.DropMatrix
+	PatternMatrixService *service.PatternMatrix
+	TrendService         *service.Trend
+	SiteStatsService     *service.SiteStats
 }
 
 func RegisterAdminController(admin *svr.Admin, c AdminController) {

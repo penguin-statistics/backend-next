@@ -14,22 +14,22 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type AccountService struct {
+type Account struct {
 	AccountRepo *repo.Account
 }
 
-func NewAccountService(accountRepo *repo.Account) *AccountService {
-	return &AccountService{
+func NewAccount(accountRepo *repo.Account) *Account {
+	return &Account{
 		AccountRepo: accountRepo,
 	}
 }
 
-func (s *AccountService) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.Account, error) {
+func (s *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.Account, error) {
 	return s.AccountRepo.CreateAccountWithRandomPenguinId(ctx)
 }
 
 // Cache: account#accountId:{accountId}, 24hrs
-func (s *AccountService) GetAccountById(ctx context.Context, accountId string) (*model.Account, error) {
+func (s *Account) GetAccountById(ctx context.Context, accountId string) (*model.Account, error) {
 	var account model.Account
 	err := cache.AccountByID.Get(accountId, &account)
 	if err == nil {
@@ -45,7 +45,7 @@ func (s *AccountService) GetAccountById(ctx context.Context, accountId string) (
 }
 
 // Cache: account#penguinId:{penguinId}, 24hrs
-func (s *AccountService) GetAccountByPenguinId(ctx context.Context, penguinId string) (*model.Account, error) {
+func (s *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (*model.Account, error) {
 	var account model.Account
 	err := cache.AccountByPenguinID.Get(penguinId, &account)
 	if err == nil {
@@ -60,11 +60,11 @@ func (s *AccountService) GetAccountByPenguinId(ctx context.Context, penguinId st
 	return dbAccount, nil
 }
 
-func (s *AccountService) IsAccountExistWithId(ctx context.Context, accountId int) bool {
+func (s *Account) IsAccountExistWithId(ctx context.Context, accountId int) bool {
 	return s.AccountRepo.IsAccountExistWithId(ctx, accountId)
 }
 
-func (s *AccountService) GetAccountFromRequest(ctx *fiber.Ctx) (*model.Account, error) {
+func (s *Account) GetAccountFromRequest(ctx *fiber.Ctx) (*model.Account, error) {
 	// get PenguinID from HTTP header in form of Authorization: PenguinID ########
 	penguinId := pgid.Extract(ctx)
 	if penguinId == "" {

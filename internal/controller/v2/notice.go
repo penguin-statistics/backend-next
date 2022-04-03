@@ -15,7 +15,7 @@ import (
 type Notice struct {
 	fx.In
 
-	NoticeService *service.NoticeService
+	NoticeService *service.Notice
 }
 
 func RegisterNotice(v2 *svr.V2, c Notice) {

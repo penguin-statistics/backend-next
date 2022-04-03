@@ -21,7 +21,7 @@ type Report struct {
 	fx.In
 
 	Crypto        *crypto.Crypto
-	ReportService *service.ReportService
+	ReportService *service.Report
 }
 
 func RegisterReport(v2 *svr.V2, v3 *svr.V3, c Report) {

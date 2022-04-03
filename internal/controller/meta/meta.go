@@ -15,7 +15,7 @@ import (
 type MetaController struct {
 	fx.In
 
-	HealthService *service.HealthService
+	HealthService *service.Health
 }
 
 func RegisterMetaController(meta *svr.Meta, c MetaController) {

@@ -14,28 +14,28 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type DropInfoService struct {
+type DropInfo struct {
 	DropInfoRepo     *repo.DropInfo
-	TimeRangeService *TimeRangeService
+	TimeRangeService *TimeRange
 }
 
-func NewDropInfoService(dropInfoRepo *repo.DropInfo, timeRangeService *TimeRangeService) *DropInfoService {
-	return &DropInfoService{
+func NewDropInfo(dropInfoRepo *repo.DropInfo, timeRangeService *TimeRange) *DropInfo {
+	return &DropInfo{
 		DropInfoRepo:     dropInfoRepo,
 		TimeRangeService: timeRangeService,
 	}
 }
 
-func (s *DropInfoService) GetDropInfosByServer(ctx context.Context, server string) ([]*model.DropInfo, error) {
+func (s *DropInfo) GetDropInfosByServer(ctx context.Context, server string) ([]*model.DropInfo, error) {
 	return s.DropInfoRepo.GetDropInfosByServer(ctx, server)
 }
 
-func (s *DropInfoService) GetDropInfosWithFilters(ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*model.DropInfo, error) {
+func (s *DropInfo) GetDropInfosWithFilters(ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*model.DropInfo, error) {
 	return s.DropInfoRepo.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, itemIdFilter)
 }
 
 // Cache: itemDropSet#server|stageId|rangeId:{server}|{stageId}|{rangeId}, 24 hrs
-func (s *DropInfoService) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server string, stageId int, rangeId int) ([]int, error) {
+func (s *DropInfo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server string, stageId int, rangeId int) ([]int, error) {
 	var itemDropSet []int
 	key := server + constant.CacheSep + strconv.Itoa(stageId) + constant.CacheSep + strconv.Itoa(rangeId)
 	err := cache.ItemDropSetByStageIDAndRangeID.Get(key, &itemDropSet)
@@ -53,7 +53,7 @@ func (s *DropInfoService) GetItemDropSetByStageIdAndRangeId(ctx context.Context,
 }
 
 // Cache: itemDropSet#server|stageId|startTime|endTime:{server}|{stageId}|{startTime}|{endTime}, 24 hrs
-func (s *DropInfoService) GetItemDropSetByStageIdAndTimeRange(ctx context.Context, server string, stageId int, startTime *time.Time, endTime *time.Time) ([]int, error) {
+func (s *DropInfo) GetItemDropSetByStageIdAndTimeRange(ctx context.Context, server string, stageId int, startTime *time.Time, endTime *time.Time) ([]int, error) {
 	var itemDropSet []int
 	key := server + constant.CacheSep + strconv.Itoa(stageId) + constant.CacheSep + strconv.Itoa(int(startTime.UnixMilli())) + constant.CacheSep + strconv.Itoa(int(endTime.UnixMilli()))
 	err := cache.ItemDropSetByStageIdAndTimeRange.Get(key, &itemDropSet)
@@ -80,7 +80,7 @@ func (s *DropInfoService) GetItemDropSetByStageIdAndTimeRange(ctx context.Contex
 	return itemDropSet, nil
 }
 
-func (s *DropInfoService) GetAppearStageIdsByServer(ctx context.Context, server string) ([]int, error) {
+func (s *DropInfo) GetAppearStageIdsByServer(ctx context.Context, server string) ([]int, error) {
 	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func (s *DropInfoService) GetAppearStageIdsByServer(ctx context.Context, server 
 	return stageIds, nil
 }
 
-func (s *DropInfoService) GetCurrentDropInfosByServer(ctx context.Context, server string) ([]*model.DropInfo, error) {
+func (s *DropInfo) GetCurrentDropInfosByServer(ctx context.Context, server string) ([]*model.DropInfo, error) {
 	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
 	if err != nil {
 		return nil, err

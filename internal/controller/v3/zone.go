@@ -11,7 +11,7 @@ import (
 type ZoneController struct {
 	fx.In
 
-	ZoneService *service.ZoneService
+	ZoneService *service.Zone
 }
 
 func RegisterZoneController(v3 *svr.V3, c ZoneController) {

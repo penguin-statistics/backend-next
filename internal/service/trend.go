@@ -17,28 +17,28 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
-type TrendService struct {
-	TimeRangeService            *TimeRangeService
-	DropReportService           *DropReportService
-	DropInfoService             *DropInfoService
-	PatternMatrixElementService *PatternMatrixElementService
-	DropPatternElementService   *DropPatternElementService
-	TrendElementService         *TrendElementService
-	StageService                *StageService
-	ItemService                 *ItemService
+type Trend struct {
+	TimeRangeService            *TimeRange
+	DropReportService           *DropReport
+	DropInfoService             *DropInfo
+	PatternMatrixElementService *PatternMatrixElement
+	DropPatternElementService   *DropPatternElement
+	TrendElementService         *TrendElement
+	StageService                *Stage
+	ItemService                 *Item
 }
 
-func NewTrendService(
-	timeRangeService *TimeRangeService,
-	dropReportService *DropReportService,
-	dropInfoService *DropInfoService,
-	patternMatrixElementService *PatternMatrixElementService,
-	dropPatternElementService *DropPatternElementService,
-	trendElementService *TrendElementService,
-	stageService *StageService,
-	itemService *ItemService,
-) *TrendService {
-	return &TrendService{
+func NewTrend(
+	timeRangeService *TimeRange,
+	dropReportService *DropReport,
+	dropInfoService *DropInfo,
+	patternMatrixElementService *PatternMatrixElement,
+	dropPatternElementService *DropPatternElement,
+	trendElementService *TrendElement,
+	stageService *Stage,
+	itemService *Item,
+) *Trend {
+	return &Trend{
 		TimeRangeService:            timeRangeService,
 		DropReportService:           dropReportService,
 		DropInfoService:             dropInfoService,
@@ -51,7 +51,7 @@ func NewTrendService(
 }
 
 // Cache: shimSavedTrendResults#server:{server}, 24hrs, records last modified time
-func (s *TrendService) GetShimSavedTrendResults(ctx context.Context, server string) (*modelv2.TrendQueryResult, error) {
+func (s *Trend) GetShimSavedTrendResults(ctx context.Context, server string) (*modelv2.TrendQueryResult, error) {
 	valueFunc := func() (*modelv2.TrendQueryResult, error) {
 		queryResult, err := s.getSavedTrendResults(ctx, server)
 		if err != nil {
@@ -74,7 +74,7 @@ func (s *TrendService) GetShimSavedTrendResults(ctx context.Context, server stri
 	return &shimResult, nil
 }
 
-func (s *TrendService) GetShimCustomizedTrendResults(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, itemIds []int, accountId null.Int) (*modelv2.TrendQueryResult, error) {
+func (s *Trend) GetShimCustomizedTrendResults(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, itemIds []int, accountId null.Int) (*modelv2.TrendQueryResult, error) {
 	trendQueryResult, err := s.QueryTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, itemIds, accountId)
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func (s *TrendService) GetShimCustomizedTrendResults(ctx context.Context, server
 	return s.applyShimForCustomizedTrendQuery(ctx, trendQueryResult, startTime)
 }
 
-func (s *TrendService) QueryTrend(
+func (s *Trend) QueryTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId null.Int,
 ) (*model.TrendQueryResult, error) {
 	trendElements, err := s.calcTrend(ctx, server, startTime, intervalLength, intervalNum, stageIdFilter, itemIdFilter, accountId)
@@ -92,7 +92,7 @@ func (s *TrendService) QueryTrend(
 	return s.convertTrendElementsToTrendQueryResult(trendElements)
 }
 
-func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) error {
+func (s *Trend) RefreshTrendElements(ctx context.Context, server string) error {
 	maxAccumulableTimeRanges, err := s.TimeRangeService.GetMaxAccumulableTimeRangesByServer(ctx, server)
 	if err != nil {
 		return err
@@ -200,7 +200,7 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 	return cache.ShimSavedTrendResults.Delete(server)
 }
 
-func (s *TrendService) getSavedTrendResults(ctx context.Context, server string) (*model.TrendQueryResult, error) {
+func (s *Trend) getSavedTrendResults(ctx context.Context, server string) (*model.TrendQueryResult, error) {
 	trendElements, err := s.TrendElementService.GetElementsByServer(ctx, server)
 	if err != nil {
 		return nil, err
@@ -208,7 +208,7 @@ func (s *TrendService) getSavedTrendResults(ctx context.Context, server string) 
 	return s.convertTrendElementsToTrendQueryResult(trendElements)
 }
 
-func (s *TrendService) calcTrend(
+func (s *Trend) calcTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId null.Int,
 ) ([]*model.TrendElement, error) {
 	endTime := startTime.Add(time.Hour * time.Duration(int(intervalLength.Hours())*intervalNum))
@@ -255,7 +255,7 @@ func (s *TrendService) calcTrend(
 	return finalResults, nil
 }
 
-func (s *TrendService) combineQuantityAndTimesResults(
+func (s *Trend) combineQuantityAndTimesResults(
 	quantityResults []*model.TotalQuantityResultForTrend, timesResults []*model.TotalTimesResultForTrend,
 ) []*model.CombinedResultForTrend {
 	var firstGroupResultsForQuantity []linq.Group
@@ -326,7 +326,7 @@ func (s *TrendService) combineQuantityAndTimesResults(
 	return combinedResults
 }
 
-func (s *TrendService) convertTrendElementsToTrendQueryResult(trendElements []*model.TrendElement) (*model.TrendQueryResult, error) {
+func (s *Trend) convertTrendElementsToTrendQueryResult(trendElements []*model.TrendElement) (*model.TrendQueryResult, error) {
 	var groupedResults []linq.Group
 	linq.From(trendElements).
 		GroupByT(
@@ -380,7 +380,7 @@ func (s *TrendService) convertTrendElementsToTrendQueryResult(trendElements []*m
 	return trendQueryResult, nil
 }
 
-func (s *TrendService) applyShimForCustomizedTrendQuery(ctx context.Context, queryResult *model.TrendQueryResult, startTime *time.Time) (*modelv2.TrendQueryResult, error) {
+func (s *Trend) applyShimForCustomizedTrendQuery(ctx context.Context, queryResult *model.TrendQueryResult, startTime *time.Time) (*modelv2.TrendQueryResult, error) {
 	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
 	if err != nil {
 		return nil, err
@@ -415,7 +415,7 @@ func (s *TrendService) applyShimForCustomizedTrendQuery(ctx context.Context, que
 	return results, nil
 }
 
-func (s *TrendService) applyShimForSavedTrendQuery(ctx context.Context, server string, queryResult *model.TrendQueryResult) (*modelv2.TrendQueryResult, error) {
+func (s *Trend) applyShimForSavedTrendQuery(ctx context.Context, server string, queryResult *model.TrendQueryResult) (*modelv2.TrendQueryResult, error) {
 	shimMinStartTime := util.GetGameDayEndTime(server, time.Now()).Add(-1 * constant.DefaultIntervalNum * 24 * time.Hour)
 	currentGameDayEndTime := util.GetGameDayEndTime(server, time.Now())
 

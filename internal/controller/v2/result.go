@@ -27,12 +27,12 @@ var ErrIntervalLengthTooSmall = pgerr.ErrInvalidReq.Msg("interval length must be
 type Result struct {
 	fx.In
 
-	DropMatrixService    *service.DropMatrixService
-	PatternMatrixService *service.PatternMatrixService
-	TrendService         *service.TrendService
-	AccountService       *service.AccountService
-	ItemService          *service.ItemService
-	StageService         *service.StageService
+	DropMatrixService    *service.DropMatrix
+	PatternMatrixService *service.PatternMatrix
+	TrendService         *service.Trend
+	AccountService       *service.Account
+	ItemService          *service.Item
+	StageService         *service.Stage
 }
 
 func RegisterResult(v2 *svr.V2, c Result) {
