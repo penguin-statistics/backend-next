@@ -14,7 +14,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
-	"github.com/penguin-statistics/backend-next/internal/utils"
+	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
 type TrendService struct {
@@ -131,9 +131,9 @@ func (s *TrendService) RefreshTrendElements(ctx context.Context, server string) 
 				endTime = time.Now()
 			}
 
-			startTime = utils.GetGameDayStartTime(server, startTime)
-			if !utils.IsGameDayStartTime(server, endTime) {
-				endTime = utils.GetGameDayEndTime(server, endTime)
+			startTime = util.GetGameDayStartTime(server, startTime)
+			if !util.IsGameDayStartTime(server, endTime) {
+				endTime = util.GetGameDayEndTime(server, endTime)
 			} else {
 				loc := constants.LocMap[server]
 				endTime = endTime.In(loc)
@@ -229,11 +229,11 @@ func (s *TrendService) calcTrend(
 		return nil, err
 	}
 
-	quantityResults, err := s.DropReportService.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength, intervalNum, utils.GetStageIdItemIdMapFromDropInfos(dropInfos), accountId)
+	quantityResults, err := s.DropReportService.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength, intervalNum, util.GetStageIdItemIdMapFromDropInfos(dropInfos), accountId)
 	if err != nil {
 		return nil, err
 	}
-	timesResults, err := s.DropReportService.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength, intervalNum, utils.GetStageIdsFromDropInfos(dropInfos), accountId)
+	timesResults, err := s.DropReportService.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength, intervalNum, util.GetStageIdsFromDropInfos(dropInfos), accountId)
 	if err != nil {
 		return nil, err
 	}
@@ -416,8 +416,8 @@ func (s *TrendService) applyShimForCustomizedTrendQuery(ctx context.Context, que
 }
 
 func (s *TrendService) applyShimForSavedTrendQuery(ctx context.Context, server string, queryResult *models.TrendQueryResult) (*modelv2.TrendQueryResult, error) {
-	shimMinStartTime := utils.GetGameDayEndTime(server, time.Now()).Add(-1 * constants.DefaultIntervalNum * 24 * time.Hour)
-	currentGameDayEndTime := utils.GetGameDayEndTime(server, time.Now())
+	shimMinStartTime := util.GetGameDayEndTime(server, time.Now()).Add(-1 * constants.DefaultIntervalNum * 24 * time.Hour)
+	currentGameDayEndTime := util.GetGameDayEndTime(server, time.Now())
 
 	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
 	if err != nil {

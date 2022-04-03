@@ -1,4 +1,4 @@
-package reportutils
+package reportutil
 
 import (
 	"github.com/ahmetb/go-linq/v3"

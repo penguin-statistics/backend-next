@@ -7,7 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
-	"github.com/penguin-statistics/backend-next/internal/utils"
+	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
 type ShortURLService struct {
@@ -30,7 +30,7 @@ func NewShortURLService(itemService *ItemService, stageService *StageService, zo
 // siteURL returns the site URL with path appended from toPath.
 // toPath is expected to always start with a slash.
 func (s *ShortURLService) siteURL(ctx *fiber.Ctx, toPath string) string {
-	ip := utils.ExtractIP(ctx)
+	ip := util.ExtractIP(ctx)
 	var host string
 	if s.GeoIPService.InChinaMainland(ip) {
 		host = constants.SiteChinaMainlandMirrorHost

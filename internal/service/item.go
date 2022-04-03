@@ -15,7 +15,7 @@ import (
 	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/repo"
-	"github.com/penguin-statistics/backend-next/internal/utils"
+	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
 type ItemService struct {
@@ -172,6 +172,6 @@ func (s *ItemService) applyShim(item *modelv2.Item) {
 
 	keywords := gjson.ParseBytes(item.Keywords)
 
-	item.AliasMap = json.RawMessage(utils.Must(json.Marshal(keywords.Get("alias").Value())))
-	item.PronMap = json.RawMessage(utils.Must(json.Marshal(keywords.Get("pron").Value())))
+	item.AliasMap = json.RawMessage(util.Must(json.Marshal(keywords.Get("alias").Value())))
+	item.PronMap = json.RawMessage(util.Must(json.Marshal(keywords.Get("pron").Value())))
 }

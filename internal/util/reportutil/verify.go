@@ -1,4 +1,4 @@
-package reportutils
+package reportutil
 
 import (
 	"context"

@@ -16,7 +16,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
-	"github.com/penguin-statistics/backend-next/internal/utils"
+	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
 /*
@@ -219,11 +219,11 @@ func (s *DropMatrixService) calcDropMatrixForTimeRanges(
 
 	var combinedResults []*models.CombinedResultForDropMatrix
 	for _, timeRange := range timeRanges {
-		quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, utils.GetStageIdItemIdMapFromDropInfos(dropInfos), accountId)
+		quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, util.GetStageIdItemIdMapFromDropInfos(dropInfos), accountId)
 		if err != nil {
 			return nil, err
 		}
-		timesResults, err := s.DropReportService.CalcTotalTimesForDropMatrix(ctx, server, timeRange, utils.GetStageIdsFromDropInfos(dropInfos), accountId)
+		timesResults, err := s.DropReportService.CalcTotalTimesForDropMatrix(ctx, server, timeRange, util.GetStageIdsFromDropInfos(dropInfos), accountId)
 		if err != nil {
 			return nil, err
 		}
@@ -371,7 +371,7 @@ func (s *DropMatrixService) combineQuantityAndTimesResults(
 func (s *DropMatrixService) convertDropMatrixElementsToMaxAccumulableDropMatrixQueryResult(
 	ctx context.Context, server string, dropMatrixElements []*models.DropMatrixElement,
 ) (*models.DropMatrixQueryResult, error) {
-	elementsMap := utils.GetDropMatrixElementsMap(dropMatrixElements)
+	elementsMap := util.GetDropMatrixElementsMap(dropMatrixElements)
 	result := &models.DropMatrixQueryResult{
 		Matrix: make([]*models.OneDropMatrixElement, 0),
 	}

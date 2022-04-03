@@ -13,7 +13,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
+	"github.com/penguin-statistics/backend-next/internal/util/rekuest"
 )
 
 const TimeLayout = "2006-01-02 15:04:05 -07:00"

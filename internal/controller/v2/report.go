@@ -13,14 +13,14 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/utils"
-	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
+	"github.com/penguin-statistics/backend-next/internal/util"
+	"github.com/penguin-statistics/backend-next/internal/util/rekuest"
 )
 
 type ReportController struct {
 	fx.In
 
-	Crypto        *utils.Crypto
+	Crypto        *util.Crypto
 	ReportService *service.ReportService
 }
 

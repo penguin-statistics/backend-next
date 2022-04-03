@@ -11,11 +11,11 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
-	"github.com/penguin-statistics/backend-next/internal/utils"
-	"github.com/penguin-statistics/backend-next/internal/utils/i18n"
+	"github.com/penguin-statistics/backend-next/internal/util"
+	"github.com/penguin-statistics/backend-next/internal/util/i18n"
 )
 
-var Validate = utils.NewValidator()
+var Validate = util.NewValidator()
 
 func init() {
 	var err error
@@ -80,7 +80,7 @@ func translate(utt ut.Translator, ve validator.ValidationErrors) []*ErrorRespons
 		fe = ve[i]
 
 		message := fe.Translate(utt)
-		message = utils.AddSpace(message)
+		message = util.AddSpace(message)
 
 		trans = append(trans, &ErrorResponse{
 			Field:     fe.Namespace(),

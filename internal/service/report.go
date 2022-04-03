@@ -22,8 +22,8 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 	"github.com/penguin-statistics/backend-next/internal/repo"
-	"github.com/penguin-statistics/backend-next/internal/utils"
-	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
+	"github.com/penguin-statistics/backend-next/internal/util"
+	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
 )
 
 var (
@@ -43,10 +43,10 @@ type ReportService struct {
 	DropPatternRepo        *repo.DropPattern
 	DropReportExtraRepo    *repo.DropReportExtra
 	DropPatternElementRepo *repo.DropPatternElement
-	ReportVerifier         *reportutils.ReportVerifier
+	ReportVerifier         *reportutil.ReportVerifier
 }
 
-func NewReportService(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *ItemService, stageService *StageService, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
+func NewReportService(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *ItemService, stageService *StageService, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *AccountService, reportVerifier *reportutil.ReportVerifier) *ReportService {
 	service := &ReportService{
 		DB:                     db,
 		Redis:                  redisClient,
@@ -102,7 +102,7 @@ func (s *ReportService) pipelineAccount(ctx *fiber.Ctx) (accountId int, err erro
 }
 
 func (s *ReportService) pipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []types.ArkDrop) ([]*types.Drop, error) {
-	drops = reportutils.MergeDrops(drops)
+	drops = reportutil.MergeDrops(drops)
 
 	convertedDrops := make([]*types.Drop, 0, len(drops))
 	for _, drop := range drops {
@@ -177,7 +177,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 		return "", err
 	}
 	if category.Valid && category.String == constants.ExtraProcessTypeGachaBox {
-		reportutils.AggregateGachaBoxDrops(singleReport)
+		reportutil.AggregateGachaBoxDrops(singleReport)
 	}
 
 	// construct ReportContext
@@ -189,7 +189,7 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 		},
 		Reports:   []*types.SingleReport{singleReport},
 		AccountID: accountId,
-		IP:        utils.ExtractIP(ctx),
+		IP:        util.ExtractIP(ctx),
 	}
 
 	return s.commitReportTask(ctx, "REPORT.SINGLE", reportTask)
@@ -227,7 +227,7 @@ func (s *ReportService) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types
 		},
 		Reports:   reports,
 		AccountID: accountId,
-		IP:        utils.ExtractIP(ctx),
+		IP:        util.ExtractIP(ctx),
 	}
 
 	return s.commitReportTask(ctx, "REPORT.BATCH", reportTask)

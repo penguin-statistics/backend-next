@@ -17,7 +17,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
+	"github.com/penguin-statistics/backend-next/internal/util/rekuest"
 )
 
 // ErrIntervalLengthTooSmall is returned when the interval length is invalid

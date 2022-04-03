@@ -9,7 +9,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/utils"
+	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
 type ItemController struct {
@@ -20,7 +20,7 @@ type ItemController struct {
 
 func RegisterItemController(v3 *svr.V3, c ItemController) {
 	v3.Get("/items", c.GetItems)
-	v3.Get("/items/:itemId", buildSanitizer(utils.NonNullString, utils.IsInt), c.GetItemById)
+	v3.Get("/items/:itemId", buildSanitizer(util.NonNullString, util.IsInt), c.GetItemById)
 }
 
 func buildSanitizer(sanitizer ...func(string) bool) func(ctx *fiber.Ctx) error {

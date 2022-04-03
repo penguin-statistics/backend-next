@@ -17,7 +17,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
-	"github.com/penguin-statistics/backend-next/internal/utils"
+	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
 type PatternMatrixService struct {
@@ -184,7 +184,7 @@ func (s *PatternMatrixService) calcPatternMatrixForTimeRanges(
 		return nil, err
 	}
 
-	stageIds := utils.GetStageIdsFromDropInfos(dropInfos)
+	stageIds := util.GetStageIdsFromDropInfos(dropInfos)
 
 	// exclude gacha box stages
 	gachaboxStages, err := s.StageService.GetGachaBoxStages(ctx)

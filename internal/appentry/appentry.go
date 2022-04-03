@@ -16,8 +16,8 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/server/httpserver"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/utils"
-	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
+	"github.com/penguin-statistics/backend-next/internal/util"
+	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
 	"github.com/penguin-statistics/backend-next/internal/workers/calcwkr"
 )
 
@@ -30,10 +30,10 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(infra.Redis),
 		fx.Provide(infra.Postgres),
 		fx.Provide(infra.GeoIPDatabase),
-		fx.Provide(reportutils.NewMD5Verifier),
-		fx.Provide(reportutils.NewUserVerifier),
-		fx.Provide(reportutils.NewDropVerifier),
-		fx.Provide(reportutils.NewReportVerifier),
+		fx.Provide(reportutil.NewMD5Verifier),
+		fx.Provide(reportutil.NewUserVerifier),
+		fx.Provide(reportutil.NewDropVerifier),
+		fx.Provide(reportutil.NewReportVerifier),
 		fx.Provide(repo.NewItem),
 		fx.Provide(repo.NewZone),
 		fx.Provide(repo.NewStageRepo),
@@ -75,7 +75,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(service.NewDropPatternElementService),
 		fx.Provide(service.NewPatternMatrixElementService),
 		fx.Provide(svr.CreateVersioningEndpoints),
-		fx.Provide(utils.NewCrypto),
+		fx.Provide(util.NewCrypto),
 		fx.Invoke(logger.Configure),
 		fx.Invoke(infra.SentryInit),
 		fx.Invoke(cache.Initialize),

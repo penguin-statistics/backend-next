@@ -14,7 +14,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgqry"
-	"github.com/penguin-statistics/backend-next/internal/utils"
+	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
 type DropReport struct {
@@ -179,7 +179,7 @@ func (s *DropReport) CalcTotalQuantityForTrend(
 		return results, nil
 	}
 
-	gameDayStart := utils.GetGameDayStartTime(server, *startTime)
+	gameDayStart := util.GetGameDayStartTime(server, *startTime)
 	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(int(intervalLength.Hours())*(intervalNum+1)))
 
 	var b strings.Builder
@@ -244,7 +244,7 @@ func (s *DropReport) CalcTotalTimesForTrend(
 		return results, nil
 	}
 
-	gameDayStart := utils.GetGameDayStartTime(server, *startTime)
+	gameDayStart := util.GetGameDayStartTime(server, *startTime)
 	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(int(intervalLength.Hours())*(intervalNum+1)))
 
 	var b strings.Builder
