@@ -12,7 +12,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 	"github.com/penguin-statistics/backend-next/internal/utils"
@@ -77,8 +77,8 @@ func (s *ItemService) SearchItemByName(ctx context.Context, name string) (*model
 }
 
 // Cache: (singular) shimItems, 24hrs; records last modified time
-func (s *ItemService) GetShimItems(ctx context.Context) ([]*shims.Item, error) {
-	var items []*shims.Item
+func (s *ItemService) GetShimItems(ctx context.Context) ([]*modelsv2.Item, error) {
+	var items []*modelsv2.Item
 	err := cache.ShimItems.Get(&items)
 	if err == nil {
 		return items, nil
@@ -98,8 +98,8 @@ func (s *ItemService) GetShimItems(ctx context.Context) ([]*shims.Item, error) {
 }
 
 // Cache: shimItem#arkItemId:{arkItemId}, 24hrs
-func (s *ItemService) GetShimItemByArkId(ctx context.Context, arkItemId string) (*shims.Item, error) {
-	var item shims.Item
+func (s *ItemService) GetShimItemByArkId(ctx context.Context, arkItemId string) (*modelsv2.Item, error) {
+	var item modelsv2.Item
 	err := cache.ShimItemByArkID.Get(arkItemId, &item)
 	if err == nil {
 		return &item, nil
@@ -148,7 +148,7 @@ func (s *ItemService) GetItemsMapByArkId(ctx context.Context) (map[string]*model
 	return itemsMapByArkId, nil
 }
 
-func (s *ItemService) applyShim(item *shims.Item) {
+func (s *ItemService) applyShim(item *modelsv2.Item) {
 	nameI18n := gjson.ParseBytes(item.NameI18n)
 	item.Name = nameI18n.Map()["zh"].String()
 

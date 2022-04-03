@@ -11,7 +11,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
@@ -72,8 +72,8 @@ func (s *StageService) SearchStageByCode(ctx context.Context, code string) (*mod
 }
 
 // Cache: shimStages#server:{server}, 24hrs; records last modified time
-func (s *StageService) GetShimStages(ctx context.Context, server string) ([]*shims.Stage, error) {
-	var stages []*shims.Stage
+func (s *StageService) GetShimStages(ctx context.Context, server string) ([]*modelsv2.Stage, error) {
+	var stages []*modelsv2.Stage
 	err := cache.ShimStages.Get(server, &stages)
 	if err == nil {
 		return stages, nil
@@ -93,8 +93,8 @@ func (s *StageService) GetShimStages(ctx context.Context, server string) ([]*shi
 }
 
 // Cache: shimStage#server|arkStageId:{server}|{arkStageId}, 24hrs
-func (s *StageService) GetShimStageByArkId(ctx context.Context, arkStageId string, server string) (*shims.Stage, error) {
-	var stage shims.Stage
+func (s *StageService) GetShimStageByArkId(ctx context.Context, arkStageId string, server string) (*modelsv2.Stage, error) {
+	var stage modelsv2.Stage
 	err := cache.ShimStageByArkID.Get(arkStageId, &stage)
 	if err == nil {
 		return &stage, nil
@@ -157,7 +157,7 @@ func (s *StageService) GetGachaBoxStages(ctx context.Context) ([]*models.Stage, 
 	return stages, nil
 }
 
-func (s *StageService) applyShim(stage *shims.Stage) {
+func (s *StageService) applyShim(stage *modelsv2.Stage) {
 	codeI18n := gjson.ParseBytes(stage.CodeI18n)
 	stage.Code = codeI18n.Map()["zh"].String()
 
@@ -171,7 +171,7 @@ func (s *StageService) applyShim(stage *shims.Stage) {
 
 	recognitionOnlyArkItemIds := make([]string, 0)
 	linq.From(stage.DropInfos).
-		WhereT(func(dropInfo *shims.DropInfo) bool {
+		WhereT(func(dropInfo *modelsv2.DropInfo) bool {
 			if dropInfo.DropType == constants.DropTypeRecognitionOnly {
 				extras := gjson.ParseBytes(dropInfo.Extras)
 				if !extras.IsObject() {

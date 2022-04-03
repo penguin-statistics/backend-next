@@ -27,7 +27,7 @@ func RegisterStageController(v2 *svr.V2, stageService *service.StageService) {
 // @Summary      Get All Stages
 // @Tags         Stage
 // @Produce      json
-// @Success      200     {array}  shims.Stage{existence=models.Existence,code_i18n=models.I18nString}
+// @Success      200     {array}  modelsv2.Stage{existence=models.Existence,code_i18n=models.I18nString}
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/stages [GET]
 func (c *StageController) GetStages(ctx *fiber.Ctx) error {
@@ -49,7 +49,7 @@ func (c *StageController) GetStages(ctx *fiber.Ctx) error {
 // @Tags         Stage
 // @Produce      json
 // @Param        stageId  path      int  true  "Stage ID"
-// @Success      200     {object}  shims.Stage{existence=models.Existence,code_i18n=models.I18nString}
+// @Success      200     {object}  modelsv2.Stage{existence=models.Existence,code_i18n=models.I18nString}
 // @Failure      400     {object}  pgerr.PenguinError "Invalid or missing stageId. Notice that this shall be the **string ID** of the stage, instead of the internally used numerical ID of the stage."
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/stages/{stageId} [GET]

@@ -8,7 +8,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
@@ -67,8 +67,8 @@ func (c *ItemRepo) GetItemByArkId(ctx context.Context, arkItemId string) (*model
 	return &item, nil
 }
 
-func (c *ItemRepo) GetShimItems(ctx context.Context) ([]*shims.Item, error) {
-	var items []*shims.Item
+func (c *ItemRepo) GetShimItems(ctx context.Context) ([]*modelsv2.Item, error) {
+	var items []*modelsv2.Item
 
 	err := c.DB.NewSelect().
 		Model(&items).
@@ -83,8 +83,8 @@ func (c *ItemRepo) GetShimItems(ctx context.Context) ([]*shims.Item, error) {
 	return items, nil
 }
 
-func (c *ItemRepo) GetShimItemByArkId(ctx context.Context, itemId string) (*shims.Item, error) {
-	var item shims.Item
+func (c *ItemRepo) GetShimItemByArkId(ctx context.Context, itemId string) (*modelsv2.Item, error) {
+	var item modelsv2.Item
 	err := c.DB.NewSelect().
 		Model(&item).
 		Where("ark_item_id = ?", itemId).

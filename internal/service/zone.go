@@ -8,7 +8,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/repos"
 )
 
@@ -59,8 +59,8 @@ func (s *ZoneService) GetZoneByArkId(ctx context.Context, arkZoneId string) (*mo
 }
 
 // Cache: (singular) shimZones, 24hrs; records last modified time
-func (s *ZoneService) GetShimZones(ctx context.Context) ([]*shims.Zone, error) {
-	var zones []*shims.Zone
+func (s *ZoneService) GetShimZones(ctx context.Context) ([]*modelsv2.Zone, error) {
+	var zones []*modelsv2.Zone
 	err := cache.ShimZones.Get(&zones)
 	if err == nil {
 		return zones, nil
@@ -80,8 +80,8 @@ func (s *ZoneService) GetShimZones(ctx context.Context) ([]*shims.Zone, error) {
 }
 
 // Cache: shimZone#arkZoneId:{arkZoneId}, 24hrs
-func (s *ZoneService) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*shims.Zone, error) {
-	var zone shims.Zone
+func (s *ZoneService) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*modelsv2.Zone, error) {
+	var zone modelsv2.Zone
 	err := cache.ShimZoneByArkID.Get(arkZoneId, &zone)
 	if err == nil {
 		return &zone, nil
@@ -96,7 +96,7 @@ func (s *ZoneService) GetShimZoneByArkId(ctx context.Context, arkZoneId string) 
 	return dbZone, nil
 }
 
-func (s *ZoneService) applyShim(zone *shims.Zone) {
+func (s *ZoneService) applyShim(zone *modelsv2.Zone) {
 	zoneNameI18n := gjson.ParseBytes(zone.ZoneNameI18n)
 	zone.ZoneName = zoneNameI18n.Map()["zh"].String()
 

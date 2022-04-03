@@ -1,4 +1,4 @@
-package shims
+package v2
 
 type SiteStats struct {
 	TotalStageTimes     []*TotalStageTime    `json:"totalStageTimes"`

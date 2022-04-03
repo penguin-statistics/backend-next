@@ -15,7 +15,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
@@ -70,8 +70,8 @@ func NewDropMatrixService(
 }
 
 // Cache: shimMaxAccumulableDropMatrixResults#server|showClosedZoned:{server}|{showClosedZones}, 24 hrs, records last modified time
-func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId null.Int) (*shims.DropMatrixQueryResult, error) {
-	valueFunc := func() (*shims.DropMatrixQueryResult, error) {
+func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId null.Int) (*modelsv2.DropMatrixQueryResult, error) {
+	valueFunc := func() (*modelsv2.DropMatrixQueryResult, error) {
 		savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId)
 		if err != nil {
 			return nil, err
@@ -83,7 +83,7 @@ func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx context.C
 		return slowResults, nil
 	}
 
-	var results shims.DropMatrixQueryResult
+	var results modelsv2.DropMatrixQueryResult
 	if !accountId.Valid && stageFilterStr == "" && itemFilterStr == "" {
 		key := server + constants.CacheSep + strconv.FormatBool(showClosedZones)
 		calculated, err := cache.ShimMaxAccumulableDropMatrixResults.MutexGetSet(key, &results, valueFunc, 24*time.Hour)
@@ -98,7 +98,7 @@ func (s *DropMatrixService) GetShimMaxAccumulableDropMatrixResults(ctx context.C
 	}
 }
 
-func (s *DropMatrixService) GetShimCustomizedDropMatrixResults(ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, itemIds []int, accountId null.Int) (*shims.DropMatrixQueryResult, error) {
+func (s *DropMatrixService) GetShimCustomizedDropMatrixResults(ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, itemIds []int, accountId null.Int) (*modelsv2.DropMatrixQueryResult, error) {
 	customizedDropMatrixQueryResult, err := s.QueryDropMatrix(ctx, server, []*models.TimeRange{timeRange}, stageIds, itemIds, accountId)
 	if err != nil {
 		return nil, err
@@ -480,7 +480,7 @@ func (s *DropMatrixService) convertDropMatrixElementsToDropMatrixQueryResult(ctx
 	return dropMatrixQueryResult, nil
 }
 
-func (s *DropMatrixService) applyShimForDropMatrixQuery(ctx context.Context, server string, showClosedZones bool, stageFilterStr, itemFilterStr string, queryResult *models.DropMatrixQueryResult) (*shims.DropMatrixQueryResult, error) {
+func (s *DropMatrixService) applyShimForDropMatrixQuery(ctx context.Context, server string, showClosedZones bool, stageFilterStr, itemFilterStr string, queryResult *models.DropMatrixQueryResult) (*modelsv2.DropMatrixQueryResult, error) {
 	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
 	if err != nil {
 		return nil, err
@@ -521,8 +521,8 @@ func (s *DropMatrixService) applyShimForDropMatrixQuery(ctx context.Context, ser
 		itemFilterSet[itemIdStr] = struct{}{}
 	}
 
-	results := &shims.DropMatrixQueryResult{
-		Matrix: make([]*shims.OneDropMatrixElement, 0),
+	results := &modelsv2.DropMatrixQueryResult{
+		Matrix: make([]*modelsv2.OneDropMatrixElement, 0),
 	}
 	for _, el := range queryResult.Matrix {
 		if !showClosedZones && !linq.From(openingStageIds).Contains(el.StageID) {
@@ -544,7 +544,7 @@ func (s *DropMatrixService) applyShimForDropMatrixQuery(ctx context.Context, ser
 		}
 
 		endTime := null.NewInt(el.TimeRange.EndTime.UnixMilli(), true)
-		oneDropMatrixElement := shims.OneDropMatrixElement{
+		oneDropMatrixElement := modelsv2.OneDropMatrixElement{
 			StageID:   stage.ArkStageID,
 			ItemID:    item.ArkItemID,
 			Quantity:  el.Quantity,

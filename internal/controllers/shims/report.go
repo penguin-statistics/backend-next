@@ -8,8 +8,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
+	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
@@ -36,7 +36,7 @@ func RegisterReportController(v2 *svr.V2, v3 *svr.V3, c ReportController) {
 // @Accept	     json
 // @Produce      json
 // @Param		 report  body      types.SingleReportRequest true "Report Request"
-// @Success      201     {object}  shims.ReportResponse "Report has been successfully submitted"
+// @Success      201     {object}  modelsv2.ReportResponse "Report has been successfully submitted"
 // @Failure      400     {object}  pgerr.PenguinError "Invalid request"
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Security     PenguinIDAuth
@@ -51,7 +51,7 @@ func (c *ReportController) SingularReport(ctx *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return ctx.JSON(shims.ReportResponse{ReportHash: taskId})
+	return ctx.JSON(modelsv2.ReportResponse{ReportHash: taskId})
 }
 
 // @Summary      Recall a Drop Report
@@ -83,7 +83,7 @@ func (c *ReportController) RecallSingularReport(ctx *fiber.Ctx) error {
 // @Tags         Report
 // @Produce      json
 // @Param		 report  body      string true "Recognition Report Request"
-// @Success      200     {object}  shims.RecognitionReportResponse "Report has been successfully submitted for queue processing"
+// @Success      200     {object}  modelsv2.RecognitionReportResponse "Report has been successfully submitted for queue processing"
 // @Failure      400     {object}  pgerr.PenguinError "Invalid request"
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Security     PenguinIDAuth
@@ -129,7 +129,7 @@ func (c *ReportController) RecognitionReport(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	return ctx.JSON(shims.RecognitionReportResponse{
+	return ctx.JSON(modelsv2.RecognitionReportResponse{
 		TaskId: taskId,
 		Errors: []string{},
 	})

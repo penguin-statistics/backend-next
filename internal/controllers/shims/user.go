@@ -5,7 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/penguin-statistics/backend-next/internal/models/shims"
+	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
@@ -28,7 +28,7 @@ func RegisterAccountController(v2 *svr.V2, s *service.AccountService) {
 // @Accept       plain
 // @Produce      plain
 // @Param        userId  body      int  true  "User ID"
-// @Success      200     {object}   shims.LoginResponse  "User ID. In the deprecated backend this is, for some reason, been implemented to return a JSON in the response body but with a `Content-Type: text/plain` in the response header instead of the correct `Content-Type: application/json`. So the v2 API has replicated this behavior to ensure compatibility."
+// @Success      200     {object}   modelsv2.LoginResponse  "User ID. In the deprecated backend this is, for some reason, been implemented to return a JSON in the response body but with a `Content-Type: text/plain` in the response header instead of the correct `Content-Type: application/json`. So the v2 API has replicated this behavior to ensure compatibility."
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/users [POST]
@@ -45,7 +45,7 @@ func (c *AccountController) Login(ctx *fiber.Ctx) error {
 	// for some reasons the response for the login API is in format of
 	// text/plain so I'd have to manually convert it to JSON and use ctx#Send to respond
 	// to ensure compatibility
-	resp, err := json.Marshal(&shims.LoginResponse{
+	resp, err := json.Marshal(&modelsv2.LoginResponse{
 		UserID: account.PenguinID,
 	})
 	if err != nil {

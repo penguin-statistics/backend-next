@@ -11,8 +11,8 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/models/shims"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
+	modelsv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
@@ -73,7 +73,7 @@ func RegisterResultController(
 // @Param        show_closed_zones query    bool     false "Whether to show closed stages or not"
 // @Param        stageFilter       query    []string false "Comma separated list of stage IDs to filter" collectionFormat(csv)
 // @Param        itemFilter        query    []string false "Comma separated list of item IDs to filter" collectionFormat(csv)
-// @Success      200               {object} shims.DropMatrixQueryResult "Drop Matrix response"
+// @Success      200               {object} modelsv2.DropMatrixQueryResult "Drop Matrix response"
 // @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/result/matrix [GET]
@@ -127,7 +127,7 @@ func (c *ResultController) GetDropMatrix(ctx *fiber.Ctx) error {
 // @Produce      json
 // @Param        server            query string true  "Server; default to CN" Enums(CN, US, JP, KR)
 // @Param        is_personal       query bool   false "Whether to query for personal drop matrix or not. If `is_personal` equals to `true`, a valid PenguinID would be required to be provided (PenguinIDAuth)"
-// @Success      200               {object} shims.PatternMatrixQueryResult
+// @Success      200               {object} modelsv2.PatternMatrixQueryResult
 // @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/result/pattern [GET]
@@ -172,7 +172,7 @@ func (c *ResultController) GetPatternMatrix(ctx *fiber.Ctx) error {
 // @Tags         Result
 // @Produce      json
 // @Param        server            query    string true  "Server; default to CN" Enums(CN, US, JP, KR)
-// @Success      200               {object} shims.TrendQueryResult
+// @Success      200               {object} modelsv2.TrendQueryResult
 // @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/result/trends [GET]
 func (c *ResultController) GetTrends(ctx *fiber.Ctx) error {
@@ -199,8 +199,8 @@ func (c *ResultController) GetTrends(ctx *fiber.Ctx) error {
 // @Tags         Result
 // @Produce      json
 // @Param        query   body      types.AdvancedQueryRequest true  "Query"
-// @Success      200     {object}  shims.AdvancedQueryResult{advanced_results=[]shims.DropMatrixQueryResult} "Drop Matrix Response: when `interval` has been left undefined."
-// @Success      202     {object}  shims.AdvancedQueryResult{advanced_results=[]shims.TrendQueryResult} "Trend Response: when `interval` has been defined a value greater than `0`. Notice that this response still responds with a status code of `200`, but due to swagger limitations, to denote a different response with the same status code is not possible. Therefore, a status code of `202` is used, only for the purpose of workaround."
+// @Success      200     {object}  modelsv2.AdvancedQueryResult{advanced_results=[]modelsv2.DropMatrixQueryResult} "Drop Matrix Response: when `interval` has been left undefined."
+// @Success      202     {object}  modelsv2.AdvancedQueryResult{advanced_results=[]modelsv2.TrendQueryResult} "Trend Response: when `interval` has been defined a value greater than `0`. Notice that this response still responds with a status code of `200`, but due to swagger limitations, to denote a different response with the same status code is not possible. Therefore, a status code of `202` is used, only for the purpose of workaround."
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/advanced [POST]
 func (c *ResultController) AdvancedQuery(ctx *fiber.Ctx) error {
@@ -208,7 +208,7 @@ func (c *ResultController) AdvancedQuery(ctx *fiber.Ctx) error {
 	if err := rekuest.ValidBody(ctx, &request); err != nil {
 		return err
 	}
-	result := &shims.AdvancedQueryResult{
+	result := &modelsv2.AdvancedQueryResult{
 		AdvancedResults: make([]any, 0),
 	}
 	for _, query := range request.Queries {
