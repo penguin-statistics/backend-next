@@ -74,250 +74,6 @@ definitions:
         example: 'invalid request: some or all request parameters are invalid'
         type: string
     type: object
-  shims.Activity:
-    properties:
-      end:
-        type: integer
-      existence:
-        type: object
-      label_i18n:
-        type: object
-      start:
-        type: integer
-    type: object
-  shims.AdvancedQueryResult:
-    properties:
-      advanced_results:
-        items: {}
-        type: array
-    type: object
-  shims.DropInfo:
-    properties:
-      bounds:
-        type: object
-      dropType:
-        type: string
-      itemId:
-        type: string
-    type: object
-  shims.DropMatrixQueryResult:
-    properties:
-      matrix:
-        items:
-          $ref: '#/definitions/shims.OneDropMatrixElement'
-        type: array
-    type: object
-  shims.Item:
-    properties:
-      alias:
-        items:
-          type: string
-        type: array
-      existence:
-        type: object
-      groupID:
-        type: string
-      itemId:
-        type: string
-      itemType:
-        type: string
-      name:
-        type: string
-      name_i18n:
-        type: object
-      pron:
-        items:
-          type: string
-        type: array
-      rarity:
-        type: integer
-      sortId:
-        type: integer
-      spriteCoord:
-        items:
-          type: integer
-        type: array
-    type: object
-  shims.LoginResponse:
-    properties:
-      userID:
-        type: string
-    type: object
-  shims.OneDrop:
-    properties:
-      itemId:
-        type: string
-      quantity:
-        type: integer
-    type: object
-  shims.OneDropMatrixElement:
-    properties:
-      end:
-        type: integer
-      itemId:
-        type: string
-      quantity:
-        type: integer
-      stageId:
-        type: string
-      start:
-        type: integer
-      times:
-        type: integer
-    type: object
-  shims.OneItemTrend:
-    properties:
-      quantity:
-        items:
-          type: integer
-        type: array
-      times:
-        items:
-          type: integer
-        type: array
-    type: object
-  shims.OnePatternMatrixElement:
-    properties:
-      end:
-        type: integer
-      pattern:
-        $ref: '#/definitions/shims.Pattern'
-      quantity:
-        type: integer
-      stageId:
-        type: string
-      start:
-        type: integer
-      times:
-        type: integer
-    type: object
-  shims.Pattern:
-    properties:
-      drops:
-        items:
-          $ref: '#/definitions/shims.OneDrop'
-        type: array
-    type: object
-  shims.PatternMatrixQueryResult:
-    properties:
-      pattern_matrix:
-        items:
-          $ref: '#/definitions/shims.OnePatternMatrixElement'
-        type: array
-    type: object
-  shims.RecognitionReportResponse:
-    properties:
-      errors:
-        items:
-          type: string
-        type: array
-      taskId:
-        example: 0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ
-        type: string
-    type: object
-  shims.ReportResponse:
-    properties:
-      reportHash:
-        example: 0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ
-        type: string
-    type: object
-  shims.SiteStats:
-    properties:
-      totalApCost:
-        type: integer
-      totalItemQuantities:
-        items:
-          $ref: '#/definitions/shims.TotalItemQuantity'
-        type: array
-      totalStageTimes:
-        items:
-          $ref: '#/definitions/shims.TotalStageTime'
-        type: array
-      totalStageTimes_24h:
-        items:
-          $ref: '#/definitions/shims.TotalStageTime'
-        type: array
-    type: object
-  shims.Stage:
-    properties:
-      apCost:
-        type: integer
-      code:
-        type: string
-      code_i18n:
-        type: object
-      dropInfos:
-        items:
-          $ref: '#/definitions/shims.DropInfo'
-        type: array
-      existence:
-        type: object
-      minClearTime:
-        type: integer
-      recognitionOnly:
-        items:
-          type: string
-        type: array
-      stageId:
-        type: string
-      stageType:
-        type: string
-      zoneId:
-        type: string
-    type: object
-  shims.StageTrend:
-    properties:
-      results:
-        additionalProperties:
-          $ref: '#/definitions/shims.OneItemTrend'
-        type: object
-      startTime:
-        type: integer
-    type: object
-  shims.TotalItemQuantity:
-    properties:
-      itemId:
-        type: string
-      quantity:
-        type: integer
-    type: object
-  shims.TotalStageTime:
-    properties:
-      stageId:
-        type: string
-      times:
-        type: integer
-    type: object
-  shims.TrendQueryResult:
-    properties:
-      trend:
-        additionalProperties:
-          $ref: '#/definitions/shims.StageTrend'
-        type: object
-    type: object
-  shims.Zone:
-    properties:
-      background:
-        type: string
-      existence:
-        type: object
-      stages:
-        items:
-          type: string
-        type: array
-      subType:
-        type: string
-      type:
-        type: string
-      zoneId:
-        type: string
-      zoneIndex:
-        type: integer
-      zoneName:
-        type: string
-      zoneName_i18n:
-        type: object
-    type: object
   types.AdvancedQuery:
     properties:
       end:
@@ -410,14 +166,259 @@ definitions:
     - stageId
     - version
     type: object
+  v2.Activity:
+    properties:
+      end:
+        type: integer
+      existence:
+        type: object
+      label_i18n:
+        type: object
+      start:
+        type: integer
+    type: object
+  v2.AdvancedQueryResult:
+    properties:
+      advanced_results:
+        items:
+          type: any
+        type: array
+    type: object
+  v2.DropInfo:
+    properties:
+      bounds:
+        type: object
+      dropType:
+        type: string
+      itemId:
+        type: string
+    type: object
+  v2.DropMatrixQueryResult:
+    properties:
+      matrix:
+        items:
+          $ref: '#/definitions/v2.OneDropMatrixElement'
+        type: array
+    type: object
+  v2.Item:
+    properties:
+      alias:
+        items:
+          type: string
+        type: array
+      existence:
+        type: object
+      groupID:
+        type: string
+      itemId:
+        type: string
+      itemType:
+        type: string
+      name:
+        type: string
+      name_i18n:
+        type: object
+      pron:
+        items:
+          type: string
+        type: array
+      rarity:
+        type: integer
+      sortId:
+        type: integer
+      spriteCoord:
+        items:
+          type: integer
+        type: array
+    type: object
+  v2.LoginResponse:
+    properties:
+      userID:
+        type: string
+    type: object
+  v2.OneDrop:
+    properties:
+      itemId:
+        type: string
+      quantity:
+        type: integer
+    type: object
+  v2.OneDropMatrixElement:
+    properties:
+      end:
+        type: integer
+      itemId:
+        type: string
+      quantity:
+        type: integer
+      stageId:
+        type: string
+      start:
+        type: integer
+      times:
+        type: integer
+    type: object
+  v2.OneItemTrend:
+    properties:
+      quantity:
+        items:
+          type: integer
+        type: array
+      times:
+        items:
+          type: integer
+        type: array
+    type: object
+  v2.OnePatternMatrixElement:
+    properties:
+      end:
+        type: integer
+      pattern:
+        $ref: '#/definitions/v2.Pattern'
+      quantity:
+        type: integer
+      stageId:
+        type: string
+      start:
+        type: integer
+      times:
+        type: integer
+    type: object
+  v2.Pattern:
+    properties:
+      drops:
+        items:
+          $ref: '#/definitions/v2.OneDrop'
+        type: array
+    type: object
+  v2.PatternMatrixQueryResult:
+    properties:
+      pattern_matrix:
+        items:
+          $ref: '#/definitions/v2.OnePatternMatrixElement'
+        type: array
+    type: object
+  v2.RecognitionReportResponse:
+    properties:
+      errors:
+        items:
+          type: string
+        type: array
+      taskId:
+        example: 0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ
+        type: string
+    type: object
+  v2.ReportResponse:
+    properties:
+      reportHash:
+        example: 0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ
+        type: string
+    type: object
+  v2.SiteStats:
+    properties:
+      totalApCost:
+        type: integer
+      totalItemQuantities:
+        items:
+          $ref: '#/definitions/v2.TotalItemQuantity'
+        type: array
+      totalStageTimes:
+        items:
+          $ref: '#/definitions/v2.TotalStageTime'
+        type: array
+      totalStageTimes_24h:
+        items:
+          $ref: '#/definitions/v2.TotalStageTime'
+        type: array
+    type: object
+  v2.Stage:
+    properties:
+      apCost:
+        type: integer
+      code:
+        type: string
+      code_i18n:
+        type: object
+      dropInfos:
+        items:
+          $ref: '#/definitions/v2.DropInfo'
+        type: array
+      existence:
+        type: object
+      minClearTime:
+        type: integer
+      recognitionOnly:
+        items:
+          type: string
+        type: array
+      stageId:
+        type: string
+      stageType:
+        type: string
+      zoneId:
+        type: string
+    type: object
+  v2.StageTrend:
+    properties:
+      results:
+        additionalProperties:
+          $ref: '#/definitions/v2.OneItemTrend'
+        type: object
+      startTime:
+        type: integer
+    type: object
+  v2.TotalItemQuantity:
+    properties:
+      itemId:
+        type: string
+      quantity:
+        type: integer
+    type: object
+  v2.TotalStageTime:
+    properties:
+      stageId:
+        type: string
+      times:
+        type: integer
+    type: object
+  v2.TrendQueryResult:
+    properties:
+      trend:
+        additionalProperties:
+          $ref: '#/definitions/v2.StageTrend'
+        type: object
+    type: object
+  v2.Zone:
+    properties:
+      background:
+        type: string
+      existence:
+        type: object
+      stages:
+        items:
+          type: string
+        type: array
+      subType:
+        type: string
+      type:
+        type: string
+      zoneId:
+        type: string
+      zoneIndex:
+        type: integer
+      zoneName:
+        type: string
+      zoneName_i18n:
+        type: object
+    type: object
 host: penguin-stats.io
 info:
   contact:
     email: alvissreimu@gmail.com
     name: AlvISs_Reimu
     url: https://github.com/AlvISsReimu
-  description: This is the Penguin Statistics v3 API, re-designed to aim for lightweight
-    on wire.
+  description: This is the Penguin Statistics v3 Backend, implemented for best performance,
+    scalability, and reliability.
   license:
     name: MIT License
     url: https://opensource.org/licenses/MIT
@@ -451,7 +452,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shims.DropMatrixQueryResult'
+            $ref: '#/definitions/v2.DropMatrixQueryResult'
         "500":
           description: An unexpected error occurred
           schema:
@@ -486,7 +487,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shims.PatternMatrixQueryResult'
+            $ref: '#/definitions/v2.PatternMatrixQueryResult'
         "500":
           description: An unexpected error occurred
           schema:
@@ -513,7 +514,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shims.TrendQueryResult'
+            $ref: '#/definitions/v2.TrendQueryResult'
         "500":
           description: An unexpected error occurred
           schema:
@@ -537,11 +538,11 @@ paths:
           description: 'Drop Matrix Response: when `interval` has been left undefined.'
           schema:
             allOf:
-            - $ref: '#/definitions/shims.AdvancedQueryResult'
+            - $ref: '#/definitions/v2.AdvancedQueryResult'
             - properties:
                 advanced_results:
                   items:
-                    $ref: '#/definitions/shims.DropMatrixQueryResult'
+                    $ref: '#/definitions/v2.DropMatrixQueryResult'
                   type: array
               type: object
         "202":
@@ -552,11 +553,11 @@ paths:
             `202` is used, only for the purpose of workaround.'
           schema:
             allOf:
-            - $ref: '#/definitions/shims.AdvancedQueryResult'
+            - $ref: '#/definitions/v2.AdvancedQueryResult'
             - properties:
                 advanced_results:
                   items:
-                    $ref: '#/definitions/shims.TrendQueryResult'
+                    $ref: '#/definitions/v2.TrendQueryResult'
                   type: array
               type: object
         "500":
@@ -590,7 +591,7 @@ paths:
           schema:
             items:
               allOf:
-              - $ref: '#/definitions/shims.Item'
+              - $ref: '#/definitions/v2.Item'
               - properties:
                   existence:
                     $ref: '#/definitions/models.Existence'
@@ -620,7 +621,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/shims.Item'
+            - $ref: '#/definitions/v2.Item'
             - properties:
                 existence:
                   $ref: '#/definitions/models.Existence'
@@ -667,7 +668,7 @@ paths:
           schema:
             items:
               allOf:
-              - $ref: '#/definitions/shims.Activity'
+              - $ref: '#/definitions/v2.Activity'
               - properties:
                   existence:
                     $ref: '#/definitions/models.Existence'
@@ -701,7 +702,7 @@ paths:
         "201":
           description: Report has been successfully submitted
           schema:
-            $ref: '#/definitions/shims.ReportResponse'
+            $ref: '#/definitions/v2.ReportResponse'
         "400":
           description: Invalid request
           schema:
@@ -762,7 +763,7 @@ paths:
         "200":
           description: Report has been successfully submitted for queue processing
           schema:
-            $ref: '#/definitions/shims.RecognitionReportResponse'
+            $ref: '#/definitions/v2.RecognitionReportResponse'
         "400":
           description: Invalid request
           schema:
@@ -818,7 +819,7 @@ paths:
         "200":
           description: Drop Matrix response
           schema:
-            $ref: '#/definitions/shims.DropMatrixQueryResult'
+            $ref: '#/definitions/v2.DropMatrixQueryResult'
         "500":
           description: An unexpected error occurred
           schema:
@@ -852,7 +853,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shims.PatternMatrixQueryResult'
+            $ref: '#/definitions/v2.PatternMatrixQueryResult'
         "500":
           description: An unexpected error occurred
           schema:
@@ -881,7 +882,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/shims.TrendQueryResult'
+            $ref: '#/definitions/v2.TrendQueryResult'
         "500":
           description: An unexpected error occurred
           schema:
@@ -899,7 +900,7 @@ paths:
           schema:
             items:
               allOf:
-              - $ref: '#/definitions/shims.Stage'
+              - $ref: '#/definitions/v2.Stage'
               - properties:
                   code_i18n:
                     $ref: '#/definitions/models.I18nString'
@@ -929,7 +930,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/shims.Stage'
+            - $ref: '#/definitions/v2.Stage'
             - properties:
                 code_i18n:
                   $ref: '#/definitions/models.I18nString'
@@ -969,7 +970,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/shims.SiteStats'
+              $ref: '#/definitions/v2.SiteStats'
             type: array
         "500":
           description: An unexpected error occurred
@@ -999,7 +1000,7 @@ paths:
             application/json`. So the v2 API has replicated this behavior to ensure
             compatibility.'
           schema:
-            $ref: '#/definitions/shims.LoginResponse'
+            $ref: '#/definitions/v2.LoginResponse'
         "500":
           description: An unexpected error occurred
           schema:
@@ -1019,7 +1020,7 @@ paths:
           schema:
             items:
               allOf:
-              - $ref: '#/definitions/shims.Zone'
+              - $ref: '#/definitions/v2.Zone'
               - properties:
                   existence:
                     $ref: '#/definitions/models.Existence'
@@ -1049,7 +1050,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/shims.Zone'
+            - $ref: '#/definitions/v2.Zone'
             - properties:
                 existence:
                   $ref: '#/definitions/models.Existence'

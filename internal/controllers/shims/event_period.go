@@ -26,7 +26,7 @@ func RegisterEventPeriodController(v2 *svr.V2, c EventPeriodController) {
 // @Summary      Get All Event Periods
 // @Tags         EventPeriod
 // @Produce      json
-// @Success      200     {array}  modelsv2.Activity{label_i18n=models.I18nString,existence=models.Existence}
+// @Success      200     {array}  v2.Activity{label_i18n=models.I18nString,existence=models.Existence}
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/period [GET]
 func (c *EventPeriodController) GetEventPeriods(ctx *fiber.Ctx) (err error) {

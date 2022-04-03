@@ -36,7 +36,7 @@ func RegisterReportController(v2 *svr.V2, v3 *svr.V3, c ReportController) {
 // @Accept	     json
 // @Produce      json
 // @Param		 report  body      types.SingleReportRequest true "Report Request"
-// @Success      201     {object}  modelsv2.ReportResponse "Report has been successfully submitted"
+// @Success      201     {object}  v2.ReportResponse "Report has been successfully submitted"
 // @Failure      400     {object}  pgerr.PenguinError "Invalid request"
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Security     PenguinIDAuth
@@ -83,7 +83,7 @@ func (c *ReportController) RecallSingularReport(ctx *fiber.Ctx) error {
 // @Tags         Report
 // @Produce      json
 // @Param		 report  body      string true "Recognition Report Request"
-// @Success      200     {object}  modelsv2.RecognitionReportResponse "Report has been successfully submitted for queue processing"
+// @Success      200     {object}  v2.RecognitionReportResponse "Report has been successfully submitted for queue processing"
 // @Failure      400     {object}  pgerr.PenguinError "Invalid request"
 // @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
 // @Security     PenguinIDAuth

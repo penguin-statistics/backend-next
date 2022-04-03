@@ -51,7 +51,7 @@ func RegisterPrivateController(
 // @Produce      json
 // @Param        server            path     string   true     "Server; default to CN" Enums(CN, US, JP, KR)
 // @Param        source            path     string   true     "Global or Personal; default to global" Enums(global, personal)
-// @Success      200               {object} modelsv2.DropMatrixQueryResult
+// @Success      200               {object} v2.DropMatrixQueryResult
 // @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/_private/result/matrix/{server}/{source} [GET]
 func (c *PrivateController) GetDropMatrix(ctx *fiber.Ctx) error {
@@ -90,7 +90,7 @@ func (c *PrivateController) GetDropMatrix(ctx *fiber.Ctx) error {
 // @Produce      json
 // @Param        server            path     string   true     "Server; default to CN" Enums(CN, US, JP, KR)
 // @Param        source            path     string   true     "Global or Personal; default to global" Enums(global, personal)
-// @Success      200               {object} modelsv2.PatternMatrixQueryResult
+// @Success      200               {object} v2.PatternMatrixQueryResult
 // @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/_private/result/pattern/{server}/{source} [GET]
 func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
@@ -127,7 +127,7 @@ func (c *PrivateController) GetPatternMatrix(ctx *fiber.Ctx) error {
 // @Tags         Private
 // @Produce      json
 // @Param        server            path     string   true     "Server; default to CN" Enums(CN, US, JP, KR)
-// @Success      200               {object} modelsv2.TrendQueryResult
+// @Success      200               {object} v2.TrendQueryResult
 // @Failure      500               {object} pgerr.PenguinError "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/_private/result/trend/{server} [GET]
 func (c *PrivateController) GetTrends(ctx *fiber.Ctx) error {
