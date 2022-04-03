@@ -4,14 +4,14 @@ import (
 	"context"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type DropMatrixElementService struct {
-	DropMatrixElementRepo *repos.DropMatrixElementRepo
+	DropMatrixElementRepo *repo.DropMatrixElementRepo
 }
 
-func NewDropMatrixElementService(dropMatrixElementRepo *repos.DropMatrixElementRepo) *DropMatrixElementService {
+func NewDropMatrixElementService(dropMatrixElementRepo *repo.DropMatrixElementRepo) *DropMatrixElementService {
 	return &DropMatrixElementService{
 		DropMatrixElementRepo: dropMatrixElementRepo,
 	}

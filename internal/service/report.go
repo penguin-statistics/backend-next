@@ -21,7 +21,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
 )
@@ -38,15 +38,15 @@ type ReportService struct {
 	ItemService            *ItemService
 	StageService           *StageService
 	AccountService         *AccountService
-	DropInfoRepo           *repos.DropInfoRepo
-	DropReportRepo         *repos.DropReportRepo
-	DropPatternRepo        *repos.DropPatternRepo
-	DropReportExtraRepo    *repos.DropReportExtraRepo
-	DropPatternElementRepo *repos.DropPatternElementRepo
+	DropInfoRepo           *repo.DropInfoRepo
+	DropReportRepo         *repo.DropReportRepo
+	DropPatternRepo        *repo.DropPatternRepo
+	DropReportExtraRepo    *repo.DropReportExtraRepo
+	DropPatternElementRepo *repo.DropPatternElementRepo
 	ReportVerifier         *reportutils.ReportVerifier
 }
 
-func NewReportService(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *ItemService, stageService *StageService, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
+func NewReportService(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *ItemService, stageService *StageService, dropInfoRepo *repo.DropInfoRepo, dropReportRepo *repo.DropReportRepo, dropReportExtraRepo *repo.DropReportExtraRepo, dropPatternRepo *repo.DropPatternRepo, dropPatternElementRepo *repo.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
 	service := &ReportService{
 		DB:                     db,
 		Redis:                  redisClient,

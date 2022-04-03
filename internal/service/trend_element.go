@@ -4,14 +4,14 @@ import (
 	"context"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type TrendElementService struct {
-	TrendElementRepo *repos.TrendElementRepo
+	TrendElementRepo *repo.TrendElementRepo
 }
 
-func NewTrendElementService(trendElementRepo *repos.TrendElementRepo) *TrendElementService {
+func NewTrendElementService(trendElementRepo *repo.TrendElementRepo) *TrendElementService {
 	return &TrendElementService{
 		TrendElementRepo: trendElementRepo,
 	}

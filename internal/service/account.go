@@ -11,14 +11,14 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type AccountService struct {
-	AccountRepo *repos.AccountRepo
+	AccountRepo *repo.AccountRepo
 }
 
-func NewAccountService(accountRepo *repos.AccountRepo) *AccountService {
+func NewAccountService(accountRepo *repo.AccountRepo) *AccountService {
 	return &AccountService{
 		AccountRepo: accountRepo,
 	}

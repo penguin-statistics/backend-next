@@ -6,14 +6,14 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type NoticeService struct {
-	NoticeRepo *repos.NoticeRepo
+	NoticeRepo *repo.NoticeRepo
 }
 
-func NewNoticeService(noticeRepo *repos.NoticeRepo) *NoticeService {
+func NewNoticeService(noticeRepo *repo.NoticeRepo) *NoticeService {
 	return &NoticeService{
 		NoticeRepo: noticeRepo,
 	}

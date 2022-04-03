@@ -11,7 +11,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cache"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type Flusher func() error
@@ -74,7 +74,7 @@ var (
 	CacheSingularFlusherMap map[string]Flusher
 )
 
-func Initialize(propertyRepo *repos.PropertyRepo) {
+func Initialize(propertyRepo *repo.PropertyRepo) {
 	once.Do(func() {
 		initializeCaches()
 		populateProperties(propertyRepo)
@@ -219,7 +219,7 @@ func initializeCaches() {
 	CacheSetMap["lastModifiedTime#key"] = LastModifiedTime.Flush
 }
 
-func populateProperties(repo *repos.PropertyRepo) {
+func populateProperties(repo *repo.PropertyRepo) {
 	Properties = make(map[string]string)
 	properties, err := repo.GetProperties(context.Background())
 	if err != nil {

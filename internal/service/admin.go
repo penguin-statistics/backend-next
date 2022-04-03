@@ -10,15 +10,15 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/models/gamedata"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type AdminService struct {
 	DB        *bun.DB
-	AdminRepo *repos.AdminRepo
+	AdminRepo *repo.AdminRepo
 }
 
-func NewAdminService(db *bun.DB, adminRepo *repos.AdminRepo) *AdminService {
+func NewAdminService(db *bun.DB, adminRepo *repo.AdminRepo) *AdminService {
 	return &AdminService{
 		DB:        db,
 		AdminRepo: adminRepo,

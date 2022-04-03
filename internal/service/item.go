@@ -14,15 +14,15 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/utils"
 )
 
 type ItemService struct {
-	ItemRepo *repos.ItemRepo
+	ItemRepo *repo.ItemRepo
 }
 
-func NewItemService(itemRepo *repos.ItemRepo) *ItemService {
+func NewItemService(itemRepo *repo.ItemRepo) *ItemService {
 	return &ItemService{
 		ItemRepo: itemRepo,
 	}

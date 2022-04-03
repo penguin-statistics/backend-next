@@ -6,14 +6,14 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type SiteStatsService struct {
-	DropReportRepo *repos.DropReportRepo
+	DropReportRepo *repo.DropReportRepo
 }
 
-func NewSiteStatsService(dropReportRepo *repos.DropReportRepo) *SiteStatsService {
+func NewSiteStatsService(dropReportRepo *repo.DropReportRepo) *SiteStatsService {
 	return &SiteStatsService{
 		DropReportRepo: dropReportRepo,
 	}

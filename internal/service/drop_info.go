@@ -11,15 +11,15 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type DropInfoService struct {
-	DropInfoRepo     *repos.DropInfoRepo
+	DropInfoRepo     *repo.DropInfoRepo
 	TimeRangeService *TimeRangeService
 }
 
-func NewDropInfoService(dropInfoRepo *repos.DropInfoRepo, timeRangeService *TimeRangeService) *DropInfoService {
+func NewDropInfoService(dropInfoRepo *repo.DropInfoRepo, timeRangeService *TimeRangeService) *DropInfoService {
 	return &DropInfoService{
 		DropInfoRepo:     dropInfoRepo,
 		TimeRangeService: timeRangeService,

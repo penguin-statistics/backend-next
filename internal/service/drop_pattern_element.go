@@ -7,14 +7,14 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type DropPatternElementService struct {
-	DropPatternElementRepo *repos.DropPatternElementRepo
+	DropPatternElementRepo *repo.DropPatternElementRepo
 }
 
-func NewDropPatternElementService(dropPatternElementRepo *repos.DropPatternElementRepo) *DropPatternElementService {
+func NewDropPatternElementService(dropPatternElementRepo *repo.DropPatternElementRepo) *DropPatternElementService {
 	return &DropPatternElementService{
 		DropPatternElementRepo: dropPatternElementRepo,
 	}

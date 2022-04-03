@@ -4,14 +4,14 @@ import (
 	"context"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type PatternMatrixElementService struct {
-	PatternMatrixElementRepo *repos.PatternMatrixElementRepo
+	PatternMatrixElementRepo *repo.PatternMatrixElementRepo
 }
 
-func NewPatternMatrixElementService(patternMatrixElementRepo *repos.PatternMatrixElementRepo) *PatternMatrixElementService {
+func NewPatternMatrixElementService(patternMatrixElementRepo *repo.PatternMatrixElementRepo) *PatternMatrixElementService {
 	return &PatternMatrixElementService{
 		PatternMatrixElementRepo: patternMatrixElementRepo,
 	}

@@ -9,14 +9,14 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type ZoneService struct {
-	ZoneRepo *repos.ZoneRepo
+	ZoneRepo *repo.ZoneRepo
 }
 
-func NewZoneService(zoneRepo *repos.ZoneRepo) *ZoneService {
+func NewZoneService(zoneRepo *repo.ZoneRepo) *ZoneService {
 	return &ZoneService{
 		ZoneRepo: zoneRepo,
 	}

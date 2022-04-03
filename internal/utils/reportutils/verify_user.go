@@ -6,7 +6,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/penguin-statistics/backend-next/internal/models/types"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 var (
@@ -15,10 +15,10 @@ var (
 )
 
 type UserVerifier struct {
-	AccountRepo *repos.AccountRepo
+	AccountRepo *repo.AccountRepo
 }
 
-func NewUserVerifier(accountRepo *repos.AccountRepo) *UserVerifier {
+func NewUserVerifier(accountRepo *repo.AccountRepo) *UserVerifier {
 	return &UserVerifier{
 		AccountRepo: accountRepo,
 	}

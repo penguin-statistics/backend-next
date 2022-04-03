@@ -7,14 +7,14 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/constants"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type FormulaService struct {
-	PropertyRepo *repos.PropertyRepo
+	PropertyRepo *repo.PropertyRepo
 }
 
-func NewFormulaService(propertyRepo *repos.PropertyRepo) *FormulaService {
+func NewFormulaService(propertyRepo *repo.PropertyRepo) *FormulaService {
 	return &FormulaService{
 		PropertyRepo: propertyRepo,
 	}

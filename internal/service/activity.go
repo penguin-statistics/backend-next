@@ -10,14 +10,14 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type ActivityService struct {
-	ActivityRepo *repos.ActivityRepo
+	ActivityRepo *repo.ActivityRepo
 }
 
-func NewActivityService(activityRepo *repos.ActivityRepo) *ActivityService {
+func NewActivityService(activityRepo *repo.ActivityRepo) *ActivityService {
 	return &ActivityService{
 		ActivityRepo: activityRepo,
 	}

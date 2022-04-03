@@ -7,14 +7,14 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type DropReportService struct {
-	DropReportRepo *repos.DropReportRepo
+	DropReportRepo *repo.DropReportRepo
 }
 
-func NewDropReportService(dropReportRepo *repos.DropReportRepo) *DropReportService {
+func NewDropReportService(dropReportRepo *repo.DropReportRepo) *DropReportService {
 	return &DropReportService{
 		DropReportRepo: dropReportRepo,
 	}

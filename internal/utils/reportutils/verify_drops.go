@@ -9,7 +9,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/models"
 	"github.com/penguin-statistics/backend-next/internal/models/types"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 var (
@@ -20,10 +20,10 @@ var (
 )
 
 type DropVerifier struct {
-	DropInfoRepo *repos.DropInfoRepo
+	DropInfoRepo *repo.DropInfoRepo
 }
 
-func NewDropVerifier(dropInfoRepo *repos.DropInfoRepo) *DropVerifier {
+func NewDropVerifier(dropInfoRepo *repo.DropInfoRepo) *DropVerifier {
 	return &DropVerifier{
 		DropInfoRepo: dropInfoRepo,
 	}
@@ -34,7 +34,7 @@ func (d *DropVerifier) Name() string {
 }
 
 func (d *DropVerifier) Verify(ctx context.Context, report *types.SingleReport, reportTask *types.ReportTask) (errs []error) {
-	itemDropInfos, typeDropInfos, err := d.DropInfoRepo.GetForCurrentTimeRangeWithDropTypes(ctx, &repos.DropInfoQuery{
+	itemDropInfos, typeDropInfos, err := d.DropInfoRepo.GetForCurrentTimeRangeWithDropTypes(ctx, &repo.DropInfoQuery{
 		Server:     reportTask.Server,
 		ArkStageId: report.StageID,
 	})

@@ -13,14 +13,14 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/models/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
 type StageService struct {
-	StageRepo *repos.StageRepo
+	StageRepo *repo.StageRepo
 }
 
-func NewStageService(stageRepo *repos.StageRepo) *StageService {
+func NewStageService(stageRepo *repo.StageRepo) *StageService {
 	return &StageService{
 		StageRepo: stageRepo,
 	}

@@ -12,7 +12,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/models/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/flake"
 	"github.com/penguin-statistics/backend-next/internal/pkg/logger"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/server/httpserver"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
@@ -34,23 +34,23 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(reportutils.NewUserVerifier),
 		fx.Provide(reportutils.NewDropVerifier),
 		fx.Provide(reportutils.NewReportVerifier),
-		fx.Provide(repos.NewItemRepo),
-		fx.Provide(repos.NewZoneRepo),
-		fx.Provide(repos.NewStageRepo),
-		fx.Provide(repos.NewNoticeRepo),
-		fx.Provide(repos.NewActivityRepo),
-		fx.Provide(repos.NewAccountRepo),
-		fx.Provide(repos.NewDropInfoRepo),
-		fx.Provide(repos.NewPropertyRepo),
-		fx.Provide(repos.NewTimeRangeRepo),
-		fx.Provide(repos.NewDropReportRepo),
-		fx.Provide(repos.NewDropPatternRepo),
-		fx.Provide(repos.NewTrendElementRepo),
-		fx.Provide(repos.NewDropReportExtraRepo),
-		fx.Provide(repos.NewDropMatrixElementRepo),
-		fx.Provide(repos.NewDropPatternElementRepo),
-		fx.Provide(repos.NewPatternMatrixElementRepo),
-		fx.Provide(repos.NewAdminRepo),
+		fx.Provide(repo.NewItemRepo),
+		fx.Provide(repo.NewZoneRepo),
+		fx.Provide(repo.NewStageRepo),
+		fx.Provide(repo.NewNoticeRepo),
+		fx.Provide(repo.NewActivityRepo),
+		fx.Provide(repo.NewAccountRepo),
+		fx.Provide(repo.NewDropInfoRepo),
+		fx.Provide(repo.NewPropertyRepo),
+		fx.Provide(repo.NewTimeRangeRepo),
+		fx.Provide(repo.NewDropReportRepo),
+		fx.Provide(repo.NewDropPatternRepo),
+		fx.Provide(repo.NewTrendElementRepo),
+		fx.Provide(repo.NewDropReportExtraRepo),
+		fx.Provide(repo.NewDropMatrixElementRepo),
+		fx.Provide(repo.NewDropPatternElementRepo),
+		fx.Provide(repo.NewPatternMatrixElementRepo),
+		fx.Provide(repo.NewAdminRepo),
 		fx.Provide(service.NewItemService),
 		fx.Provide(service.NewZoneService),
 		fx.Provide(service.NewStageService),
