@@ -1,4 +1,4 @@
-package util
+package gameday
 
 import (
 	"time"
@@ -6,7 +6,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/constant"
 )
 
-func GetGameDayStartTime(server string, t time.Time) time.Time {
+func StartTime(server string, t time.Time) time.Time {
 	loc := constant.LocMap[server]
 	t = t.In(loc)
 	if t.Hour() < 4 {
@@ -16,11 +16,11 @@ func GetGameDayStartTime(server string, t time.Time) time.Time {
 	return newT
 }
 
-func GetGameDayEndTime(server string, t time.Time) time.Time {
-	return GetGameDayStartTime(server, t).Add(time.Hour * 24)
+func EndTime(server string, t time.Time) time.Time {
+	return StartTime(server, t).Add(time.Hour * 24)
 }
 
-func IsGameDayStartTime(server string, t time.Time) bool {
+func IsStartTime(server string, t time.Time) bool {
 	loc := constant.LocMap[server]
 	t = t.In(loc)
 	return t.Hour() == constant.GameDayStartHour &&

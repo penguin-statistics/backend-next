@@ -14,6 +14,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
+	"github.com/penguin-statistics/backend-next/internal/pkg/gameday"
 	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
@@ -131,9 +132,9 @@ func (s *Trend) RefreshTrendElements(ctx context.Context, server string) error {
 				endTime = time.Now()
 			}
 
-			startTime = util.GetGameDayStartTime(server, startTime)
-			if !util.IsGameDayStartTime(server, endTime) {
-				endTime = util.GetGameDayEndTime(server, endTime)
+			startTime = gameday.StartTime(server, startTime)
+			if !gameday.IsStartTime(server, endTime) {
+				endTime = gameday.EndTime(server, endTime)
 			} else {
 				loc := constant.LocMap[server]
 				endTime = endTime.In(loc)
@@ -416,8 +417,8 @@ func (s *Trend) applyShimForCustomizedTrendQuery(ctx context.Context, queryResul
 }
 
 func (s *Trend) applyShimForSavedTrendQuery(ctx context.Context, server string, queryResult *model.TrendQueryResult) (*modelv2.TrendQueryResult, error) {
-	shimMinStartTime := util.GetGameDayEndTime(server, time.Now()).Add(-1 * constant.DefaultIntervalNum * 24 * time.Hour)
-	currentGameDayEndTime := util.GetGameDayEndTime(server, time.Now())
+	shimMinStartTime := gameday.EndTime(server, time.Now()).Add(-1 * constant.DefaultIntervalNum * 24 * time.Hour)
+	currentGameDayEndTime := gameday.EndTime(server, time.Now())
 
 	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
 	if err != nil {
