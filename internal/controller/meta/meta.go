@@ -12,13 +12,13 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
-type MetaController struct {
+type Meta struct {
 	fx.In
 
 	HealthService *service.Health
 }
 
-func RegisterMetaController(meta *svr.Meta, c MetaController) {
+func RegisterMeta(meta *svr.Meta, c Meta) {
 	meta.Get("/bininfo", c.BinInfo)
 
 	meta.Get("/health", cache.New(cache.Config{
@@ -27,14 +27,14 @@ func RegisterMetaController(meta *svr.Meta, c MetaController) {
 	}), c.Health)
 }
 
-func (c *MetaController) BinInfo(ctx *fiber.Ctx) error {
+func (c *Meta) BinInfo(ctx *fiber.Ctx) error {
 	return ctx.JSON(fiber.Map{
 		"version": bininfo.Version,
 		"build":   bininfo.BuildTime,
 	})
 }
 
-func (c *MetaController) Health(ctx *fiber.Ctx) error {
+func (c *Meta) Health(ctx *fiber.Ctx) error {
 	if err := c.HealthService.Ping(ctx.Context()); err != nil {
 		return err
 	}

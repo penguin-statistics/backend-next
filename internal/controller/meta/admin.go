@@ -29,7 +29,7 @@ type AdminController struct {
 	SiteStatsService     *service.SiteStats
 }
 
-func RegisterAdminController(admin *svr.Admin, c AdminController) {
+func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Post("/save", c.SaveRenderedObjects)
 	admin.Post("/purge", c.PurgeCache)
 

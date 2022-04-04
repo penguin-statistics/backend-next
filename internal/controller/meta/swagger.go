@@ -8,7 +8,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
 )
 
-func RegisterSwaggerController(app *fiber.App) {
+func RegisterSwagger(app *fiber.App) {
 	docs.SwaggerInfo.Version = bininfo.Version
 	app.Get("/swagger/*", swagger.Handler) // default
 

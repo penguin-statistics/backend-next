@@ -24,7 +24,7 @@ import (
 func ProvideOptions(includeSwagger bool) []fx.Option {
 	opts := []fx.Option{
 		fx.Provide(config.Parse),
-		fx.Provide(flake.NewSnowflake),
+		fx.Provide(flake.New),
 		fx.Provide(httpserver.Create),
 		fx.Provide(infra.NATS),
 		fx.Provide(infra.Redis),
@@ -91,9 +91,9 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Invoke(controllerv2.RegisterSiteStats),
 		fx.Invoke(controllerv2.RegisterEventPeriod),
 		fx.Invoke(controllerv2.RegisterShortURL),
-		fx.Invoke(controllermeta.RegisterMetaController),
-		fx.Invoke(controllermeta.RegisterIndexController),
-		fx.Invoke(controllermeta.RegisterAdminController),
+		fx.Invoke(controllermeta.RegisterMeta),
+		fx.Invoke(controllermeta.RegisterIndex),
+		fx.Invoke(controllermeta.RegisterAdmin),
 		fx.Invoke(calcwkr.Start),
 		fx.StartTimeout(1 * time.Second),
 		// StopTimeout is not typically needed, since we're using fiber's Shutdown(),
@@ -103,7 +103,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 	}
 
 	if includeSwagger {
-		opts = append(opts, fx.Invoke(controllermeta.RegisterSwaggerController))
+		opts = append(opts, fx.Invoke(controllermeta.RegisterSwagger))
 	}
 
 	return opts
