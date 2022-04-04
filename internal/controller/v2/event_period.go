@@ -23,12 +23,12 @@ func RegisterEventPeriod(v2 *svr.V2, c EventPeriod) {
 	v2.Get("/period", c.GetEventPeriods)
 }
 
-// @Summary      Get All Event Periods
-// @Tags         EventPeriod
-// @Produce      json
-// @Success      200     {array}  v2.Activity{label_i18n=model.I18nString,existence=model.Existence}
-// @Failure      500     {object}  pgerr.PenguinError "An unexpected error occurred"
-// @Router       /PenguinStats/api/v2/period [GET]
+// @Summary  Get All Event Periods
+// @Tags     EventPeriod
+// @Produce  json
+// @Success  200  {array}   modelv2.Activity{label_i18n=model.I18nString,existence=model.Existence}
+// @Failure  500  {object}  pgerr.PenguinError  "An unexpected error occurred"
+// @Router   /PenguinStats/api/v2/period [GET]
 func (c *EventPeriod) GetEventPeriods(ctx *fiber.Ctx) (err error) {
 	var activities []*modelv2.Activity
 	activities, err = c.ActivityService.GetShimActivities(ctx.Context())

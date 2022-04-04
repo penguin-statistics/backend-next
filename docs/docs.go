@@ -283,10 +283,10 @@ const docTemplate = `{
                                         "type": "object",
                                         "properties": {
                                             "existence": {
-                                                "$ref": "#/definitions/models.Existence"
+                                                "$ref": "#/definitions/model.Existence"
                                             },
                                             "name_i18n": {
-                                                "$ref": "#/definitions/models.I18nString"
+                                                "$ref": "#/definitions/model.I18nString"
                                             }
                                         }
                                     }
@@ -333,10 +333,10 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "existence": {
-                                            "$ref": "#/definitions/models.Existence"
+                                            "$ref": "#/definitions/model.Existence"
                                         },
                                         "name_i18n": {
-                                            "$ref": "#/definitions/models.I18nString"
+                                            "$ref": "#/definitions/model.I18nString"
                                         }
                                     }
                                 }
@@ -373,7 +373,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.Notice"
+                                "$ref": "#/definitions/model.Notice"
                             }
                         }
                     },
@@ -409,10 +409,10 @@ const docTemplate = `{
                                         "type": "object",
                                         "properties": {
                                             "existence": {
-                                                "$ref": "#/definitions/models.Existence"
+                                                "$ref": "#/definitions/model.Existence"
                                             },
                                             "label_i18n": {
-                                                "$ref": "#/definitions/models.I18nString"
+                                                "$ref": "#/definitions/model.I18nString"
                                             }
                                         }
                                     }
@@ -762,10 +762,10 @@ const docTemplate = `{
                                         "type": "object",
                                         "properties": {
                                             "code_i18n": {
-                                                "$ref": "#/definitions/models.I18nString"
+                                                "$ref": "#/definitions/model.I18nString"
                                             },
                                             "existence": {
-                                                "$ref": "#/definitions/models.Existence"
+                                                "$ref": "#/definitions/model.Existence"
                                             }
                                         }
                                     }
@@ -812,10 +812,10 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "code_i18n": {
-                                            "$ref": "#/definitions/models.I18nString"
+                                            "$ref": "#/definitions/model.I18nString"
                                         },
                                         "existence": {
-                                            "$ref": "#/definitions/models.Existence"
+                                            "$ref": "#/definitions/model.Existence"
                                         }
                                     }
                                 }
@@ -947,10 +947,10 @@ const docTemplate = `{
                                         "type": "object",
                                         "properties": {
                                             "existence": {
-                                                "$ref": "#/definitions/models.Existence"
+                                                "$ref": "#/definitions/model.Existence"
                                             },
                                             "zoneName_i18n": {
-                                                "$ref": "#/definitions/models.I18nString"
+                                                "$ref": "#/definitions/model.I18nString"
                                             }
                                         }
                                     }
@@ -997,10 +997,10 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "existence": {
-                                            "$ref": "#/definitions/models.Existence"
+                                            "$ref": "#/definitions/model.Existence"
                                         },
                                         "zoneName_i18n": {
-                                            "$ref": "#/definitions/models.I18nString"
+                                            "$ref": "#/definitions/model.I18nString"
                                         }
                                     }
                                 }
@@ -1024,7 +1024,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "models.Existence": {
+        "model.Existence": {
             "type": "object",
             "required": [
                 "CN",
@@ -1035,23 +1035,23 @@ const docTemplate = `{
             "properties": {
                 "CN": {
                     "description": "CN: 国服 Mainland China Server (maintained by Hypergryph Network Technology Co., Ltd.)",
-                    "$ref": "#/definitions/models.ServerExistence"
+                    "$ref": "#/definitions/model.ServerExistence"
                 },
                 "JP": {
                     "description": "JP: 日服 Japan Server (maintained by Yostar Inc,.)",
-                    "$ref": "#/definitions/models.ServerExistence"
+                    "$ref": "#/definitions/model.ServerExistence"
                 },
                 "KR": {
                     "description": "KR: 韩服 Korea Server (maintained by Yostar Limited)",
-                    "$ref": "#/definitions/models.ServerExistence"
+                    "$ref": "#/definitions/model.ServerExistence"
                 },
                 "US": {
                     "description": "US: 美服/国际服 Global Server (maintained by Yostar Limited)",
-                    "$ref": "#/definitions/models.ServerExistence"
+                    "$ref": "#/definitions/model.ServerExistence"
                 }
             }
         },
-        "models.I18nString": {
+        "model.I18nString": {
             "type": "object",
             "required": [
                 "en",
@@ -1078,7 +1078,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.Notice": {
+        "model.Notice": {
             "type": "object",
             "properties": {
                 "content_i18n": {
@@ -1098,7 +1098,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.ServerExistence": {
+        "model.ServerExistence": {
             "type": "object",
             "required": [
                 "exist"

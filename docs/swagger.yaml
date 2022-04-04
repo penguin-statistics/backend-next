@@ -1,19 +1,19 @@
 basePath: /
 definitions:
-  models.Existence:
+  model.Existence:
     properties:
       CN:
-        $ref: '#/definitions/models.ServerExistence'
+        $ref: '#/definitions/model.ServerExistence'
         description: 'CN: 国服 Mainland China Server (maintained by Hypergryph Network
           Technology Co., Ltd.)'
       JP:
-        $ref: '#/definitions/models.ServerExistence'
+        $ref: '#/definitions/model.ServerExistence'
         description: 'JP: 日服 Japan Server (maintained by Yostar Inc,.)'
       KR:
-        $ref: '#/definitions/models.ServerExistence'
+        $ref: '#/definitions/model.ServerExistence'
         description: 'KR: 韩服 Korea Server (maintained by Yostar Limited)'
       US:
-        $ref: '#/definitions/models.ServerExistence'
+        $ref: '#/definitions/model.ServerExistence'
         description: 'US: 美服/国际服 Global Server (maintained by Yostar Limited)'
     required:
     - CN
@@ -21,7 +21,7 @@ definitions:
     - KR
     - US
     type: object
-  models.I18nString:
+  model.I18nString:
     properties:
       en:
         description: 'EN: English (en)'
@@ -41,7 +41,7 @@ definitions:
     - ko
     - zh
     type: object
-  models.Notice:
+  model.Notice:
     properties:
       content_i18n:
         items:
@@ -54,7 +54,7 @@ definitions:
       severity:
         type: integer
     type: object
-  models.ServerExistence:
+  model.ServerExistence:
     properties:
       endTime:
         type: integer
@@ -594,9 +594,9 @@ paths:
               - $ref: '#/definitions/v2.Item'
               - properties:
                   existence:
-                    $ref: '#/definitions/models.Existence'
+                    $ref: '#/definitions/model.Existence'
                   name_i18n:
-                    $ref: '#/definitions/models.I18nString'
+                    $ref: '#/definitions/model.I18nString'
                 type: object
             type: array
         "500":
@@ -624,9 +624,9 @@ paths:
             - $ref: '#/definitions/v2.Item'
             - properties:
                 existence:
-                  $ref: '#/definitions/models.Existence'
+                  $ref: '#/definitions/model.Existence'
                 name_i18n:
-                  $ref: '#/definitions/models.I18nString'
+                  $ref: '#/definitions/model.I18nString'
               type: object
         "400":
           description: Invalid or missing itemId. Notice that this shall be the **string
@@ -649,7 +649,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/models.Notice'
+              $ref: '#/definitions/model.Notice'
             type: array
         "500":
           description: An unexpected error occurred
@@ -671,9 +671,9 @@ paths:
               - $ref: '#/definitions/v2.Activity'
               - properties:
                   existence:
-                    $ref: '#/definitions/models.Existence'
+                    $ref: '#/definitions/model.Existence'
                   label_i18n:
-                    $ref: '#/definitions/models.I18nString'
+                    $ref: '#/definitions/model.I18nString'
                 type: object
             type: array
         "500":
@@ -903,9 +903,9 @@ paths:
               - $ref: '#/definitions/v2.Stage'
               - properties:
                   code_i18n:
-                    $ref: '#/definitions/models.I18nString'
+                    $ref: '#/definitions/model.I18nString'
                   existence:
-                    $ref: '#/definitions/models.Existence'
+                    $ref: '#/definitions/model.Existence'
                 type: object
             type: array
         "500":
@@ -933,9 +933,9 @@ paths:
             - $ref: '#/definitions/v2.Stage'
             - properties:
                 code_i18n:
-                  $ref: '#/definitions/models.I18nString'
+                  $ref: '#/definitions/model.I18nString'
                 existence:
-                  $ref: '#/definitions/models.Existence'
+                  $ref: '#/definitions/model.Existence'
               type: object
         "400":
           description: Invalid or missing stageId. Notice that this shall be the **string
@@ -1023,9 +1023,9 @@ paths:
               - $ref: '#/definitions/v2.Zone'
               - properties:
                   existence:
-                    $ref: '#/definitions/models.Existence'
+                    $ref: '#/definitions/model.Existence'
                   zoneName_i18n:
-                    $ref: '#/definitions/models.I18nString'
+                    $ref: '#/definitions/model.I18nString'
                 type: object
             type: array
         "500":
@@ -1053,9 +1053,9 @@ paths:
             - $ref: '#/definitions/v2.Zone'
             - properties:
                 existence:
-                  $ref: '#/definitions/models.Existence'
+                  $ref: '#/definitions/model.Existence'
                 zoneName_i18n:
-                  $ref: '#/definitions/models.I18nString'
+                  $ref: '#/definitions/model.I18nString'
               type: object
         "400":
           description: Invalid or missing zoneId. Notice that this shall be the **string

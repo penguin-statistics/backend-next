@@ -1,6 +1,9 @@
 package model
 
-// this file is mainly for providing swagger with correct types
+// this file is only for providing swagger with correct types,
+// and does not have any meaning on the real application logic.
+// this file's declarations shall not be used in any of the application code.,
+// with the only exception being the swagger docs generator.
 
 type I18nString struct {
 	// ZH: 中文 (zh-CN)
