@@ -1,4 +1,4 @@
-package model
+package account
 
 import (
 	"time"
@@ -6,7 +6,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-type Account struct {
+type Model struct {
 	bun.BaseModel `bun:"accounts"`
 
 	AccountID int     `bun:",pk,autoincrement" json:"id"`

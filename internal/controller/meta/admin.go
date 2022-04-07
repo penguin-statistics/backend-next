@@ -7,6 +7,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
+	"github.com/penguin-statistics/backend-next/internal/core/admin"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/model/gamedata"
@@ -21,7 +22,7 @@ const TimeLayout = "2006-01-02 15:04:05 -07:00"
 type AdminController struct {
 	fx.In
 
-	AdminService         *service.Admin
+	AdminService         *admin.Service
 	ItemService          *service.Item
 	DropMatrixService    *service.DropMatrix
 	PatternMatrixService *service.PatternMatrix

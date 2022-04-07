@@ -17,9 +17,6 @@ import (
 type Flusher func() error
 
 var (
-	AccountByID        *cache.Set[model.Account]
-	AccountByPenguinID *cache.Set[model.Account]
-
 	ItemDropSetByStageIDAndRangeID   *cache.Set[[]int]
 	ItemDropSetByStageIdAndTimeRange *cache.Set[[]int]
 
@@ -36,7 +33,6 @@ var (
 
 	Notices *cache.Singular[[]*model.Notice]
 
-	Activities     *cache.Singular[[]*model.Activity]
 	ShimActivities *cache.Singular[[]*modelv2.Activity]
 
 	ShimLatestPatternMatrixResults *cache.Set[modelv2.PatternMatrixQueryResult]
@@ -106,13 +102,6 @@ func initializeCaches() {
 	CacheSetMap = make(map[string]Flusher)
 	CacheSingularFlusherMap = make(map[string]Flusher)
 
-	// account
-	AccountByID = cache.NewSet[model.Account]("account#accountId")
-	AccountByPenguinID = cache.NewSet[model.Account]("account#penguinId")
-
-	CacheSetMap["account#accountId"] = AccountByID.Flush
-	CacheSetMap["account#penguinId"] = AccountByPenguinID.Flush
-
 	// drop_info
 	ItemDropSetByStageIDAndRangeID = cache.NewSet[[]int]("itemDropSet#server|stageId|rangeId")
 	ItemDropSetByStageIdAndTimeRange = cache.NewSet[[]int]("itemDropSet#server|stageId|startTime|endTime")
@@ -150,10 +139,8 @@ func initializeCaches() {
 	CacheSingularFlusherMap["notices"] = Notices.Delete
 
 	// activity
-	Activities = cache.NewSingular[[]*model.Activity]("activities")
 	ShimActivities = cache.NewSingular[[]*modelv2.Activity]("shimActivities")
 
-	CacheSingularFlusherMap["activities"] = Activities.Delete
 	CacheSingularFlusherMap["shimActivities"] = ShimActivities.Delete
 
 	// pattern_matrix

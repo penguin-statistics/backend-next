@@ -1,4 +1,4 @@
-package service
+package admin
 
 import (
 	"context"
@@ -7,25 +7,25 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
+	"github.com/penguin-statistics/backend-next/internal/core/activity"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/model/gamedata"
-	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type Admin struct {
+type Service struct {
 	DB        *bun.DB
-	AdminRepo *repo.Admin
+	AdminRepo *Repo
 }
 
-func NewAdmin(db *bun.DB, adminRepo *repo.Admin) *Admin {
-	return &Admin{
+func NewService(db *bun.DB, adminRepo *Repo) *Service {
+	return &Service{
 		DB:        db,
 		AdminRepo: adminRepo,
 	}
 }
 
-func (s *Admin) SaveRenderedObjects(ctx context.Context, objects *gamedata.RenderedObjects) error {
+func (s *Service) SaveRenderedObjects(ctx context.Context, objects *gamedata.RenderedObjects) error {
 	var innerErr error
 	err := s.DB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var zoneId int
@@ -40,7 +40,7 @@ func (s *Admin) SaveRenderedObjects(ctx context.Context, objects *gamedata.Rende
 		}
 
 		if objects.Activity != nil {
-			activities := []*model.Activity{objects.Activity}
+			activities := []*activity.Model{objects.Activity}
 			if err := s.AdminRepo.SaveActivities(ctx, tx, &activities); err != nil {
 				innerErr = err
 				return err
@@ -106,7 +106,7 @@ func (s *Admin) SaveRenderedObjects(ctx context.Context, objects *gamedata.Rende
 
 		// activity
 		if objects.Activity != nil {
-			cache.Activities.Delete()
+			activity.CacheActivities.Delete()
 			cache.ShimActivities.Delete()
 		}
 

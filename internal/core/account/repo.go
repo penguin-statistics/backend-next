@@ -1,4 +1,4 @@
-package repo
+package account
 
 import (
 	"context"
@@ -11,18 +11,17 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
-const AccountMaxRetries = 100
+const MaxRetries = 100
 
-type Account struct {
+type Repo struct {
 	db *bun.DB
 }
 
-func NewAccount(db *bun.DB) *Account {
-	return &Account{db: db}
+func NewRepo(db *bun.DB) *Repo {
+	return &Repo{db: db}
 }
 
 // PenguinID is a 8 number string and padded with 0
@@ -31,10 +30,10 @@ func generateRandomPenguinId() string {
 	return fmt.Sprintf("%08d", rand.Intn(1e8))
 }
 
-func (c *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.Account, error) {
+func (c *Repo) CreateAccountWithRandomPenguinId(ctx context.Context) (*Model, error) {
 	// retry if account already exists
-	for i := 0; i < AccountMaxRetries; i++ {
-		account := &model.Account{
+	for i := 0; i < MaxRetries; i++ {
+		account := &Model{
 			PenguinID: generateRandomPenguinId(),
 		}
 		_, err := c.db.NewInsert().
@@ -56,8 +55,8 @@ func (c *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.
 	return nil, pgerr.ErrInternalError.Msg("failed to create account")
 }
 
-func (c *Account) GetAccountById(ctx context.Context, accountId string) (*model.Account, error) {
-	var account model.Account
+func (c *Repo) GetAccountById(ctx context.Context, accountId string) (*Model, error) {
+	var account Model
 
 	err := c.db.NewSelect().
 		Model(&account).
@@ -74,8 +73,8 @@ func (c *Account) GetAccountById(ctx context.Context, accountId string) (*model.
 	return &account, nil
 }
 
-func (c *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (*model.Account, error) {
-	var account model.Account
+func (c *Repo) GetAccountByPenguinId(ctx context.Context, penguinId string) (*Model, error) {
+	var account Model
 
 	err := c.db.NewSelect().
 		Model(&account).
@@ -91,8 +90,8 @@ func (c *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (
 	return &account, nil
 }
 
-func (c *Account) IsAccountExistWithId(ctx context.Context, accountId int) bool {
-	var account model.Account
+func (c *Repo) IsAccountExistWithId(ctx context.Context, accountId int) bool {
+	var account Model
 
 	count, err := c.db.NewSelect().
 		Model(&account).

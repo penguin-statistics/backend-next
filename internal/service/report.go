@@ -17,6 +17,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
+	"github.com/penguin-statistics/backend-next/internal/core/account"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
@@ -37,7 +38,7 @@ type Report struct {
 	NatsJS                 nats.JetStreamContext
 	ItemService            *Item
 	StageService           *Stage
-	AccountService         *Account
+	AccountService         *account.Service
 	DropInfoRepo           *repo.DropInfo
 	DropReportRepo         *repo.DropReport
 	DropPatternRepo        *repo.DropPattern
@@ -46,7 +47,7 @@ type Report struct {
 	ReportVerifier         *reportutil.ReportVerifier
 }
 
-func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *Item, stageService *Stage, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *Account, reportVerifier *reportutil.ReportVerifier) *Report {
+func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *Item, stageService *Stage, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *account.Service, reportVerifier *reportutil.ReportVerifier) *Report {
 	service := &Report{
 		DB:                     db,
 		Redis:                  redisClient,

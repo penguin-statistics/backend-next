@@ -6,17 +6,17 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
+	"github.com/penguin-statistics/backend-next/internal/core/activity"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
-	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
 type EventPeriod struct {
 	fx.In
 
-	ActivityService *service.Activity
+	ActivityService *activity.Service
 }
 
 func RegisterEventPeriod(v2 *svr.V2, c EventPeriod) {

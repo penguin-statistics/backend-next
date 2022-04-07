@@ -1,4 +1,4 @@
-package service
+package account
 
 import (
 	"context"
@@ -7,31 +7,28 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
-	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type Account struct {
-	AccountRepo *repo.Account
+type Service struct {
+	AccountRepo *Repo
 }
 
-func NewAccount(accountRepo *repo.Account) *Account {
-	return &Account{
+func NewService(accountRepo *Repo) *Service {
+	return &Service{
 		AccountRepo: accountRepo,
 	}
 }
 
-func (s *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.Account, error) {
+func (s *Service) CreateAccountWithRandomPenguinId(ctx context.Context) (*Model, error) {
 	return s.AccountRepo.CreateAccountWithRandomPenguinId(ctx)
 }
 
 // Cache: account#accountId:{accountId}, 24hrs
-func (s *Account) GetAccountById(ctx context.Context, accountId string) (*model.Account, error) {
-	var account model.Account
-	err := cache.AccountByID.Get(accountId, &account)
+func (s *Service) GetAccountById(ctx context.Context, accountId string) (*Model, error) {
+	var account Model
+	err := CacheByID.Get(accountId, &account)
 	if err == nil {
 		return &account, nil
 	}
@@ -40,14 +37,14 @@ func (s *Account) GetAccountById(ctx context.Context, accountId string) (*model.
 	if err != nil {
 		return nil, err
 	}
-	go cache.AccountByID.Set(accountId, *dbAccount, time.Hour*24)
+	go CacheByID.Set(accountId, *dbAccount, time.Hour*24)
 	return dbAccount, nil
 }
 
 // Cache: account#penguinId:{penguinId}, 24hrs
-func (s *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (*model.Account, error) {
-	var account model.Account
-	err := cache.AccountByPenguinID.Get(penguinId, &account)
+func (s *Service) GetAccountByPenguinId(ctx context.Context, penguinId string) (*Model, error) {
+	var account Model
+	err := CacheByPenguinID.Get(penguinId, &account)
 	if err == nil {
 		return &account, nil
 	}
@@ -56,15 +53,15 @@ func (s *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (
 	if err != nil {
 		return nil, err
 	}
-	go cache.AccountByPenguinID.Set(penguinId, *dbAccount, time.Hour*24)
+	go CacheByPenguinID.Set(penguinId, *dbAccount, time.Hour*24)
 	return dbAccount, nil
 }
 
-func (s *Account) IsAccountExistWithId(ctx context.Context, accountId int) bool {
+func (s *Service) IsAccountExistWithId(ctx context.Context, accountId int) bool {
 	return s.AccountRepo.IsAccountExistWithId(ctx, accountId)
 }
 
-func (s *Account) GetAccountFromRequest(ctx *fiber.Ctx) (*model.Account, error) {
+func (s *Service) GetAccountFromRequest(ctx *fiber.Ctx) (*Model, error) {
 	// get PenguinID from HTTP header in form of Authorization: PenguinID ########
 	penguinId := pgid.Extract(ctx)
 	if penguinId == "" {

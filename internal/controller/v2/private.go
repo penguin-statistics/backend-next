@@ -8,6 +8,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
+	"github.com/penguin-statistics/backend-next/internal/core/account"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
@@ -24,7 +25,7 @@ type Private struct {
 	DropMatrixService    *service.DropMatrix
 	PatternMatrixService *service.PatternMatrix
 	TrendService         *service.Trend
-	AccountService       *service.Account
+	AccountService       *account.Service
 	ItemService          *service.Item
 	StageService         *service.Stage
 }

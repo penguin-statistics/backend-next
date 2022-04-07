@@ -1,4 +1,4 @@
-package service
+package activity
 
 import (
 	"context"
@@ -7,26 +7,24 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
-	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
-	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type Activity struct {
-	ActivityRepo *repo.Activity
+type Service struct {
+	ActivityRepo *Repo
 }
 
-func NewActivity(activityRepo *repo.Activity) *Activity {
-	return &Activity{
+func NewService(activityRepo *Repo) *Service {
+	return &Service{
 		ActivityRepo: activityRepo,
 	}
 }
 
 // Cache: (singular) activities, 24hrs; records last modified time
-func (s *Activity) GetActivities(ctx context.Context) ([]*model.Activity, error) {
-	var activities []*model.Activity
-	err := cache.Activities.Get(&activities)
+func (s *Service) GetActivities(ctx context.Context) ([]*Model, error) {
+	var activities []*Model
+	err := CacheActivities.Get(&activities)
 	if err == nil {
 		return activities, nil
 	}
@@ -35,14 +33,14 @@ func (s *Activity) GetActivities(ctx context.Context) ([]*model.Activity, error)
 	if err != nil {
 		return nil, err
 	}
-	if err = cache.Activities.Set(activities, 24*time.Hour); err == nil {
+	if err = CacheActivities.Set(activities, 24*time.Hour); err == nil {
 		cache.LastModifiedTime.Set("[activities]", time.Now(), 0)
 	}
 	return activities, err
 }
 
 // Cache: (singular) shimActivities, 24hrs; records last modified time
-func (s *Activity) GetShimActivities(ctx context.Context) ([]*modelv2.Activity, error) {
+func (s *Service) GetShimActivities(ctx context.Context) ([]*modelv2.Activity, error) {
 	var shimActivitiesFromCache []*modelv2.Activity
 	err := cache.ShimActivities.Get(&shimActivitiesFromCache)
 	if err == nil {
@@ -63,7 +61,7 @@ func (s *Activity) GetShimActivities(ctx context.Context) ([]*modelv2.Activity, 
 	return shimActivities, nil
 }
 
-func (s *Activity) applyShim(activity *model.Activity) *modelv2.Activity {
+func (s *Service) applyShim(activity *Model) *modelv2.Activity {
 	shimActivity := &modelv2.Activity{
 		Existence: activity.Existence,
 		LabelI18n: activity.Name,

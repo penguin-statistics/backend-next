@@ -1,4 +1,4 @@
-package model
+package activity
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-type Activity struct {
+type Model struct {
 	bun.BaseModel `bun:"activities"`
 
 	ActivityID int             `bun:",pk,autoincrement" json:"id"`

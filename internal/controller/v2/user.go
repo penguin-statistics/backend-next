@@ -6,17 +6,17 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
+	"github.com/penguin-statistics/backend-next/internal/core/account"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
-	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
 type Account struct {
 	fx.In
 
-	AccountService *service.Account
+	AccountService *account.Service
 }
 
 func RegisterAccount(v2 *svr.V2, c Account) {

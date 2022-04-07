@@ -8,6 +8,9 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/config"
 	controllermeta "github.com/penguin-statistics/backend-next/internal/controller/meta"
 	controllerv2 "github.com/penguin-statistics/backend-next/internal/controller/v2"
+	"github.com/penguin-statistics/backend-next/internal/core/account"
+	"github.com/penguin-statistics/backend-next/internal/core/activity"
+	"github.com/penguin-statistics/backend-next/internal/core/admin"
 	"github.com/penguin-statistics/backend-next/internal/infra"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/crypto"
@@ -30,6 +33,11 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(svr.CreateEndpointGroups),
 		fx.Provide(crypto.NewCrypto),
 
+		// Scoped Modules
+		account.Module(),
+		activity.Module(),
+		admin.Module(),
+
 		// Infrastructures
 		fx.Provide(
 			infra.NATS,
@@ -50,11 +58,8 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(
 			repo.NewItem,
 			repo.NewZone,
-			repo.NewAdmin,
 			repo.NewStage,
 			repo.NewNotice,
-			repo.NewAccount,
-			repo.NewActivity,
 			repo.NewDropInfo,
 			repo.NewProperty,
 			repo.NewTimeRange,
@@ -74,13 +79,10 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 			service.NewStage,
 			service.NewGeoIP,
 			service.NewTrend,
-			service.NewAdmin,
 			service.NewHealth,
 			service.NewNotice,
 			service.NewReport,
-			service.NewAccount,
 			service.NewFormula,
-			service.NewActivity,
 			service.NewDropInfo,
 			service.NewShortURL,
 			service.NewTimeRange,
