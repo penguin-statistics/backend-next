@@ -45,6 +45,7 @@ require (
 require (
 	github.com/fasthttp/websocket v1.5.0 // indirect
 	github.com/gofiber/websocket/v2 v2.0.18 // indirect
+	github.com/joho/godotenv v1.4.0 // indirect
 	github.com/samber/lo v1.11.0 // indirect
 	github.com/savsgio/gotils v0.0.0-20220201163454-d252f0a44d5b // indirect
 	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
