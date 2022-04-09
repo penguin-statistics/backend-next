@@ -61,28 +61,26 @@ func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamConte
 		DropPatternElementRepo: dropPatternElementRepo,
 		ReportVerifier:         reportVerifier,
 	}
+	go service.startConsumerWorkers(runtime.NumCPU())
+	return service
+}
 
-	// TODO: isolate report consumer as standalone workers
+func (s *ReportService) startConsumerWorkers(numWorker int) {
+	ch := make(chan error)
 	go func() {
-		ch := make(chan error)
-
-		go func() {
-			for {
-				err := <-ch
-				spew.Dump(err)
-			}
-		}()
-
-		for i := 0; i < runtime.NumCPU(); i++ {
-			go func() {
-				err := service.ReportConsumeWorker(context.Background(), ch)
-				if err != nil {
-					ch <- err
-				}
-			}()
+		for {
+			err := <-ch
+			spew.Dump(err)
 		}
 	}()
-	return service
+	for i := 0; i < numWorker; i++ {
+		go func() {
+			err := s.ReportConsumeWorker(context.Background(), ch)
+			if err != nil {
+				ch <- err
+			}
+		}()
+	}
 }
 
 func (s *Report) pipelineAccount(ctx *fiber.Ctx) (accountId int, err error) {
@@ -275,7 +273,10 @@ func (s *Report) ReportConsumeWorker(ctx context.Context, ch chan error) error {
 			func() {
 				taskCtx, cancelTask := context.WithDeadline(ctx, time.Now().Add(time.Second*10))
 				inprogressInformer := time.AfterFunc(time.Second*5, func() {
-					msg.InProgress()
+					err = msg.InProgress()
+					if err != nil {
+						log.Error().Err(err).Msg("failed to set msg InProgress")
+					}
 				})
 				defer func() {
 					inprogressInformer.Stop()
