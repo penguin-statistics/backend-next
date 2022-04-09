@@ -65,7 +65,7 @@ func NewReportService(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStre
 	return service
 }
 
-func (s *ReportService) startConsumerWorkers(NumWorker int) {
+func (s *ReportService) startConsumerWorkers(numWorker int) {
 	ch := make(chan error)
 	go func() {
 		for {
@@ -73,7 +73,7 @@ func (s *ReportService) startConsumerWorkers(NumWorker int) {
 			spew.Dump(err)
 		}
 	}()
-	for i := 0; i < NumWorker; i++ {
+	for i := 0; i < numWorker; i++ {
 		go func() {
 			err := s.ReportConsumeWorker(context.Background(), ch)
 			if err != nil {
