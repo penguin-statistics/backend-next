@@ -11,6 +11,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
+	"github.com/penguin-statistics/backend-next/internal/core/item"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
@@ -26,7 +27,7 @@ type Trend struct {
 	DropPatternElementService   *DropPatternElement
 	TrendElementService         *TrendElement
 	StageService                *Stage
-	ItemService                 *Item
+	ItemService                 *item.Service
 }
 
 func NewTrend(
@@ -37,7 +38,7 @@ func NewTrend(
 	dropPatternElementService *DropPatternElement,
 	trendElementService *TrendElement,
 	stageService *Stage,
-	itemService *Item,
+	itemService *item.Service,
 ) *Trend {
 	return &Trend{
 		TimeRangeService:            timeRangeService,

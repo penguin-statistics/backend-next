@@ -1,4 +1,4 @@
-package model
+package item
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-type Item struct {
+type Model struct {
 	bun.BaseModel `bun:"items,alias:it" swaggerignore:"true"`
 
 	// ItemID (penguinItemId) is the numerical ID of the item.

@@ -6,11 +6,11 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
+	"github.com/penguin-statistics/backend-next/internal/core/item"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
-	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
 var _ modelv2.Dummy
@@ -18,7 +18,7 @@ var _ modelv2.Dummy
 type Item struct {
 	fx.In
 
-	ItemService *service.Item
+	ItemService *item.Service
 }
 
 func RegisterItem(v2 *svr.V2, c Item) {

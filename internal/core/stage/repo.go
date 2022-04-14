@@ -1,4 +1,4 @@
-package repo
+package stage
 
 import (
 	"context"
@@ -11,21 +11,20 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
-	"github.com/penguin-statistics/backend-next/internal/model"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
-type Stage struct {
+type Repo struct {
 	db *bun.DB
 }
 
-func NewStage(db *bun.DB) *Stage {
-	return &Stage{db: db}
+func NewRepo(db *bun.DB) *Repo {
+	return &Repo{db: db}
 }
 
-func (c *Stage) GetStages(ctx context.Context) ([]*model.Stage, error) {
-	var stages []*model.Stage
+func (c *Repo) GetStages(ctx context.Context) ([]*Model, error) {
+	var stages []*Model
 	err := c.db.NewSelect().
 		Model(&stages).
 		Order("stage_id ASC").
@@ -40,8 +39,8 @@ func (c *Stage) GetStages(ctx context.Context) ([]*model.Stage, error) {
 	return stages, nil
 }
 
-func (c *Stage) GetStageById(ctx context.Context, stageId int) (*model.Stage, error) {
-	var stage model.Stage
+func (c *Repo) GetStageById(ctx context.Context, stageId int) (*Model, error) {
+	var stage Model
 	err := c.db.NewSelect().
 		Model(&stage).
 		Where("stage_id = ?", stageId).
@@ -56,8 +55,8 @@ func (c *Stage) GetStageById(ctx context.Context, stageId int) (*model.Stage, er
 	return &stage, nil
 }
 
-func (c *Stage) GetStageByArkId(ctx context.Context, arkStageId string) (*model.Stage, error) {
-	var stage model.Stage
+func (c *Repo) GetStageByArkId(ctx context.Context, arkStageId string) (*Model, error) {
+	var stage Model
 	err := c.db.NewSelect().
 		Model(&stage).
 		Where("ark_stage_id = ?", arkStageId).
@@ -72,7 +71,7 @@ func (c *Stage) GetStageByArkId(ctx context.Context, arkStageId string) (*model.
 	return &stage, nil
 }
 
-func (c *Stage) GetShimStages(ctx context.Context, server string) ([]*modelv2.Stage, error) {
+func (c *Repo) GetShimStages(ctx context.Context, server string) ([]*modelv2.Stage, error) {
 	var stages []*modelv2.Stage
 
 	err := c.db.NewSelect().
@@ -105,7 +104,7 @@ func (c *Stage) GetShimStages(ctx context.Context, server string) ([]*modelv2.St
 	return stages, nil
 }
 
-func (c *Stage) GetShimStageByArkId(ctx context.Context, arkStageId string, server string) (*modelv2.Stage, error) {
+func (c *Repo) GetShimStageByArkId(ctx context.Context, arkStageId string, server string) (*modelv2.Stage, error) {
 	var stage modelv2.Stage
 	err := c.db.NewSelect().
 		Model(&stage).
@@ -141,8 +140,8 @@ func (c *Stage) GetShimStageByArkId(ctx context.Context, arkStageId string, serv
 	return &stage, nil
 }
 
-func (c *Stage) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId string) (null.String, error) {
-	var stage model.Stage
+func (c *Repo) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId string) (null.String, error) {
+	var stage Model
 	err := c.db.NewSelect().
 		Model(&stage).
 		Column("st.extra_process_type").
@@ -158,8 +157,8 @@ func (c *Stage) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId 
 	return stage.ExtraProcessType, nil
 }
 
-func (c *Stage) SearchStageByCode(ctx context.Context, code string) (*model.Stage, error) {
-	var stage model.Stage
+func (c *Repo) SearchStageByCode(ctx context.Context, code string) (*Model, error) {
+	var stage Model
 	err := c.db.NewSelect().
 		Model(&stage).
 		Where("\"code\"::TEXT ILIKE ?", "%"+code+"%").
@@ -174,8 +173,8 @@ func (c *Stage) SearchStageByCode(ctx context.Context, code string) (*model.Stag
 	return &stage, nil
 }
 
-func (c *Stage) GetGachaBoxStages(ctx context.Context) ([]*model.Stage, error) {
-	var stages []*model.Stage
+func (c *Repo) GetGachaBoxStages(ctx context.Context) ([]*Model, error) {
+	var stages []*Model
 	err := c.db.NewSelect().
 		Model(&stages).
 		Where("extra_process_type = ?", constant.ExtraProcessTypeGachaBox).

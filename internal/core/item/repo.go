@@ -1,4 +1,4 @@
-package repo
+package item
 
 import (
 	"context"
@@ -7,21 +7,20 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
-type Item struct {
+type Repo struct {
 	DB *bun.DB
 }
 
-func NewItem(db *bun.DB) *Item {
-	return &Item{DB: db}
+func NewRepo(db *bun.DB) *Repo {
+	return &Repo{DB: db}
 }
 
-func (c *Item) GetItems(ctx context.Context) ([]*model.Item, error) {
-	var items []*model.Item
+func (c *Repo) GetItems(ctx context.Context) ([]*Model, error) {
+	var items []*Model
 	err := c.DB.NewSelect().
 		Model(&items).
 		Scan(ctx)
@@ -35,8 +34,8 @@ func (c *Item) GetItems(ctx context.Context) ([]*model.Item, error) {
 	return items, nil
 }
 
-func (c *Item) GetItemById(ctx context.Context, itemId int) (*model.Item, error) {
-	var item model.Item
+func (c *Repo) GetItemById(ctx context.Context, itemId int) (*Model, error) {
+	var item Model
 	err := c.DB.NewSelect().
 		Model(&item).
 		Where("item_id = ?", itemId).
@@ -51,8 +50,8 @@ func (c *Item) GetItemById(ctx context.Context, itemId int) (*model.Item, error)
 	return &item, nil
 }
 
-func (c *Item) GetItemByArkId(ctx context.Context, arkItemId string) (*model.Item, error) {
-	var item model.Item
+func (c *Repo) GetItemByArkId(ctx context.Context, arkItemId string) (*Model, error) {
+	var item Model
 	err := c.DB.NewSelect().
 		Model(&item).
 		Where("ark_item_id = ?", arkItemId).
@@ -67,7 +66,7 @@ func (c *Item) GetItemByArkId(ctx context.Context, arkItemId string) (*model.Ite
 	return &item, nil
 }
 
-func (c *Item) GetShimItems(ctx context.Context) ([]*modelv2.Item, error) {
+func (c *Repo) GetShimItems(ctx context.Context) ([]*modelv2.Item, error) {
 	var items []*modelv2.Item
 
 	err := c.DB.NewSelect().
@@ -83,7 +82,7 @@ func (c *Item) GetShimItems(ctx context.Context) ([]*modelv2.Item, error) {
 	return items, nil
 }
 
-func (c *Item) GetShimItemByArkId(ctx context.Context, itemId string) (*modelv2.Item, error) {
+func (c *Repo) GetShimItemByArkId(ctx context.Context, itemId string) (*modelv2.Item, error) {
 	var item modelv2.Item
 	err := c.DB.NewSelect().
 		Model(&item).
@@ -99,8 +98,8 @@ func (c *Item) GetShimItemByArkId(ctx context.Context, itemId string) (*modelv2.
 	return &item, nil
 }
 
-func (c *Item) SearchItemByName(ctx context.Context, name string) (*model.Item, error) {
-	var item model.Item
+func (c *Repo) SearchItemByName(ctx context.Context, name string) (*Model, error) {
+	var item Model
 	err := c.DB.NewSelect().
 		Model(&item).
 		Where("\"name\"::TEXT ILIKE ?", "%"+name+"%").

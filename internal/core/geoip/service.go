@@ -1,4 +1,4 @@
-package service
+package geoip
 
 import (
 	"net"
@@ -7,17 +7,17 @@ import (
 	"github.com/pkg/errors"
 )
 
-type GeoIP struct {
+type Service struct {
 	db *geoip2.Reader
 }
 
-func NewGeoIP(db *geoip2.Reader) *GeoIP {
-	return &GeoIP{
+func NewService(db *geoip2.Reader) *Service {
+	return &Service{
 		db: db,
 	}
 }
 
-func (s *GeoIP) Country(ip string) (*geoip2.Country, error) {
+func (s *Service) Country(ip string) (*geoip2.Country, error) {
 	netIP := net.ParseIP(ip)
 	if netIP == nil {
 		return nil, errors.New("invalid ip")
@@ -25,7 +25,7 @@ func (s *GeoIP) Country(ip string) (*geoip2.Country, error) {
 	return s.db.Country(netIP)
 }
 
-func (s *GeoIP) InChinaMainland(ip string) bool {
+func (s *Service) InChinaMainland(ip string) bool {
 	country, err := s.Country(ip)
 	if err != nil || country == nil {
 		return false

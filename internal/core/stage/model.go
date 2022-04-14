@@ -1,4 +1,4 @@
-package model
+package stage
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-type Stage struct {
+type Model struct {
 	bun.BaseModel `bun:"stages,alias:st"`
 
 	// StageID (penguinStageId) is the numerical ID of the stage.

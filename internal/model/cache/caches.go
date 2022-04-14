@@ -24,12 +24,8 @@ var (
 
 	Formula *cache.Singular[json.RawMessage]
 
-	Items           *cache.Singular[[]*model.Item]
-	ItemByArkID     *cache.Set[model.Item]
 	ShimItems       *cache.Singular[[]*modelv2.Item]
 	ShimItemByArkID *cache.Set[modelv2.Item]
-	ItemsMapById    *cache.Singular[map[int]*model.Item]
-	ItemsMapByArkID *cache.Singular[map[string]*model.Item]
 
 	Notices *cache.Singular[[]*model.Notice]
 
@@ -39,12 +35,8 @@ var (
 
 	ShimSiteStats *cache.Set[modelv2.SiteStats]
 
-	Stages           *cache.Singular[[]*model.Stage]
-	StageByArkID     *cache.Set[model.Stage]
 	ShimStages       *cache.Set[[]*modelv2.Stage]
 	ShimStageByArkID *cache.Set[modelv2.Stage]
-	StagesMapByID    *cache.Singular[map[int]*model.Stage]
-	StagesMapByArkID *cache.Singular[map[string]*model.Stage]
 
 	TimeRanges               *cache.Set[[]*model.TimeRange]
 	TimeRangeByID            *cache.Set[model.TimeRange]
@@ -119,19 +111,11 @@ func initializeCaches() {
 	CacheSingularFlusherMap["formula"] = Formula.Delete
 
 	// item
-	Items = cache.NewSingular[[]*model.Item]("items")
-	ItemByArkID = cache.NewSet[model.Item]("item#arkItemId")
 	ShimItems = cache.NewSingular[[]*modelv2.Item]("shimItems")
 	ShimItemByArkID = cache.NewSet[modelv2.Item]("shimItem#arkItemId")
-	ItemsMapById = cache.NewSingular[map[int]*model.Item]("itemsMapById")
-	ItemsMapByArkID = cache.NewSingular[map[string]*model.Item]("itemsMapByArkId")
 
-	CacheSingularFlusherMap["items"] = Items.Delete
-	CacheSetMap["item#arkItemId"] = ItemByArkID.Flush
 	CacheSingularFlusherMap["shimItems"] = ShimItems.Delete
 	CacheSetMap["shimItem#arkItemId"] = ShimItemByArkID.Flush
-	CacheSingularFlusherMap["itemsMapById"] = ItemsMapById.Delete
-	CacheSingularFlusherMap["itemsMapByArkId"] = ItemsMapByArkID.Delete
 
 	// notice
 	Notices = cache.NewSingular[[]*model.Notice]("notices")
@@ -154,12 +138,8 @@ func initializeCaches() {
 	CacheSetMap["shimSiteStats#server"] = ShimSiteStats.Flush
 
 	// stage
-	Stages = cache.NewSingular[[]*model.Stage]("stages")
-	StageByArkID = cache.NewSet[model.Stage]("stage#arkStageId")
 	ShimStages = cache.NewSet[[]*modelv2.Stage]("shimStages#server")
 	ShimStageByArkID = cache.NewSet[modelv2.Stage]("shimStage#server|arkStageId")
-	StagesMapByID = cache.NewSingular[map[int]*model.Stage]("stagesMapById")
-	StagesMapByArkID = cache.NewSingular[map[string]*model.Stage]("stagesMapByArkId")
 
 	CacheSingularFlusherMap["stages"] = Stages.Delete
 	CacheSetMap["stage#arkStageId"] = StageByArkID.Flush

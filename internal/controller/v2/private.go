@@ -9,6 +9,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/core/account"
+	"github.com/penguin-statistics/backend-next/internal/core/item"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
@@ -26,7 +27,7 @@ type Private struct {
 	PatternMatrixService *service.PatternMatrix
 	TrendService         *service.Trend
 	AccountService       *account.Service
-	ItemService          *service.Item
+	ItemService          *item.Service
 	StageService         *service.Stage
 }
 

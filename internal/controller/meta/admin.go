@@ -8,7 +8,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/core/admin"
-	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/core/item"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/model/gamedata"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
@@ -23,7 +23,7 @@ type AdminController struct {
 	fx.In
 
 	AdminService         *admin.Service
-	ItemService          *service.Item
+	ItemService          *item.Service
 	DropMatrixService    *service.DropMatrix
 	PatternMatrixService *service.PatternMatrix
 	TrendService         *service.Trend
@@ -43,7 +43,7 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 }
 
 type CliGameDataSeedResponse struct {
-	Items []*model.Item `json:"items"`
+	Items []*item.Model `json:"items"`
 }
 
 func (c AdminController) GetCliGameDataSeed(ctx *fiber.Ctx) error {

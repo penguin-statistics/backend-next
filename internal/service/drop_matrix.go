@@ -13,6 +13,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
+	"github.com/penguin-statistics/backend-next/internal/core/item"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
@@ -48,7 +49,7 @@ type DropMatrix struct {
 	DropInfoService          *DropInfo
 	DropMatrixElementService *DropMatrixElement
 	StageService             *Stage
-	ItemService              *Item
+	ItemService              *item.Service
 }
 
 func NewDropMatrix(
@@ -57,7 +58,7 @@ func NewDropMatrix(
 	dropInfoService *DropInfo,
 	dropMatrixElementService *DropMatrixElement,
 	stageService *Stage,
-	itemService *Item,
+	itemService *item.Service,
 ) *DropMatrix {
 	return &DropMatrix{
 		TimeRangeService:         timeRangeService,

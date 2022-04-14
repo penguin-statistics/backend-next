@@ -14,6 +14,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
+	"github.com/penguin-statistics/backend-next/internal/core/item"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
@@ -27,7 +28,7 @@ type PatternMatrix struct {
 	PatternMatrixElementService *PatternMatrixElement
 	DropPatternElementService   *DropPatternElement
 	StageService                *Stage
-	ItemService                 *Item
+	ItemService                 *item.Service
 }
 
 func NewPatternMatrix(
@@ -37,7 +38,7 @@ func NewPatternMatrix(
 	patternMatrixElementService *PatternMatrixElement,
 	dropPatternElementService *DropPatternElement,
 	stageService *Stage,
-	itemService *Item,
+	itemService *item.Service,
 ) *PatternMatrix {
 	return &PatternMatrix{
 		TimeRangeService:            timeRangeService,
