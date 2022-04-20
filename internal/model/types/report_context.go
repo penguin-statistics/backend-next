@@ -12,6 +12,8 @@ type SingleReport struct {
 
 type ReportTask struct {
 	TaskID string `json:"taskId"`
+	// CreatedAt is the time the task was created, in microseconds since the epoch.
+	CreatedAt int64 `json:"createdAt"`
 	FragmentReportCommon
 
 	Reports []*SingleReport `json:"report"`

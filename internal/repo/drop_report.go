@@ -30,7 +30,6 @@ func NewDropReport(db *bun.DB) *DropReport {
 func (s *DropReport) CreateDropReport(ctx context.Context, tx bun.Tx, dropReport *model.DropReport) error {
 	_, err := tx.NewInsert().
 		Model(dropReport).
-		ExcludeColumn("created_at").
 		Exec(ctx)
 	return err
 }

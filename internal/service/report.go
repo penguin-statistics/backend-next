@@ -167,7 +167,7 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 	singleReport := &types.SingleReport{
 		FragmentStageID: req.FragmentStageID,
 		Drops:           drops,
-		// for now, we does not support multiple report by specifying `times`
+		// for now, we do not support multiple report by specifying `times`
 		Times: 1,
 	}
 
@@ -182,6 +182,7 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 
 	// construct ReportContext
 	reportTask := &types.ReportTask{
+		CreatedAt: time.Now().UnixMicro(),
 		FragmentReportCommon: types.FragmentReportCommon{
 			Server:  req.Server,
 			Source:  req.Source,
@@ -267,8 +268,6 @@ func (s *Report) ReportConsumeWorker(ctx context.Context, ch chan error) error {
 		return err
 	}
 
-	time.Now().UnixMilli()
-
 	for {
 		select {
 		case msg := <-msgChan:
@@ -328,6 +327,14 @@ func (s *Report) consumeReportTask(ctx context.Context, reportTask *types.Report
 			Msg("report task verification failed, marking task as unreliable")
 	}
 
+	// reportTask.CreatedAt is in microseconds
+	var taskCreatedAt time.Time
+	if reportTask.CreatedAt != 0 {
+		taskCreatedAt = time.Unix(0, reportTask.CreatedAt*1000)
+	} else {
+		taskCreatedAt = time.Now()
+	}
+
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -366,6 +373,7 @@ func (s *Report) consumeReportTask(ctx context.Context, reportTask *types.Report
 			StageID:     stage.StageID,
 			PatternID:   dropPattern.PatternID,
 			Times:       report.Times,
+			CreatedAt:   &taskCreatedAt,
 			Reliability: taskReliability,
 			Server:      reportTask.Server,
 			AccountID:   reportTask.AccountID,
