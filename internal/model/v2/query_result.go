@@ -8,11 +8,11 @@ type DropMatrixQueryResult struct {
 }
 
 type OneDropMatrixElement struct {
-	StageID   string   `json:"stageId"`
-	ItemID    string   `json:"itemId"`
-	Times     int      `json:"times"`
-	Quantity  int      `json:"quantity"`
-	StartTime int64    `json:"start"`
+	StageID   string   `json:"stageId" example:"main_01-07"`
+	ItemID    string   `json:"itemId" example:"30012"`
+	Times     int      `json:"times" example:"1061347"`
+	Quantity  int      `json:"quantity" example:"1322056"`
+	StartTime int64    `json:"start" example:"1556676000000"`
 	EndTime   null.Int `json:"end,omitempty" swaggertype:"integer"`
 }
 
@@ -22,12 +22,12 @@ type PatternMatrixQueryResult struct {
 }
 
 type OnePatternMatrixElement struct {
-	StageID   string   `json:"stageId"`
+	StageID   string   `json:"stageId" example:"main_01-07"`
 	Pattern   *Pattern `json:"pattern"`
-	Times     int      `json:"times"`
-	Quantity  int      `json:"quantity"`
-	StartTime int64    `json:"start"`
-	EndTime   null.Int `json:"end,omitempty" swaggertype:"integer"`
+	Times     int      `json:"times" example:"641734"`
+	Quantity  int      `json:"quantity" example:"159486"`
+	StartTime int64    `json:"start" example:"1633032000000"`
+	EndTime   null.Int `json:"end,omitempty" swaggertype:"integer" extensions:"x-nullable"`
 }
 
 type Pattern struct {
@@ -35,8 +35,8 @@ type Pattern struct {
 }
 
 type OneDrop struct {
-	ItemID   string `json:"itemId"`
-	Quantity int    `json:"quantity"`
+	ItemID   string `json:"itemId" example:"30012"`
+	Quantity int    `json:"quantity" example:"1"`
 }
 
 // Trend

@@ -4,7 +4,7 @@ import "gopkg.in/guregu/null.v3"
 
 type ArkDrop struct {
 	DropType string `json:"dropType" validate:"required,oneof=REGULAR_DROP NORMAL_DROP SPECIAL_DROP EXTRA_DROP FURNITURE"`
-	ItemID   string `json:"itemId" validate:"required,printascii"`
+	ItemID   string `json:"itemId" validate:"required,printascii" example:"30013"`
 	Quantity int    `json:"quantity" validate:"required,lte=1000"`
 }
 

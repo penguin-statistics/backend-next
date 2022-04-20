@@ -65,7 +65,7 @@ func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamConte
 	return service
 }
 
-func (s *ReportService) startConsumerWorkers(numWorker int) {
+func (s *Report) startConsumerWorkers(numWorker int) {
 	ch := make(chan error)
 	go func() {
 		for {

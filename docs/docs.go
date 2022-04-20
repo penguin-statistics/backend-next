@@ -449,7 +449,7 @@ const docTemplate = `{
                 "summary": "Submit a Drop Report",
                 "parameters": [
                     {
-                        "description": "Report Request",
+                        "description": "Report request",
                         "name": "report",
                         "in": "body",
                         "required": true,
@@ -495,7 +495,7 @@ const docTemplate = `{
                 "summary": "Recall a Drop Report",
                 "parameters": [
                     {
-                        "description": "Report Recall Request",
+                        "description": "Report Recall request",
                         "name": "report",
                         "in": "body",
                         "required": true,
@@ -1104,14 +1104,17 @@ const docTemplate = `{
                 "exist"
             ],
             "properties": {
-                "endTime": {
-                    "type": "integer"
+                "closeTime": {
+                    "type": "integer",
+                    "example": 1635966000000
                 },
                 "exist": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "example": true
                 },
-                "startTime": {
-                    "type": "integer"
+                "openTime": {
+                    "type": "integer",
+                    "example": 1634799600000
                 }
             }
         },
@@ -1196,7 +1199,8 @@ const docTemplate = `{
                     ]
                 },
                 "itemId": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "30013"
                 },
                 "quantity": {
                     "type": "integer",
@@ -1239,7 +1243,7 @@ const docTemplate = `{
                     "description": "Source describes a source of the report. Third-party API consumers should change this to their own name.",
                     "type": "string",
                     "maxLength": 32,
-                    "example": "frontend-v2"
+                    "example": "your-app-name"
                 },
                 "stageId": {
                     "type": "string",
@@ -1365,10 +1369,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "itemId": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "30012"
                 },
                 "quantity": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 1
                 }
             }
         },
@@ -1379,19 +1385,24 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "itemId": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "30012"
                 },
                 "quantity": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 1322056
                 },
                 "stageId": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "main_01-07"
                 },
                 "start": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 1556676000000
                 },
                 "times": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 1061347
                 }
             }
         },
@@ -1416,22 +1427,27 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "end": {
-                    "type": "integer"
+                    "type": "integer",
+                    "x-nullable": true
                 },
                 "pattern": {
                     "$ref": "#/definitions/v2.Pattern"
                 },
                 "quantity": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 159486
                 },
                 "stageId": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "main_01-07"
                 },
                 "start": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 1633032000000
                 },
                 "times": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 641734
                 }
             }
         },
@@ -1511,10 +1527,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "apCost": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 6
                 },
                 "code": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "1-7"
                 },
                 "code_i18n": {
                     "type": "object"
@@ -1529,7 +1547,8 @@ const docTemplate = `{
                     "type": "object"
                 },
                 "minClearTime": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 118000
                 },
                 "recognitionOnly": {
                     "type": "array",
@@ -1538,13 +1557,23 @@ const docTemplate = `{
                     }
                 },
                 "stageId": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "main_01-07"
                 },
                 "stageType": {
-                    "type": "string"
+                    "description": "StageType is the type of the stage\n* MAIN - Mainline Stages\n* SUB - Sub Stages\n* ACTIVITY - Activity Stages\n* DAILY - Daily Stages",
+                    "type": "string",
+                    "enum": [
+                        "MAIN",
+                        "SUB",
+                        "ACTIVITY",
+                        "DAILY"
+                    ],
+                    "example": "MAIN"
                 },
                 "zoneId": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "main_1"
                 }
             }
         },

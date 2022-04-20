@@ -28,9 +28,9 @@ type I18nOptionalString struct {
 }
 
 type ServerExistence struct {
-	Exist     bool `json:"exist" validate:"required"`
-	StartTime *int `json:"startTime,omitempty"`
-	EndTime   *int `json:"endTime,omitempty"`
+	Exist     bool `json:"exist" validate:"required" example:"true"`
+	StartTime *int `json:"openTime,omitempty" extension:"x-nullable" example:"1634799600000"`
+	EndTime   *int `json:"closeTime,omitempty" extension:"x-nullable" example:"1635966000000"`
 }
 
 type Existence struct {
@@ -47,7 +47,7 @@ type Existence struct {
 }
 
 type Keywords struct {
-	// Alias of the item,
+	// Alias of the item
 	Alias I18nOptionalString `json:"alias"`
 	// Pronunciation hints of the item
 	Pron I18nOptionalString `json:"pron"`
