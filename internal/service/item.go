@@ -117,7 +117,7 @@ func (s *Item) GetShimItemByArkId(ctx context.Context, arkItemId string) (*model
 // Cache: (singular) itemsMapById, 24hrs
 func (s *Item) GetItemsMapById(ctx context.Context) (map[int]*model.Item, error) {
 	var itemsMapById map[int]*model.Item
-	cache.ItemsMapById.MutexGetSet(&itemsMapById, func() (map[int]*model.Item, error) {
+	err := cache.ItemsMapById.MutexGetSet(&itemsMapById, func() (map[int]*model.Item, error) {
 		items, err := s.GetItems(ctx)
 		if err != nil {
 			return nil, err
@@ -128,13 +128,16 @@ func (s *Item) GetItemsMapById(ctx context.Context) (map[int]*model.Item, error)
 		}
 		return s, nil
 	}, 24*time.Hour)
+	if err != nil {
+		return nil, err
+	}
 	return itemsMapById, nil
 }
 
 // Cache: (singular) itemsMapByArkId, 24hrs
 func (s *Item) GetItemsMapByArkId(ctx context.Context) (map[string]*model.Item, error) {
 	var itemsMapByArkId map[string]*model.Item
-	cache.ItemsMapByArkID.MutexGetSet(&itemsMapByArkId, func() (map[string]*model.Item, error) {
+	err := cache.ItemsMapByArkID.MutexGetSet(&itemsMapByArkId, func() (map[string]*model.Item, error) {
 		items, err := s.GetItems(ctx)
 		if err != nil {
 			return nil, err
@@ -145,6 +148,9 @@ func (s *Item) GetItemsMapByArkId(ctx context.Context) (map[string]*model.Item, 
 		}
 		return s, nil
 	}, 24*time.Hour)
+	if err != nil {
+		return nil, err
+	}
 	return itemsMapByArkId, nil
 }
 

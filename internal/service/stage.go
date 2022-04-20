@@ -116,7 +116,7 @@ func (s *Stage) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId 
 // Cache: (singular) stagesMapById, 24hrs
 func (s *Stage) GetStagesMapById(ctx context.Context) (map[int]*model.Stage, error) {
 	var stagesMapById map[int]*model.Stage
-	cache.StagesMapByID.MutexGetSet(&stagesMapById, func() (map[int]*model.Stage, error) {
+	err := cache.StagesMapByID.MutexGetSet(&stagesMapById, func() (map[int]*model.Stage, error) {
 		stages, err := s.GetStages(ctx)
 		if err != nil {
 			return nil, err
@@ -127,13 +127,16 @@ func (s *Stage) GetStagesMapById(ctx context.Context) (map[int]*model.Stage, err
 		}
 		return s, nil
 	}, 24*time.Hour)
+	if err != nil {
+		return nil, err
+	}
 	return stagesMapById, nil
 }
 
 // Cache: (singular) stagesMapByArkId, 24hrs
 func (s *Stage) GetStagesMapByArkId(ctx context.Context) (map[string]*model.Stage, error) {
 	var stagesMapByArkId map[string]*model.Stage
-	cache.StagesMapByArkID.MutexGetSet(&stagesMapByArkId, func() (map[string]*model.Stage, error) {
+	err := cache.StagesMapByArkID.MutexGetSet(&stagesMapByArkId, func() (map[string]*model.Stage, error) {
 		stages, err := s.GetStages(ctx)
 		if err != nil {
 			return nil, err
@@ -144,6 +147,9 @@ func (s *Stage) GetStagesMapByArkId(ctx context.Context) (map[string]*model.Stag
 		}
 		return s, nil
 	}, 24*time.Hour)
+	if err != nil {
+		return nil, err
+	}
 	return stagesMapByArkId, nil
 }
 
