@@ -17,16 +17,14 @@ COPY go.sum ./
 RUN go mod download
 COPY . .
 
-RUN apk update && apk add bash git openssh
+RUN apk --no-cache add bash git openssh
 
 # inject versioning information & build the binary
 RUN export BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ"); go build -o backend -ldflags "-X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.Version=$VERSION -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.BuildTime=$BUILD_TIME" .
 
 # runner
 FROM base AS runner
-RUN apk add --no-cache libc6-compat
-
-RUN apk add --no-cache tini
+RUN apk add --no-cache libc6-compat tini
 # Tini is now available at /sbin/tini
 
 COPY --from=builder /app/backend /app/backend
