@@ -1,6 +1,7 @@
 package appentry
 
 import (
+	"github.com/penguin-statistics/backend-next/internal/workers/reportwkr"
 	"time"
 
 	"go.uber.org/fx"
@@ -124,6 +125,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 
 		// Workers
 		fx.Invoke(calcwkr.Start),
+		fx.Invoke(reportwkr.Start),
 
 		// fx Extra Options
 		fx.StartTimeout(1 * time.Second),

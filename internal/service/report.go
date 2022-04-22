@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"runtime"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -61,26 +60,7 @@ func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamConte
 		DropPatternElementRepo: dropPatternElementRepo,
 		ReportVerifier:         reportVerifier,
 	}
-	go service.startConsumerWorkers(runtime.NumCPU())
 	return service
-}
-
-func (s *Report) startConsumerWorkers(numWorker int) {
-	ch := make(chan error)
-	go func() {
-		for {
-			err := <-ch
-			spew.Dump(err)
-		}
-	}()
-	for i := 0; i < numWorker; i++ {
-		go func() {
-			err := s.ReportConsumeWorker(context.Background(), ch)
-			if err != nil {
-				ch <- err
-			}
-		}()
-	}
 }
 
 func (s *Report) pipelineAccount(ctx *fiber.Ctx) (accountId int, err error) {
