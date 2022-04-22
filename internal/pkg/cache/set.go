@@ -50,13 +50,12 @@ func (c *Set[T]) Get(key string, dest *T) error {
 	return nil
 }
 
-func (c *Set[T]) Set(key string, value T, expire time.Duration) error {
+func (c *Set[T]) Set(key string, value T, expire time.Duration) {
 	key = c.key(key)
 	if l := log.Trace(); l.Enabled() {
 		l.Str("key", key).Msg("setting value to cache")
 	}
 	c.c.Set(key, value, expire)
-	return nil
 }
 
 // MutexGetSet gets value from cache and writes to dest, or if the key does not exists, it executes valueFunc
@@ -88,11 +87,11 @@ func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, erro
 		return err
 	}
 
-	err = c.Set(key, *value, expire)
-	if err != nil {
-		log.Error().Err(err).Str("key", key).Msg("failed to set value to cache in MutexGetSet")
-		return err
-	}
+	c.Set(key, *value, expire)
+	// if err != nil {
+	// 	log.Error().Err(err).Str("key", key).Msg("failed to set value to cache in MutexGetSet")
+	// 	return err
+	// }
 
 	// copy value to dest
 	var r reflect.Value
