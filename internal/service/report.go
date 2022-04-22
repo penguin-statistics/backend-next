@@ -330,7 +330,7 @@ func (s *Report) consumeReportTask(ctx context.Context, reportTask *types.Report
 	// reportTask.CreatedAt is in microseconds
 	var taskCreatedAt time.Time
 	if reportTask.CreatedAt != 0 {
-		taskCreatedAt = time.Unix(0, reportTask.CreatedAt*1000)
+		taskCreatedAt = time.UnixMicro(reportTask.CreatedAt)
 	} else {
 		taskCreatedAt = time.Now()
 	}

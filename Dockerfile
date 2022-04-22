@@ -9,6 +9,8 @@ ENV GOARCH amd64
 # build-args
 ARG VERSION
 
+RUN apk --no-cache add bash git openssh
+
 # modules: utilize build cache
 COPY go.mod ./
 COPY go.sum ./
@@ -16,8 +18,6 @@ COPY go.sum ./
 # RUN go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.cn,direct
 RUN go mod download
 COPY . .
-
-RUN apk --no-cache add bash git openssh
 
 # inject versioning information & build the binary
 RUN export BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ"); go build -o backend -ldflags "-X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.Version=$VERSION -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.BuildTime=$BUILD_TIME" .
