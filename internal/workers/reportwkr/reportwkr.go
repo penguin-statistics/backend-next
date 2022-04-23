@@ -9,19 +9,19 @@ import (
 	"runtime"
 )
 
-type ReportConsumerDeps struct {
+type WorkerDeps struct {
 	fx.In
 	ReportServices *service.Report
 }
 
-type ReportConsumerWorker struct {
+type Worker struct {
 	// count is the number of workers
-	numWorker int
+	count int
 
-	ReportConsumerDeps
+	WorkerDeps
 }
 
-func Start(conf *config.Config, deps ReportConsumerDeps) {
+func Start(conf *config.Config, deps WorkerDeps) {
 	ch := make(chan error)
 	// handle & dump errors from workers
 	go func() {
@@ -31,9 +31,9 @@ func Start(conf *config.Config, deps ReportConsumerDeps) {
 		}
 	}()
 	// works like a consumer factory
-	reportWorkers := &ReportConsumerWorker{
-		numWorker:          0,
-		ReportConsumerDeps: deps,
+	reportWorkers := &Worker{
+		count:      0,
+		WorkerDeps: deps,
 	}
 	// spawn workers
 	// maybe we should specify the number of worker in config.Config ?
@@ -45,6 +45,6 @@ func Start(conf *config.Config, deps ReportConsumerDeps) {
 			}
 		}()
 		// update current worker count
-		reportWorkers.numWorker += 1
+		reportWorkers.count += 1
 	}
 }
