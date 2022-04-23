@@ -3,28 +3,28 @@ package service
 import (
 	"context"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type PatternMatrixElementService struct {
-	PatternMatrixElementRepo *repos.PatternMatrixElementRepo
+type PatternMatrixElement struct {
+	PatternMatrixElementRepo *repo.PatternMatrixElement
 }
 
-func NewPatternMatrixElementService(patternMatrixElementRepo *repos.PatternMatrixElementRepo) *PatternMatrixElementService {
-	return &PatternMatrixElementService{
+func NewPatternMatrixElement(patternMatrixElementRepo *repo.PatternMatrixElement) *PatternMatrixElement {
+	return &PatternMatrixElement{
 		PatternMatrixElementRepo: patternMatrixElementRepo,
 	}
 }
 
-func (s *PatternMatrixElementService) BatchSaveElements(ctx context.Context, elements []*models.PatternMatrixElement, server string) error {
+func (s *PatternMatrixElement) BatchSaveElements(ctx context.Context, elements []*model.PatternMatrixElement, server string) error {
 	return s.PatternMatrixElementRepo.BatchSaveElements(ctx, elements, server)
 }
 
-func (s *PatternMatrixElementService) DeleteByServer(ctx context.Context, server string) error {
+func (s *PatternMatrixElement) DeleteByServer(ctx context.Context, server string) error {
 	return s.PatternMatrixElementRepo.DeleteByServer(ctx, server)
 }
 
-func (s *PatternMatrixElementService) GetElementsByServer(ctx context.Context, server string) ([]*models.PatternMatrixElement, error) {
+func (s *PatternMatrixElement) GetElementsByServer(ctx context.Context, server string) ([]*model.PatternMatrixElement, error) {
 	return s.PatternMatrixElementRepo.GetElementsByServer(ctx, server)
 }

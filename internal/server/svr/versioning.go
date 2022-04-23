@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/constants"
+	"github.com/penguin-statistics/backend-next/internal/constant"
 )
 
 type V2 struct {
@@ -27,10 +27,10 @@ type Meta struct {
 	fiber.Router
 }
 
-func CreateVersioningEndpoints(app *fiber.App, conf *config.Config) (*V2, *V3, *Admin, *Meta) {
+func CreateEndpointGroups(app *fiber.App, conf *config.Config) (*V2, *V3, *Admin, *Meta) {
 	v2 := app.Group("/PenguinStats/api/v2", func(c *fiber.Ctx) error {
 		// add compatibility versioning header for v2 shims
-		c.Set(constants.ShimCompatibilityHeaderKey, constants.ShimCompatibilityHeaderValue)
+		c.Set(constant.ShimCompatibilityHeaderKey, constant.ShimCompatibilityHeaderValue)
 		return c.Next()
 	})
 

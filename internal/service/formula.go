@@ -5,30 +5,30 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/constant"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type FormulaService struct {
-	PropertyRepo *repos.PropertyRepo
+type Formula struct {
+	PropertyRepo *repo.Property
 }
 
-func NewFormulaService(propertyRepo *repos.PropertyRepo) *FormulaService {
-	return &FormulaService{
+func NewFormula(propertyRepo *repo.Property) *Formula {
+	return &Formula{
 		PropertyRepo: propertyRepo,
 	}
 }
 
 // Cache: (singular) formula, 24hrs
-func (s *FormulaService) GetFormula(ctx context.Context) (json.RawMessage, error) {
+func (s *Formula) GetFormula(ctx context.Context) (json.RawMessage, error) {
 	var formula json.RawMessage
 	err := cache.Formula.Get(&formula)
 	if err == nil {
 		return formula, nil
 	}
 
-	property, err := s.PropertyRepo.GetPropertyByKey(ctx, constants.FormulaPropertyKey)
+	property, err := s.PropertyRepo.GetPropertyByKey(ctx, constant.FormulaPropertyKey)
 	if err != nil {
 		return nil, err
 	}

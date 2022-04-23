@@ -3,7 +3,7 @@ package middlewares
 import (
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/penguin-statistics/backend-next/internal/utils/rekuest"
+	"github.com/penguin-statistics/backend-next/internal/util/rekuest"
 )
 
 func ValidateServer(c *fiber.Ctx) error {

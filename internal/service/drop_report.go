@@ -6,40 +6,40 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type DropReportService struct {
-	DropReportRepo *repos.DropReportRepo
+type DropReport struct {
+	DropReportRepo *repo.DropReport
 }
 
-func NewDropReportService(dropReportRepo *repos.DropReportRepo) *DropReportService {
-	return &DropReportService{
+func NewDropReport(dropReportRepo *repo.DropReport) *DropReport {
+	return &DropReport{
 		DropReportRepo: dropReportRepo,
 	}
 }
 
-func (s *DropReportService) CalcTotalQuantityForDropMatrix(ctx context.Context, server string, timeRange *models.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int) ([]*models.TotalQuantityResultForDropMatrix, error) {
+func (s *DropReport) CalcTotalQuantityForDropMatrix(ctx context.Context, server string, timeRange *model.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int) ([]*model.TotalQuantityResultForDropMatrix, error) {
 	return s.DropReportRepo.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, stageIdItemIdMap, accountId)
 }
 
-func (s *DropReportService) CalcTotalQuantityForPatternMatrix(ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId null.Int) ([]*models.TotalQuantityResultForPatternMatrix, error) {
+func (s *DropReport) CalcTotalQuantityForPatternMatrix(ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int) ([]*model.TotalQuantityResultForPatternMatrix, error) {
 	return s.DropReportRepo.CalcTotalQuantityForPatternMatrix(ctx, server, timeRange, stageIds, accountId)
 }
 
-func (s *DropReportService) CalcTotalTimesForDropMatrix(ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId null.Int) ([]*models.TotalTimesResult, error) {
+func (s *DropReport) CalcTotalTimesForDropMatrix(ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int) ([]*model.TotalTimesResult, error) {
 	return s.DropReportRepo.CalcTotalTimes(ctx, server, timeRange, stageIds, accountId, false)
 }
 
-func (s *DropReportService) CalcTotalTimesForPatternMatrix(ctx context.Context, server string, timeRange *models.TimeRange, stageIds []int, accountId null.Int) ([]*models.TotalTimesResult, error) {
+func (s *DropReport) CalcTotalTimesForPatternMatrix(ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int) ([]*model.TotalTimesResult, error) {
 	return s.DropReportRepo.CalcTotalTimes(ctx, server, timeRange, stageIds, accountId, true)
 }
 
-func (s *DropReportService) CalcTotalQuantityForTrend(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int) ([]*models.TotalQuantityResultForTrend, error) {
+func (s *DropReport) CalcTotalQuantityForTrend(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int) ([]*model.TotalQuantityResultForTrend, error) {
 	return s.DropReportRepo.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIdItemIdMap, accountId)
 }
 
-func (s *DropReportService) CalcTotalTimesForTrend(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId null.Int) ([]*models.TotalTimesResultForTrend, error) {
+func (s *DropReport) CalcTotalTimesForTrend(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId null.Int) ([]*model.TotalTimesResultForTrend, error) {
 	return s.DropReportRepo.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, accountId)
 }

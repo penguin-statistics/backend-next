@@ -26,5 +26,9 @@ func WaitAll(chans ...<-chan error) error {
 	}
 
 	wg.Wait()
+
+	if lastErr.Load() == nil {
+		return nil
+	}
 	return lastErr.Load().(error)
 }

@@ -6,25 +6,25 @@ import (
 
 	"github.com/tidwall/gjson"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/models/shims"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type ZoneService struct {
-	ZoneRepo *repos.ZoneRepo
+type Zone struct {
+	ZoneRepo *repo.Zone
 }
 
-func NewZoneService(zoneRepo *repos.ZoneRepo) *ZoneService {
-	return &ZoneService{
+func NewZone(zoneRepo *repo.Zone) *Zone {
+	return &Zone{
 		ZoneRepo: zoneRepo,
 	}
 }
 
 // Cache: (singular) zones, 24hrs
-func (s *ZoneService) GetZones(ctx context.Context) ([]*models.Zone, error) {
-	var zones []*models.Zone
+func (s *Zone) GetZones(ctx context.Context) ([]*model.Zone, error) {
+	var zones []*model.Zone
 	err := cache.Zones.Get(&zones)
 	if err == nil {
 		return zones, nil
@@ -38,13 +38,13 @@ func (s *ZoneService) GetZones(ctx context.Context) ([]*models.Zone, error) {
 	return zones, nil
 }
 
-func (s *ZoneService) GetZoneById(ctx context.Context, id int) (*models.Zone, error) {
+func (s *Zone) GetZoneById(ctx context.Context, id int) (*model.Zone, error) {
 	return s.ZoneRepo.GetZoneById(ctx, id)
 }
 
 // Cache: zone#arkZoneId:{arkZoneId}, 24hrs
-func (s *ZoneService) GetZoneByArkId(ctx context.Context, arkZoneId string) (*models.Zone, error) {
-	var zone models.Zone
+func (s *Zone) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model.Zone, error) {
+	var zone model.Zone
 	err := cache.ZoneByArkID.Get(arkZoneId, &zone)
 	if err == nil {
 		return &zone, nil
@@ -59,8 +59,8 @@ func (s *ZoneService) GetZoneByArkId(ctx context.Context, arkZoneId string) (*mo
 }
 
 // Cache: (singular) shimZones, 24hrs; records last modified time
-func (s *ZoneService) GetShimZones(ctx context.Context) ([]*shims.Zone, error) {
-	var zones []*shims.Zone
+func (s *Zone) GetShimZones(ctx context.Context) ([]*modelv2.Zone, error) {
+	var zones []*modelv2.Zone
 	err := cache.ShimZones.Get(&zones)
 	if err == nil {
 		return zones, nil
@@ -80,8 +80,8 @@ func (s *ZoneService) GetShimZones(ctx context.Context) ([]*shims.Zone, error) {
 }
 
 // Cache: shimZone#arkZoneId:{arkZoneId}, 24hrs
-func (s *ZoneService) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*shims.Zone, error) {
-	var zone shims.Zone
+func (s *Zone) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*modelv2.Zone, error) {
+	var zone modelv2.Zone
 	err := cache.ShimZoneByArkID.Get(arkZoneId, &zone)
 	if err == nil {
 		return &zone, nil
@@ -96,7 +96,7 @@ func (s *ZoneService) GetShimZoneByArkId(ctx context.Context, arkZoneId string) 
 	return dbZone, nil
 }
 
-func (s *ZoneService) applyShim(zone *shims.Zone) {
+func (s *Zone) applyShim(zone *modelv2.Zone) {
 	zoneNameI18n := gjson.ParseBytes(zone.ZoneNameI18n)
 	zone.ZoneName = zoneNameI18n.Map()["zh"].String()
 

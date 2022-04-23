@@ -12,13 +12,13 @@ import (
 	"github.com/uptrace/bun"
 	"github.com/vmihailenco/msgpack/v5"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
+	"github.com/penguin-statistics/backend-next/internal/model"
 )
 
 func BenchmarkJsonOrGobOrMsgpackEncoding(b *testing.B) {
 	var db *bun.DB
 	populate(&db)
-	var stage models.Stage
+	var stage model.Stage
 	err := db.NewSelect().Model(&stage).Scan(context.Background())
 	if err != nil {
 		b.Fatal(err)
@@ -106,7 +106,7 @@ func BenchmarkJsonOrGobOrMsgpackEncoding(b *testing.B) {
 func BenchmarkJsonOrGobOrMsgpackDecoding(b *testing.B) {
 	var db *bun.DB
 	populate(&db)
-	var stage models.Stage
+	var stage model.Stage
 	err := db.NewSelect().Model(&stage).Scan(context.Background())
 	if err != nil {
 		b.Fatal(err)
@@ -116,7 +116,7 @@ func BenchmarkJsonOrGobOrMsgpackDecoding(b *testing.B) {
 
 	b.Run("jsonWithoutStaticDecoder", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			var unmarshalled models.Stage
+			var unmarshalled model.Stage
 			err := json.Unmarshal(jsonToDecode, &unmarshalled)
 			if err != nil {
 				b.Error(err)
@@ -126,7 +126,7 @@ func BenchmarkJsonOrGobOrMsgpackDecoding(b *testing.B) {
 
 	b.Run("gojsonWithoutStaticDecoder", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			var unmarshalled models.Stage
+			var unmarshalled model.Stage
 			err := gojson.Unmarshal(jsonToDecode, &unmarshalled)
 			if err != nil {
 				b.Error(err)

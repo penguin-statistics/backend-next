@@ -4,7 +4,7 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "This is the Penguin Statistics v3 API, re-designed to aim for lightweight on wire.",
+        "description": "This is the Penguin Statistics v3 Backend, implemented for best performance, scalability, and reliability.",
         "title": "Penguin Statistics API",
         "contact": {
             "name": "AlvISs_Reimu",
@@ -59,7 +59,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shims.DropMatrixQueryResult"
+                            "$ref": "#/definitions/v2.DropMatrixQueryResult"
                         }
                     },
                     "500": {
@@ -110,7 +110,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shims.PatternMatrixQueryResult"
+                            "$ref": "#/definitions/v2.PatternMatrixQueryResult"
                         }
                     },
                     "500": {
@@ -150,7 +150,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shims.TrendQueryResult"
+                            "$ref": "#/definitions/v2.TrendQueryResult"
                         }
                     },
                     "500": {
@@ -188,7 +188,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/shims.AdvancedQueryResult"
+                                    "$ref": "#/definitions/v2.AdvancedQueryResult"
                                 },
                                 {
                                     "type": "object",
@@ -196,7 +196,7 @@
                                         "advanced_results": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/shims.DropMatrixQueryResult"
+                                                "$ref": "#/definitions/v2.DropMatrixQueryResult"
                                             }
                                         }
                                     }
@@ -209,7 +209,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/shims.AdvancedQueryResult"
+                                    "$ref": "#/definitions/v2.AdvancedQueryResult"
                                 },
                                 {
                                     "type": "object",
@@ -217,7 +217,7 @@
                                         "advanced_results": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/shims.TrendQueryResult"
+                                                "$ref": "#/definitions/v2.TrendQueryResult"
                                             }
                                         }
                                     }
@@ -273,16 +273,16 @@
                             "items": {
                                 "allOf": [
                                     {
-                                        "$ref": "#/definitions/shims.Item"
+                                        "$ref": "#/definitions/v2.Item"
                                     },
                                     {
                                         "type": "object",
                                         "properties": {
                                             "existence": {
-                                                "$ref": "#/definitions/models.Existence"
+                                                "$ref": "#/definitions/model.Existence"
                                             },
                                             "name_i18n": {
-                                                "$ref": "#/definitions/models.I18nString"
+                                                "$ref": "#/definitions/model.I18nString"
                                             }
                                         }
                                     }
@@ -323,16 +323,16 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/shims.Item"
+                                    "$ref": "#/definitions/v2.Item"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "existence": {
-                                            "$ref": "#/definitions/models.Existence"
+                                            "$ref": "#/definitions/model.Existence"
                                         },
                                         "name_i18n": {
-                                            "$ref": "#/definitions/models.I18nString"
+                                            "$ref": "#/definitions/model.I18nString"
                                         }
                                     }
                                 }
@@ -369,7 +369,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.Notice"
+                                "$ref": "#/definitions/model.Notice"
                             }
                         }
                     },
@@ -399,16 +399,16 @@
                             "items": {
                                 "allOf": [
                                     {
-                                        "$ref": "#/definitions/shims.Activity"
+                                        "$ref": "#/definitions/v2.Activity"
                                     },
                                     {
                                         "type": "object",
                                         "properties": {
                                             "existence": {
-                                                "$ref": "#/definitions/models.Existence"
+                                                "$ref": "#/definitions/model.Existence"
                                             },
                                             "label_i18n": {
-                                                "$ref": "#/definitions/models.I18nString"
+                                                "$ref": "#/definitions/model.I18nString"
                                             }
                                         }
                                     }
@@ -445,7 +445,7 @@
                 "summary": "Submit a Drop Report",
                 "parameters": [
                     {
-                        "description": "Report Request",
+                        "description": "Report request",
                         "name": "report",
                         "in": "body",
                         "required": true,
@@ -458,7 +458,7 @@
                     "201": {
                         "description": "Report has been successfully submitted",
                         "schema": {
-                            "$ref": "#/definitions/shims.ReportResponse"
+                            "$ref": "#/definitions/v2.ReportResponse"
                         }
                     },
                     "400": {
@@ -491,7 +491,7 @@
                 "summary": "Recall a Drop Report",
                 "parameters": [
                     {
-                        "description": "Report Recall Request",
+                        "description": "Report Recall request",
                         "name": "report",
                         "in": "body",
                         "required": true,
@@ -549,7 +549,7 @@
                     "200": {
                         "description": "Report has been successfully submitted for queue processing",
                         "schema": {
-                            "$ref": "#/definitions/shims.RecognitionReportResponse"
+                            "$ref": "#/definitions/v2.RecognitionReportResponse"
                         }
                     },
                     "400": {
@@ -632,7 +632,7 @@
                     "200": {
                         "description": "Drop Matrix response",
                         "schema": {
-                            "$ref": "#/definitions/shims.DropMatrixQueryResult"
+                            "$ref": "#/definitions/v2.DropMatrixQueryResult"
                         }
                     },
                     "500": {
@@ -683,7 +683,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shims.PatternMatrixQueryResult"
+                            "$ref": "#/definitions/v2.PatternMatrixQueryResult"
                         }
                     },
                     "500": {
@@ -723,7 +723,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/shims.TrendQueryResult"
+                            "$ref": "#/definitions/v2.TrendQueryResult"
                         }
                     },
                     "500": {
@@ -752,16 +752,16 @@
                             "items": {
                                 "allOf": [
                                     {
-                                        "$ref": "#/definitions/shims.Stage"
+                                        "$ref": "#/definitions/v2.Stage"
                                     },
                                     {
                                         "type": "object",
                                         "properties": {
                                             "code_i18n": {
-                                                "$ref": "#/definitions/models.I18nString"
+                                                "$ref": "#/definitions/model.I18nString"
                                             },
                                             "existence": {
-                                                "$ref": "#/definitions/models.Existence"
+                                                "$ref": "#/definitions/model.Existence"
                                             }
                                         }
                                     }
@@ -802,16 +802,16 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/shims.Stage"
+                                    "$ref": "#/definitions/v2.Stage"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "code_i18n": {
-                                            "$ref": "#/definitions/models.I18nString"
+                                            "$ref": "#/definitions/model.I18nString"
                                         },
                                         "existence": {
-                                            "$ref": "#/definitions/models.Existence"
+                                            "$ref": "#/definitions/model.Existence"
                                         }
                                     }
                                 }
@@ -863,7 +863,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/shims.SiteStats"
+                                "$ref": "#/definitions/v2.SiteStats"
                             }
                         }
                     },
@@ -908,7 +908,7 @@
                     "200": {
                         "description": "User ID. In the deprecated backend this is, for some reason, been implemented to return a JSON in the response body but with a `Content-Type: text/plain` in the response header instead of the correct `Content-Type: application/json`. So the v2 API has replicated this behavior to ensure compatibility.",
                         "schema": {
-                            "$ref": "#/definitions/shims.LoginResponse"
+                            "$ref": "#/definitions/v2.LoginResponse"
                         }
                     },
                     "500": {
@@ -937,16 +937,16 @@
                             "items": {
                                 "allOf": [
                                     {
-                                        "$ref": "#/definitions/shims.Zone"
+                                        "$ref": "#/definitions/v2.Zone"
                                     },
                                     {
                                         "type": "object",
                                         "properties": {
                                             "existence": {
-                                                "$ref": "#/definitions/models.Existence"
+                                                "$ref": "#/definitions/model.Existence"
                                             },
                                             "zoneName_i18n": {
-                                                "$ref": "#/definitions/models.I18nString"
+                                                "$ref": "#/definitions/model.I18nString"
                                             }
                                         }
                                     }
@@ -987,16 +987,16 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/shims.Zone"
+                                    "$ref": "#/definitions/v2.Zone"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "existence": {
-                                            "$ref": "#/definitions/models.Existence"
+                                            "$ref": "#/definitions/model.Existence"
                                         },
                                         "zoneName_i18n": {
-                                            "$ref": "#/definitions/models.I18nString"
+                                            "$ref": "#/definitions/model.I18nString"
                                         }
                                     }
                                 }
@@ -1020,7 +1020,7 @@
         }
     },
     "definitions": {
-        "models.Existence": {
+        "model.Existence": {
             "type": "object",
             "required": [
                 "CN",
@@ -1031,23 +1031,23 @@
             "properties": {
                 "CN": {
                     "description": "CN: 国服 Mainland China Server (maintained by Hypergryph Network Technology Co., Ltd.)",
-                    "$ref": "#/definitions/models.ServerExistence"
+                    "$ref": "#/definitions/model.ServerExistence"
                 },
                 "JP": {
                     "description": "JP: 日服 Japan Server (maintained by Yostar Inc,.)",
-                    "$ref": "#/definitions/models.ServerExistence"
+                    "$ref": "#/definitions/model.ServerExistence"
                 },
                 "KR": {
                     "description": "KR: 韩服 Korea Server (maintained by Yostar Limited)",
-                    "$ref": "#/definitions/models.ServerExistence"
+                    "$ref": "#/definitions/model.ServerExistence"
                 },
                 "US": {
                     "description": "US: 美服/国际服 Global Server (maintained by Yostar Limited)",
-                    "$ref": "#/definitions/models.ServerExistence"
+                    "$ref": "#/definitions/model.ServerExistence"
                 }
             }
         },
-        "models.I18nString": {
+        "model.I18nString": {
             "type": "object",
             "required": [
                 "en",
@@ -1074,7 +1074,7 @@
                 }
             }
         },
-        "models.Notice": {
+        "model.Notice": {
             "type": "object",
             "properties": {
                 "content_i18n": {
@@ -1094,20 +1094,23 @@
                 }
             }
         },
-        "models.ServerExistence": {
+        "model.ServerExistence": {
             "type": "object",
             "required": [
                 "exist"
             ],
             "properties": {
-                "endTime": {
-                    "type": "integer"
+                "closeTime": {
+                    "type": "integer",
+                    "example": 1635966000000
                 },
                 "exist": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "example": true
                 },
-                "startTime": {
-                    "type": "integer"
+                "openTime": {
+                    "type": "integer",
+                    "example": 1634799600000
                 }
             }
         },
@@ -1121,381 +1124,6 @@
                 "message": {
                     "type": "string",
                     "example": "invalid request: some or all request parameters are invalid"
-                }
-            }
-        },
-        "shims.Activity": {
-            "type": "object",
-            "properties": {
-                "end": {
-                    "type": "integer"
-                },
-                "existence": {
-                    "type": "object"
-                },
-                "label_i18n": {
-                    "type": "object"
-                },
-                "start": {
-                    "type": "integer"
-                }
-            }
-        },
-        "shims.AdvancedQueryResult": {
-            "type": "object",
-            "properties": {
-                "advanced_results": {
-                    "type": "array",
-                    "items": {}
-                }
-            }
-        },
-        "shims.DropInfo": {
-            "type": "object",
-            "properties": {
-                "bounds": {
-                    "type": "object"
-                },
-                "dropType": {
-                    "type": "string"
-                },
-                "itemId": {
-                    "type": "string"
-                }
-            }
-        },
-        "shims.DropMatrixQueryResult": {
-            "type": "object",
-            "properties": {
-                "matrix": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/shims.OneDropMatrixElement"
-                    }
-                }
-            }
-        },
-        "shims.Item": {
-            "type": "object",
-            "properties": {
-                "alias": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "existence": {
-                    "type": "object"
-                },
-                "groupID": {
-                    "type": "string"
-                },
-                "itemId": {
-                    "type": "string"
-                },
-                "itemType": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "name_i18n": {
-                    "type": "object"
-                },
-                "pron": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "rarity": {
-                    "type": "integer"
-                },
-                "sortId": {
-                    "type": "integer"
-                },
-                "spriteCoord": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
-        },
-        "shims.LoginResponse": {
-            "type": "object",
-            "properties": {
-                "userID": {
-                    "type": "string"
-                }
-            }
-        },
-        "shims.OneDrop": {
-            "type": "object",
-            "properties": {
-                "itemId": {
-                    "type": "string"
-                },
-                "quantity": {
-                    "type": "integer"
-                }
-            }
-        },
-        "shims.OneDropMatrixElement": {
-            "type": "object",
-            "properties": {
-                "end": {
-                    "type": "integer"
-                },
-                "itemId": {
-                    "type": "string"
-                },
-                "quantity": {
-                    "type": "integer"
-                },
-                "stageId": {
-                    "type": "string"
-                },
-                "start": {
-                    "type": "integer"
-                },
-                "times": {
-                    "type": "integer"
-                }
-            }
-        },
-        "shims.OneItemTrend": {
-            "type": "object",
-            "properties": {
-                "quantity": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "times": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
-        },
-        "shims.OnePatternMatrixElement": {
-            "type": "object",
-            "properties": {
-                "end": {
-                    "type": "integer"
-                },
-                "pattern": {
-                    "$ref": "#/definitions/shims.Pattern"
-                },
-                "quantity": {
-                    "type": "integer"
-                },
-                "stageId": {
-                    "type": "string"
-                },
-                "start": {
-                    "type": "integer"
-                },
-                "times": {
-                    "type": "integer"
-                }
-            }
-        },
-        "shims.Pattern": {
-            "type": "object",
-            "properties": {
-                "drops": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/shims.OneDrop"
-                    }
-                }
-            }
-        },
-        "shims.PatternMatrixQueryResult": {
-            "type": "object",
-            "properties": {
-                "pattern_matrix": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/shims.OnePatternMatrixElement"
-                    }
-                }
-            }
-        },
-        "shims.RecognitionReportResponse": {
-            "type": "object",
-            "properties": {
-                "errors": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "taskId": {
-                    "type": "string",
-                    "example": "0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ"
-                }
-            }
-        },
-        "shims.ReportResponse": {
-            "type": "object",
-            "properties": {
-                "reportHash": {
-                    "type": "string",
-                    "example": "0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ"
-                }
-            }
-        },
-        "shims.SiteStats": {
-            "type": "object",
-            "properties": {
-                "totalApCost": {
-                    "type": "integer"
-                },
-                "totalItemQuantities": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/shims.TotalItemQuantity"
-                    }
-                },
-                "totalStageTimes": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/shims.TotalStageTime"
-                    }
-                },
-                "totalStageTimes_24h": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/shims.TotalStageTime"
-                    }
-                }
-            }
-        },
-        "shims.Stage": {
-            "type": "object",
-            "properties": {
-                "apCost": {
-                    "type": "integer"
-                },
-                "code": {
-                    "type": "string"
-                },
-                "code_i18n": {
-                    "type": "object"
-                },
-                "dropInfos": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/shims.DropInfo"
-                    }
-                },
-                "existence": {
-                    "type": "object"
-                },
-                "minClearTime": {
-                    "type": "integer"
-                },
-                "recognitionOnly": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "stageId": {
-                    "type": "string"
-                },
-                "stageType": {
-                    "type": "string"
-                },
-                "zoneId": {
-                    "type": "string"
-                }
-            }
-        },
-        "shims.StageTrend": {
-            "type": "object",
-            "properties": {
-                "results": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "$ref": "#/definitions/shims.OneItemTrend"
-                    }
-                },
-                "startTime": {
-                    "type": "integer"
-                }
-            }
-        },
-        "shims.TotalItemQuantity": {
-            "type": "object",
-            "properties": {
-                "itemId": {
-                    "type": "string"
-                },
-                "quantity": {
-                    "type": "integer"
-                }
-            }
-        },
-        "shims.TotalStageTime": {
-            "type": "object",
-            "properties": {
-                "stageId": {
-                    "type": "string"
-                },
-                "times": {
-                    "type": "integer"
-                }
-            }
-        },
-        "shims.TrendQueryResult": {
-            "type": "object",
-            "properties": {
-                "trend": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "$ref": "#/definitions/shims.StageTrend"
-                    }
-                }
-            }
-        },
-        "shims.Zone": {
-            "type": "object",
-            "properties": {
-                "background": {
-                    "type": "string"
-                },
-                "existence": {
-                    "type": "object"
-                },
-                "stages": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "subType": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                },
-                "zoneId": {
-                    "type": "string"
-                },
-                "zoneIndex": {
-                    "type": "integer"
-                },
-                "zoneName": {
-                    "type": "string"
-                },
-                "zoneName_i18n": {
-                    "type": "object"
                 }
             }
         },
@@ -1567,7 +1195,8 @@
                     ]
                 },
                 "itemId": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "30013"
                 },
                 "quantity": {
                     "type": "integer",
@@ -1610,7 +1239,7 @@
                     "description": "Source describes a source of the report. Third-party API consumers should change this to their own name.",
                     "type": "string",
                     "maxLength": 32,
-                    "example": "frontend-v2"
+                    "example": "your-app-name"
                 },
                 "stageId": {
                     "type": "string",
@@ -1621,6 +1250,408 @@
                     "type": "string",
                     "maxLength": 32,
                     "example": "v0.0.0+0000000"
+                }
+            }
+        },
+        "v2.Activity": {
+            "type": "object",
+            "properties": {
+                "end": {
+                    "type": "integer"
+                },
+                "existence": {
+                    "type": "object"
+                },
+                "label_i18n": {
+                    "type": "object"
+                },
+                "start": {
+                    "type": "integer"
+                }
+            }
+        },
+        "v2.AdvancedQueryResult": {
+            "type": "object",
+            "properties": {
+                "advanced_results": {
+                    "type": "array",
+                    "items": {
+                        "type": "any"
+                    }
+                }
+            }
+        },
+        "v2.DropInfo": {
+            "type": "object",
+            "properties": {
+                "bounds": {
+                    "type": "object"
+                },
+                "dropType": {
+                    "type": "string"
+                },
+                "itemId": {
+                    "type": "string"
+                }
+            }
+        },
+        "v2.DropMatrixQueryResult": {
+            "type": "object",
+            "properties": {
+                "matrix": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.OneDropMatrixElement"
+                    }
+                }
+            }
+        },
+        "v2.Item": {
+            "type": "object",
+            "properties": {
+                "alias": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "existence": {
+                    "type": "object"
+                },
+                "groupID": {
+                    "type": "string"
+                },
+                "itemId": {
+                    "type": "string"
+                },
+                "itemType": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "name_i18n": {
+                    "type": "object"
+                },
+                "pron": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "rarity": {
+                    "type": "integer"
+                },
+                "sortId": {
+                    "type": "integer"
+                },
+                "spriteCoord": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "v2.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "userID": {
+                    "type": "string"
+                }
+            }
+        },
+        "v2.OneDrop": {
+            "type": "object",
+            "properties": {
+                "itemId": {
+                    "type": "string",
+                    "example": "30012"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "v2.OneDropMatrixElement": {
+            "type": "object",
+            "properties": {
+                "end": {
+                    "type": "integer"
+                },
+                "itemId": {
+                    "type": "string",
+                    "example": "30012"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "example": 1322056
+                },
+                "stageId": {
+                    "type": "string",
+                    "example": "main_01-07"
+                },
+                "start": {
+                    "type": "integer",
+                    "example": 1556676000000
+                },
+                "times": {
+                    "type": "integer",
+                    "example": 1061347
+                }
+            }
+        },
+        "v2.OneItemTrend": {
+            "type": "object",
+            "properties": {
+                "quantity": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "times": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "v2.OnePatternMatrixElement": {
+            "type": "object",
+            "properties": {
+                "end": {
+                    "type": "integer",
+                    "x-nullable": true
+                },
+                "pattern": {
+                    "$ref": "#/definitions/v2.Pattern"
+                },
+                "quantity": {
+                    "type": "integer",
+                    "example": 159486
+                },
+                "stageId": {
+                    "type": "string",
+                    "example": "main_01-07"
+                },
+                "start": {
+                    "type": "integer",
+                    "example": 1633032000000
+                },
+                "times": {
+                    "type": "integer",
+                    "example": 641734
+                }
+            }
+        },
+        "v2.Pattern": {
+            "type": "object",
+            "properties": {
+                "drops": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.OneDrop"
+                    }
+                }
+            }
+        },
+        "v2.PatternMatrixQueryResult": {
+            "type": "object",
+            "properties": {
+                "pattern_matrix": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.OnePatternMatrixElement"
+                    }
+                }
+            }
+        },
+        "v2.RecognitionReportResponse": {
+            "type": "object",
+            "properties": {
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "taskId": {
+                    "type": "string",
+                    "example": "0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ"
+                }
+            }
+        },
+        "v2.ReportResponse": {
+            "type": "object",
+            "properties": {
+                "reportHash": {
+                    "type": "string",
+                    "example": "0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ"
+                }
+            }
+        },
+        "v2.SiteStats": {
+            "type": "object",
+            "properties": {
+                "totalApCost": {
+                    "type": "integer"
+                },
+                "totalItemQuantities": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.TotalItemQuantity"
+                    }
+                },
+                "totalStageTimes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.TotalStageTime"
+                    }
+                },
+                "totalStageTimes_24h": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.TotalStageTime"
+                    }
+                }
+            }
+        },
+        "v2.Stage": {
+            "type": "object",
+            "properties": {
+                "apCost": {
+                    "type": "integer",
+                    "example": 6
+                },
+                "code": {
+                    "type": "string",
+                    "example": "1-7"
+                },
+                "code_i18n": {
+                    "type": "object"
+                },
+                "dropInfos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.DropInfo"
+                    }
+                },
+                "existence": {
+                    "type": "object"
+                },
+                "minClearTime": {
+                    "type": "integer",
+                    "example": 118000
+                },
+                "recognitionOnly": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stageId": {
+                    "type": "string",
+                    "example": "main_01-07"
+                },
+                "stageType": {
+                    "description": "StageType is the type of the stage\n* MAIN - Mainline Stages\n* SUB - Sub Stages\n* ACTIVITY - Activity Stages\n* DAILY - Daily Stages",
+                    "type": "string",
+                    "enum": [
+                        "MAIN",
+                        "SUB",
+                        "ACTIVITY",
+                        "DAILY"
+                    ],
+                    "example": "MAIN"
+                },
+                "zoneId": {
+                    "type": "string",
+                    "example": "main_1"
+                }
+            }
+        },
+        "v2.StageTrend": {
+            "type": "object",
+            "properties": {
+                "results": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/v2.OneItemTrend"
+                    }
+                },
+                "startTime": {
+                    "type": "integer"
+                }
+            }
+        },
+        "v2.TotalItemQuantity": {
+            "type": "object",
+            "properties": {
+                "itemId": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "integer"
+                }
+            }
+        },
+        "v2.TotalStageTime": {
+            "type": "object",
+            "properties": {
+                "stageId": {
+                    "type": "string"
+                },
+                "times": {
+                    "type": "integer"
+                }
+            }
+        },
+        "v2.TrendQueryResult": {
+            "type": "object",
+            "properties": {
+                "trend": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/v2.StageTrend"
+                    }
+                }
+            }
+        },
+        "v2.Zone": {
+            "type": "object",
+            "properties": {
+                "background": {
+                    "type": "string"
+                },
+                "existence": {
+                    "type": "object"
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "subType": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "zoneId": {
+                    "type": "string"
+                },
+                "zoneIndex": {
+                    "type": "integer"
+                },
+                "zoneName": {
+                    "type": "string"
+                },
+                "zoneName_i18n": {
+                    "type": "object"
                 }
             }
         }

@@ -4,24 +4,24 @@ import (
 	"context"
 	"time"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type NoticeService struct {
-	NoticeRepo *repos.NoticeRepo
+type Notice struct {
+	NoticeRepo *repo.Notice
 }
 
-func NewNoticeService(noticeRepo *repos.NoticeRepo) *NoticeService {
-	return &NoticeService{
+func NewNotice(noticeRepo *repo.Notice) *Notice {
+	return &Notice{
 		NoticeRepo: noticeRepo,
 	}
 }
 
 // Cache: (singular) notices, 24hrs; records last modified time
-func (s *NoticeService) GetNotices(ctx context.Context) ([]*models.Notice, error) {
-	var noticesFromCache []*models.Notice
+func (s *Notice) GetNotices(ctx context.Context) ([]*model.Notice, error) {
+	var noticesFromCache []*model.Notice
 	err := cache.Notices.Get(&noticesFromCache)
 	if err == nil {
 		return noticesFromCache, nil

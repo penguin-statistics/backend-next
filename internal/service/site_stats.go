@@ -4,24 +4,24 @@ import (
 	"context"
 	"time"
 
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/models/shims"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type SiteStatsService struct {
-	DropReportRepo *repos.DropReportRepo
+type SiteStats struct {
+	DropReportRepo *repo.DropReport
 }
 
-func NewSiteStatsService(dropReportRepo *repos.DropReportRepo) *SiteStatsService {
-	return &SiteStatsService{
+func NewSiteStats(dropReportRepo *repo.DropReport) *SiteStats {
+	return &SiteStats{
 		DropReportRepo: dropReportRepo,
 	}
 }
 
 // Cache: shimSiteStats#server:{server}, 24hrs
-func (s *SiteStatsService) GetShimSiteStats(ctx context.Context, server string) (*shims.SiteStats, error) {
-	var results shims.SiteStats
+func (s *SiteStats) GetShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
+	var results modelv2.SiteStats
 	err := cache.ShimSiteStats.Get(server, &results)
 	if err == nil {
 		return &results, nil
@@ -30,8 +30,8 @@ func (s *SiteStatsService) GetShimSiteStats(ctx context.Context, server string) 
 	return s.RefreshShimSiteStats(ctx, server)
 }
 
-func (s *SiteStatsService) RefreshShimSiteStats(ctx context.Context, server string) (*shims.SiteStats, error) {
-	valueFunc := func() (*shims.SiteStats, error) {
+func (s *SiteStats) RefreshShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
+	valueFunc := func() (*modelv2.SiteStats, error) {
 		stageTimes, err := s.DropReportRepo.CalcTotalStageQuantityForShimSiteStats(ctx, server, false)
 		if err != nil {
 			return nil, err
@@ -52,7 +52,7 @@ func (s *SiteStatsService) RefreshShimSiteStats(ctx context.Context, server stri
 			return nil, err
 		}
 
-		return &shims.SiteStats{
+		return &modelv2.SiteStats{
 			TotalStageTimes:     stageTimes,
 			TotalStageTimes24H:  stageTimes24h,
 			TotalItemQuantities: itemQuantity,
@@ -60,7 +60,7 @@ func (s *SiteStatsService) RefreshShimSiteStats(ctx context.Context, server stri
 		}, nil
 	}
 
-	var results shims.SiteStats
+	var results modelv2.SiteStats
 	cache.ShimSiteStats.Delete(server)
 	_, err := cache.ShimSiteStats.MutexGetSet(server, &results, valueFunc, 24*time.Hour)
 	if err != nil {

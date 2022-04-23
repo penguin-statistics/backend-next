@@ -6,26 +6,26 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/models/shims"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/constant"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type ActivityService struct {
-	ActivityRepo *repos.ActivityRepo
+type Activity struct {
+	ActivityRepo *repo.Activity
 }
 
-func NewActivityService(activityRepo *repos.ActivityRepo) *ActivityService {
-	return &ActivityService{
+func NewActivity(activityRepo *repo.Activity) *Activity {
+	return &Activity{
 		ActivityRepo: activityRepo,
 	}
 }
 
 // Cache: (singular) activities, 24hrs; records last modified time
-func (s *ActivityService) GetActivities(ctx context.Context) ([]*models.Activity, error) {
-	var activities []*models.Activity
+func (s *Activity) GetActivities(ctx context.Context) ([]*model.Activity, error) {
+	var activities []*model.Activity
 	err := cache.Activities.Get(&activities)
 	if err == nil {
 		return activities, nil
@@ -42,8 +42,8 @@ func (s *ActivityService) GetActivities(ctx context.Context) ([]*models.Activity
 }
 
 // Cache: (singular) shimActivities, 24hrs; records last modified time
-func (s *ActivityService) GetShimActivities(ctx context.Context) ([]*shims.Activity, error) {
-	var shimActivitiesFromCache []*shims.Activity
+func (s *Activity) GetShimActivities(ctx context.Context) ([]*modelv2.Activity, error) {
+	var shimActivitiesFromCache []*modelv2.Activity
 	err := cache.ShimActivities.Get(&shimActivitiesFromCache)
 	if err == nil {
 		return shimActivitiesFromCache, nil
@@ -53,7 +53,7 @@ func (s *ActivityService) GetShimActivities(ctx context.Context) ([]*shims.Activ
 	if err != nil {
 		return nil, err
 	}
-	shimActivities := make([]*shims.Activity, len(activities))
+	shimActivities := make([]*modelv2.Activity, len(activities))
 	for i, activity := range activities {
 		shimActivities[i] = s.applyShim(activity)
 	}
@@ -63,13 +63,13 @@ func (s *ActivityService) GetShimActivities(ctx context.Context) ([]*shims.Activ
 	return shimActivities, nil
 }
 
-func (s *ActivityService) applyShim(activity *models.Activity) *shims.Activity {
-	shimActivity := &shims.Activity{
+func (s *Activity) applyShim(activity *model.Activity) *modelv2.Activity {
+	shimActivity := &modelv2.Activity{
 		Existence: activity.Existence,
 		LabelI18n: activity.Name,
 		Start:     activity.StartTime.UnixMilli(),
 	}
-	if activity.EndTime != nil && activity.EndTime.UnixMilli() != constants.FakeEndTimeMilli {
+	if activity.EndTime != nil && activity.EndTime.UnixMilli() != constant.FakeEndTimeMilli {
 		endTime := null.NewInt(activity.EndTime.UnixMilli(), true)
 		shimActivity.End = endTime
 	}

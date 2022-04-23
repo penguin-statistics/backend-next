@@ -5,24 +5,24 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type DropPatternElementService struct {
-	DropPatternElementRepo *repos.DropPatternElementRepo
+type DropPatternElement struct {
+	DropPatternElementRepo *repo.DropPatternElement
 }
 
-func NewDropPatternElementService(dropPatternElementRepo *repos.DropPatternElementRepo) *DropPatternElementService {
-	return &DropPatternElementService{
+func NewDropPatternElement(dropPatternElementRepo *repo.DropPatternElement) *DropPatternElement {
+	return &DropPatternElement{
 		DropPatternElementRepo: dropPatternElementRepo,
 	}
 }
 
 // Cache: dropPatternElements#patternId:{patternId}, 24hrs
-func (s *DropPatternElementService) GetDropPatternElementsByPatternId(ctx context.Context, patternId int) ([]*models.DropPatternElement, error) {
-	var dropPatternElements []*models.DropPatternElement
+func (s *DropPatternElement) GetDropPatternElementsByPatternId(ctx context.Context, patternId int) ([]*model.DropPatternElement, error) {
+	var dropPatternElements []*model.DropPatternElement
 	err := cache.DropPatternElementsByPatternID.Get(strconv.Itoa(patternId), &dropPatternElements)
 	if err == nil {
 		return dropPatternElements, nil

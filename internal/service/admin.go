@@ -6,32 +6,32 @@ import (
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
-	"github.com/penguin-statistics/backend-next/internal/models/gamedata"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/constant"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	"github.com/penguin-statistics/backend-next/internal/model/gamedata"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-type AdminService struct {
+type Admin struct {
 	DB        *bun.DB
-	AdminRepo *repos.AdminRepo
+	AdminRepo *repo.Admin
 }
 
-func NewAdminService(db *bun.DB, adminRepo *repos.AdminRepo) *AdminService {
-	return &AdminService{
+func NewAdmin(db *bun.DB, adminRepo *repo.Admin) *Admin {
+	return &Admin{
 		DB:        db,
 		AdminRepo: adminRepo,
 	}
 }
 
-func (s *AdminService) SaveRenderedObjects(ctx context.Context, objects *gamedata.RenderedObjects) error {
+func (s *Admin) SaveRenderedObjects(ctx context.Context, objects *gamedata.RenderedObjects) error {
 	var innerErr error
 	err := s.DB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var zoneId int
-		var zones []*models.Zone
+		var zones []*model.Zone
 		if objects.Zone != nil {
-			zones = []*models.Zone{objects.Zone}
+			zones = []*model.Zone{objects.Zone}
 			if err := s.AdminRepo.SaveZones(ctx, tx, &zones); err != nil {
 				innerErr = err
 				return err
@@ -40,7 +40,7 @@ func (s *AdminService) SaveRenderedObjects(ctx context.Context, objects *gamedat
 		}
 
 		if objects.Activity != nil {
-			activities := []*models.Activity{objects.Activity}
+			activities := []*model.Activity{objects.Activity}
 			if err := s.AdminRepo.SaveActivities(ctx, tx, &activities); err != nil {
 				innerErr = err
 				return err
@@ -48,9 +48,9 @@ func (s *AdminService) SaveRenderedObjects(ctx context.Context, objects *gamedat
 		}
 
 		var rangeId int
-		var timeRanges []*models.TimeRange
+		var timeRanges []*model.TimeRange
 		if objects.TimeRange != nil {
-			timeRanges = []*models.TimeRange{objects.TimeRange}
+			timeRanges = []*model.TimeRange{objects.TimeRange}
 			if err := s.AdminRepo.SaveTimeRanges(ctx, tx, &timeRanges); err != nil {
 				innerErr = err
 				return err
@@ -60,7 +60,7 @@ func (s *AdminService) SaveRenderedObjects(ctx context.Context, objects *gamedat
 
 		stageIdMap := make(map[string]int)
 		if len(objects.Stages) > 0 {
-			linq.From(objects.Stages).ForEachT(func(stage *models.Stage) {
+			linq.From(objects.Stages).ForEachT(func(stage *model.Stage) {
 				stage.ZoneID = zoneId
 			})
 			if err := s.AdminRepo.SaveStages(ctx, tx, &objects.Stages); err != nil {
@@ -69,13 +69,13 @@ func (s *AdminService) SaveRenderedObjects(ctx context.Context, objects *gamedat
 			}
 			linq.From(objects.Stages).
 				ToMapByT(&stageIdMap,
-					func(stage *models.Stage) string { return stage.ArkStageID },
-					func(stage *models.Stage) int { return stage.StageID },
+					func(stage *model.Stage) string { return stage.ArkStageID },
+					func(stage *model.Stage) int { return stage.StageID },
 				)
 		}
 
 		if len(objects.DropInfosMap) > 0 {
-			dropInfosToSave := make([]*models.DropInfo, 0)
+			dropInfosToSave := make([]*model.DropInfo, 0)
 			for arkStageId, dropInfos := range objects.DropInfosMap {
 				stageId := stageIdMap[arkStageId]
 				for _, dropInfo := range dropInfos {
@@ -122,7 +122,7 @@ func (s *AdminService) SaveRenderedObjects(ctx context.Context, objects *gamedat
 			cache.Stages.Delete()
 			cache.StagesMapByID.Delete()
 			cache.StagesMapByArkID.Delete()
-			for _, server := range constants.Servers {
+			for _, server := range constant.Servers {
 				cache.ShimStages.Delete(server)
 			}
 		}

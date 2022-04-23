@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+option go_package = "github.com/penguin-statistics/backend-next/internal/model/protos";
+
+message Ping {
+    Header header = 1;
+    int32 sequence = 2;
+}
+
+message Pong {
+    Header header = 1;
+    int32 sequence = 2;
+}
+
+message Skeleton {
+    Header header = 1;
+}
+
+message Header {
+    MessageType type = 1;
+}
+
+enum MessageType {
+    // default value, leave for unknown
+    UNKNOWN = 0;
+    
+    // ping-pong messages
+    PING = 1;
+    PONG = 2;
+
+    // server push messages. start from 1 << 8
+    /// uses MatrixUpdateMessage
+    MATRIX_UPDATE_MESSAGE = 256;
+
+    // request-response pattern messages. start from 1 << 12
+    /// uses MatrixUpdateSubscribeReq
+    MATRIX_UPDATE_SUBSCRIBE_REQ = 4096;
+    /// uses MatrixUpdateSubscribeResp
+    MATRIX_UPDATE_SUBSCRIBE_RESP = 4097;
+}
+
+message MatrixUpdateMessage {
+    message Segment {
+        message Element {
+            oneof id {
+                int32 stage_id = 1;
+                int32 item_id = 2;
+            }
+            // amount: absolute changed value under MATRIX_UPDATE_MESSAGE
+            int32 amount = 3;
+        }
+
+        oneof bucket {
+            int32 stage_id = 1;
+            int32 item_id = 2;
+        }
+        repeated Element elements = 3;
+    }
+
+    Header header = 1;
+    repeated Segment segments = 2;
+}
+
+message MatrixUpdateSubscribeReq {
+    Header header = 1;
+    int32 sequence = 2;
+    oneof id {
+        int32 stage_id = 3;
+        int32 item_id = 4;
+    }
+}
+
+message MatrixUpdateSubscribeResp {
+    Header header = 1;
+    int32 sequence = 2;
+}
+
+

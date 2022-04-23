@@ -6,95 +6,126 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/controllers"
-	"github.com/penguin-statistics/backend-next/internal/controllers/shims"
+	controllermeta "github.com/penguin-statistics/backend-next/internal/controller/meta"
+	controllerv2 "github.com/penguin-statistics/backend-next/internal/controller/v2"
 	"github.com/penguin-statistics/backend-next/internal/infra"
-	"github.com/penguin-statistics/backend-next/internal/models/cache"
+	"github.com/penguin-statistics/backend-next/internal/model/cache"
+	"github.com/penguin-statistics/backend-next/internal/pkg/crypto"
 	"github.com/penguin-statistics/backend-next/internal/pkg/flake"
 	"github.com/penguin-statistics/backend-next/internal/pkg/logger"
-	"github.com/penguin-statistics/backend-next/internal/repos"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/server/httpserver"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/utils"
-	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
+	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
 	"github.com/penguin-statistics/backend-next/internal/workers/calcwkr"
 )
 
 func ProvideOptions(includeSwagger bool) []fx.Option {
 	opts := []fx.Option{
+		// Misc
 		fx.Provide(config.Parse),
-		fx.Provide(flake.NewSnowflake),
+		fx.Provide(flake.New),
 		fx.Provide(httpserver.Create),
-		fx.Provide(infra.NATS),
-		fx.Provide(infra.Redis),
-		fx.Provide(infra.Postgres),
-		fx.Provide(infra.GeoIPDatabase),
-		fx.Provide(reportutils.NewMD5Verifier),
-		fx.Provide(reportutils.NewUserVerifier),
-		fx.Provide(reportutils.NewDropVerifier),
-		fx.Provide(reportutils.NewReportVerifier),
-		fx.Provide(repos.NewItemRepo),
-		fx.Provide(repos.NewZoneRepo),
-		fx.Provide(repos.NewStageRepo),
-		fx.Provide(repos.NewNoticeRepo),
-		fx.Provide(repos.NewActivityRepo),
-		fx.Provide(repos.NewAccountRepo),
-		fx.Provide(repos.NewDropInfoRepo),
-		fx.Provide(repos.NewPropertyRepo),
-		fx.Provide(repos.NewTimeRangeRepo),
-		fx.Provide(repos.NewDropReportRepo),
-		fx.Provide(repos.NewDropPatternRepo),
-		fx.Provide(repos.NewTrendElementRepo),
-		fx.Provide(repos.NewDropReportExtraRepo),
-		fx.Provide(repos.NewDropMatrixElementRepo),
-		fx.Provide(repos.NewDropPatternElementRepo),
-		fx.Provide(repos.NewPatternMatrixElementRepo),
-		fx.Provide(repos.NewAdminRepo),
-		fx.Provide(service.NewItemService),
-		fx.Provide(service.NewZoneService),
-		fx.Provide(service.NewStageService),
-		fx.Provide(service.NewGeoIPService),
-		fx.Provide(service.NewTrendService),
-		fx.Provide(service.NewAdminService),
-		fx.Provide(service.NewHealthService),
-		fx.Provide(service.NewNoticeService),
-		fx.Provide(service.NewReportService),
-		fx.Provide(service.NewAccountService),
-		fx.Provide(service.NewFormulaService),
-		fx.Provide(service.NewActivityService),
-		fx.Provide(service.NewDropInfoService),
-		fx.Provide(service.NewShortURLService),
-		fx.Provide(service.NewTimeRangeService),
-		fx.Provide(service.NewSiteStatsService),
-		fx.Provide(service.NewDropMatrixService),
-		fx.Provide(service.NewDropReportService),
-		fx.Provide(service.NewTrendElementService),
-		fx.Provide(service.NewPatternMatrixService),
-		fx.Provide(service.NewDropMatrixElementService),
-		fx.Provide(service.NewDropPatternElementService),
-		fx.Provide(service.NewPatternMatrixElementService),
-		fx.Provide(svr.CreateVersioningEndpoints),
-		fx.Provide(utils.NewCrypto),
+		fx.Provide(svr.CreateEndpointGroups),
+		fx.Provide(crypto.NewCrypto),
+
+		// Infrastructures
+		fx.Provide(
+			infra.NATS,
+			infra.Redis,
+			infra.Postgres,
+			infra.GeoIPDatabase,
+		),
+
+		// Verifiers
+		fx.Provide(
+			reportutil.NewMD5Verifier,
+			reportutil.NewUserVerifier,
+			reportutil.NewDropVerifier,
+			reportutil.NewReportVerifier,
+		),
+
+		// Repositories
+		fx.Provide(
+			repo.NewItem,
+			repo.NewZone,
+			repo.NewAdmin,
+			repo.NewStage,
+			repo.NewNotice,
+			repo.NewAccount,
+			repo.NewActivity,
+			repo.NewDropInfo,
+			repo.NewProperty,
+			repo.NewTimeRange,
+			repo.NewDropReport,
+			repo.NewDropPattern,
+			repo.NewTrendElement,
+			repo.NewDropReportExtra,
+			repo.NewDropMatrixElement,
+			repo.NewDropPatternElement,
+			repo.NewPatternMatrixElement,
+		),
+
+		// Services
+		fx.Provide(
+			service.NewItem,
+			service.NewZone,
+			service.NewStage,
+			service.NewGeoIP,
+			service.NewTrend,
+			service.NewAdmin,
+			service.NewHealth,
+			service.NewNotice,
+			service.NewReport,
+			service.NewAccount,
+			service.NewFormula,
+			service.NewActivity,
+			service.NewDropInfo,
+			service.NewShortURL,
+			service.NewTimeRange,
+			service.NewSiteStats,
+			service.NewDropMatrix,
+			service.NewDropReport,
+			service.NewTrendElement,
+			service.NewPatternMatrix,
+			service.NewDropMatrixElement,
+			service.NewDropPatternElement,
+			service.NewPatternMatrixElement,
+		),
+
+		// Global Singleton Inits
 		fx.Invoke(logger.Configure),
 		fx.Invoke(infra.SentryInit),
 		fx.Invoke(cache.Initialize),
-		fx.Invoke(shims.RegisterItemController),
-		fx.Invoke(shims.RegisterZoneController),
-		fx.Invoke(shims.RegisterStageController),
-		fx.Invoke(shims.RegisterNoticeController),
-		fx.Invoke(shims.RegisterResultController),
-		fx.Invoke(shims.RegisterReportController),
-		fx.Invoke(shims.RegisterAccountController),
-		fx.Invoke(shims.RegisterFormulaController),
-		fx.Invoke(shims.RegisterPrivateController),
-		fx.Invoke(shims.RegisterSiteStatsController),
-		fx.Invoke(shims.RegisterEventPeriodController),
-		fx.Invoke(controllers.RegisterMetaController),
-		fx.Invoke(controllers.RegisterIndexController),
-		fx.Invoke(controllers.RegisterAdminController),
-		fx.Invoke(controllers.RegisterShortURLController),
+
+		// Controllers (v2)
+		fx.Invoke(
+			controllerv2.RegisterItem,
+			controllerv2.RegisterZone,
+			controllerv2.RegisterStage,
+			controllerv2.RegisterNotice,
+			controllerv2.RegisterResult,
+			controllerv2.RegisterReport,
+			controllerv2.RegisterAccount,
+			controllerv2.RegisterFormula,
+			controllerv2.RegisterPrivate,
+			controllerv2.RegisterSiteStats,
+			controllerv2.RegisterEventPeriod,
+			controllerv2.RegisterShortURL,
+		),
+
+		// Controllers (meta)
+		fx.Invoke(
+			controllermeta.RegisterMeta,
+			controllermeta.RegisterIndex,
+			controllermeta.RegisterAdmin,
+		),
+
+		// Workers
 		fx.Invoke(calcwkr.Start),
+
+		// fx Extra Options
 		fx.StartTimeout(1 * time.Second),
 		// StopTimeout is not typically needed, since we're using fiber's Shutdown(),
 		// in which fiber has its own IdleTimeout for controlling the shutdown timeout.
@@ -103,7 +134,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 	}
 
 	if includeSwagger {
-		opts = append(opts, fx.Invoke(controllers.RegisterSwaggerController))
+		opts = append(opts, fx.Invoke(controllermeta.RegisterSwagger))
 	}
 
 	return opts

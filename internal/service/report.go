@@ -16,14 +16,14 @@ import (
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/constants"
-	"github.com/penguin-statistics/backend-next/internal/models"
-	"github.com/penguin-statistics/backend-next/internal/models/types"
+	"github.com/penguin-statistics/backend-next/internal/constant"
+	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
-	"github.com/penguin-statistics/backend-next/internal/repos"
-	"github.com/penguin-statistics/backend-next/internal/utils"
-	"github.com/penguin-statistics/backend-next/internal/utils/reportutils"
+	"github.com/penguin-statistics/backend-next/internal/repo"
+	"github.com/penguin-statistics/backend-next/internal/util"
+	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
 )
 
 var (
@@ -31,23 +31,23 @@ var (
 	ErrNatsTimeout    = errors.New("timeout waiting for NATS response")
 )
 
-type ReportService struct {
+type Report struct {
 	DB                     *bun.DB
 	Redis                  *redis.Client
 	NatsJS                 nats.JetStreamContext
-	ItemService            *ItemService
-	StageService           *StageService
-	AccountService         *AccountService
-	DropInfoRepo           *repos.DropInfoRepo
-	DropReportRepo         *repos.DropReportRepo
-	DropPatternRepo        *repos.DropPatternRepo
-	DropReportExtraRepo    *repos.DropReportExtraRepo
-	DropPatternElementRepo *repos.DropPatternElementRepo
-	ReportVerifier         *reportutils.ReportVerifier
+	ItemService            *Item
+	StageService           *Stage
+	AccountService         *Account
+	DropInfoRepo           *repo.DropInfo
+	DropReportRepo         *repo.DropReport
+	DropPatternRepo        *repo.DropPattern
+	DropReportExtraRepo    *repo.DropReportExtra
+	DropPatternElementRepo *repo.DropPatternElement
+	ReportVerifier         *reportutil.ReportVerifier
 }
 
-func NewReportService(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *ItemService, stageService *StageService, dropInfoRepo *repos.DropInfoRepo, dropReportRepo *repos.DropReportRepo, dropReportExtraRepo *repos.DropReportExtraRepo, dropPatternRepo *repos.DropPatternRepo, dropPatternElementRepo *repos.DropPatternElementRepo, accountService *AccountService, reportVerifier *reportutils.ReportVerifier) *ReportService {
-	service := &ReportService{
+func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *Item, stageService *Stage, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *Account, reportVerifier *reportutil.ReportVerifier) *Report {
+	service := &Report{
 		DB:                     db,
 		Redis:                  redisClient,
 		NatsJS:                 natsJs,
@@ -61,31 +61,29 @@ func NewReportService(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStre
 		DropPatternElementRepo: dropPatternElementRepo,
 		ReportVerifier:         reportVerifier,
 	}
-
-	// TODO: isolate report consumer as standalone workers
-	go func() {
-		ch := make(chan error)
-
-		go func() {
-			for {
-				err := <-ch
-				spew.Dump(err)
-			}
-		}()
-
-		for i := 0; i < runtime.NumCPU(); i++ {
-			go func() {
-				err := service.ReportConsumeWorker(context.Background(), ch)
-				if err != nil {
-					ch <- err
-				}
-			}()
-		}
-	}()
+	go service.startConsumerWorkers(runtime.NumCPU())
 	return service
 }
 
-func (s *ReportService) pipelineAccount(ctx *fiber.Ctx) (accountId int, err error) {
+func (s *Report) startConsumerWorkers(numWorker int) {
+	ch := make(chan error)
+	go func() {
+		for {
+			err := <-ch
+			spew.Dump(err)
+		}
+	}()
+	for i := 0; i < numWorker; i++ {
+		go func() {
+			err := s.ReportConsumeWorker(context.Background(), ch)
+			if err != nil {
+				ch <- err
+			}
+		}()
+	}
+}
+
+func (s *Report) pipelineAccount(ctx *fiber.Ctx) (accountId int, err error) {
 	account, err := s.AccountService.GetAccountFromRequest(ctx)
 	if err != nil {
 		createdAccount, err := s.AccountService.CreateAccountWithRandomPenguinId(ctx.Context())
@@ -101,8 +99,8 @@ func (s *ReportService) pipelineAccount(ctx *fiber.Ctx) (accountId int, err erro
 	return accountId, nil
 }
 
-func (s *ReportService) pipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []types.ArkDrop) ([]*types.Drop, error) {
-	drops = reportutils.MergeDrops(drops)
+func (s *Report) pipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []types.ArkDrop) ([]*types.Drop, error) {
+	drops = reportutil.MergeDrops(drops)
 
 	convertedDrops := make([]*types.Drop, 0, len(drops))
 	for _, drop := range drops {
@@ -113,7 +111,7 @@ func (s *ReportService) pipelineMergeDropsAndMapDropTypes(ctx context.Context, d
 
 		convertedDrops = append(convertedDrops, &types.Drop{
 			// maps DropType to DB DropType
-			DropType: constants.DropTypeMap[drop.DropType],
+			DropType: constant.DropTypeMap[drop.DropType],
 			ItemID:   item.ItemID,
 			Quantity: drop.Quantity,
 		})
@@ -122,11 +120,11 @@ func (s *ReportService) pipelineMergeDropsAndMapDropTypes(ctx context.Context, d
 	return convertedDrops, nil
 }
 
-func (s *ReportService) pipelineTaskId(ctx *fiber.Ctx) string {
+func (s *Report) pipelineTaskId(ctx *fiber.Ctx) string {
 	return ctx.Locals("requestid").(string) + "-" + uniuri.NewLen(32)
 }
 
-func (s *ReportService) commitReportTask(ctx *fiber.Ctx, subject string, task *types.ReportTask) (taskId string, err error) {
+func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.ReportTask) (taskId string, err error) {
 	taskId = s.pipelineTaskId(ctx)
 	task.TaskID = taskId
 
@@ -153,7 +151,7 @@ func (s *ReportService) commitReportTask(ctx *fiber.Ctx, subject string, task *t
 }
 
 // returns taskID and error, if any
-func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingleReportRequest) (taskId string, err error) {
+func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingleReportRequest) (taskId string, err error) {
 	// if account is not found, create new account
 	accountId, err := s.pipelineAccount(ctx)
 	if err != nil {
@@ -169,6 +167,8 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 	singleReport := &types.SingleReport{
 		FragmentStageID: req.FragmentStageID,
 		Drops:           drops,
+		// for now, we do not support multiple report by specifying `times`
+		Times: 1,
 	}
 
 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
@@ -176,12 +176,13 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 	if err != nil {
 		return "", err
 	}
-	if category.Valid && category.String == constants.ExtraProcessTypeGachaBox {
-		reportutils.AggregateGachaBoxDrops(singleReport)
+	if category.Valid && category.String == constant.ExtraProcessTypeGachaBox {
+		reportutil.AggregateGachaBoxDrops(singleReport)
 	}
 
 	// construct ReportContext
 	reportTask := &types.ReportTask{
+		CreatedAt: time.Now().UnixMicro(),
 		FragmentReportCommon: types.FragmentReportCommon{
 			Server:  req.Server,
 			Source:  req.Source,
@@ -189,13 +190,13 @@ func (s *ReportService) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *ty
 		},
 		Reports:   []*types.SingleReport{singleReport},
 		AccountID: accountId,
-		IP:        utils.ExtractIP(ctx),
+		IP:        util.ExtractIP(ctx),
 	}
 
 	return s.commitReportTask(ctx, "REPORT.SINGLE", reportTask)
 }
 
-func (s *ReportService) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchReportRequest) (taskId string, err error) {
+func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchReportRequest) (taskId string, err error) {
 	// if account is not found, create new account
 	accountId, err := s.pipelineAccount(ctx)
 	if err != nil {
@@ -227,13 +228,13 @@ func (s *ReportService) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types
 		},
 		Reports:   reports,
 		AccountID: accountId,
-		IP:        utils.ExtractIP(ctx),
+		IP:        util.ExtractIP(ctx),
 	}
 
 	return s.commitReportTask(ctx, "REPORT.BATCH", reportTask)
 }
 
-func (s *ReportService) RecallSingularReport(ctx context.Context, req *types.SingleReportRecallRequest) error {
+func (s *Report) RecallSingularReport(ctx context.Context, req *types.SingleReportRecallRequest) error {
 	var reportId int
 	r := s.Redis.Get(ctx, req.ReportHash)
 
@@ -258,7 +259,7 @@ func (s *ReportService) RecallSingularReport(ctx context.Context, req *types.Sin
 	return nil
 }
 
-func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) error {
+func (s *Report) ReportConsumeWorker(ctx context.Context, ch chan error) error {
 	msgChan := make(chan *nats.Msg, 16)
 
 	_, err := s.NatsJS.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.AckWait(time.Second*10), nats.MaxAckPending(128))
@@ -267,15 +268,16 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 		return err
 	}
 
-	time.Now().UnixMilli()
-
 	for {
 		select {
 		case msg := <-msgChan:
 			func() {
 				taskCtx, cancelTask := context.WithDeadline(ctx, time.Now().Add(time.Second*10))
 				inprogressInformer := time.AfterFunc(time.Second*5, func() {
-					msg.InProgress()
+					err = msg.InProgress()
+					if err != nil {
+						log.Error().Err(err).Msg("failed to set msg InProgress")
+					}
 				})
 				defer func() {
 					inprogressInformer.Stop()
@@ -310,7 +312,7 @@ func (s *ReportService) ReportConsumeWorker(ctx context.Context, ch chan error) 
 	}
 }
 
-func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types.ReportTask) error {
+func (s *Report) consumeReportTask(ctx context.Context, reportTask *types.ReportTask) error {
 	L := log.With().
 		Interface("task", reportTask).
 		Logger()
@@ -323,6 +325,14 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 		L.Warn().
 			Interface("errors", errs).
 			Msg("report task verification failed, marking task as unreliable")
+	}
+
+	// reportTask.CreatedAt is in microseconds
+	var taskCreatedAt time.Time
+	if reportTask.CreatedAt != 0 {
+		taskCreatedAt = time.UnixMicro(reportTask.CreatedAt)
+	} else {
+		taskCreatedAt = time.Now()
 	}
 
 	tx, err := s.DB.BeginTx(ctx, nil)
@@ -359,14 +369,11 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 		if err != nil {
 			return err
 		}
-		times := report.Times
-		if times == 0 {
-			times = 1
-		}
-		dropReport := &models.DropReport{
+		dropReport := &model.DropReport{
 			StageID:     stage.StageID,
 			PatternID:   dropPattern.PatternID,
-			Times:       times,
+			Times:       report.Times,
+			CreatedAt:   &taskCreatedAt,
 			Reliability: taskReliability,
 			Server:      reportTask.Server,
 			AccountID:   reportTask.AccountID,
@@ -383,7 +390,7 @@ func (s *ReportService) consumeReportTask(ctx context.Context, reportTask *types
 			// FIXME: temporary hack; find why ip is empty
 			reportTask.IP = "127.0.0.1"
 		}
-		if err = s.DropReportExtraRepo.CreateDropReportExtra(ctx, tx, &models.DropReportExtra{
+		if err = s.DropReportExtraRepo.CreateDropReportExtra(ctx, tx, &model.DropReportExtra{
 			ReportID: dropReport.ReportID,
 			IP:       reportTask.IP,
 			Source:   reportTask.Source,

@@ -16,6 +16,7 @@ require (
 	github.com/gofiber/contrib/fibersentry v0.0.0-20220308072908-2bb8d753d425
 	github.com/gofiber/fiber/v2 v2.29.0
 	github.com/gofiber/helmet/v2 v2.2.8
+	github.com/joho/godotenv v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/nats-io/nats.go v1.13.1-0.20220121202836-972a071d373d
 	github.com/oschwald/geoip2-golang v1.6.1
@@ -23,6 +24,7 @@ require (
 	github.com/penguin-statistics/fiberotel v0.8.2
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.26.1
+	github.com/samber/lo v1.11.0
 	github.com/stretchr/testify v1.7.0
 	github.com/swaggo/swag v1.8.0
 	github.com/tidwall/gjson v1.12.0
@@ -42,13 +44,7 @@ require (
 	gopkg.in/guregu/null.v3 v3.5.0
 )
 
-require (
-	github.com/fasthttp/websocket v1.5.0 // indirect
-	github.com/gofiber/websocket/v2 v2.0.18 // indirect
-	github.com/samber/lo v1.11.0 // indirect
-	github.com/savsgio/gotils v0.0.0-20220201163454-d252f0a44d5b // indirect
-	golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
-)
+require golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
 
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
@@ -96,7 +92,6 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
-	golang.org/x/mod v0.6.0-dev.0.20211013180041-c96bc1413d57 // indirect
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
 	golang.org/x/sys v0.0.0-20220310020820-b874c991c1a5 // indirect
 	golang.org/x/tools v0.1.8-0.20211029000441-d6a9af8af023 // indirect
