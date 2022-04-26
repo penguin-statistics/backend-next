@@ -24,7 +24,7 @@ type Report struct {
 	ReportService *service.Report
 }
 
-func RegisterReport(v2 *svr.V2, v3 *svr.V3, c Report) {
+func RegisterReport(v2 *svr.V2, c Report) {
 	v2.Post("/report", c.SingularReport)
 	v2.Post("/report/recall", c.RecallSingularReport)
 	v2.Post("/report/recognition", c.RecognitionReport)

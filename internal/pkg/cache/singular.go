@@ -42,12 +42,11 @@ func (c *Singular[T]) Get(dest *T) error {
 	return nil
 }
 
-func (c *Singular[T]) Set(value T, expire time.Duration) error {
+func (c *Singular[T]) Set(value T, expire time.Duration) {
 	c.c.Set(c.key, value, expire)
-	return nil
 }
 
-// MutexGetSet gets value from cache and writes to dest, or if the key does not exists, it executes valueFunc
+// MutexGetSet gets value from cache and writes to dest, or if the key does not exist, it executes valueFunc
 // to get cache value if the key still not exists when serially dispatched, sets value to cache and
 // writes value to dest.
 // The first return value means whether the value is got from cache or not. True means calculated; False means got from cache.
@@ -76,11 +75,7 @@ func (c *Singular[T]) slowMutexGetSet(dest *T, valueFunc func() (T, error), expi
 		return err
 	}
 
-	err = c.Set(value, expire)
-	if err != nil {
-		log.Error().Err(err).Str("key", c.key).Msg("failed to set value to cache in MutexGetSet")
-		return err
-	}
+	c.Set(value, expire)
 
 	// copy value to dest
 	// copy value to dest

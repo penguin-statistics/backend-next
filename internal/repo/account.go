@@ -25,7 +25,7 @@ func NewAccount(db *bun.DB) *Account {
 	return &Account{db: db}
 }
 
-// PenguinID is a 8 number string and padded with 0
+// PenguinID is an 8 number string and padded with 0
 func generateRandomPenguinId() string {
 	rand.Seed(time.Now().UnixNano())
 	return fmt.Sprintf("%08d", rand.Intn(1e8))

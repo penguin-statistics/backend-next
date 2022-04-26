@@ -58,7 +58,7 @@ func (c *Set[T]) Set(key string, value T, expire time.Duration) {
 	c.c.Set(key, value, expire)
 }
 
-// MutexGetSet gets value from cache and writes to dest, or if the key does not exists, it executes valueFunc
+// MutexGetSet gets value from cache and writes to dest, or if the key does not exist, it executes valueFunc
 // to get cache value if the key still not exists when serially dispatched, sets value to cache and
 // writes value to dest.
 // The first return value means whether the value is got from cache or not. True means calculated; False means got from cache.

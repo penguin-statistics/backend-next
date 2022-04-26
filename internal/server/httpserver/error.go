@@ -42,7 +42,7 @@ func handleCustomError(ctx *fiber.Ctx, e *pgerr.PenguinError) error {
 func ErrorHandler(ctx *fiber.Ctx, err error) error {
 	defer func() {
 		// Recover from panic: ErrorHandler panics will not be handled by fasthttp
-		// as the request pipeline might not yet reached any middlewares yet.
+		// as the request pipeline might not yet reach any middlewares yet.
 		// e.g. a 431 Request Header Fields Too Large error occurs.
 		if r := recover(); r != nil {
 			log.Error().

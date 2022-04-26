@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-var validIdRegex = regexp.MustCompile(`^[a-zA-Z0-9\-_]+$`)
+var validIdRegex = regexp.MustCompile(`^[a-zA-Z\d\-_]+$`)
 
 func IsASCII(s string) bool {
 	for _, r := range s {
@@ -35,7 +35,7 @@ func NonNullString(s string) bool {
 }
 
 // AddSpace Adds a space, if not present, between ASCII Characters and Non-ASCII Characters.
-// Notice that Non-ASCII characters could be multi-byte unicode sequence.
+// Notice that Non-ASCII characters could be multibyte unicode sequence.
 // For example, "中文english" -> "中文 english"
 func AddSpace(s string) string {
 	var b strings.Builder

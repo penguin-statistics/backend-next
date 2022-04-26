@@ -23,6 +23,9 @@ type DropVerifier struct {
 	DropInfoRepo *repo.DropInfo
 }
 
+// ensure DropVerifier conforms to Verifier
+var _ Verifier = (*DropVerifier)(nil)
+
 func NewDropVerifier(dropInfoRepo *repo.DropInfo) *DropVerifier {
 	return &DropVerifier{
 		DropInfoRepo: dropInfoRepo,

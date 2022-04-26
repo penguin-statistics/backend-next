@@ -47,7 +47,7 @@ func (c *Stage) GetStages(ctx *fiber.Ctx) error {
 	return ctx.JSON(stages)
 }
 
-// @Summary  Get an Stage with ID
+// @Summary  Get a Stage with ID
 // @Tags     Stage
 // @Produce  json
 // @Param    stageId  path      int  true  "Stage ID"

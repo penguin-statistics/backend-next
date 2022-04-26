@@ -3,10 +3,10 @@ package rekuest
 import (
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
-	en_translations "github.com/go-playground/validator/v10/translations/en"
-	ja_translations "github.com/go-playground/validator/v10/translations/ja"
-	zh_translations "github.com/go-playground/validator/v10/translations/zh"
-	zh_tw_translations "github.com/go-playground/validator/v10/translations/zh_tw"
+	enTranslations "github.com/go-playground/validator/v10/translations/en"
+	jaTranslations "github.com/go-playground/validator/v10/translations/ja"
+	zhTranslations "github.com/go-playground/validator/v10/translations/zh"
+	zhTwTranslations "github.com/go-playground/validator/v10/translations/zh_tw"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 
@@ -20,25 +20,25 @@ var Validate = util.NewValidator()
 func init() {
 	var err error
 	entr, _ := i18n.UT.GetTranslator("en")
-	err = en_translations.RegisterDefaultTranslations(Validate, entr)
+	err = enTranslations.RegisterDefaultTranslations(Validate, entr)
 	if err != nil {
 		log.Warn().Err(err).Str("locale", "en").Msg("could not register translation")
 	}
 
 	zhtr, _ := i18n.UT.GetTranslator("zh")
-	err = zh_translations.RegisterDefaultTranslations(Validate, zhtr)
+	err = zhTranslations.RegisterDefaultTranslations(Validate, zhtr)
 	if err != nil {
 		log.Warn().Err(err).Str("locale", "zh").Msg("could not register translation")
 	}
 
 	zhtwtr, _ := i18n.UT.GetTranslator("zh_Hant_TW")
-	err = zh_tw_translations.RegisterDefaultTranslations(Validate, zhtwtr)
+	err = zhTwTranslations.RegisterDefaultTranslations(Validate, zhtwtr)
 	if err != nil {
 		log.Warn().Err(err).Str("locale", "zh_Hant_TW").Msg("could not register translation")
 	}
 
 	jatr, _ := i18n.UT.GetTranslator("ja")
-	err = ja_translations.RegisterDefaultTranslations(Validate, jatr)
+	err = jaTranslations.RegisterDefaultTranslations(Validate, jatr)
 	if err != nil {
 		log.Warn().Err(err).Str("locale", "ja").Msg("could not register translation")
 	}

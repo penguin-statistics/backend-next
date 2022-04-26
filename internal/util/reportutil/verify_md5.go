@@ -15,6 +15,9 @@ type MD5Verifier struct {
 	DropReportExtraRepo *repo.DropReportExtra
 }
 
+// ensure MD5Verifier conforms to Verifier
+var _ Verifier = (*MD5Verifier)(nil)
+
 func NewMD5Verifier(dropReportExtraRepo *repo.DropReportExtra) *MD5Verifier {
 	return &MD5Verifier{
 		DropReportExtraRepo: dropReportExtraRepo,

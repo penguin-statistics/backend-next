@@ -43,7 +43,7 @@ func (c *Account) Login(ctx *fiber.Ctx) error {
 	pgid.Inject(ctx, account.PenguinID)
 
 	// for some reasons the response for the login API is in format of
-	// text/plain so I'd have to manually convert it to JSON and use ctx#Send to respond
+	// text/plain, so I'd have to manually convert it to JSON and use ctx#Send to respond
 	// to ensure compatibility
 	resp, err := json.Marshal(&modelv2.LoginResponse{
 		UserID: account.PenguinID,
