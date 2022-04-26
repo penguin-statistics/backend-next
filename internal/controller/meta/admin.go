@@ -1,12 +1,9 @@
 package meta
 
 import (
-	"time"
-
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/model/gamedata"
@@ -15,8 +12,6 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/util/rekuest"
 )
-
-const TimeLayout = "2006-01-02 15:04:05 -07:00"
 
 type AdminController struct {
 	fx.In
@@ -97,19 +92,4 @@ func (c *AdminController) RefreshAllSiteStats(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	_, err := c.SiteStatsService.RefreshShimSiteStats(ctx.Context(), server)
 	return err
-}
-
-func getTimeFromString(timeRange types.TimeRange) (startTime *time.Time, endTime *time.Time, err error) {
-	start, err := time.Parse(TimeLayout, timeRange.StartTime)
-	if err != nil {
-		return nil, nil, err
-	}
-	end := time.UnixMilli(constant.FakeEndTimeMilli)
-	if timeRange.EndTime.Valid {
-		end, err = time.Parse(TimeLayout, timeRange.EndTime.String)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	return &start, &end, nil
 }
