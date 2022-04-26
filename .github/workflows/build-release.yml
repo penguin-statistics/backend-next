@@ -2,9 +2,10 @@ name: Build Docker Image (Release)
 
 on:
   push:
-    # trigger on any tag push
+    # trigger on version tag push
     tags:
-      - "**"
+      - "v*"
+
 concurrency:
   group: ${{ github.ref }}
   cancel-in-progress: true
@@ -57,3 +58,8 @@ jobs:
         with:
           environment: prod
           version: ${{ env.VERSION }}
+      
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
