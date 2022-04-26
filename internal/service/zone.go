@@ -73,9 +73,8 @@ func (s *Zone) GetShimZones(ctx context.Context) ([]*modelv2.Zone, error) {
 	for _, i := range zones {
 		s.applyShim(i)
 	}
-	if err := cache.ShimZones.Set(zones, 24*time.Hour); err == nil {
-		cache.LastModifiedTime.Set("[shimZones]", time.Now(), 0)
-	}
+	cache.ShimZones.Set(zones, 24*time.Hour)
+	cache.LastModifiedTime.Set("[shimZones]", time.Now(), 0)
 	return zones, nil
 }
 
