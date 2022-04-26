@@ -273,14 +273,14 @@ func (s *Report) ReportConsumeWorker(ctx context.Context, ch chan error) error {
 		case msg := <-msgChan:
 			func() {
 				taskCtx, cancelTask := context.WithDeadline(ctx, time.Now().Add(time.Second*10))
-				inprogressInformer := time.AfterFunc(time.Second*5, func() {
+				inProgressInformer := time.AfterFunc(time.Second*5, func() {
 					err = msg.InProgress()
 					if err != nil {
 						log.Error().Err(err).Msg("failed to set msg InProgress")
 					}
 				})
 				defer func() {
-					inprogressInformer.Stop()
+					inProgressInformer.Stop()
 					cancelTask()
 					if err := msg.Ack(); err != nil {
 						log.Error().Err(err).Msg("failed to ack")

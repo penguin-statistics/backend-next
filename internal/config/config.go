@@ -48,7 +48,7 @@ type Config struct {
 	// Normal contributors should not need to change this: when left empty, recognition report is simply disabled.
 	RecognitionEncryptionIV []int `split_words:"true"`
 
-	// HTTPServerShutdownTimeout is the timeout for the HTTP server to shutdown gracefully.
+	// HTTPServerShutdownTimeout is the timeout for the HTTP server to shut down gracefully.
 	HTTPServerShutdownTimeout time.Duration `required:"true" split_words:"true" default:"60s"`
 
 	// GeoIPDBPath is the path to the GeoIP2 database.

@@ -16,7 +16,7 @@ func getEnvironment(conf *config.Config) string {
 	}
 }
 
-// SentryInit initializes sentry with side-effect
+// SentryInit initializes sentry with side effect
 func SentryInit(conf *config.Config) error {
 	if conf.SentryDSN == "" {
 		log.Warn().Msg("Sentry is disabled due to missing DSN.")

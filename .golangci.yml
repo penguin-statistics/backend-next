@@ -115,7 +115,7 @@ issues:
     - comment on exported method
     # ignore cache errcheck
     - Error return value of `cache\..*` is not checked
-    # some times we don't need crypto/rand
+    # sometimes we don't need crypto/rand
     - G404
     # can we plz just don't care about this casing problem...
     - Id.*ID
