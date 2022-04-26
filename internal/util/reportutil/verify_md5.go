@@ -9,7 +9,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
 
-var ErrMD5Conflict = errors.New("report with specified md5 has already exited")
+var ErrMD5Conflict = errors.New("report with specified md5 has already existed")
 
 type MD5Verifier struct {
 	DropReportExtraRepo *repo.DropReportExtra

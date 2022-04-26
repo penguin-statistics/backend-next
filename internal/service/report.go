@@ -5,10 +5,14 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/dchest/uniuri"
 	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
 	"github.com/nats-io/nats.go"
+	"github.com/pkg/errors"
+	"github.com/uptrace/bun"
+
 	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
@@ -16,8 +20,6 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/util"
 	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
-	"github.com/pkg/errors"
-	"github.com/uptrace/bun"
 )
 
 var (
@@ -187,10 +189,13 @@ func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchR
 			return "", err
 		}
 
+		// catch the variable
+		metadata := drop.Metadata
+		spew.Dump(metadata)
 		reports[i] = &types.SingleReport{
 			FragmentStageID: drop.FragmentStageID,
 			Drops:           drops,
-			Metadata:        &drop.Metadata,
+			Metadata:        &metadata,
 		}
 	}
 
