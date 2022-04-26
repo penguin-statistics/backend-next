@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/dchest/uniuri"
 	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
@@ -191,7 +190,6 @@ func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchR
 
 		// catch the variable
 		metadata := drop.Metadata
-		spew.Dump(metadata)
 		reports[i] = &types.SingleReport{
 			FragmentStageID: drop.FragmentStageID,
 			Drops:           drops,
