@@ -28,6 +28,10 @@ type TimeRange struct {
 }
 
 type PurgeCacheRequest struct {
+	Pairs []PurgeCachePair `json:"pairs"`
+}
+
+type PurgeCachePair struct {
 	Name string      `json:"name"`
 	Key  null.String `json:"key" swaggertype:"string"`
 }
