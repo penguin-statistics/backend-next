@@ -35,9 +35,8 @@ func (s *Activity) GetActivities(ctx context.Context) ([]*model.Activity, error)
 	if err != nil {
 		return nil, err
 	}
-	if err = cache.Activities.Set(activities, 24*time.Hour); err == nil {
-		cache.LastModifiedTime.Set("[activities]", time.Now(), 0)
-	}
+	cache.Activities.Set(activities, 24*time.Hour)
+	cache.LastModifiedTime.Set("[activities]", time.Now(), 0)
 	return activities, err
 }
 
@@ -57,9 +56,8 @@ func (s *Activity) GetShimActivities(ctx context.Context) ([]*modelv2.Activity, 
 	for i, activity := range activities {
 		shimActivities[i] = s.applyShim(activity)
 	}
-	if err := cache.ShimActivities.Set(shimActivities, 24*time.Hour); err == nil {
-		cache.LastModifiedTime.Set("[shimActivities]", time.Now(), 0)
-	}
+	cache.ShimActivities.Set(shimActivities, 24*time.Hour)
+	cache.LastModifiedTime.Set("[shimActivities]", time.Now(), 0)
 	return shimActivities, nil
 }
 

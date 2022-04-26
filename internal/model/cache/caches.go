@@ -70,8 +70,8 @@ var (
 
 	once sync.Once
 
-	CacheSetMap             map[string]Flusher
-	CacheSingularFlusherMap map[string]Flusher
+	SetMap             map[string]Flusher
+	SingularFlusherMap map[string]Flusher
 )
 
 func Initialize(propertyRepo *repo.Property) {
@@ -83,18 +83,18 @@ func Initialize(propertyRepo *repo.Property) {
 
 func Delete(name string, key null.String) error {
 	if key.Valid {
-		if _, ok := CacheSetMap[name]; ok {
-			if err := CacheSetMap[name](); err != nil {
+		if _, ok := SetMap[name]; ok {
+			if err := SetMap[name](); err != nil {
 				return err
 			}
 		}
 	} else {
-		if _, ok := CacheSingularFlusherMap[name]; ok {
-			if err := CacheSingularFlusherMap[name](); err != nil {
+		if _, ok := SingularFlusherMap[name]; ok {
+			if err := SingularFlusherMap[name](); err != nil {
 				return err
 			}
-		} else if _, ok := CacheSetMap[name]; ok {
-			if err := CacheSetMap[name](); err != nil {
+		} else if _, ok := SetMap[name]; ok {
+			if err := SetMap[name](); err != nil {
 				return err
 			}
 		}
@@ -103,31 +103,31 @@ func Delete(name string, key null.String) error {
 }
 
 func initializeCaches() {
-	CacheSetMap = make(map[string]Flusher)
-	CacheSingularFlusherMap = make(map[string]Flusher)
+	SetMap = make(map[string]Flusher)
+	SingularFlusherMap = make(map[string]Flusher)
 
 	// account
 	AccountByID = cache.NewSet[model.Account]("account#accountId")
 	AccountByPenguinID = cache.NewSet[model.Account]("account#penguinId")
 
-	CacheSetMap["account#accountId"] = AccountByID.Flush
-	CacheSetMap["account#penguinId"] = AccountByPenguinID.Flush
+	SetMap["account#accountId"] = AccountByID.Flush
+	SetMap["account#penguinId"] = AccountByPenguinID.Flush
 
 	// drop_info
 	ItemDropSetByStageIDAndRangeID = cache.NewSet[[]int]("itemDropSet#server|stageId|rangeId")
 	ItemDropSetByStageIdAndTimeRange = cache.NewSet[[]int]("itemDropSet#server|stageId|startTime|endTime")
 
-	CacheSetMap["itemDropSet#server|stageId|rangeId"] = ItemDropSetByStageIDAndRangeID.Flush
-	CacheSetMap["itemDropSet#server|stageId|startTime|endTime"] = ItemDropSetByStageIdAndTimeRange.Flush
+	SetMap["itemDropSet#server|stageId|rangeId"] = ItemDropSetByStageIDAndRangeID.Flush
+	SetMap["itemDropSet#server|stageId|startTime|endTime"] = ItemDropSetByStageIdAndTimeRange.Flush
 
 	// drop_matrix
 	ShimMaxAccumulableDropMatrixResults = cache.NewSet[modelv2.DropMatrixQueryResult]("shimMaxAccumulableDropMatrixResults#server|showClosedZoned")
 
-	CacheSetMap["shimMaxAccumulableDropMatrixResults#server|showClosedZoned"] = ShimMaxAccumulableDropMatrixResults.Flush
+	SetMap["shimMaxAccumulableDropMatrixResults#server|showClosedZoned"] = ShimMaxAccumulableDropMatrixResults.Flush
 
 	// formula
 	Formula = cache.NewSingular[json.RawMessage]("formula")
-	CacheSingularFlusherMap["formula"] = Formula.Delete
+	SingularFlusherMap["formula"] = Formula.Delete
 
 	// item
 	Items = cache.NewSingular[[]*model.Item]("items")
@@ -137,34 +137,34 @@ func initializeCaches() {
 	ItemsMapById = cache.NewSingular[map[int]*model.Item]("itemsMapById")
 	ItemsMapByArkID = cache.NewSingular[map[string]*model.Item]("itemsMapByArkId")
 
-	CacheSingularFlusherMap["items"] = Items.Delete
-	CacheSetMap["item#arkItemId"] = ItemByArkID.Flush
-	CacheSingularFlusherMap["shimItems"] = ShimItems.Delete
-	CacheSetMap["shimItem#arkItemId"] = ShimItemByArkID.Flush
-	CacheSingularFlusherMap["itemsMapById"] = ItemsMapById.Delete
-	CacheSingularFlusherMap["itemsMapByArkId"] = ItemsMapByArkID.Delete
+	SingularFlusherMap["items"] = Items.Delete
+	SetMap["item#arkItemId"] = ItemByArkID.Flush
+	SingularFlusherMap["shimItems"] = ShimItems.Delete
+	SetMap["shimItem#arkItemId"] = ShimItemByArkID.Flush
+	SingularFlusherMap["itemsMapById"] = ItemsMapById.Delete
+	SingularFlusherMap["itemsMapByArkId"] = ItemsMapByArkID.Delete
 
 	// notice
 	Notices = cache.NewSingular[[]*model.Notice]("notices")
 
-	CacheSingularFlusherMap["notices"] = Notices.Delete
+	SingularFlusherMap["notices"] = Notices.Delete
 
 	// activity
 	Activities = cache.NewSingular[[]*model.Activity]("activities")
 	ShimActivities = cache.NewSingular[[]*modelv2.Activity]("shimActivities")
 
-	CacheSingularFlusherMap["activities"] = Activities.Delete
-	CacheSingularFlusherMap["shimActivities"] = ShimActivities.Delete
+	SingularFlusherMap["activities"] = Activities.Delete
+	SingularFlusherMap["shimActivities"] = ShimActivities.Delete
 
 	// pattern_matrix
 	ShimLatestPatternMatrixResults = cache.NewSet[modelv2.PatternMatrixQueryResult]("shimLatestPatternMatrixResults#server")
 
-	CacheSetMap["shimLatestPatternMatrixResults#server"] = ShimLatestPatternMatrixResults.Flush
+	SetMap["shimLatestPatternMatrixResults#server"] = ShimLatestPatternMatrixResults.Flush
 
 	// site_stats
 	ShimSiteStats = cache.NewSet[modelv2.SiteStats]("shimSiteStats#server")
 
-	CacheSetMap["shimSiteStats#server"] = ShimSiteStats.Flush
+	SetMap["shimSiteStats#server"] = ShimSiteStats.Flush
 
 	// stage
 	Stages = cache.NewSingular[[]*model.Stage]("stages")
@@ -174,12 +174,12 @@ func initializeCaches() {
 	StagesMapByID = cache.NewSingular[map[int]*model.Stage]("stagesMapById")
 	StagesMapByArkID = cache.NewSingular[map[string]*model.Stage]("stagesMapByArkId")
 
-	CacheSingularFlusherMap["stages"] = Stages.Delete
-	CacheSetMap["stage#arkStageId"] = StageByArkID.Flush
-	CacheSetMap["shimStages#server"] = ShimStages.Flush
-	CacheSetMap["shimStage#server|arkStageId"] = ShimStageByArkID.Flush
-	CacheSingularFlusherMap["stagesMapById"] = StagesMapByID.Delete
-	CacheSingularFlusherMap["stagesMapByArkId"] = StagesMapByArkID.Delete
+	SingularFlusherMap["stages"] = Stages.Delete
+	SetMap["stage#arkStageId"] = StageByArkID.Flush
+	SetMap["shimStages#server"] = ShimStages.Flush
+	SetMap["shimStage#server|arkStageId"] = ShimStageByArkID.Flush
+	SingularFlusherMap["stagesMapById"] = StagesMapByID.Delete
+	SingularFlusherMap["stagesMapByArkId"] = StagesMapByArkID.Delete
 
 	// time_range
 	TimeRanges = cache.NewSet[[]*model.TimeRange]("timeRanges#server")
@@ -187,15 +187,15 @@ func initializeCaches() {
 	TimeRangesMap = cache.NewSet[map[int]*model.TimeRange]("timeRangesMap#server")
 	MaxAccumulableTimeRanges = cache.NewSet[map[int]map[int][]*model.TimeRange]("maxAccumulableTimeRanges#server")
 
-	CacheSetMap["timeRanges#server"] = TimeRanges.Flush
-	CacheSetMap["timeRange#rangeId"] = TimeRangeByID.Flush
-	CacheSetMap["timeRangesMap#server"] = TimeRangesMap.Flush
-	CacheSetMap["maxAccumulableTimeRanges#server"] = MaxAccumulableTimeRanges.Flush
+	SetMap["timeRanges#server"] = TimeRanges.Flush
+	SetMap["timeRange#rangeId"] = TimeRangeByID.Flush
+	SetMap["timeRangesMap#server"] = TimeRangesMap.Flush
+	SetMap["maxAccumulableTimeRanges#server"] = MaxAccumulableTimeRanges.Flush
 
 	// trend
 	ShimSavedTrendResults = cache.NewSet[modelv2.TrendQueryResult]("shimSavedTrendResults#server")
 
-	CacheSetMap["shimSavedTrendResults#server"] = ShimSavedTrendResults.Flush
+	SetMap["shimSavedTrendResults#server"] = ShimSavedTrendResults.Flush
 
 	// zone
 	Zones = cache.NewSingular[[]*model.Zone]("zones")
@@ -203,20 +203,20 @@ func initializeCaches() {
 	ShimZones = cache.NewSingular[[]*modelv2.Zone]("shimZones")
 	ShimZoneByArkID = cache.NewSet[modelv2.Zone]("shimZone#arkZoneId")
 
-	CacheSingularFlusherMap["zones"] = Zones.Delete
-	CacheSetMap["zone#arkZoneId"] = ZoneByArkID.Flush
-	CacheSingularFlusherMap["shimZones"] = ShimZones.Delete
-	CacheSetMap["shimZone#arkZoneId"] = ShimZoneByArkID.Flush
+	SingularFlusherMap["zones"] = Zones.Delete
+	SetMap["zone#arkZoneId"] = ZoneByArkID.Flush
+	SingularFlusherMap["shimZones"] = ShimZones.Delete
+	SetMap["shimZone#arkZoneId"] = ShimZoneByArkID.Flush
 
 	// drop_pattern_elements
 	DropPatternElementsByPatternID = cache.NewSet[[]*model.DropPatternElement]("dropPatternElements#patternId")
 
-	CacheSetMap["dropPatternElements#patternId"] = DropPatternElementsByPatternID.Flush
+	SetMap["dropPatternElements#patternId"] = DropPatternElementsByPatternID.Flush
 
 	// others
 	LastModifiedTime = cache.NewSet[time.Time]("lastModifiedTime#key")
 
-	CacheSetMap["lastModifiedTime#key"] = LastModifiedTime.Flush
+	SetMap["lastModifiedTime#key"] = LastModifiedTime.Flush
 }
 
 func populateProperties(repo *repo.Property) {

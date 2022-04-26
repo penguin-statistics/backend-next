@@ -18,6 +18,9 @@ type UserVerifier struct {
 	AccountRepo *repo.Account
 }
 
+// ensure UserVerifier conforms to Verifier
+var _ Verifier = (*UserVerifier)(nil)
+
 func NewUserVerifier(accountRepo *repo.Account) *UserVerifier {
 	return &UserVerifier{
 		AccountRepo: accountRepo,

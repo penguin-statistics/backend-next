@@ -21,7 +21,7 @@ func Extract(ctx *fiber.Ctx) string {
 }
 
 func Inject(ctx *fiber.Ctx, penguinId string) {
-	// we even got emojis in PenguinID for some of the internal testers :)
+	// we even got emojis in PenguinID for some internal testers :)
 	penguinId = url.QueryEscape(penguinId)
 
 	// Populate cookie

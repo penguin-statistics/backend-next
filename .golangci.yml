@@ -1,3 +1,6 @@
+run:
+  go: '1.18'
+
 linters-settings:
   dupl:
     threshold: 500 # we got swagger comments so...
@@ -57,7 +60,8 @@ linters:
     - staticcheck
     - structcheck
     - stylecheck
-    - typecheck
+    # typecheck: not working with go 1.18
+    # - typecheck
     - unconvert
     - unparam
     - unused
@@ -77,7 +81,6 @@ linters:
   # - gocognit
   # - godot
   # - godox
-  # - goerr113
   # - maligned
   # - nestif
   # - prealloc
@@ -115,7 +118,7 @@ issues:
     - comment on exported method
     # ignore cache errcheck
     - Error return value of `cache\..*` is not checked
-    # some times we don't need crypto/rand
+    # sometimes we don't need crypto/rand
     - G404
     # can we plz just don't care about this casing problem...
     - Id.*ID

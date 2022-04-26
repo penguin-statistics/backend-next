@@ -34,7 +34,7 @@ type BatchReportDrop struct {
 }
 
 type ReportRequestMetadata struct {
-	Fingerprint  string      `json:"fingerprint" validate:"lte=128"`
+	Fingerprint  string      `json:"fingerprint,omitempty" validate:"lte=128"`
 	MD5          null.String `json:"md5" validate:"lte=32" swaggertype:"string"`
 	FileName     string      `json:"fileName" validate:"lte=512"`
 	LastModified int         `json:"lastModified"`

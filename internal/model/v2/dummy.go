@@ -1,9 +1,9 @@
 package v2
 
-// Dummy is for swagger to find the correct package by using a
-// import alias in the used file. For some of the files, typically
+// Dummy is for swagger to find the correct package by using an
+// import alias in the used file. For some files, typically
 // in the controller, the model is not actually been referenced as
-// a type. Therefore causing the import to be stripped and causing
+// a type. Therefore, causing the import to be stripped and causing
 // swag-go to fail finding the right package.
 //
 // The intended way to use this is:
