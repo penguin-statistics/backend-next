@@ -193,6 +193,7 @@ func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchR
 		reports[i] = &types.SingleReport{
 			FragmentStageID: drop.FragmentStageID,
 			Drops:           drops,
+			Times:           1,
 			Metadata:        &metadata,
 		}
 	}
