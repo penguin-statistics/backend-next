@@ -3,17 +3,19 @@ package reportwkr
 import (
 	"context"
 	"encoding/json"
+	"runtime"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/nats-io/nats.go"
+	"github.com/rs/zerolog/log"
+	"go.uber.org/fx"
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/penguin-statistics/backend-next/internal/config"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/rs/zerolog/log"
-	"go.uber.org/fx"
-	"gopkg.in/guregu/null.v3"
-	"runtime"
-	"time"
 )
 
 type WorkerDeps struct {

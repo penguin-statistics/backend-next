@@ -100,6 +100,19 @@ func (s *Report) pipelineTaskId(ctx *fiber.Ctx) string {
 	return ctx.Locals("requestid").(string) + "-" + uniuri.NewLen(32)
 }
 
+func (s *Report) pipelineAggregateGachaboxDrops(ctx context.Context, singleReport *types.SingleReport) error {
+	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
+	category, err := s.StageService.GetStageExtraProcessTypeByArkId(ctx, singleReport.StageID)
+	if err != nil {
+		return err
+	}
+	if category.Valid && category.String == constant.ExtraProcessTypeGachaBox {
+		reportutil.AggregateGachaBoxDrops(singleReport)
+	}
+
+	return nil
+}
+
 func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.ReportTask) (taskId string, err error) {
 	taskId = s.pipelineTaskId(ctx)
 	task.TaskID = taskId
@@ -148,12 +161,9 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 	}
 
 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
-	category, err := s.StageService.GetStageExtraProcessTypeByArkId(ctx.Context(), singleReport.StageID)
+	err = s.pipelineAggregateGachaboxDrops(ctx.Context(), singleReport)
 	if err != nil {
 		return "", err
-	}
-	if category.Valid && category.String == constant.ExtraProcessTypeGachaBox {
-		reportutil.AggregateGachaBoxDrops(singleReport)
 	}
 
 	// construct ReportContext
@@ -190,11 +200,18 @@ func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchR
 
 		// catch the variable
 		metadata := drop.Metadata
-		reports[i] = &types.SingleReport{
+		report := &types.SingleReport{
 			FragmentStageID: drop.FragmentStageID,
 			Drops:           drops,
 			Metadata:        &metadata,
 		}
+
+		err = s.pipelineAggregateGachaboxDrops(ctx.Context(), report)
+		if err != nil {
+			return "", err
+		}
+
+		reports[i] = report
 	}
 
 	// construct ReportContext

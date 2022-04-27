@@ -1,13 +1,18 @@
 package meta
 
 import (
+	"net/http"
+
 	"github.com/gofiber/fiber/v2"
+	"github.com/pkg/errors"
+	"github.com/samber/lo"
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/model/gamedata"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/util/rekuest"
@@ -70,7 +75,25 @@ func (c *AdminController) PurgeCache(ctx *fiber.Ctx) error {
 	if err := rekuest.ValidBody(ctx, &request); err != nil {
 		return err
 	}
-	return cache.Delete(request.Name, request.Key)
+	errs := lo.Filter(
+		lo.Map(request.Pairs, func(pair types.PurgeCachePair, _ int) error {
+			err := cache.Delete(pair.Name, pair.Key)
+			if err != nil {
+				return errors.Wrapf(err, "cache [%s:%s]", pair.Name, pair.Key)
+			}
+			return nil
+		}),
+		func(v error, i int) bool {
+			return v != nil
+		},
+	)
+	if len(errs) > 0 {
+		err := pgerr.New(http.StatusInternalServerError, "PURGE_CACHE_FAILED", "error occurred while purging cache")
+		err.Extras = &pgerr.Extras{
+			"caches": errs,
+		}
+	}
+	return nil
 }
 
 func (c *AdminController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
