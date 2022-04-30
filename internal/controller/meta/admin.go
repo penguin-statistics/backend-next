@@ -30,6 +30,7 @@ type AdminController struct {
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
+	admin.Get("/bonjour", c.Bonjour)
 	admin.Post("/save", c.SaveRenderedObjects)
 	admin.Post("/purge", c.PurgeCache)
 
@@ -43,6 +44,11 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 
 type CliGameDataSeedResponse struct {
 	Items []*model.Item `json:"items"`
+}
+
+// Bonjour is for the admin dashboard to detect authentication status
+func (c AdminController) Bonjour(ctx *fiber.Ctx) error {
+	return ctx.SendStatus(http.StatusNoContent)
 }
 
 func (c AdminController) GetCliGameDataSeed(ctx *fiber.Ctx) error {
