@@ -238,7 +238,10 @@ func (s *Trend) calcTrend(
 	if err != nil {
 		return nil, err
 	}
-	combinedResults := s.combineQuantityAndTimesResults(quantityResults, timesResults)
+	combinedResults, err := s.combineQuantityAndTimesResults(ctx, server, itemIdFilter, quantityResults, timesResults)
+	if err != nil {
+		return nil, err
+	}
 
 	finalResults := make([]*model.TrendElement, 0, len(combinedResults))
 	for _, result := range combinedResults {
@@ -257,8 +260,8 @@ func (s *Trend) calcTrend(
 }
 
 func (s *Trend) combineQuantityAndTimesResults(
-	quantityResults []*model.TotalQuantityResultForTrend, timesResults []*model.TotalTimesResultForTrend,
-) []*model.CombinedResultForTrend {
+	ctx context.Context, server string, itemIdFilter []int, quantityResults []*model.TotalQuantityResultForTrend, timesResults []*model.TotalTimesResultForTrend,
+) ([]*model.CombinedResultForTrend, error) {
 	var firstGroupResultsForQuantity []linq.Group
 	combinedResults := make([]*model.CombinedResultForTrend, 0)
 	linq.From(quantityResults).
@@ -305,6 +308,31 @@ func (s *Trend) combineQuantityAndTimesResults(
 			ToSlice(&secondGroupResultsForTimes)
 		for _, secondGroupElements := range secondGroupResultsForTimes {
 			stageId := secondGroupElements.Key.(int)
+
+			if quantityResultsMapForOneGroup == nil {
+				// it means no items were dropped in this group, we need to find all dropable items and set their quantity to 0
+				dropInfosForSpecialTimeRange, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, []*model.TimeRange{
+					{
+						StartTime: secondGroupElements.Group[0].(*model.TotalTimesResultForTrend).IntervalStart,
+						EndTime:   secondGroupElements.Group[0].(*model.TotalTimesResultForTrend).IntervalEnd,
+					},
+				}, []int{stageId}, itemIdFilter)
+				if err != nil {
+					return nil, err
+				}
+				var dropItemIds []int
+				linq.From(dropInfosForSpecialTimeRange).
+					WhereT(func(el *model.DropInfo) bool { return el.ItemID.Valid }).
+					SelectT(func(el *model.DropInfo) int { return int(el.ItemID.Int64) }).
+					ToSlice(&dropItemIds)
+				quantityResultsMapForOneGroup = make(map[int]map[int]int)
+				subMap := make(map[int]int)
+				for _, dropItemId := range dropItemIds {
+					subMap[dropItemId] = 0
+				}
+				quantityResultsMapForOneGroup[stageId] = subMap
+			}
+
 			resultsMap := quantityResultsMapForOneGroup[stageId]
 			for _, el := range secondGroupElements.Group {
 				times := el.(*model.TotalTimesResultForTrend).TotalTimes
@@ -324,7 +352,7 @@ func (s *Trend) combineQuantityAndTimesResults(
 			}
 		}
 	}
-	return combinedResults
+	return combinedResults, nil
 }
 
 func (s *Trend) convertTrendElementsToTrendQueryResult(trendElements []*model.TrendElement) (*model.TrendQueryResult, error) {

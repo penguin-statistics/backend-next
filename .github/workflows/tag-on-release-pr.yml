@@ -1,0 +1,31 @@
+name: Release PR Tagger
+
+on:
+  # trigger on pull-request merged to main branch
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: tagger-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # check the following items before procedding:
+    # 1. the PR has been merged to branch `main`
+    # 2. the PR title starts with string `Release`
+    if: ${{ github.event_name == 'pull_request' && github.payload.pull_request.merged && github.payload.pull_request.base.ref == 'main' && startsWith(github.payload.pull_request.title, 'Release') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      # git tag the release.
+      # The tag name is the string after `Release`, trimmed of whitespace
+      - name: Tag Release
+        id: tag_release
+        run: |
+          export TAG=$(echo ${{ github.payload.pull_request.title }} | sed -E 's/^Release(.*)$/\1/' | xargs);
+          git tag $TAG
+          git push origin $TAG
+          
