@@ -7,7 +7,7 @@ on:
       - main
 
 concurrency:
-  group: ${{ github.ref }}
+  group: tagger-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
