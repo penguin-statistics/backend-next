@@ -1,4 +1,4 @@
-name: Build Docker Image (Release)
+name: Release PR Tagger
 
 on:
   # trigger on pull-request merged to main branch
@@ -20,52 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/golang@master
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --sarif-file-output=snyk.sarif
-
-      - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v1
-        with:
-          sarif_file: snyk.sarif
-
-      # - name: Run golangci-lint
-      #   uses: golangci/golangci-lint-action@v3.1.0
-
-      # - name: Get Tag Version
-      #   id: get_version
-      #   run: |
-      #     export TRUNCATED_GITHUB_SHA=$(echo ${{ github.sha }} | cut -c1-7);
-      #     echo "VERSION=${GITHUB_REF/refs\/tags\//}+${TRUNCATED_GITHUB_SHA}" >> $GITHUB_ENV
-      #     echo "GIT_TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
-
-      # - name: Build and Publish to Registry
-      #   uses: elgohr/Publish-Docker-Github-Action@3.04
-      #   with:
-      #     name: penguin-statistics/backend-next
-      #     username: ${{ github.actor }}
-      #     password: ${{ secrets.GITHUB_TOKEN }}
-      #     registry: ghcr.io
-      #     tags: "latest,${{ env.GIT_TAG }}"
-      #     buildargs: VERSION
-
-      # - name: Create Sentry release
-      #   uses: getsentry/action-release@v1
-      #   env:
-      #     SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-      #     SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-      #     SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-      #   with:
-      #     environment: prod
-      #     version: ${{ env.VERSION }}
-
-      - uses: "marvinpinto/action-automatic-releases@latest"
-        with:
-          # use title as the pull request title, but remove the `Release:` prefix and trim the whitespace
-          title: ${{ github.event.pull_request.title.replace("^Release:", "").trim() }}
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          prerelease: false
+      # git tag the release.
+      # The tag name is the string after `Release`, trimmed of whitespace
+      - name: Tag Release
+        id: tag_release
+        run: |
+          git tag -a ${{ github.payload.pull_request.title | startswith 'Release' | substringafter 'Release' | trim }} -m "Release ${{ github.payload.pull_request.title | startswith 'Release' | substringafter 'Release' | trim }}"
+          git push origin ${{ github.payload.pull_request.title | startswith 'Release' | substringafter 'Release' | trim }}
+          
