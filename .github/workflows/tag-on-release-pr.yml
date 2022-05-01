@@ -11,11 +11,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  tag:
     # check the following items before procedding:
     # 1. the PR has been merged to branch `main`
     # 2. the PR title starts with string `Release`
-    if: ${{ github.event_name == 'pull_request' && github.payload.pull_request.merged && github.payload.pull_request.base.ref == 'main' && startsWith(github.payload.pull_request.title, 'Release') }}
+    if: ${{ github.payload.pull_request.merged && github.payload.pull_request.base.ref == 'main' && startsWith(github.payload.pull_request.title, 'Release') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
