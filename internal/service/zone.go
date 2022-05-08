@@ -34,7 +34,7 @@ func (s *Zone) GetZones(ctx context.Context) ([]*model.Zone, error) {
 	if err != nil {
 		return nil, err
 	}
-	go cache.Zones.Set(zones, 24*time.Hour)
+	go cache.Zones.Set(zones, time.Hour)
 	return zones, nil
 }
 
@@ -54,7 +54,7 @@ func (s *Zone) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model.Zon
 	if err != nil {
 		return nil, err
 	}
-	go cache.ZoneByArkID.Set(arkZoneId, *dbZone, 24*time.Hour)
+	go cache.ZoneByArkID.Set(arkZoneId, *dbZone, time.Hour)
 	return dbZone, nil
 }
 
@@ -73,7 +73,7 @@ func (s *Zone) GetShimZones(ctx context.Context) ([]*modelv2.Zone, error) {
 	for _, i := range zones {
 		s.applyShim(i)
 	}
-	cache.ShimZones.Set(zones, 24*time.Hour)
+	cache.ShimZones.Set(zones, time.Hour)
 	cache.LastModifiedTime.Set("[shimZones]", time.Now(), 0)
 	return zones, nil
 }
@@ -91,7 +91,7 @@ func (s *Zone) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*model
 		return nil, err
 	}
 	s.applyShim(dbZone)
-	go cache.ShimZoneByArkID.Set(arkZoneId, *dbZone, 24*time.Hour)
+	go cache.ShimZoneByArkID.Set(arkZoneId, *dbZone, time.Hour)
 	return dbZone, nil
 }
 

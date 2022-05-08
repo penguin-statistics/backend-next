@@ -36,7 +36,7 @@ func (s *TimeRange) GetTimeRangesByServer(ctx context.Context, server string) ([
 	if err != nil {
 		return nil, err
 	}
-	go cache.TimeRanges.Set(server, timeRanges, 24*time.Hour)
+	go cache.TimeRanges.Set(server, timeRanges, time.Hour)
 	return timeRanges, nil
 }
 
@@ -49,7 +49,7 @@ func (s *TimeRange) GetTimeRangeById(ctx context.Context, rangeId int) (*model.T
 	}
 
 	slowTimeRange, err := s.TimeRangeRepo.GetTimeRangeById(ctx, rangeId)
-	go cache.TimeRangeByID.Set(strconv.Itoa(rangeId), *slowTimeRange, 24*time.Hour)
+	go cache.TimeRangeByID.Set(strconv.Itoa(rangeId), *slowTimeRange, time.Hour)
 	return slowTimeRange, err
 }
 
@@ -84,7 +84,7 @@ func (s *TimeRange) GetTimeRangesMap(ctx context.Context, server string) (map[in
 			&timeRangesMap,
 			func(timeRange *model.TimeRange) int { return timeRange.RangeID },
 			func(timeRange *model.TimeRange) *model.TimeRange { return timeRange })
-	go cache.TimeRangesMap.Set(server, timeRangesMap, 24*time.Hour)
+	go cache.TimeRangesMap.Set(server, timeRangesMap, time.Hour)
 	return timeRangesMap, nil
 }
 
@@ -158,7 +158,7 @@ func (s *TimeRange) GetMaxAccumulableTimeRangesByServer(ctx context.Context, ser
 			maxAccumulableTimeRanges[stageId] = maxAccumulableTimeRangesForOneStage
 		}
 	}
-	go cache.MaxAccumulableTimeRanges.Set(server, maxAccumulableTimeRanges, 24*time.Hour)
+	go cache.MaxAccumulableTimeRanges.Set(server, maxAccumulableTimeRanges, time.Hour)
 	return maxAccumulableTimeRanges, nil
 }
 
