@@ -231,7 +231,7 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 	startTime := time.UnixMilli(startTimeMilli)
 
 	// handle end time (might be null)
-	endTimeMilli := constant.FakeEndTimeMilli
+	endTimeMilli := time.Now().UnixMilli()
 	if query.EndTime.Valid {
 		endTimeMilli = query.EndTime.Int64
 	}
@@ -268,7 +268,7 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 		}
 		intervalNum := c.calcIntervalNum(startTime, endTime, intervalLength)
 		if intervalNum > constant.MaxIntervalNum {
-			return nil, pgerr.ErrInvalidReq.Msg("interval length is too long: interval length is %.2f sections, which is larger than %d sections", intervalNum, constant.MaxIntervalNum)
+			return nil, pgerr.ErrInvalidReq.Msg("too many sections: interval number is %d sections, which is larger than %d sections", intervalNum, constant.MaxIntervalNum)
 		}
 
 		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx.Context(), query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, accountId)
