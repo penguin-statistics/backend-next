@@ -17,7 +17,7 @@ jobs:
     # check the following items before procedding:
     # 1. the PR has been merged to branch `main`
     # 2. the PR title starts with string `Release`
-    if: ${{ github.event.pull_request.action == 'closed' && github.event.pull_request.merged && github.event.pull_request.base.ref == 'main' && startsWith(github.event.pull_request.title, 'Release') }}
+    if: github.event.pull_request.merged && github.event.pull_request.base.ref == 'main' && startsWith(github.event.pull_request.title, 'Release')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -30,4 +30,25 @@ jobs:
           export TAG=$(echo ${{ github.event.pull_request.title }} | sed -E 's/^Release(.*)$/\1/' | xargs);
           git tag $TAG
           git push origin $TAG
+          echo "BUMPED_VERSION=$(echo "${{ env.TAG }}" | awk -F. '{OFS="."; $NF+=1; print $0}')" >> $GITHUB_ENV
+
+      # Open a new pull request bumping the patch version
+      - name: Open a new Pull Request
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { repo, owner } = context.repo;
+            const result = await github.rest.pulls.create({
+              title: 'Release ${{ env.TAG }}',
+              owner,
+              repo,
+              head: 'dev',
+              base: 'main'
+            });
+            github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: result.data.number,
+              labels: ['release', 'automated']
+            });
           
