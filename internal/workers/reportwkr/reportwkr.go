@@ -36,7 +36,9 @@ func Start(conf *config.Config, deps WorkerDeps) {
 	go func() {
 		for {
 			err := <-ch
-			spew.Dump(err)
+			if err != nil {
+				log.Error().Err(err).Msg("report worker error")
+			}
 		}
 	}()
 	// works like a consumer factory
@@ -181,12 +183,9 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 			return err
 		}
 
-		var md5 null.String
-		if report.Metadata != nil {
+		md5 := ""
+		if report.Metadata != nil && report.Metadata.MD5 != "" {
 			md5 = report.Metadata.MD5
-		}
-		if md5.Valid && md5.String == "" {
-			md5.Valid = false
 		}
 		if reportTask.IP == "" {
 			// FIXME: temporary hack; find why ip is empty
@@ -198,7 +197,7 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 			Source:   reportTask.Source,
 			Version:  reportTask.Version,
 			Metadata: report.Metadata,
-			MD5:      md5,
+			MD5:      null.NewString(md5, md5 != ""),
 		}); err != nil {
 			return err
 		}
