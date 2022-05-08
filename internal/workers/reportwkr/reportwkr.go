@@ -185,6 +185,9 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 		if report.Metadata != nil {
 			md5 = report.Metadata.MD5
 		}
+		if md5.Valid && md5.String == "" {
+			md5.Valid = false
+		}
 		if reportTask.IP == "" {
 			// FIXME: temporary hack; find why ip is empty
 			reportTask.IP = "127.0.0.1"

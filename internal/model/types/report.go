@@ -20,6 +20,8 @@ type SingleReportRequest struct {
 
 	Drops     []ArkDrop `json:"drops" validate:"dive"`
 	PenguinID string    `json:"-"`
+
+	Metadata *ReportRequestMetadata `json:"metadata" validate:"dive"`
 }
 
 type SingleReportRecallRequest struct {
@@ -38,6 +40,9 @@ type ReportRequestMetadata struct {
 	MD5          null.String `json:"md5" validate:"lte=32" swaggertype:"string"`
 	FileName     string      `json:"fileName" validate:"lte=512"`
 	LastModified int         `json:"lastModified"`
+
+	RecognizerVersion       null.String `json:"recognizerVersion" validate:"lte=32" swaggertype:"string"`
+	RecognizerAssetsVersion null.String `json:"recognizerAssetsVersion" validate:"lte=32" swaggertype:"string"`
 }
 
 type BatchReportRequest struct {
