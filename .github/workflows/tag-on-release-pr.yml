@@ -3,6 +3,8 @@ name: Release PR Tagger
 on:
   # trigger on pull-request merged to main branch
   pull_request:
+    types:
+      - closed
     branches:
       - main
 
