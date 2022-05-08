@@ -28,8 +28,8 @@ func (u *MD5Verifier) Name() string {
 	return "md5"
 }
 
-func (u *MD5Verifier) Verify(ctx context.Context, report *types.SingleReport, reportTask *types.ReportTask) []error {
-	if report.Metadata != nil && report.Metadata.MD5.Valid && report.Metadata.MD5.String != "" && u.DropReportExtraRepo.IsDropReportExtraMD5Exist(ctx, report.Metadata.MD5.String) {
+func (u *MD5Verifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) []error {
+	if report.Metadata != nil && report.Metadata.MD5 != "" && u.DropReportExtraRepo.IsDropReportExtraMD5Exist(ctx, report.Metadata.MD5) {
 		return []error{ErrMD5Conflict}
 	}
 	return nil

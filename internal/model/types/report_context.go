@@ -1,12 +1,12 @@
 package types
 
-type SingleReport struct {
+type ReportTaskSingleReport struct {
 	FragmentStageID
 
 	Drops []*Drop `json:"drops" validate:"dive"`
 	Times int     `json:"times"`
 
-	// Metadata is optional; if not provided, the report will be treated as a single report.
+	// Metadata is optional
 	Metadata *ReportRequestMetadata `json:"metadata" validate:"dive"`
 }
 
@@ -16,7 +16,7 @@ type ReportTask struct {
 	CreatedAt int64 `json:"createdAt"`
 	FragmentReportCommon
 
-	Reports []*SingleReport `json:"report"`
+	Reports []*ReportTaskSingleReport `json:"report"`
 
 	AccountID int    `json:"accountId"`
 	IP        string `json:"ip"`

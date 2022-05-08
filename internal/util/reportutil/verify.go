@@ -13,7 +13,7 @@ type VerifyViolation struct {
 
 type Verifier interface {
 	Name() string
-	Verify(ctx context.Context, report *types.SingleReport, reportTask *types.ReportTask) []error
+	Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) []error
 }
 
 type ReportVerifier []Verifier

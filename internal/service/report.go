@@ -100,7 +100,7 @@ func (s *Report) pipelineTaskId(ctx *fiber.Ctx) string {
 	return ctx.Locals("requestid").(string) + "-" + uniuri.NewLen(32)
 }
 
-func (s *Report) pipelineAggregateGachaboxDrops(ctx context.Context, singleReport *types.SingleReport) error {
+func (s *Report) pipelineAggregateGachaboxDrops(ctx context.Context, singleReport *types.ReportTaskSingleReport) error {
 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
 	category, err := s.StageService.GetStageExtraProcessTypeByArkId(ctx, singleReport.StageID)
 	if err != nil {
@@ -153,11 +153,12 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 		return "", err
 	}
 
-	singleReport := &types.SingleReport{
+	singleReport := &types.ReportTaskSingleReport{
 		FragmentStageID: req.FragmentStageID,
 		Drops:           drops,
 		// for now, we do not support multiple report by specifying `times`
-		Times: 1,
+		Times:    1,
+		Metadata: req.Metadata,
 	}
 
 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
@@ -174,7 +175,7 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 			Source:  req.Source,
 			Version: req.Version,
 		},
-		Reports:   []*types.SingleReport{singleReport},
+		Reports:   []*types.ReportTaskSingleReport{singleReport},
 		AccountID: accountId,
 		IP:        util.ExtractIP(ctx),
 	}
@@ -189,7 +190,7 @@ func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchR
 		return "", err
 	}
 
-	reports := make([]*types.SingleReport, len(req.BatchDrops))
+	reports := make([]*types.ReportTaskSingleReport, len(req.BatchDrops))
 
 	for i, drop := range req.BatchDrops {
 		// merge drops with same (dropType, itemId) pair
@@ -200,7 +201,7 @@ func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchR
 
 		// catch the variable
 		metadata := drop.Metadata
-		report := &types.SingleReport{
+		report := &types.ReportTaskSingleReport{
 			FragmentStageID: drop.FragmentStageID,
 			Drops:           drops,
 			Times:           1,

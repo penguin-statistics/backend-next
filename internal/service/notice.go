@@ -31,7 +31,7 @@ func (s *Notice) GetNotices(ctx context.Context) ([]*model.Notice, error) {
 	if err != nil {
 		return nil, err
 	}
-	cache.Notices.Set(notices, 24*time.Hour)
+	cache.Notices.Set(notices, time.Hour)
 	cache.LastModifiedTime.Set("[notices]", time.Now(), 0)
 	return notices, err
 }

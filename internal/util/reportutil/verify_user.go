@@ -31,7 +31,7 @@ func (u *UserVerifier) Name() string {
 	return "user"
 }
 
-func (u *UserVerifier) Verify(ctx context.Context, report *types.SingleReport, reportTask *types.ReportTask) []error {
+func (u *UserVerifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) []error {
 	id := reportTask.AccountID
 	if id == 0 {
 		return []error{ErrAccountIDEmpty}
