@@ -21,6 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch_depth: 0
+          ref: 'main'
 
       # git tag the release.
       # The tag name is the string after `Release`, trimmed of whitespace
