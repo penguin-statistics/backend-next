@@ -107,50 +107,50 @@ func (s *DropMatrix) GetShimCustomizedDropMatrixResults(ctx context.Context, ser
 }
 
 func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server string) error {
-	toSave := []*model.DropMatrixElement{}
 	allTimeRanges, err := s.TimeRangeService.GetTimeRangesByServer(ctx, server)
 	if err != nil {
 		return err
 	}
-	ch := make(chan []*model.DropMatrixElement, 15)
-	var wg sync.WaitGroup
-
-	go func() {
-		for {
-			m, ok := <-ch
-			if !ok {
-				return
-			}
-			toSave = append(toSave, m...)
-			wg.Done()
-		}
-	}()
+	// Drop matrix to be saved
+	ch := make(chan []*model.DropMatrixElement, len(allTimeRanges))
 
 	usedTimeMap := sync.Map{}
 
-	limiter := make(chan struct{}, runtime.NumCPU())
-	wg.Add(len(allTimeRanges))
-	for _, timeRange := range allTimeRanges {
-		limiter <- struct{}{}
-		go func(timeRange *model.TimeRange) {
-			startTime := time.Now()
-
-			timeRanges := []*model.TimeRange{timeRange}
-			currentBatch, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false))
-			if err != nil {
-				return
+	// workers wait group
+	var wg sync.WaitGroup
+	wg.Add(runtime.NumCPU())
+	// task channel
+	timeRangeTasks := make(chan *model.TimeRange, len(allTimeRanges))
+	// spawn workers
+	for i := 1; i < runtime.NumCPU(); i++ {
+		go func() {
+			defer wg.Done()
+			for timeRange := range timeRangeTasks {
+				startTime := time.Now()
+				timeRanges := []*model.TimeRange{timeRange}
+				currentBatch, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false))
+				if err != nil {
+					return
+				}
+				ch <- currentBatch
+				usedTimeMap.Store(timeRange.RangeID, int(time.Since(startTime).Microseconds()))
 			}
-
-			ch <- currentBatch
-			<-limiter
-
-			usedTimeMap.Store(timeRange.RangeID, int(time.Since(startTime).Microseconds()))
-		}(timeRange)
+		}()
 	}
-
+	// send tasks & close the task channel
+	for _, timeRange := range allTimeRanges {
+		timeRangeTasks <- timeRange
+	}
+	close(timeRangeTasks)
+	// wait for all matrix to be calculated
 	wg.Wait()
 	close(ch)
-
+	// retrieve results
+	var toSave []*model.DropMatrixElement
+	for m := range ch {
+		toSave = append(toSave, m...)
+	}
+	// process results
 	if err := s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server); err != nil {
 		return err
 	}
