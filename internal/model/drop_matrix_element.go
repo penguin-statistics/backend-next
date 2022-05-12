@@ -14,6 +14,7 @@ type DropMatrixElement struct {
 	Quantity  int    `json:"quantity"`
 	Times     int    `json:"times"`
 	Server    string `json:"server"`
+	IsManual  bool   `json:"isManual"`
 
 	// TimeRange field is for those elements whose time range is not saved in DB, but a customized one
 	TimeRange *TimeRange `bun:"-" json:"-"`

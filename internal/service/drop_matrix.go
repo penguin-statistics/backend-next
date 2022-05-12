@@ -136,10 +136,15 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 			startTime := time.Now()
 
 			timeRanges := []*model.TimeRange{timeRange}
-			currentBatch, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false))
+			manualResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), true)
 			if err != nil {
 				return
 			}
+			autoResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), false)
+			if err != nil {
+				return
+			}
+			currentBatch := append(manualResults, autoResults...)
 
 			ch <- currentBatch
 			<-limiter
@@ -167,10 +172,15 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 func (s *DropMatrix) QueryDropMatrix(
 	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId null.Int,
 ) (*model.DropMatrixQueryResult, error) {
-	dropMatrixElements, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, stageIdFilter, itemIdFilter, accountId)
+	manualResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, stageIdFilter, itemIdFilter, accountId, true)
 	if err != nil {
 		return nil, err
 	}
+	autoResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, stageIdFilter, itemIdFilter, accountId, false)
+	if err != nil {
+		return nil, err
+	}
+	dropMatrixElements := append(manualResults, autoResults...)
 	return s.convertDropMatrixElementsToDropMatrixQueryResult(ctx, dropMatrixElements)
 }
 
@@ -203,14 +213,22 @@ func (s *DropMatrix) getDropMatrixElements(ctx context.Context, server string, a
 		for _, timeRange := range timeRangesMap {
 			timeRanges = append(timeRanges, timeRange)
 		}
-		return s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId)
+		manualResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId, true)
+		if err != nil {
+			return nil, err
+		}
+		autoResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId, false)
+		if err != nil {
+			return nil, err
+		}
+		return append(manualResults, autoResults...), nil
 	} else {
 		return s.DropMatrixElementService.GetElementsByServer(ctx, server)
 	}
 }
 
 func (s *DropMatrix) calcDropMatrixForTimeRanges(
-	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId null.Int,
+	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId null.Int, isManual bool,
 ) ([]*model.DropMatrixElement, error) {
 	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, itemIdFilter)
 	if err != nil {
@@ -219,11 +237,11 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 
 	var combinedResults []*model.CombinedResultForDropMatrix
 	for _, timeRange := range timeRanges {
-		quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, util.GetStageIdItemIdMapFromDropInfos(dropInfos), accountId)
+		quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, util.GetStageIdItemIdMapFromDropInfos(dropInfos), accountId, isManual)
 		if err != nil {
 			return nil, err
 		}
-		timesResults, err := s.DropReportService.CalcTotalTimesForDropMatrix(ctx, server, timeRange, util.GetStageIdsFromDropInfos(dropInfos), accountId)
+		timesResults, err := s.DropReportService.CalcTotalTimesForDropMatrix(ctx, server, timeRange, util.GetStageIdsFromDropInfos(dropInfos), accountId, isManual)
 		if err != nil {
 			return nil, err
 		}
@@ -292,6 +310,7 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 					Quantity: quantity,
 					Times:    times,
 					Server:   server,
+					IsManual: isManual,
 				}
 				if rangeId == 0 {
 					dropMatrixElement.TimeRange = timeRange
@@ -309,6 +328,7 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 					Quantity: 0,
 					Times:    stageTimesMap[stageId],
 					Server:   server,
+					IsManual: isManual,
 				}
 				if rangeId == 0 {
 					dropMatrixElementWithZeroQuantity.TimeRange = timeRange

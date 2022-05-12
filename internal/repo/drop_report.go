@@ -44,7 +44,7 @@ func (s *DropReport) DeleteDropReport(ctx context.Context, reportId int) error {
 }
 
 func (s *DropReport) CalcTotalQuantityForDropMatrix(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int,
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int, isManual bool,
 ) ([]*model.TotalQuantityResultForDropMatrix, error) {
 	results := make([]*model.TotalQuantityResultForDropMatrix, 0)
 	if len(stageIdItemIdMap) == 0 {
@@ -70,19 +70,34 @@ func (s *DropReport) CalcTotalQuantityForDropMatrix(
 	}
 	fmt.Fprintf(&b, " AND (%s)", strings.Join(stageConditions, " OR "))
 
-	query := s.DB.NewSelect().
+	subq1 := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
-		Column("dr.stage_id", "dpe.item_id").
-		ColumnExpr("SUM(dpe.quantity) AS total_quantity").
+		Column("dr.report_id", "dr.stage_id", "dpe.item_id", "dpe.quantity").
 		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id")
 	if accountId.Valid {
-		query = query.Where("dr.reliability >= 0 AND dr.account_id = ?", accountId.Int64)
+		subq1 = subq1.Where("dr.reliability >= 0 AND dr.account_id = ?", accountId.Int64)
 	} else {
-		query = query.Where("dr.reliability = 0")
+		subq1 = subq1.Where("dr.reliability = 0")
 	}
-	query = query.Where("dr.server = ? AND "+b.String(), server)
-	if err := query.
-		Group("dr.stage_id", "dpe.item_id").
+	subq1 = subq1.Where("dr.server = ? AND "+b.String(), server)
+
+	subq2 := s.DB.NewSelect().
+		TableExpr("drop_report_extras AS dre").
+		Column("dre.report_id", "dre.source_name")
+
+	mainq := s.DB.NewSelect().
+		TableExpr("(?) AS a", subq1).
+		Column("stage_id", "item_id").
+		ColumnExpr("SUM(quantity) AS total_quantity").
+		Join("LEFT JOIN (?) AS b ON b.report_id = a.report_id", subq2)
+	if isManual {
+		mainq = mainq.Where("source_name IN (?)", bun.In(constant.ManualSources))
+	} else {
+		mainq = mainq.Where("source_name NOT IN (?)", bun.In(constant.ManualSources))
+	}
+
+	if err := mainq.
+		Group("stage_id", "item_id").
 		Scan(ctx, &results); err != nil {
 		return nil, err
 	}
@@ -129,7 +144,7 @@ func (s *DropReport) CalcTotalQuantityForPatternMatrix(
 }
 
 func (s *DropReport) CalcTotalTimes(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int, excludeNonOneTimes bool,
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int, excludeNonOneTimes bool, isManual bool,
 ) ([]*model.TotalTimesResult, error) {
 	results := make([]*model.TotalTimesResult, 0)
 	if len(stageIds) == 0 {

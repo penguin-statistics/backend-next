@@ -20,20 +20,21 @@ func NewDropReport(dropReportRepo *repo.DropReport) *DropReport {
 	}
 }
 
-func (s *DropReport) CalcTotalQuantityForDropMatrix(ctx context.Context, server string, timeRange *model.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int) ([]*model.TotalQuantityResultForDropMatrix, error) {
-	return s.DropReportRepo.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, stageIdItemIdMap, accountId)
+func (s *DropReport) CalcTotalQuantityForDropMatrix(ctx context.Context, server string, timeRange *model.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int, isManual bool) ([]*model.TotalQuantityResultForDropMatrix, error) {
+	return s.DropReportRepo.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, stageIdItemIdMap, accountId, isManual)
 }
 
 func (s *DropReport) CalcTotalQuantityForPatternMatrix(ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int) ([]*model.TotalQuantityResultForPatternMatrix, error) {
 	return s.DropReportRepo.CalcTotalQuantityForPatternMatrix(ctx, server, timeRange, stageIds, accountId)
 }
 
-func (s *DropReport) CalcTotalTimesForDropMatrix(ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int) ([]*model.TotalTimesResult, error) {
-	return s.DropReportRepo.CalcTotalTimes(ctx, server, timeRange, stageIds, accountId, false)
+func (s *DropReport) CalcTotalTimesForDropMatrix(ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int, isManual bool) ([]*model.TotalTimesResult, error) {
+	return s.DropReportRepo.CalcTotalTimes(ctx, server, timeRange, stageIds, accountId, false, isManual)
 }
 
 func (s *DropReport) CalcTotalTimesForPatternMatrix(ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int) ([]*model.TotalTimesResult, error) {
-	return s.DropReportRepo.CalcTotalTimes(ctx, server, timeRange, stageIds, accountId, true)
+	// TODO: implement manual and auto stuff
+	return s.DropReportRepo.CalcTotalTimes(ctx, server, timeRange, stageIds, accountId, true, false)
 }
 
 func (s *DropReport) CalcTotalQuantityForTrend(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int) ([]*model.TotalQuantityResultForTrend, error) {
