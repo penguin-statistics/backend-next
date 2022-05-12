@@ -50,25 +50,6 @@ func (s *DropReport) CalcTotalQuantityForDropMatrix(
 	if len(stageIdItemIdMap) == 0 {
 		return results, nil
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Format(time.RFC3339))
-	fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Format(time.RFC3339))
-	stageConditions := make([]string, 0)
-	for stageId, itemIds := range stageIdItemIdMap {
-		var stageB strings.Builder
-		fmt.Fprintf(&stageB, "dr.stage_id = %d AND dpe.item_id", stageId)
-		if len(itemIds) == 1 {
-			fmt.Fprintf(&stageB, " = %d", itemIds[0])
-		} else {
-			var itemIdsStr []string
-			for _, itemId := range itemIds {
-				itemIdsStr = append(itemIdsStr, strconv.Itoa(itemId))
-			}
-			fmt.Fprintf(&stageB, " IN (%s)", strings.Join(itemIdsStr, ","))
-		}
-		stageConditions = append(stageConditions, stageB.String())
-	}
-	fmt.Fprintf(&b, " AND (%s)", strings.Join(stageConditions, " OR "))
 
 	query := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
@@ -80,7 +61,7 @@ func (s *DropReport) CalcTotalQuantityForDropMatrix(
 	} else {
 		query = query.Where("dr.reliability = 0")
 	}
-	query = query.Where("dr.server = ? AND "+b.String(), server)
+	query = query.Where("dr.server = ? AND "+s.genCreatedAtAndStageAndItemConditions(timeRange, stageIdItemIdMap), server)
 	if err := query.
 		Group("dr.stage_id", "dpe.item_id").
 		Scan(ctx, &results); err != nil {
@@ -96,19 +77,6 @@ func (s *DropReport) CalcTotalQuantityForPatternMatrix(
 	if len(stageIds) == 0 {
 		return results, nil
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Format(time.RFC3339))
-	fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Format(time.RFC3339))
-	b.WriteString(" AND dr.stage_id")
-	if len(stageIds) == 1 {
-		fmt.Fprintf(&b, "= %d", stageIds[0])
-	} else {
-		var stageIdsStr []string
-		for _, stageId := range stageIds {
-			stageIdsStr = append(stageIdsStr, strconv.Itoa(stageId))
-		}
-		fmt.Fprintf(&b, " IN (%s)", strings.Join(stageIdsStr, ","))
-	}
 
 	query := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
@@ -119,7 +87,7 @@ func (s *DropReport) CalcTotalQuantityForPatternMatrix(
 	} else {
 		query = query.Where("dr.reliability = 0")
 	}
-	query = query.Where("dr.server = ? AND dr.times = ? AND "+b.String(), server, 1)
+	query = query.Where("dr.server = ? AND dr.times = ? AND "+s.genCreatedAtAndStageConditions(timeRange, stageIds), server, 1)
 	if err := query.
 		Group("dr.stage_id", "dr.pattern_id").
 		Scan(ctx, &results); err != nil {
@@ -135,19 +103,6 @@ func (s *DropReport) CalcTotalTimes(
 	if len(stageIds) == 0 {
 		return results, nil
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Format(time.RFC3339))
-	fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Format(time.RFC3339))
-	b.WriteString(" AND dr.stage_id")
-	if len(stageIds) == 1 {
-		fmt.Fprintf(&b, "= %d", stageIds[0])
-	} else {
-		var stageIdsStr []string
-		for _, stageId := range stageIds {
-			stageIdsStr = append(stageIdsStr, strconv.Itoa(stageId))
-		}
-		fmt.Fprintf(&b, " IN (%s)", strings.Join(stageIdsStr, ","))
-	}
 
 	query := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
@@ -161,7 +116,7 @@ func (s *DropReport) CalcTotalTimes(
 	if excludeNonOneTimes {
 		query = query.Where("dr.times = 1")
 	}
-	query = query.Where("dr.server = ? AND "+b.String(), server)
+	query = query.Where("dr.server = ? AND "+s.genCreatedAtAndStageConditions(timeRange, stageIds), server)
 	if err := query.
 		Group("dr.stage_id").
 		Scan(ctx, &results); err != nil {
@@ -177,25 +132,6 @@ func (s *DropReport) CalcQuantityUniqCount(
 	if len(stageIdItemIdMap) == 0 {
 		return results, nil
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Format(time.RFC3339))
-	fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Format(time.RFC3339))
-	stageConditions := make([]string, 0)
-	for stageId, itemIds := range stageIdItemIdMap {
-		var stageB strings.Builder
-		fmt.Fprintf(&stageB, "dr.stage_id = %d AND dpe.item_id", stageId)
-		if len(itemIds) == 1 {
-			fmt.Fprintf(&stageB, " = %d", itemIds[0])
-		} else {
-			var itemIdsStr []string
-			for _, itemId := range itemIds {
-				itemIdsStr = append(itemIdsStr, strconv.Itoa(itemId))
-			}
-			fmt.Fprintf(&stageB, " IN (%s)", strings.Join(itemIdsStr, ","))
-		}
-		stageConditions = append(stageConditions, stageB.String())
-	}
-	fmt.Fprintf(&b, " AND (%s)", strings.Join(stageConditions, " OR "))
 
 	query := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
@@ -207,7 +143,7 @@ func (s *DropReport) CalcQuantityUniqCount(
 	} else {
 		query = query.Where("dr.reliability = 0")
 	}
-	query = query.Where("dr.server = ? AND "+b.String(), server)
+	query = query.Where("dr.server = ? AND "+s.genCreatedAtAndStageAndItemConditions(timeRange, stageIdItemIdMap), server)
 	if err := query.
 		Group("dr.stage_id", "dpe.item_id", "dpe.quantity").
 		Scan(ctx, &results); err != nil {
@@ -247,20 +183,8 @@ func (s *DropReport) CalcTotalQuantityForTrend(
 	}
 	fmt.Fprintf(&b, " AND (%s)", strings.Join(stageConditions, " OR "))
 
-	var subQueryExprBuilder strings.Builder
-	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + (n || ' hours')::interval AS interval_start, ")
-	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + ((n + ?) || ' hours')::interval AS interval_end, ")
-	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_id")
-	subQuery := s.DB.NewSelect().
-		TableExpr("generate_series(?, ? * ?, ?) AS n", 0, int(intervalLength.Hours()), intervalNum, int(intervalLength.Hours())).
-		ColumnExpr(subQueryExprBuilder.String(),
-			gameDayStart.Unix(),
-			gameDayStart.Unix(),
-			int(intervalLength.Hours()),
-			int(intervalLength.Hours()),
-		)
 	query := s.DB.NewSelect().
-		With("intervals", subQuery).
+		With("intervals", s.genSubQueryForTrend(gameDayStart, intervalLength, intervalNum)).
 		TableExpr("drop_reports AS dr").
 		Column("sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id", "dpe.item_id").
 		ColumnExpr("SUM(dpe.quantity) AS total_quantity").
@@ -306,20 +230,8 @@ func (s *DropReport) CalcTotalTimesForTrend(
 		fmt.Fprintf(&b, " IN (%s)", strings.Join(stageIdsStr, ","))
 	}
 
-	var subQueryExprBuilder strings.Builder
-	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + (n || ' hours')::interval AS interval_start, ")
-	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + ((n + ?) || ' hours')::interval AS interval_end, ")
-	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_id")
-	subQuery := s.DB.NewSelect().
-		TableExpr("generate_series(?, ? * ?, ?) AS n", 0, int(intervalLength.Hours()), intervalNum-1, int(intervalLength.Hours())).
-		ColumnExpr(subQueryExprBuilder.String(),
-			gameDayStart.Unix(),
-			gameDayStart.Unix(),
-			int(intervalLength.Hours()),
-			int(intervalLength.Hours()),
-		)
 	query := s.DB.NewSelect().
-		With("intervals", subQuery).
+		With("intervals", s.genSubQueryForTrend(gameDayStart, intervalLength, intervalNum)).
 		TableExpr("drop_reports AS dr").
 		Column("sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id").
 		ColumnExpr("SUM(dr.times) AS total_times").
@@ -396,4 +308,59 @@ func (s *DropReport) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, 
 		return nil, err
 	}
 	return results, nil
+}
+
+func (s *DropReport) genCreatedAtAndStageAndItemConditions(timeRange *model.TimeRange, stageIdItemIdMap map[int][]int) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Format(time.RFC3339))
+	fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Format(time.RFC3339))
+	stageConditions := make([]string, 0)
+	for stageId, itemIds := range stageIdItemIdMap {
+		var stageB strings.Builder
+		fmt.Fprintf(&stageB, "dr.stage_id = %d AND dpe.item_id", stageId)
+		if len(itemIds) == 1 {
+			fmt.Fprintf(&stageB, " = %d", itemIds[0])
+		} else {
+			var itemIdsStr []string
+			for _, itemId := range itemIds {
+				itemIdsStr = append(itemIdsStr, strconv.Itoa(itemId))
+			}
+			fmt.Fprintf(&stageB, " IN (%s)", strings.Join(itemIdsStr, ","))
+		}
+		stageConditions = append(stageConditions, stageB.String())
+	}
+	fmt.Fprintf(&b, " AND (%s)", strings.Join(stageConditions, " OR "))
+	return b.String()
+}
+
+func (s *DropReport) genCreatedAtAndStageConditions(timeRange *model.TimeRange, stageIds []int) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Format(time.RFC3339))
+	fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Format(time.RFC3339))
+	b.WriteString(" AND dr.stage_id")
+	if len(stageIds) == 1 {
+		fmt.Fprintf(&b, "= %d", stageIds[0])
+	} else {
+		var stageIdsStr []string
+		for _, stageId := range stageIds {
+			stageIdsStr = append(stageIdsStr, strconv.Itoa(stageId))
+		}
+		fmt.Fprintf(&b, " IN (%s)", strings.Join(stageIdsStr, ","))
+	}
+	return b.String()
+}
+
+func (s *DropReport) genSubQueryForTrend(gameDayStart time.Time, intervalLength time.Duration, intervalNum int) *bun.SelectQuery {
+	var subQueryExprBuilder strings.Builder
+	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + (n || ' hours')::interval AS interval_start, ")
+	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + ((n + ?) || ' hours')::interval AS interval_end, ")
+	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_id")
+	return s.DB.NewSelect().
+		TableExpr("generate_series(?, ? * ?, ?) AS n", 0, int(intervalLength.Hours()), intervalNum, int(intervalLength.Hours())).
+		ColumnExpr(subQueryExprBuilder.String(),
+			gameDayStart.Unix(),
+			gameDayStart.Unix(),
+			int(intervalLength.Hours()),
+			int(intervalLength.Hours()),
+		)
 }
