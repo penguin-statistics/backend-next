@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"math"
 	"runtime"
 	"strconv"
 	"strings"
@@ -219,7 +220,8 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 
 	var combinedResults []*model.CombinedResultForDropMatrix
 	for _, timeRange := range timeRanges {
-		quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, util.GetStageIdItemIdMapFromDropInfos(dropInfos), accountId)
+		stageIdItemIdMap := util.GetStageIdItemIdMapFromDropInfos(dropInfos)
+		quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, stageIdItemIdMap, accountId)
 		if err != nil {
 			return nil, err
 		}
@@ -227,7 +229,11 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 		if err != nil {
 			return nil, err
 		}
-		oneBatch := s.combineQuantityAndTimesResults(quantityResults, timesResults, timeRange)
+		quantityUniqCountResults, err := s.DropReportService.CalcQuantityUniqCount(ctx, server, timeRange, stageIdItemIdMap, accountId)
+		if err != nil {
+			return nil, err
+		}
+		oneBatch := s.combineQuantityAndTimesResults(quantityResults, timesResults, quantityUniqCountResults, timeRange)
 		combinedResults = append(combinedResults, oneBatch...)
 	}
 
@@ -285,12 +291,14 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 				itemId := el3.(*model.CombinedResultForDropMatrix).ItemID
 				quantity := el3.(*model.CombinedResultForDropMatrix).Quantity
 				times := el3.(*model.CombinedResultForDropMatrix).Times
+				stdDev := el3.(*model.CombinedResultForDropMatrix).StdDev
 				dropMatrixElement := model.DropMatrixElement{
 					StageID:  stageId,
 					ItemID:   itemId,
 					RangeID:  rangeId,
 					Quantity: quantity,
 					Times:    times,
+					StdDev:   stdDev,
 					Server:   server,
 				}
 				if rangeId == 0 {
@@ -308,6 +316,7 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 					RangeID:  rangeId,
 					Quantity: 0,
 					Times:    stageTimesMap[stageId],
+					StdDev:   0,
 					Server:   server,
 				}
 				if rangeId == 0 {
@@ -321,10 +330,12 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 }
 
 func (s *DropMatrix) combineQuantityAndTimesResults(
-	quantityResults []*model.TotalQuantityResultForDropMatrix, timesResults []*model.TotalTimesResult, timeRange *model.TimeRange,
+	quantityResults []*model.TotalQuantityResultForDropMatrix, timesResults []*model.TotalTimesResult,
+	quantityUniqCountResults []*model.QuantityUniqCountResultForDropMatrix, timeRange *model.TimeRange,
 ) []*model.CombinedResultForDropMatrix {
-	var firstGroupResults []linq.Group
 	combinedResults := make([]*model.CombinedResultForDropMatrix, 0)
+
+	var firstGroupResults []linq.Group
 	linq.From(quantityResults).
 		GroupByT(
 			func(result *model.TotalQuantityResultForDropMatrix) int { return result.StageID },
@@ -343,6 +354,35 @@ func (s *DropMatrix) combineQuantityAndTimesResults(
 		quantityResultsMap[stageId] = resultsMap
 	}
 
+	var quantityUniqCountGroupResultsByStageID []linq.Group
+	linq.From(quantityUniqCountResults).
+		GroupByT(func(result *model.QuantityUniqCountResultForDropMatrix) int { return result.StageID },
+			func(result *model.QuantityUniqCountResultForDropMatrix) *model.QuantityUniqCountResultForDropMatrix {
+				return result
+			}).
+		ToSlice(&quantityUniqCountGroupResultsByStageID)
+	quantityUniqCountResultsMap := make(map[int]map[int]map[int]int)
+	for _, quantityUniqCountGroupElements := range quantityUniqCountGroupResultsByStageID {
+		stageId := quantityUniqCountGroupElements.Key.(int)
+		var quantityUniqCountGroupResultsByItemID []linq.Group
+		linq.From(quantityUniqCountGroupElements.Group).
+			GroupByT(func(result *model.QuantityUniqCountResultForDropMatrix) int { return result.ItemID },
+				func(result *model.QuantityUniqCountResultForDropMatrix) *model.QuantityUniqCountResultForDropMatrix {
+					return result
+				}).ToSlice(&quantityUniqCountGroupResultsByItemID)
+		oneItemResultsMap := make(map[int]map[int]int)
+		for _, quantityUniqCountGroupElements2 := range quantityUniqCountGroupResultsByItemID {
+			itemId := quantityUniqCountGroupElements2.Key.(int)
+			subMap := make(map[int]int)
+			linq.From(quantityUniqCountGroupElements2.Group).
+				ToMapByT(&subMap,
+					func(el any) int { return el.(*model.QuantityUniqCountResultForDropMatrix).Quantity },
+					func(el any) int { return el.(*model.QuantityUniqCountResultForDropMatrix).Count })
+			oneItemResultsMap[itemId] = subMap
+		}
+		quantityUniqCountResultsMap[stageId] = oneItemResultsMap
+	}
+
 	var secondGroupResults []linq.Group
 	linq.From(timesResults).
 		GroupByT(
@@ -352,6 +392,7 @@ func (s *DropMatrix) combineQuantityAndTimesResults(
 	for _, secondGroupResults := range secondGroupResults {
 		stageId := secondGroupResults.Key.(int)
 		quantityResultsMapForOneStage := quantityResultsMap[stageId]
+		quantityUniqCountResultsMapForOneStage := quantityUniqCountResultsMap[stageId]
 		for _, el := range secondGroupResults.Group {
 			times := el.(*model.TotalTimesResult).TotalTimes
 			for itemId, quantity := range quantityResultsMapForOneStage {
@@ -360,6 +401,7 @@ func (s *DropMatrix) combineQuantityAndTimesResults(
 					ItemID:    itemId,
 					Quantity:  quantity,
 					Times:     times,
+					StdDev:    s.calcStdDev(quantityUniqCountResultsMapForOneStage[itemId], times),
 					TimeRange: timeRange,
 				})
 			}
@@ -558,4 +600,14 @@ func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, server str
 		results.Matrix = append(results.Matrix, &oneDropMatrixElement)
 	}
 	return results, nil
+}
+
+func (s *DropMatrix) calcStdDev(quantityCountMap map[int]int, times int) float64 {
+	sum := 0
+	squareSum := 0
+	for quantity, times := range quantityCountMap {
+		sum += quantity * times
+		squareSum += quantity * quantity * times
+	}
+	return math.Sqrt(float64(squareSum)/float64(times) - math.Pow(float64(sum)/float64(times), 2))
 }

@@ -14,11 +14,19 @@ type TotalTimesResult struct {
 	TotalTimes int `json:"totalTimes" bun:"total_times"`
 }
 
+type QuantityUniqCountResultForDropMatrix struct {
+	StageID  int `json:"stageId" bun:"stage_id"`
+	ItemID   int `json:"itemId" bun:"item_id"`
+	Quantity int `json:"quantity" bun:"quantity"`
+	Count    int `json:"count" bun:"count"`
+}
+
 type CombinedResultForDropMatrix struct {
 	StageID   int        `json:"stageId"`
 	ItemID    int        `json:"itemId"`
 	Times     int        `json:"times"`
 	Quantity  int        `json:"quantity"`
+	StdDev    float64    `json:"stdDev"`
 	TimeRange *TimeRange `json:"timeRange"`
 }
 

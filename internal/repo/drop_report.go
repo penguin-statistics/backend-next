@@ -170,6 +170,52 @@ func (s *DropReport) CalcTotalTimes(
 	return results, nil
 }
 
+func (s *DropReport) CalcQuantityUniqCount(
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int,
+) ([]*model.QuantityUniqCountResultForDropMatrix, error) {
+	results := make([]*model.QuantityUniqCountResultForDropMatrix, 0)
+	if len(stageIdItemIdMap) == 0 {
+		return results, nil
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "dr.created_at >= timestamp with time zone '%s'", timeRange.StartTime.Format(time.RFC3339))
+	fmt.Fprintf(&b, " AND dr.created_at <= timestamp with time zone '%s'", timeRange.EndTime.Format(time.RFC3339))
+	stageConditions := make([]string, 0)
+	for stageId, itemIds := range stageIdItemIdMap {
+		var stageB strings.Builder
+		fmt.Fprintf(&stageB, "dr.stage_id = %d AND dpe.item_id", stageId)
+		if len(itemIds) == 1 {
+			fmt.Fprintf(&stageB, " = %d", itemIds[0])
+		} else {
+			var itemIdsStr []string
+			for _, itemId := range itemIds {
+				itemIdsStr = append(itemIdsStr, strconv.Itoa(itemId))
+			}
+			fmt.Fprintf(&stageB, " IN (%s)", strings.Join(itemIdsStr, ","))
+		}
+		stageConditions = append(stageConditions, stageB.String())
+	}
+	fmt.Fprintf(&b, " AND (%s)", strings.Join(stageConditions, " OR "))
+
+	query := s.DB.NewSelect().
+		TableExpr("drop_reports AS dr").
+		Column("dr.stage_id", "dpe.item_id", "dpe.quantity").
+		ColumnExpr("COUNT(*) AS count").
+		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id")
+	if accountId.Valid {
+		query = query.Where("dr.reliability >= 0 AND dr.account_id = ?", accountId.Int64)
+	} else {
+		query = query.Where("dr.reliability = 0")
+	}
+	query = query.Where("dr.server = ? AND "+b.String(), server)
+	if err := query.
+		Group("dr.stage_id", "dpe.item_id", "dpe.quantity").
+		Scan(ctx, &results); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 func (s *DropReport) CalcTotalQuantityForTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int,
 ) ([]*model.TotalQuantityResultForTrend, error) {
