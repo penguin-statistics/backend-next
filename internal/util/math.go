@@ -2,6 +2,8 @@ package util
 
 import (
 	"math"
+
+	"github.com/rs/zerolog/log"
 )
 
 type StatsBundle struct {
@@ -25,14 +27,27 @@ func CalcStdDevFromQuantityBuckets(quantityBuckets map[int]int, times int) float
 		sum += quantity * times
 		squareSum += quantity * quantity * times
 	}
-	return math.Sqrt(float64(squareSum)/float64(times) - math.Pow(float64(sum)/float64(times), 2))
+	variance := float64(squareSum)/float64(times) - math.Pow(float64(sum)/float64(times), 2)
+	if variance < 0 {
+		// should not happen, unless something is wrong with the drop patternn
+		log.Error().Msgf("variance is less than 0: %f", variance)
+		return 0
+	}
+	return math.Sqrt(variance)
 }
 
 func CombineTwoBundles(bundle1, bundle2 *StatsBundle) *StatsBundle {
 	n := bundle1.N + bundle2.N
 	avg := (bundle1.Avg*float64(bundle1.N) + bundle2.Avg*float64(bundle2.N)) / float64(n)
 	squareAvg := (calcSquareAvg(bundle1)*float64(bundle1.N) + calcSquareAvg(bundle2)*float64(bundle2.N)) / float64(n)
-	stdDev := math.Sqrt(squareAvg - math.Pow(avg, 2))
+	variance := squareAvg - math.Pow(avg, 2)
+	stdDev := 0.0
+	if variance < 0 {
+		// should not happen, unless something is wrong with the drop pattern
+		log.Error().Msgf("variance is less than 0: %f", variance)
+	} else {
+		stdDev = math.Sqrt(variance)
+	}
 	return &StatsBundle{
 		N:      n,
 		Avg:    avg,

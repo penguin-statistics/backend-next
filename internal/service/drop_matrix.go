@@ -10,6 +10,7 @@ import (
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
@@ -396,11 +397,15 @@ func (s *DropMatrix) combineQuantityAndTimesResults(
 		for _, el := range secondGroupResults.Group {
 			times := el.(*model.TotalTimesResult).TotalTimes
 			for itemId, quantity := range quantityResultsMapForOneStage {
+				quantityBuckets := quantityUniqCountResultsMapForOneStage[itemId]
+				if !s.validateQuantityBucketsAndTimes(quantityBuckets, times) {
+					log.Warn().Msgf("quantity buckets and times are not matched for stage %d, item %d, timerange %+v, please check drop pattern", stageId, itemId, timeRange)
+				}
 				combinedResults = append(combinedResults, &model.CombinedResultForDropMatrix{
 					StageID:         stageId,
 					ItemID:          itemId,
 					Quantity:        quantity,
-					QuantityBuckets: quantityUniqCountResultsMapForOneStage[itemId],
+					QuantityBuckets: quantityBuckets,
 					Times:           times,
 					TimeRange:       timeRange,
 				})
@@ -476,6 +481,14 @@ func (s *DropMatrix) combineDropMatrixResults(a, b *model.OneDropMatrixElement) 
 	if a.ItemID != b.ItemID {
 		return nil, errors.New("itemId not match")
 	}
+	bundleA, err := s.convertOneDropMatrixElementToStatsBundle(a)
+	if err != nil {
+		return nil, err
+	}
+	bundleB, err := s.convertOneDropMatrixElementToStatsBundle(b)
+	if err != nil {
+		return nil, err
+	}
 	result := &model.OneDropMatrixElement{
 		StageID:  a.StageID,
 		ItemID:   a.ItemID,
@@ -483,8 +496,8 @@ func (s *DropMatrix) combineDropMatrixResults(a, b *model.OneDropMatrixElement) 
 		Times:    a.Times + b.Times,
 		StdDev: util.RoundFloat64(
 			util.CombineTwoBundles(
-				s.convertOneDropMatrixElementToStatsBundle(a),
-				s.convertOneDropMatrixElementToStatsBundle(b),
+				bundleA,
+				bundleB,
 			).StdDev, constant.StdDevDigits),
 	}
 	return result, nil
@@ -610,10 +623,21 @@ func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, server str
 	return results, nil
 }
 
-func (s *DropMatrix) convertOneDropMatrixElementToStatsBundle(el *model.OneDropMatrixElement) *util.StatsBundle {
+func (s *DropMatrix) convertOneDropMatrixElementToStatsBundle(el *model.OneDropMatrixElement) (*util.StatsBundle, error) {
+	if el.Times == 0 {
+		return nil, errors.New("times should not be 0")
+	}
 	return &util.StatsBundle{
 		N:      el.Times,
 		Avg:    float64(el.Quantity) / float64(el.Times),
 		StdDev: el.StdDev,
+	}, nil
+}
+
+func (s *DropMatrix) validateQuantityBucketsAndTimes(quantityBuckets map[int]int, times int) bool {
+	sum := 0
+	for _, quantity := range quantityBuckets {
+		sum += quantity
 	}
+	return sum <= times
 }
