@@ -22,12 +22,12 @@ type QuantityUniqCountResultForDropMatrix struct {
 }
 
 type CombinedResultForDropMatrix struct {
-	StageID   int        `json:"stageId"`
-	ItemID    int        `json:"itemId"`
-	Times     int        `json:"times"`
-	Quantity  int        `json:"quantity"`
-	StdDev    float64    `json:"stdDev"`
-	TimeRange *TimeRange `json:"timeRange"`
+	StageID         int         `json:"stageId"`
+	ItemID          int         `json:"itemId"`
+	Times           int         `json:"times"`
+	Quantity        int         `json:"quantity"`
+	QuantityBuckets map[int]int `json:"quantityBuckets"`
+	TimeRange       *TimeRange  `json:"timeRange"`
 }
 
 type DropMatrixQueryResult struct {
@@ -39,6 +39,7 @@ type OneDropMatrixElement struct {
 	ItemID    int        `json:"itemId"`
 	Times     int        `json:"times"`
 	Quantity  int        `json:"quantity"`
+	StdDev    float64    `json:"stdDev"`
 	TimeRange *TimeRange `json:"timeRange"`
 }
 

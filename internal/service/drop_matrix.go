@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"math"
 	"runtime"
 	"strconv"
 	"strings"
@@ -291,15 +290,15 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 				itemId := el3.(*model.CombinedResultForDropMatrix).ItemID
 				quantity := el3.(*model.CombinedResultForDropMatrix).Quantity
 				times := el3.(*model.CombinedResultForDropMatrix).Times
-				stdDev := el3.(*model.CombinedResultForDropMatrix).StdDev
+				quantityBuckets := el3.(*model.CombinedResultForDropMatrix).QuantityBuckets
 				dropMatrixElement := model.DropMatrixElement{
-					StageID:  stageId,
-					ItemID:   itemId,
-					RangeID:  rangeId,
-					Quantity: quantity,
-					Times:    times,
-					StdDev:   stdDev,
-					Server:   server,
+					StageID:         stageId,
+					ItemID:          itemId,
+					RangeID:         rangeId,
+					Quantity:        quantity,
+					QuantityBuckets: quantityBuckets,
+					Times:           times,
+					Server:          server,
 				}
 				if rangeId == 0 {
 					dropMatrixElement.TimeRange = timeRange
@@ -310,14 +309,15 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 			}
 			// add those items which do not show up in the matrix (quantity is 0)
 			for itemId := range dropSet {
+				times := stageTimesMap[stageId]
 				dropMatrixElementWithZeroQuantity := model.DropMatrixElement{
-					StageID:  stageId,
-					ItemID:   itemId,
-					RangeID:  rangeId,
-					Quantity: 0,
-					Times:    stageTimesMap[stageId],
-					StdDev:   0,
-					Server:   server,
+					StageID:         stageId,
+					ItemID:          itemId,
+					RangeID:         rangeId,
+					Quantity:        0,
+					QuantityBuckets: map[int]int{0: times},
+					Times:           times,
+					Server:          server,
 				}
 				if rangeId == 0 {
 					dropMatrixElementWithZeroQuantity.TimeRange = timeRange
@@ -397,12 +397,12 @@ func (s *DropMatrix) combineQuantityAndTimesResults(
 			times := el.(*model.TotalTimesResult).TotalTimes
 			for itemId, quantity := range quantityResultsMapForOneStage {
 				combinedResults = append(combinedResults, &model.CombinedResultForDropMatrix{
-					StageID:   stageId,
-					ItemID:    itemId,
-					Quantity:  quantity,
-					Times:     times,
-					StdDev:    s.calcStdDev(quantityUniqCountResultsMapForOneStage[itemId], times),
-					TimeRange: timeRange,
+					StageID:         stageId,
+					ItemID:          itemId,
+					Quantity:        quantity,
+					QuantityBuckets: quantityUniqCountResultsMapForOneStage[itemId],
+					Times:           times,
+					TimeRange:       timeRange,
 				})
 			}
 		}
@@ -440,6 +440,7 @@ func (s *DropMatrix) convertDropMatrixElementsToMaxAccumulableDropMatrixQueryRes
 					ItemID:   itemId,
 					Quantity: element.Quantity,
 					Times:    element.Times,
+					StdDev:   util.RoundFloat64(util.CalcStdDevFromQuantityBuckets(element.QuantityBuckets, element.Times), constant.StdDevDigits),
 				}
 				if timeRange.StartTime.Before(*startTime) {
 					startTime = timeRange.StartTime
@@ -480,6 +481,11 @@ func (s *DropMatrix) combineDropMatrixResults(a, b *model.OneDropMatrixElement) 
 		ItemID:   a.ItemID,
 		Quantity: a.Quantity + b.Quantity,
 		Times:    a.Times + b.Times,
+		StdDev: util.RoundFloat64(
+			util.CombineTwoBundles(
+				s.convertOneDropMatrixElementToStatsBundle(a),
+				s.convertOneDropMatrixElementToStatsBundle(b),
+			).StdDev, constant.StdDevDigits),
 	}
 	return result, nil
 }
@@ -515,6 +521,7 @@ func (s *DropMatrix) convertDropMatrixElementsToDropMatrixQueryResult(ctx contex
 				ItemID:    dropMatrixElement.ItemID,
 				Quantity:  dropMatrixElement.Quantity,
 				Times:     dropMatrixElement.Times,
+				StdDev:    util.RoundFloat64(util.CalcStdDevFromQuantityBuckets(dropMatrixElement.QuantityBuckets, dropMatrixElement.Times), constant.StdDevDigits),
 				TimeRange: timeRange,
 			})
 		}
@@ -591,6 +598,7 @@ func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, server str
 			ItemID:    item.ArkItemID,
 			Quantity:  el.Quantity,
 			Times:     el.Times,
+			StdDev:    el.StdDev,
 			StartTime: el.TimeRange.StartTime.UnixMilli(),
 			EndTime:   endTime,
 		}
@@ -602,12 +610,10 @@ func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, server str
 	return results, nil
 }
 
-func (s *DropMatrix) calcStdDev(quantityCountMap map[int]int, times int) float64 {
-	sum := 0
-	squareSum := 0
-	for quantity, times := range quantityCountMap {
-		sum += quantity * times
-		squareSum += quantity * quantity * times
+func (s *DropMatrix) convertOneDropMatrixElementToStatsBundle(el *model.OneDropMatrixElement) *util.StatsBundle {
+	return &util.StatsBundle{
+		N:      el.Times,
+		Avg:    float64(el.Quantity) / float64(el.Times),
+		StdDev: el.StdDev,
 	}
-	return math.Sqrt(float64(squareSum)/float64(times) - math.Pow(float64(sum)/float64(times), 2))
 }
