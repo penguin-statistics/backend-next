@@ -29,7 +29,7 @@ func CalcStdDevFromQuantityBuckets(quantityBuckets map[int]int, times int) float
 	}
 	variance := float64(squareSum)/float64(times) - math.Pow(float64(sum)/float64(times), 2)
 	if variance < 0 {
-		// should not happen, unless something is wrong with the drop patternn
+		// should not happen, unless something is wrong with the drop pattern
 		log.Error().Msgf("variance is less than 0: %f", variance)
 		return 0
 	}
