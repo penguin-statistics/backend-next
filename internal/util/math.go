@@ -39,7 +39,7 @@ func CalcStdDevFromQuantityBuckets(quantityBuckets map[int]int, times int) float
 func CombineTwoBundles(bundle1, bundle2 *StatsBundle) *StatsBundle {
 	n := bundle1.N + bundle2.N
 	avg := (bundle1.Avg*float64(bundle1.N) + bundle2.Avg*float64(bundle2.N)) / float64(n)
-	squareAvg := (calcSquareAvg(bundle1)*float64(bundle1.N) + calcSquareAvg(bundle2)*float64(bundle2.N)) / float64(n)
+	squareAvg := (bundle1.calcSquareAvg()*float64(bundle1.N) + bundle2.calcSquareAvg()*float64(bundle2.N)) / float64(n)
 	variance := squareAvg - math.Pow(avg, 2)
 	stdDev := 0.0
 	if variance < 0 {
@@ -60,6 +60,6 @@ func RoundFloat64(f float64, n int) float64 {
 	return math.Round(f*pow10_n) / pow10_n
 }
 
-func calcSquareAvg(bundle *StatsBundle) float64 {
+func (bundle *StatsBundle) calcSquareAvg() float64 {
 	return math.Pow(bundle.Avg, 2) + math.Pow(bundle.StdDev, 2)
 }
