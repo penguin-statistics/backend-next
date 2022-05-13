@@ -19,6 +19,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/util"
 	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
+	"github.com/penguin-statistics/backend-next/internal/util/reportutil/reportverifs"
 )
 
 var (
@@ -38,10 +39,10 @@ type Report struct {
 	DropPatternRepo        *repo.DropPattern
 	DropReportExtraRepo    *repo.DropReportExtra
 	DropPatternElementRepo *repo.DropPatternElement
-	ReportVerifier         *reportutil.ReportVerifier
+	ReportVerifier         *reportverifs.ReportVerifier
 }
 
-func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *Item, stageService *Stage, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *Account, reportVerifier *reportutil.ReportVerifier) *Report {
+func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *Item, stageService *Stage, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *Account, reportVerifier *reportverifs.ReportVerifier) *Report {
 	service := &Report{
 		DB:                     db,
 		Redis:                  redisClient,
@@ -76,7 +77,7 @@ func (s *Report) pipelineAccount(ctx *fiber.Ctx) (accountId int, err error) {
 }
 
 func (s *Report) pipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []types.ArkDrop) ([]*types.Drop, error) {
-	drops = reportutil.MergeDrops(drops)
+	drops = reportutil.MergeDropsByDropTypeAndItemID(drops)
 
 	convertedDrops := make([]*types.Drop, 0, len(drops))
 	for _, drop := range drops {
