@@ -10,6 +10,7 @@ import (
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
@@ -219,7 +220,8 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 
 	var combinedResults []*model.CombinedResultForDropMatrix
 	for _, timeRange := range timeRanges {
-		quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, util.GetStageIdItemIdMapFromDropInfos(dropInfos), accountId)
+		stageIdItemIdMap := util.GetStageIdItemIdMapFromDropInfos(dropInfos)
+		quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, stageIdItemIdMap, accountId)
 		if err != nil {
 			return nil, err
 		}
@@ -227,7 +229,11 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 		if err != nil {
 			return nil, err
 		}
-		oneBatch := s.combineQuantityAndTimesResults(quantityResults, timesResults, timeRange)
+		quantityUniqCountResults, err := s.DropReportService.CalcQuantityUniqCount(ctx, server, timeRange, stageIdItemIdMap, accountId)
+		if err != nil {
+			return nil, err
+		}
+		oneBatch := s.combineQuantityAndTimesResults(quantityResults, timesResults, quantityUniqCountResults, timeRange)
 		combinedResults = append(combinedResults, oneBatch...)
 	}
 
@@ -285,13 +291,15 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 				itemId := el3.(*model.CombinedResultForDropMatrix).ItemID
 				quantity := el3.(*model.CombinedResultForDropMatrix).Quantity
 				times := el3.(*model.CombinedResultForDropMatrix).Times
+				quantityBuckets := el3.(*model.CombinedResultForDropMatrix).QuantityBuckets
 				dropMatrixElement := model.DropMatrixElement{
-					StageID:  stageId,
-					ItemID:   itemId,
-					RangeID:  rangeId,
-					Quantity: quantity,
-					Times:    times,
-					Server:   server,
+					StageID:         stageId,
+					ItemID:          itemId,
+					RangeID:         rangeId,
+					Quantity:        quantity,
+					QuantityBuckets: quantityBuckets,
+					Times:           times,
+					Server:          server,
 				}
 				if rangeId == 0 {
 					dropMatrixElement.TimeRange = timeRange
@@ -302,13 +310,15 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 			}
 			// add those items which do not show up in the matrix (quantity is 0)
 			for itemId := range dropSet {
+				times := stageTimesMap[stageId]
 				dropMatrixElementWithZeroQuantity := model.DropMatrixElement{
-					StageID:  stageId,
-					ItemID:   itemId,
-					RangeID:  rangeId,
-					Quantity: 0,
-					Times:    stageTimesMap[stageId],
-					Server:   server,
+					StageID:         stageId,
+					ItemID:          itemId,
+					RangeID:         rangeId,
+					Quantity:        0,
+					QuantityBuckets: map[int]int{0: times},
+					Times:           times,
+					Server:          server,
 				}
 				if rangeId == 0 {
 					dropMatrixElementWithZeroQuantity.TimeRange = timeRange
@@ -321,10 +331,12 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 }
 
 func (s *DropMatrix) combineQuantityAndTimesResults(
-	quantityResults []*model.TotalQuantityResultForDropMatrix, timesResults []*model.TotalTimesResult, timeRange *model.TimeRange,
+	quantityResults []*model.TotalQuantityResultForDropMatrix, timesResults []*model.TotalTimesResult,
+	quantityUniqCountResults []*model.QuantityUniqCountResultForDropMatrix, timeRange *model.TimeRange,
 ) []*model.CombinedResultForDropMatrix {
-	var firstGroupResults []linq.Group
 	combinedResults := make([]*model.CombinedResultForDropMatrix, 0)
+
+	var firstGroupResults []linq.Group
 	linq.From(quantityResults).
 		GroupByT(
 			func(result *model.TotalQuantityResultForDropMatrix) int { return result.StageID },
@@ -343,6 +355,35 @@ func (s *DropMatrix) combineQuantityAndTimesResults(
 		quantityResultsMap[stageId] = resultsMap
 	}
 
+	var quantityUniqCountGroupResultsByStageID []linq.Group
+	linq.From(quantityUniqCountResults).
+		GroupByT(func(result *model.QuantityUniqCountResultForDropMatrix) int { return result.StageID },
+			func(result *model.QuantityUniqCountResultForDropMatrix) *model.QuantityUniqCountResultForDropMatrix {
+				return result
+			}).
+		ToSlice(&quantityUniqCountGroupResultsByStageID)
+	quantityUniqCountResultsMap := make(map[int]map[int]map[int]int)
+	for _, quantityUniqCountGroupElements := range quantityUniqCountGroupResultsByStageID {
+		stageId := quantityUniqCountGroupElements.Key.(int)
+		var quantityUniqCountGroupResultsByItemID []linq.Group
+		linq.From(quantityUniqCountGroupElements.Group).
+			GroupByT(func(result *model.QuantityUniqCountResultForDropMatrix) int { return result.ItemID },
+				func(result *model.QuantityUniqCountResultForDropMatrix) *model.QuantityUniqCountResultForDropMatrix {
+					return result
+				}).ToSlice(&quantityUniqCountGroupResultsByItemID)
+		oneItemResultsMap := make(map[int]map[int]int)
+		for _, quantityUniqCountGroupElements2 := range quantityUniqCountGroupResultsByItemID {
+			itemId := quantityUniqCountGroupElements2.Key.(int)
+			subMap := make(map[int]int)
+			linq.From(quantityUniqCountGroupElements2.Group).
+				ToMapByT(&subMap,
+					func(el any) int { return el.(*model.QuantityUniqCountResultForDropMatrix).Quantity },
+					func(el any) int { return el.(*model.QuantityUniqCountResultForDropMatrix).Count })
+			oneItemResultsMap[itemId] = subMap
+		}
+		quantityUniqCountResultsMap[stageId] = oneItemResultsMap
+	}
+
 	var secondGroupResults []linq.Group
 	linq.From(timesResults).
 		GroupByT(
@@ -352,15 +393,21 @@ func (s *DropMatrix) combineQuantityAndTimesResults(
 	for _, secondGroupResults := range secondGroupResults {
 		stageId := secondGroupResults.Key.(int)
 		quantityResultsMapForOneStage := quantityResultsMap[stageId]
+		quantityUniqCountResultsMapForOneStage := quantityUniqCountResultsMap[stageId]
 		for _, el := range secondGroupResults.Group {
 			times := el.(*model.TotalTimesResult).TotalTimes
 			for itemId, quantity := range quantityResultsMapForOneStage {
+				quantityBuckets := quantityUniqCountResultsMapForOneStage[itemId]
+				if !s.validateQuantityBucketsAndTimes(quantityBuckets, times) {
+					log.Warn().Msgf("quantity buckets and times are not matched for stage %d, item %d, timerange %+v, please check drop pattern", stageId, itemId, timeRange)
+				}
 				combinedResults = append(combinedResults, &model.CombinedResultForDropMatrix{
-					StageID:   stageId,
-					ItemID:    itemId,
-					Quantity:  quantity,
-					Times:     times,
-					TimeRange: timeRange,
+					StageID:         stageId,
+					ItemID:          itemId,
+					Quantity:        quantity,
+					QuantityBuckets: quantityBuckets,
+					Times:           times,
+					TimeRange:       timeRange,
 				})
 			}
 		}
@@ -398,6 +445,7 @@ func (s *DropMatrix) convertDropMatrixElementsToMaxAccumulableDropMatrixQueryRes
 					ItemID:   itemId,
 					Quantity: element.Quantity,
 					Times:    element.Times,
+					StdDev:   util.RoundFloat64(util.CalcStdDevFromQuantityBuckets(element.QuantityBuckets, element.Times), constant.StdDevDigits),
 				}
 				if timeRange.StartTime.Before(*startTime) {
 					startTime = timeRange.StartTime
@@ -433,11 +481,24 @@ func (s *DropMatrix) combineDropMatrixResults(a, b *model.OneDropMatrixElement) 
 	if a.ItemID != b.ItemID {
 		return nil, errors.New("itemId not match")
 	}
+	bundleA, err := s.convertOneDropMatrixElementToStatsBundle(a)
+	if err != nil {
+		return nil, err
+	}
+	bundleB, err := s.convertOneDropMatrixElementToStatsBundle(b)
+	if err != nil {
+		return nil, err
+	}
 	result := &model.OneDropMatrixElement{
 		StageID:  a.StageID,
 		ItemID:   a.ItemID,
 		Quantity: a.Quantity + b.Quantity,
 		Times:    a.Times + b.Times,
+		StdDev: util.RoundFloat64(
+			util.CombineTwoBundles(
+				bundleA,
+				bundleB,
+			).StdDev, constant.StdDevDigits),
 	}
 	return result, nil
 }
@@ -473,6 +534,7 @@ func (s *DropMatrix) convertDropMatrixElementsToDropMatrixQueryResult(ctx contex
 				ItemID:    dropMatrixElement.ItemID,
 				Quantity:  dropMatrixElement.Quantity,
 				Times:     dropMatrixElement.Times,
+				StdDev:    util.RoundFloat64(util.CalcStdDevFromQuantityBuckets(dropMatrixElement.QuantityBuckets, dropMatrixElement.Times), constant.StdDevDigits),
 				TimeRange: timeRange,
 			})
 		}
@@ -549,6 +611,7 @@ func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, server str
 			ItemID:    item.ArkItemID,
 			Quantity:  el.Quantity,
 			Times:     el.Times,
+			StdDev:    el.StdDev,
 			StartTime: el.TimeRange.StartTime.UnixMilli(),
 			EndTime:   endTime,
 		}
@@ -558,4 +621,23 @@ func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, server str
 		results.Matrix = append(results.Matrix, &oneDropMatrixElement)
 	}
 	return results, nil
+}
+
+func (s *DropMatrix) convertOneDropMatrixElementToStatsBundle(el *model.OneDropMatrixElement) (*util.StatsBundle, error) {
+	if el.Times == 0 {
+		return nil, errors.New("times should not be 0")
+	}
+	return &util.StatsBundle{
+		N:      el.Times,
+		Avg:    float64(el.Quantity) / float64(el.Times),
+		StdDev: el.StdDev,
+	}, nil
+}
+
+func (s *DropMatrix) validateQuantityBucketsAndTimes(quantityBuckets map[int]int, times int) bool {
+	sum := 0
+	for _, quantity := range quantityBuckets {
+		sum += quantity
+	}
+	return sum <= times
 }
