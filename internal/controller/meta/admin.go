@@ -103,7 +103,7 @@ func (c AdminController) FindPatterns(ctx *fiber.Ctx) error {
 				spew.Dump(hash, fingerprint, err)
 				sb.WriteString(fmt.Sprintf(`WITH inserted_id AS (INSERT INTO drop_patterns ("hash", "original_fingerprint") VALUES ('%s', '%s') RETURNING pattern_id)
 UPDATE drop_reports SET pattern_id = (select pattern_id from inserted_id) WHERE pattern_id = '%d';
-`, fingerprint, hash, pattern.PatternID))
+`, hash, fingerprint, pattern.PatternID))
 				continue
 			}
 
