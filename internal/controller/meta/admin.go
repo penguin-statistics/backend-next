@@ -1,11 +1,17 @@
 package meta
 
 import (
+	"fmt"
 	"net/http"
+	"sort"
+	"strconv"
+	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gofiber/fiber/v2"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
+	"github.com/zeebo/xxh3"
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/model"
@@ -13,6 +19,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model/gamedata"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/util/rekuest"
@@ -21,6 +28,7 @@ import (
 type AdminController struct {
 	fx.In
 
+	PatternRepo          *repo.DropPattern
 	AdminService         *service.Admin
 	ItemService          *service.Item
 	DropMatrixService    *service.DropMatrix
@@ -35,6 +43,7 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Post("/purge", c.PurgeCache)
 
 	admin.Get("/cli/gamedata/seed", c.GetCliGameDataSeed)
+	admin.Get("/_temp/pattern", c.FindPatterns)
 
 	admin.Get("/refresh/matrix/:server", c.RefreshAllDropMatrixElements)
 	admin.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
@@ -49,6 +58,68 @@ type CliGameDataSeedResponse struct {
 // Bonjour is for the admin dashboard to detect authentication status
 func (c AdminController) Bonjour(ctx *fiber.Ctx) error {
 	return ctx.SendStatus(http.StatusNoContent)
+}
+
+func (c AdminController) FindPatterns(ctx *fiber.Ctx) error {
+	patterns, err := c.PatternRepo.GetDropPatterns(ctx.Context())
+	if err != nil {
+		return err
+	}
+
+	var sb strings.Builder
+
+	for _, pattern := range patterns {
+		m := map[string]int{}
+		haveDup := false
+		segments := strings.Split(pattern.OriginalFingerprint, "|")
+		if len(segments) == 1 && segments[0] == "" {
+			continue
+		}
+		for _, segment := range segments {
+			a := strings.Split(segment, ":")
+			if _, ok := m[a[0]]; ok {
+				haveDup = true
+			}
+
+			i, _ := strconv.Atoi(a[1])
+
+			if _, ok := m[a[0]]; ok {
+				m[a[0]] = m[a[0]] + i
+			} else {
+				m[a[0]] = i
+			}
+		}
+		if haveDup {
+			segments := make([]string, 0)
+
+			for i, j := range m {
+				segments = append(segments, fmt.Sprintf("%s:%d", i, j))
+			}
+
+			fingerprint, hash := c.calculateDropPatternHash(segments)
+
+			correctPattern, err := c.PatternRepo.GetDropPatternByHash(ctx.Context(), hash)
+			if err != nil {
+				spew.Dump(hash, fingerprint, err)
+				sb.WriteString(fmt.Sprintf(`WITH inserted_id AS (INSERT INTO drop_patterns ("hash", "original_fingerprint") VALUES ('%s', '%s') RETURNING pattern_id)
+UPDATE drop_reports SET pattern_id = (select pattern_id from inserted_id) WHERE pattern_id = '%d';
+`, fingerprint, hash, pattern.PatternID))
+				continue
+			}
+
+			sb.WriteString(fmt.Sprintf("UPDATE drop_reports SET pattern_id = '%d' WHERE pattern_id = '%d';\n", correctPattern.PatternID, pattern.PatternID))
+		}
+	}
+
+	return ctx.SendString(sb.String())
+}
+
+func (c AdminController) calculateDropPatternHash(segments []string) (originalFingerprint, hexHash string) {
+	sort.Strings(segments)
+
+	originalFingerprint = strings.Join(segments, "|")
+	hash := xxh3.HashStringSeed(originalFingerprint, 0)
+	return originalFingerprint, strconv.FormatUint(hash, 16)
 }
 
 func (c AdminController) GetCliGameDataSeed(ctx *fiber.Ctx) error {
