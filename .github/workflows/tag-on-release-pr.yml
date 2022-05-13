@@ -34,24 +34,3 @@ jobs:
           git tag $TAG
           git push origin $TAG
           echo "BUMPED_VERSION=$(echo "${{ env.TAG }}" | awk -F. '{OFS="."; $NF+=1; print $0}')" >> $GITHUB_ENV
-
-      # Open a new pull request bumping the patch version
-      - name: Open a new Pull Request
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const { repo, owner } = context.repo;
-            const result = await github.rest.pulls.create({
-              title: 'Release ${{ env.TAG }}',
-              owner,
-              repo,
-              head: 'dev',
-              base: 'main'
-            });
-            github.rest.issues.addLabels({
-              owner,
-              repo,
-              issue_number: result.data.number,
-              labels: ['release', 'automated']
-            });
-          
