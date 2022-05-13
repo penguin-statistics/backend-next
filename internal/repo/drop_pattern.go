@@ -15,6 +15,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
 )
 
 type DropPattern struct {
@@ -85,6 +86,8 @@ func (s *DropPattern) GetOrCreateDropPatternFromDrops(ctx context.Context, tx bu
 }
 
 func (s *DropPattern) calculateDropPatternHash(drops []*types.Drop) (originalFingerprint, hexHash string) {
+	drops = reportutil.MergeDropsByItemID(drops)
+
 	segments := make([]string, len(drops))
 
 	for i, drop := range drops {
