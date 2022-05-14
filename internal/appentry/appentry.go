@@ -1,7 +1,6 @@
 package appentry
 
 import (
-	"github.com/penguin-statistics/backend-next/internal/workers/reportwkr"
 	"time"
 
 	"go.uber.org/fx"
@@ -18,8 +17,9 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/server/httpserver"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
+	"github.com/penguin-statistics/backend-next/internal/util/reportutil/reportverifs"
 	"github.com/penguin-statistics/backend-next/internal/workers/calcwkr"
+	"github.com/penguin-statistics/backend-next/internal/workers/reportwkr"
 )
 
 func ProvideOptions(includeSwagger bool) []fx.Option {
@@ -41,10 +41,10 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 
 		// Verifiers
 		fx.Provide(
-			reportutil.NewMD5Verifier,
-			reportutil.NewUserVerifier,
-			reportutil.NewDropVerifier,
-			reportutil.NewReportVerifier,
+			reportverifs.NewMD5Verifier,
+			reportverifs.NewUserVerifier,
+			reportverifs.NewDropVerifier,
+			reportverifs.NewReportVerifier,
 		),
 
 		// Repositories

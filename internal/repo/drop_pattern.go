@@ -15,6 +15,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
 )
 
 type DropPattern struct {
@@ -23,6 +24,21 @@ type DropPattern struct {
 
 func NewDropPattern(db *bun.DB) *DropPattern {
 	return &DropPattern{DB: db}
+}
+
+func (s *DropPattern) GetDropPatterns(ctx context.Context) ([]*model.DropPattern, error) {
+	dropPatterns := make([]*model.DropPattern, 0)
+	err := s.DB.NewSelect().
+		Model(&dropPatterns).
+		Scan(ctx)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, pgerr.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return dropPatterns, nil
 }
 
 func (s *DropPattern) GetDropPatternById(ctx context.Context, id int) (*model.DropPattern, error) {
@@ -85,6 +101,8 @@ func (s *DropPattern) GetOrCreateDropPatternFromDrops(ctx context.Context, tx bu
 }
 
 func (s *DropPattern) calculateDropPatternHash(drops []*types.Drop) (originalFingerprint, hexHash string) {
+	drops = reportutil.MergeDropsByItemID(drops)
+
 	segments := make([]string, len(drops))
 
 	for i, drop := range drops {

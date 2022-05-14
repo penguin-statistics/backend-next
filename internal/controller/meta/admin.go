@@ -13,6 +13,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model/gamedata"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/util/rekuest"
@@ -21,6 +22,7 @@ import (
 type AdminController struct {
 	fx.In
 
+	PatternRepo          *repo.DropPattern
 	AdminService         *service.Admin
 	ItemService          *service.Item
 	DropMatrixService    *service.DropMatrix

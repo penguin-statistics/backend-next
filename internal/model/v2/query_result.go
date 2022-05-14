@@ -12,6 +12,7 @@ type OneDropMatrixElement struct {
 	ItemID    string   `json:"itemId" example:"30012"`
 	Times     int      `json:"times" example:"1061347"`
 	Quantity  int      `json:"quantity" example:"1322056"`
+	StdDev    float64  `json:"stdDev" example:"0.114514"`
 	StartTime int64    `json:"start" example:"1556676000000"`
 	EndTime   null.Int `json:"end,omitempty" swaggertype:"integer"`
 }

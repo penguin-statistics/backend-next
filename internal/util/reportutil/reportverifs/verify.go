@@ -1,4 +1,4 @@
-package reportutil
+package reportverifs
 
 import (
 	"context"

@@ -44,3 +44,7 @@ func (s *DropReport) CalcTotalQuantityForTrend(ctx context.Context, server strin
 func (s *DropReport) CalcTotalTimesForTrend(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId null.Int) ([]*model.TotalTimesResultForTrend, error) {
 	return s.DropReportRepo.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, accountId)
 }
+
+func (s *DropReport) CalcQuantityUniqCount(ctx context.Context, server string, timeRange *model.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int) ([]*model.QuantityUniqCountResultForDropMatrix, error) {
+	return s.DropReportRepo.CalcQuantityUniqCount(ctx, server, timeRange, stageIdItemIdMap, accountId)
+}
