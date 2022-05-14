@@ -225,7 +225,7 @@ func (s *DropReport) CalcTotalTimesForTrend(
 	subq1 := s.DB.NewSelect().
 		With("intervals", s.genSubQueryForTrendSegments(gameDayStart, intervalLength, intervalNum)).
 		TableExpr("drop_reports AS dr").
-		Column("sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id", "dr.times").
+		Column("dr.report_id", "sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id", "dr.times").
 		Join("RIGHT JOIN intervals AS sub").
 		JoinOn("dr.created_at >= sub.interval_start AND dr.created_at < sub.interval_end")
 	s.handleAccountAndReliability(subq1, accountId)
@@ -241,7 +241,7 @@ func (s *DropReport) CalcTotalTimesForTrend(
 	s.handleSourceName(mainq, sourceCategory)
 
 	if err := mainq.
-		Group("sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id").
+		Group("group_id", "interval_start", "interval_end", "stage_id").
 		Scan(ctx, &results); err != nil {
 		return nil, err
 	}
