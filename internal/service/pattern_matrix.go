@@ -2,21 +2,18 @@ package service
 
 import (
 	"context"
-	"runtime"
-	"strconv"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
+	"github.com/penguin-statistics/backend-next/internal/pkg/async"
+	"github.com/penguin-statistics/backend-next/internal/pkg/wrap"
 	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
@@ -79,7 +76,6 @@ func (s *PatternMatrix) GetShimLatestPatternMatrixResults(ctx context.Context, s
 }
 
 func (s *PatternMatrix) RefreshAllPatternMatrixElements(ctx context.Context, server string) error {
-	toSave := []*model.PatternMatrixElement{}
 	timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
 	if err != nil {
 		return err
@@ -88,53 +84,17 @@ func (s *PatternMatrix) RefreshAllPatternMatrixElements(ctx context.Context, ser
 	if err != nil {
 		return err
 	}
-	stageIdsMap := s.getStageIdsMapByTimeRange(allTimeRanges)
+	stageIdsTuples := wrap.TuplePtrsFromMap(s.getStageIdsMapByTimeRange(allTimeRanges))
 
-	ch := make(chan []*model.PatternMatrixElement, 15)
-	var wg sync.WaitGroup
-
-	go func() {
-		for {
-			m, ok := <-ch
-			if !ok {
-				return
-			}
-			toSave = append(toSave, m...)
-			wg.Done()
-		}
-	}()
-
-	limiter := make(chan struct{}, runtime.NumCPU())
-	wg.Add(len(stageIdsMap))
-
-	errCount := int32(0)
-
-	for rangeId, stageIds := range stageIdsMap {
-		limiter <- struct{}{}
-		go func(rangeId int, stageIds []int) {
-			defer func() {
-				<-limiter
-			}()
-
-			timeRanges := []*model.TimeRange{timeRangesMap[rangeId]}
-			currentBatch, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, stageIds, null.NewInt(0, false))
-			if err != nil {
-				log.Error().Err(err).Msg("failed to calculate pattern matrix")
-				atomic.AddInt32(&errCount, 1)
-				return
-			}
-
-			ch <- currentBatch
-		}(rangeId, stageIds)
-	}
-	wg.Wait()
-	close(ch)
-
-	if errCount > 0 {
-		return errors.New("failed to calculate pattern matrix (total: " + strconv.Itoa(int(errCount)) + " errors); see log for details")
+	elements, err := async.FlatMap(stageIdsTuples, 15, func(tuple *wrap.Tuple[int, []int]) ([]*model.PatternMatrixElement, error) {
+		timeRanges := []*model.TimeRange{timeRangesMap[tuple.Key]}
+		return s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, tuple.Val, null.NewInt(0, false))
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to calculate pattern matrix")
 	}
 
-	if err := s.PatternMatrixElementService.BatchSaveElements(ctx, toSave, server); err != nil {
+	if err := s.PatternMatrixElementService.BatchSaveElements(ctx, elements, server); err != nil {
 		return err
 	}
 	return cache.ShimLatestPatternMatrixResults.Delete(server)

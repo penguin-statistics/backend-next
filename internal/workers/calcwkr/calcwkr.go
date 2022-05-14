@@ -53,6 +53,8 @@ func (w *Worker) do() {
 	ctx := context.Background()
 
 	go func() {
+		time.Sleep(time.Second * 3)
+
 		for {
 			log.Info().
 				Int("count", w.count).

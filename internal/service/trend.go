@@ -2,11 +2,10 @@ package service
 
 import (
 	"context"
-	"runtime"
-	"sync"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
+	"github.com/penguin-statistics/backend-next/internal/pkg/async"
 	"github.com/penguin-statistics/backend-next/internal/pkg/gameday"
 	"github.com/penguin-statistics/backend-next/internal/util"
 )
@@ -160,42 +160,19 @@ func (s *Trend) RefreshTrendElements(ctx context.Context, server string) error {
 		}
 	}
 
-	toSave := []*model.TrendElement{}
-	ch := make(chan []*model.TrendElement, 15)
-	var wg sync.WaitGroup
+	elements, err := async.FlatMap(calcq, 5, func(m map[string]any) ([]*model.TrendElement, error) {
+		stageId := m["stageId"].(int)
+		itemIds := m["itemIds"].([]int)
+		startTime := m["startTime"].(time.Time)
+		intervalNum := m["intervalNum"].(int)
 
-	go func() {
-		for {
-			m, ok := <-ch
-			if !ok {
-				return
-			}
-			toSave = append(toSave, m...)
-			wg.Done()
-		}
-	}()
-
-	limiter := make(chan struct{}, runtime.NumCPU())
-	wg.Add(len(calcq))
-	for _, el := range calcq {
-		limiter <- struct{}{}
-		go func(el map[string]any) {
-			startTime := el["startTime"].(time.Time)
-			intervalNum := el["intervalNum"].(int)
-			stageId := el["stageId"].(int)
-			itemIds := el["itemIds"].([]int)
-			currentBatch, err := s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, null.NewInt(0, false))
-			if err != nil {
-				return
-			}
-			ch <- currentBatch
-			<-limiter
-		}(el)
+		return s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, null.NewInt(0, false))
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to refresh trend elements")
 	}
-	wg.Wait()
-	close(ch)
 
-	if err := s.TrendElementService.BatchSaveElements(ctx, toSave, server); err != nil {
+	if err := s.TrendElementService.BatchSaveElements(ctx, elements, server); err != nil {
 		return err
 	}
 	return cache.ShimSavedTrendResults.Delete(server)
