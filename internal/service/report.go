@@ -98,7 +98,7 @@ func (s *Report) pipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []
 }
 
 func (s *Report) pipelineTaskId(ctx *fiber.Ctx) string {
-	return ctx.Locals("requestid").(string) + "-" + uniuri.NewLen(32)
+	return ctx.Locals(constant.ContextKeyRequestID).(string) + "-" + uniuri.NewLen(16)
 }
 
 func (s *Report) pipelineAggregateGachaboxDrops(ctx context.Context, singleReport *types.ReportTaskSingleReport) error {

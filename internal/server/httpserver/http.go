@@ -68,6 +68,7 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 		ExposeHeaders:    "Content-Type, X-Penguin-Set-PenguinID, X-Penguin-Upgrade, X-Penguin-Compatible, X-Penguin-Request-ID",
 		AllowCredentials: true,
 	}))
+	// requestid is used by report service to identify requests and generate taskId there afterwards
 	app.Use(requestid.New(
 		requestid.Config{
 			Header: "X-Penguin-Request-ID",
