@@ -7,11 +7,11 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-type Errors[T any] struct {
+type Errors struct {
 	Errs []error
 }
 
-func (e Errors[T]) Error() any {
+func (e Errors) Error() any {
 	var sb strings.Builder
 	for _, err := range e.Errs {
 		sb.WriteString(err.Error())
@@ -33,7 +33,7 @@ func Map[T any, D any](src []T, concurrencyLimit int, f func(T) (D, error)) ([]D
 
 	limiter := make(chan struct{}, concurrencyLimit)
 
-	bufSize := min(len(src)/2, 32)
+	bufSize := max(min(len(src)/2, 32), 1)
 	resCh := make(chan D, bufSize)
 
 	errCh := make(chan error, bufSize)
@@ -58,7 +58,7 @@ func Map[T any, D any](src []T, concurrencyLimit int, f func(T) (D, error)) ([]D
 	}()
 
 	// error fan-in
-	errors := Errors[T]{}
+	errors := Errors{}
 	go func() {
 		for {
 			err, ok := <-errCh
@@ -113,6 +113,14 @@ func FlatMap[T any, D any](src []T, concurrencyLimit int, f func(T) ([]D, error)
 
 func min[T constraints.Ordered](a, b T) T {
 	if a < b {
+		return a
+	} else {
+		return b
+	}
+}
+
+func max[T constraints.Ordered](a, b T) T {
+	if a > b {
 		return a
 	} else {
 		return b
