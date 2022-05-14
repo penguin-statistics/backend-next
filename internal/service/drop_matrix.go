@@ -71,9 +71,11 @@ func NewDropMatrix(
 }
 
 // Cache: shimMaxAccumulableDropMatrixResults#server|showClosedZoned:{server}|{showClosedZones}, 24 hrs, records last modified time
-func (s *DropMatrix) GetShimMaxAccumulableDropMatrixResults(ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId null.Int) (*modelv2.DropMatrixQueryResult, error) {
+func (s *DropMatrix) GetShimMaxAccumulableDropMatrixResults(
+	ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId null.Int,
+) (*modelv2.DropMatrixQueryResult, error) {
 	valueFunc := func() (*modelv2.DropMatrixQueryResult, error) {
-		savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId)
+		savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId, constant.SourceCategoryAll)
 		if err != nil {
 			return nil, err
 		}
@@ -100,9 +102,9 @@ func (s *DropMatrix) GetShimMaxAccumulableDropMatrixResults(ctx context.Context,
 }
 
 func (s *DropMatrix) GetShimCustomizedDropMatrixResults(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, itemIds []int, accountId null.Int, sourceCategory string,
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, itemIds []int, accountId null.Int,
 ) (*modelv2.DropMatrixQueryResult, error) {
-	customizedDropMatrixQueryResult, err := s.QueryDropMatrix(ctx, server, []*model.TimeRange{timeRange}, stageIds, itemIds, accountId, sourceCategory)
+	customizedDropMatrixQueryResult, err := s.QueryDropMatrix(ctx, server, []*model.TimeRange{timeRange}, stageIds, itemIds, accountId, constant.SourceCategoryAll)
 	if err != nil {
 		return nil, err
 	}
@@ -135,11 +137,16 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 				if err != nil {
 					return
 				}
-				autoResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), constant.SourceCategoryAutomated)
+				automatedResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), constant.SourceCategoryAutomated)
 				if err != nil {
 					return
 				}
-				currentBatch := append(manualResults, autoResults...)
+				allResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), constant.SourceCategoryAll)
+				if err != nil {
+					return
+				}
+				currentBatch := append(manualResults, automatedResults...)
+				currentBatch = append(currentBatch, allResults...)
 				ch <- currentBatch
 				usedTimeMap.Store(timeRange.RangeID, int(time.Since(startTime).Microseconds()))
 			}
@@ -183,8 +190,8 @@ func (s *DropMatrix) QueryDropMatrix(
 }
 
 // calc DropMatrixQueryResult for max accumulable timeranges
-func (s *DropMatrix) getMaxAccumulableDropMatrixResults(ctx context.Context, server string, accountId null.Int) (*model.DropMatrixQueryResult, error) {
-	dropMatrixElements, err := s.getDropMatrixElements(ctx, server, accountId)
+func (s *DropMatrix) getMaxAccumulableDropMatrixResults(ctx context.Context, server string, accountId null.Int, sourceCategory string) (*model.DropMatrixQueryResult, error) {
+	dropMatrixElements, err := s.getDropMatrixElements(ctx, server, accountId, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +199,7 @@ func (s *DropMatrix) getMaxAccumulableDropMatrixResults(ctx context.Context, ser
 }
 
 // For global, get elements from DB; For personal, calc elements
-func (s *DropMatrix) getDropMatrixElements(ctx context.Context, server string, accountId null.Int) ([]*model.DropMatrixElement, error) {
+func (s *DropMatrix) getDropMatrixElements(ctx context.Context, server string, accountId null.Int, sourceCategory string) ([]*model.DropMatrixElement, error) {
 	if accountId.Valid {
 		maxAccumulableTimeRanges, err := s.TimeRangeService.GetMaxAccumulableTimeRangesByServer(ctx, server)
 		if err != nil {
@@ -211,17 +218,13 @@ func (s *DropMatrix) getDropMatrixElements(ctx context.Context, server string, a
 		for _, timeRange := range timeRangesMap {
 			timeRanges = append(timeRanges, timeRange)
 		}
-		manualResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId, constant.SourceCategoryManual)
+		dropMatrixElements, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId, sourceCategory)
 		if err != nil {
 			return nil, err
 		}
-		autoResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId, constant.SourceCategoryAutomated)
-		if err != nil {
-			return nil, err
-		}
-		return append(manualResults, autoResults...), nil
+		return dropMatrixElements, nil
 	} else {
-		return s.DropMatrixElementService.GetElementsByServer(ctx, server)
+		return s.DropMatrixElementService.GetElementsByServerAndSourceCategory(ctx, server, sourceCategory)
 	}
 }
 

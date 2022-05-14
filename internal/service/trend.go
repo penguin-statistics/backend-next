@@ -54,7 +54,7 @@ func NewTrend(
 // Cache: shimSavedTrendResults#server:{server}, 24hrs, records last modified time
 func (s *Trend) GetShimSavedTrendResults(ctx context.Context, server string) (*modelv2.TrendQueryResult, error) {
 	valueFunc := func() (*modelv2.TrendQueryResult, error) {
-		queryResult, err := s.getSavedTrendResults(ctx, server)
+		queryResult, err := s.getSavedTrendResults(ctx, server, constant.SourceCategoryAll)
 		if err != nil {
 			return nil, err
 		}
@@ -75,8 +75,10 @@ func (s *Trend) GetShimSavedTrendResults(ctx context.Context, server string) (*m
 	return &shimResult, nil
 }
 
-func (s *Trend) GetShimCustomizedTrendResults(ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, itemIds []int, accountId null.Int) (*modelv2.TrendQueryResult, error) {
-	trendQueryResult, err := s.QueryTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, itemIds, accountId)
+func (s *Trend) GetShimCustomizedTrendResults(
+	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, itemIds []int, accountId null.Int,
+) (*modelv2.TrendQueryResult, error) {
+	trendQueryResult, err := s.QueryTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, itemIds, accountId, constant.SourceCategoryAll)
 	if err != nil {
 		return nil, err
 	}
@@ -84,9 +86,9 @@ func (s *Trend) GetShimCustomizedTrendResults(ctx context.Context, server string
 }
 
 func (s *Trend) QueryTrend(
-	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId null.Int,
+	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId null.Int, sourceCategory string,
 ) (*model.TrendQueryResult, error) {
-	trendElements, err := s.calcTrend(ctx, server, startTime, intervalLength, intervalNum, stageIdFilter, itemIdFilter, accountId)
+	trendElements, err := s.calcTrend(ctx, server, startTime, intervalLength, intervalNum, stageIdFilter, itemIdFilter, accountId, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -184,10 +186,20 @@ func (s *Trend) RefreshTrendElements(ctx context.Context, server string) error {
 			intervalNum := el["intervalNum"].(int)
 			stageId := el["stageId"].(int)
 			itemIds := el["itemIds"].([]int)
-			currentBatch, err := s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, null.NewInt(0, false))
+			manualResults, err := s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, null.NewInt(0, false), constant.SourceCategoryManual)
 			if err != nil {
 				return
 			}
+			automatedResults, err := s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, null.NewInt(0, false), constant.SourceCategoryAutomated)
+			if err != nil {
+				return
+			}
+			allResults, err := s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, null.NewInt(0, false), constant.SourceCategoryAll)
+			if err != nil {
+				return
+			}
+			currentBatch := append(manualResults, automatedResults...)
+			currentBatch = append(currentBatch, allResults...)
 			ch <- currentBatch
 			<-limiter
 		}(el)
@@ -201,8 +213,8 @@ func (s *Trend) RefreshTrendElements(ctx context.Context, server string) error {
 	return cache.ShimSavedTrendResults.Delete(server)
 }
 
-func (s *Trend) getSavedTrendResults(ctx context.Context, server string) (*model.TrendQueryResult, error) {
-	trendElements, err := s.TrendElementService.GetElementsByServer(ctx, server)
+func (s *Trend) getSavedTrendResults(ctx context.Context, server string, sourceCategory string) (*model.TrendQueryResult, error) {
+	trendElements, err := s.TrendElementService.GetElementsByServerAndSourceCategory(ctx, server, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +222,7 @@ func (s *Trend) getSavedTrendResults(ctx context.Context, server string) (*model
 }
 
 func (s *Trend) calcTrend(
-	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId null.Int,
+	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId null.Int, sourceCategory string,
 ) ([]*model.TrendElement, error) {
 	endTime := startTime.Add(time.Hour * time.Duration(int(intervalLength.Hours())*intervalNum))
 	if e := log.Trace(); e.Enabled() {
@@ -230,11 +242,11 @@ func (s *Trend) calcTrend(
 		return nil, err
 	}
 
-	quantityResults, err := s.DropReportService.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength, intervalNum, util.GetStageIdItemIdMapFromDropInfos(dropInfos), accountId, constant.SourceCategoryAll)
+	quantityResults, err := s.DropReportService.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength, intervalNum, util.GetStageIdItemIdMapFromDropInfos(dropInfos), accountId, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
-	timesResults, err := s.DropReportService.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength, intervalNum, util.GetStageIdsFromDropInfos(dropInfos), accountId, constant.SourceCategoryAll)
+	timesResults, err := s.DropReportService.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength, intervalNum, util.GetStageIdsFromDropInfos(dropInfos), accountId, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -246,14 +258,15 @@ func (s *Trend) calcTrend(
 	finalResults := make([]*model.TrendElement, 0, len(combinedResults))
 	for _, result := range combinedResults {
 		finalResults = append(finalResults, &model.TrendElement{
-			StageID:   result.StageID,
-			ItemID:    result.ItemID,
-			Quantity:  result.Quantity,
-			Times:     result.Times,
-			Server:    server,
-			StartTime: result.StartTime,
-			EndTime:   result.EndTime,
-			GroupID:   result.GroupID,
+			StageID:        result.StageID,
+			ItemID:         result.ItemID,
+			Quantity:       result.Quantity,
+			Times:          result.Times,
+			Server:         server,
+			StartTime:      result.StartTime,
+			EndTime:        result.EndTime,
+			GroupID:        result.GroupID,
+			SourceCategory: sourceCategory,
 		})
 	}
 	return finalResults, nil
