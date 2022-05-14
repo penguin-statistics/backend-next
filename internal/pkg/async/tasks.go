@@ -7,14 +7,15 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-type AsyncErrors[T any] struct {
+type Errors[T any] struct {
 	Errs []error
 }
 
-func (e AsyncErrors[T]) Error() any {
+func (e Errors[T]) Error() any {
 	var sb strings.Builder
 	for _, err := range e.Errs {
 		sb.WriteString(err.Error())
+		sb.WriteString("; ")
 	}
 	return sb.String()
 }
@@ -57,7 +58,7 @@ func Map[T any, D any](src []T, concurrencyLimit int, f func(T) (D, error)) ([]D
 	}()
 
 	// error fan-in
-	errors := AsyncErrors[T]{}
+	errors := Errors[T]{}
 	go func() {
 		for {
 			err, ok := <-errCh
