@@ -1,11 +1,17 @@
 package meta
 
 import (
+	"fmt"
 	"net/http"
+	"sort"
+	"strconv"
+	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gofiber/fiber/v2"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
+	"github.com/zeebo/xxh3"
 	"go.uber.org/fx"
 
 	"github.com/penguin-statistics/backend-next/internal/model"
@@ -23,6 +29,7 @@ type AdminController struct {
 	fx.In
 
 	PatternRepo          *repo.DropPattern
+	PatternElementRepo   *repo.DropPatternElement
 	AdminService         *service.Admin
 	ItemService          *service.Item
 	DropMatrixService    *service.DropMatrix
@@ -37,6 +44,8 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Post("/purge", c.PurgeCache)
 
 	admin.Get("/cli/gamedata/seed", c.GetCliGameDataSeed)
+	admin.Get("/_temp/pattern/merging", c.FindPatterns)
+	admin.Get("/_temp/pattern/disambiguation", c.DisambiguatePatterns)
 
 	admin.Get("/refresh/matrix/:server", c.RefreshAllDropMatrixElements)
 	admin.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
@@ -51,6 +60,150 @@ type CliGameDataSeedResponse struct {
 // Bonjour is for the admin dashboard to detect authentication status
 func (c AdminController) Bonjour(ctx *fiber.Ctx) error {
 	return ctx.SendStatus(http.StatusNoContent)
+}
+
+func (c AdminController) FindPatterns(ctx *fiber.Ctx) error {
+	patterns, err := c.PatternRepo.GetDropPatterns(ctx.Context())
+	if err != nil {
+		return err
+	}
+
+	var sb strings.Builder
+
+	for _, pattern := range patterns {
+		m := map[string]int{}
+		haveDup := false
+		segments := strings.Split(pattern.OriginalFingerprint, "|")
+		if len(segments) == 1 && segments[0] == "" {
+			continue
+		}
+		for _, segment := range segments {
+			a := strings.Split(segment, ":")
+			if _, ok := m[a[0]]; ok {
+				haveDup = true
+			}
+
+			i, _ := strconv.Atoi(a[1])
+
+			if _, ok := m[a[0]]; ok {
+				m[a[0]] = m[a[0]] + i
+			} else {
+				m[a[0]] = i
+			}
+		}
+		if haveDup {
+			segments := make([]string, 0)
+
+			for i, j := range m {
+				segments = append(segments, fmt.Sprintf("%s:%d", i, j))
+			}
+
+			fingerprint, hash := c.calculateDropPatternHash(segments)
+
+			correctPattern, err := c.PatternRepo.GetDropPatternByHash(ctx.Context(), hash)
+			if err != nil {
+				spew.Dump(hash, fingerprint, err)
+				sb.WriteString(fmt.Sprintf(`WITH inserted_id AS (INSERT INTO drop_patterns ("hash", "original_fingerprint") VALUES ('%s', '%s') RETURNING pattern_id)
+UPDATE drop_reports SET pattern_id = (select pattern_id from inserted_id) WHERE pattern_id = '%d';
+`, hash, fingerprint, pattern.PatternID))
+				continue
+			}
+
+			sb.WriteString(fmt.Sprintf("UPDATE drop_reports SET pattern_id = '%d' WHERE pattern_id = '%d';\n", correctPattern.PatternID, pattern.PatternID))
+		}
+	}
+
+	return ctx.SendString(sb.String())
+}
+
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+func (c AdminController) DisambiguatePatterns(ctx *fiber.Ctx) error {
+	patterns, err := c.PatternRepo.GetDropPatterns(ctx.Context())
+	if err != nil {
+		return err
+	}
+
+	elements, err := c.PatternElementRepo.GetDropPatternElements(ctx.Context())
+	if err != nil {
+		return err
+	}
+
+	getElementsByPatternId := func(patternId int) []*model.DropPatternElement {
+		var filtered []*model.DropPatternElement
+		for _, element := range elements {
+			if element.DropPatternID == patternId {
+				filtered = append(filtered, element)
+			}
+		}
+		return filtered
+	}
+
+	var sb strings.Builder
+	sb.WriteString("BEGIN\n")
+
+	for _, pattern := range patterns {
+		segments := strings.Split(pattern.OriginalFingerprint, "|")
+		if len(segments) == 1 && segments[0] == "" {
+			continue
+		}
+		storedPatterns := getElementsByPatternId(pattern.PatternID)
+		calculatedPatterns := make([]*model.DropPatternElement, 0)
+		for _, segment := range segments {
+			a := strings.Split(segment, ":")
+			itemId := must(strconv.Atoi(a[0]))
+			quantity := must(strconv.Atoi(a[1]))
+			calculatedPatterns = append(calculatedPatterns, &model.DropPatternElement{
+				DropPatternID: pattern.PatternID,
+				ItemID:        itemId,
+				Quantity:      quantity,
+			})
+		}
+		// // compare calculated and stored patterns
+		// if len(storedPatterns) != len(calculatedPatterns) {
+		// 	sb.WriteString(fmt.Sprintf("LENGTH: (patternId: %d) %d != %d\n", pattern.PatternID, len(storedPatterns), len(calculatedPatterns)))
+		// 	continue
+		// } else {
+
+		// }
+		storedPatternsOF, storedPatternsHash := c.calculateDropPatternHashFromElements(storedPatterns)
+		calculatedPatternsOF, calculatedPatternsHash := c.calculateDropPatternHashFromElements(calculatedPatterns)
+		if storedPatternsHash != calculatedPatternsHash {
+			sb.WriteString(fmt.Sprintf("HASH: (patternId: %d) %s (%s) != %s (%s)\n", pattern.PatternID, storedPatternsHash, storedPatternsOF, calculatedPatternsHash, calculatedPatternsOF))
+			continue
+		}
+	}
+
+	sb.WriteString("END\n")
+
+	return ctx.SendString(sb.String())
+}
+
+func (c AdminController) calculateDropPatternHashFromElements(elements []*model.DropPatternElement) (originalFingerprint, hexHash string) {
+	segments := make([]string, len(elements))
+
+	for i, element := range elements {
+		segments[i] = fmt.Sprintf("%d:%d", element.ItemID, element.Quantity)
+	}
+
+	sort.Strings(segments)
+
+	originalFingerprint = strings.Join(segments, "|")
+	hash := xxh3.HashStringSeed(originalFingerprint, 0)
+	return originalFingerprint, strconv.FormatUint(hash, 16)
+}
+
+func (c AdminController) calculateDropPatternHash(segments []string) (originalFingerprint, hexHash string) {
+	sort.Strings(segments)
+
+	originalFingerprint = strings.Join(segments, "|")
+	hash := xxh3.HashStringSeed(originalFingerprint, 0)
+	return originalFingerprint, strconv.FormatUint(hash, 16)
 }
 
 func (c AdminController) GetCliGameDataSeed(ctx *fiber.Ctx) error {
