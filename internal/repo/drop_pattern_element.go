@@ -20,6 +20,21 @@ func NewDropPatternElement(db *bun.DB) *DropPatternElement {
 	return &DropPatternElement{DB: db}
 }
 
+func (r *DropPatternElement) GetDropPatternElements(ctx context.Context) ([]*model.DropPatternElement, error) {
+	var elements []*model.DropPatternElement
+	err := r.DB.NewSelect().
+		Model(&elements).
+		Scan(ctx)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, pgerr.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return elements, nil
+}
+
 func (r *DropPatternElement) GetDropPatternElementById(ctx context.Context, id int) (*model.DropPatternElement, error) {
 	var DropPatternElement model.DropPatternElement
 	err := r.DB.NewSelect().
