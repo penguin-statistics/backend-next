@@ -112,19 +112,30 @@ func (s *DropReport) CalcTotalTimes(
 		return results, nil
 	}
 
-	query := s.DB.NewSelect().
+	subq1 := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
-		Column("dr.stage_id").
-		ColumnExpr("SUM(dr.times) AS total_times")
-	s.handleAccountAndReliability(query, accountId)
+		Column("dr.report_id", "dr.stage_id", "dr.times")
+	s.handleAccountAndReliability(subq1, accountId)
 	if excludeNonOneTimes {
-		s.handleTimes(query, 1)
+		s.handleTimes(subq1, 1)
 	}
-	s.handleCreatedAtWithTimeRange(query, timeRange)
-	s.handleServer(query, server)
-	s.handleStages(query, stageIds)
-	if err := query.
-		Group("dr.stage_id").
+	s.handleCreatedAtWithTimeRange(subq1, timeRange)
+	s.handleServer(subq1, server)
+	s.handleStages(subq1, stageIds)
+
+	subq2 := s.DB.NewSelect().
+		TableExpr("drop_report_extras AS dre").
+		Column("dre.report_id", "dre.source_name")
+
+	mainq := s.DB.NewSelect().
+		TableExpr("(?) AS a", subq1).
+		Column("stage_id").
+		ColumnExpr("SUM(times) AS total_times").
+		Join("LEFT JOIN (?) AS b ON b.report_id = a.report_id", subq2)
+	s.handleSourceName(mainq, sourceCategory)
+
+	if err := mainq.
+		Group("stage_id").
 		Scan(ctx, &results); err != nil {
 		return nil, err
 	}
@@ -139,17 +150,28 @@ func (s *DropReport) CalcQuantityUniqCount(
 		return results, nil
 	}
 
-	query := s.DB.NewSelect().
+	subq1 := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
-		Column("dr.stage_id", "dpe.item_id", "dpe.quantity").
-		ColumnExpr("COUNT(*) AS count").
+		Column("dr.report_id", "dr.stage_id", "dpe.item_id", "dpe.quantity").
 		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id")
-	s.handleAccountAndReliability(query, accountId)
-	s.handleCreatedAtWithTimeRange(query, timeRange)
-	s.handleServer(query, server)
-	s.handleStagesAndItems(query, stageIdItemIdMap)
-	if err := query.
-		Group("dr.stage_id", "dpe.item_id", "dpe.quantity").
+	s.handleAccountAndReliability(subq1, accountId)
+	s.handleCreatedAtWithTimeRange(subq1, timeRange)
+	s.handleServer(subq1, server)
+	s.handleStagesAndItems(subq1, stageIdItemIdMap)
+
+	subq2 := s.DB.NewSelect().
+		TableExpr("drop_report_extras AS dre").
+		Column("dre.report_id", "dre.source_name")
+
+	mainq := s.DB.NewSelect().
+		TableExpr("(?) AS a", subq1).
+		Column("stage_id", "item_id", "quantity").
+		ColumnExpr("COUNT(*) AS count").
+		Join("LEFT JOIN (?) AS b ON b.report_id = a.report_id", subq2)
+	s.handleSourceName(mainq, sourceCategory)
+
+	if err := mainq.
+		Group("stage_id", "item_id", "quantity").
 		Scan(ctx, &results); err != nil {
 		return nil, err
 	}
@@ -320,10 +342,10 @@ func (s *DropReport) handleAccountAndReliability(query *bun.SelectQuery, account
 
 func (s *DropReport) handleCreatedAtWithTimeRange(query *bun.SelectQuery, timeRange *model.TimeRange) {
 	if timeRange.StartTime != nil {
-		query = query.Where("dr.created_at >= timestamp with time zone '?'", timeRange.StartTime.Format(time.RFC3339))
+		query = query.Where("dr.created_at >= timestamp with time zone ?", timeRange.StartTime.Format(time.RFC3339))
 	}
 	if timeRange.EndTime != nil {
-		query = query.Where("dr.created_at < timestamp with time zone '?'", timeRange.EndTime.Format(time.RFC3339))
+		query = query.Where("dr.created_at < timestamp with time zone ?", timeRange.EndTime.Format(time.RFC3339))
 	}
 }
 

@@ -131,15 +131,15 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 			for timeRange := range timeRangeTasks {
 				startTime := time.Now()
 				timeRanges := []*model.TimeRange{timeRange}
-        manualResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), constant.SourceCategoryManual)
-        if err != nil {
-          return
-        }
-        autoResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), constant.SourceCategoryAutomated)
-        if err != nil {
-          return
-        }
-        currentBatch := append(manualResults, autoResults...)
+				manualResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), constant.SourceCategoryManual)
+				if err != nil {
+					return
+				}
+				autoResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), constant.SourceCategoryAutomated)
+				if err != nil {
+					return
+				}
+				currentBatch := append(manualResults, autoResults...)
 				ch <- currentBatch
 				usedTimeMap.Store(timeRange.RangeID, int(time.Since(startTime).Microseconds()))
 			}

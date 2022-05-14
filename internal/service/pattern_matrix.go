@@ -204,11 +204,11 @@ func (s *PatternMatrix) calcPatternMatrixForTimeRanges(
 	}
 
 	for _, timeRange := range timeRanges {
-		quantityResults, err := s.DropReportService.CalcTotalQuantityForPatternMatrix(ctx, server, timeRange, stageIds, accountId)
+		quantityResults, err := s.DropReportService.CalcTotalQuantityForPatternMatrix(ctx, server, timeRange, stageIds, accountId, constant.SourceCategoryAll)
 		if err != nil {
 			return nil, err
 		}
-		timesResults, err := s.DropReportService.CalcTotalTimesForPatternMatrix(ctx, server, timeRange, stageIds, accountId)
+		timesResults, err := s.DropReportService.CalcTotalTimesForPatternMatrix(ctx, server, timeRange, stageIds, accountId, constant.SourceCategoryAll)
 		if err != nil {
 			return nil, err
 		}
