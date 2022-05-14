@@ -44,7 +44,10 @@ require (
 	gopkg.in/guregu/null.v3 v3.5.0
 )
 
-require golang.org/x/exp v0.0.0-20220303212507-bbda1eaf7a17 // indirect
+require (
+	golang.org/x/exp v0.0.0-20220428152302-39d4317da171 // indirect
+	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29 // indirect
+)
 
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect

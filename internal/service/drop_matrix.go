@@ -2,10 +2,8 @@ package service
 
 import (
 	"context"
-	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
@@ -17,6 +15,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
+	"github.com/penguin-statistics/backend-next/internal/pkg/async"
 	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
@@ -112,47 +111,14 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 	if err != nil {
 		return err
 	}
-	// Drop matrix to be saved
-	ch := make(chan []*model.DropMatrixElement, len(allTimeRanges))
 
-	usedTimeMap := sync.Map{}
+	elements, err := async.FlatMap(allTimeRanges, 15, func(timeRange *model.TimeRange) ([]*model.DropMatrixElement, error) {
+		timeRanges := []*model.TimeRange{timeRange}
+		return s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false))
+	})
 
-	// workers wait group
-	var wg sync.WaitGroup
-	wg.Add(runtime.NumCPU())
-	// task channel
-	timeRangeTasks := make(chan *model.TimeRange, len(allTimeRanges))
-	// spawn workers
-	for i := 1; i < runtime.NumCPU(); i++ {
-		go func() {
-			defer wg.Done()
-			for timeRange := range timeRangeTasks {
-				startTime := time.Now()
-				timeRanges := []*model.TimeRange{timeRange}
-				currentBatch, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false))
-				if err != nil {
-					return
-				}
-				ch <- currentBatch
-				usedTimeMap.Store(timeRange.RangeID, int(time.Since(startTime).Microseconds()))
-			}
-		}()
-	}
-	// send tasks & close the task channel
-	for _, timeRange := range allTimeRanges {
-		timeRangeTasks <- timeRange
-	}
-	close(timeRangeTasks)
-	// wait for all matrix to be calculated
-	wg.Wait()
-	close(ch)
-	// retrieve results
-	var toSave []*model.DropMatrixElement
-	for m := range ch {
-		toSave = append(toSave, m...)
-	}
 	// process results
-	if err := s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server); err != nil {
+	if err := s.DropMatrixElementService.BatchSaveElements(ctx, elements, server); err != nil {
 		return err
 	}
 	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constant.CacheSep + "true"); err != nil {

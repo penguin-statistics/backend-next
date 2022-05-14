@@ -54,6 +54,7 @@ func (w *Worker) do() {
 
 	go func() {
 		for {
+			time.Sleep(time.Second * 3)
 			log.Info().
 				Int("count", w.count).
 				Msg("worker batch started")
