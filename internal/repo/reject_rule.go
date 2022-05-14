@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	RejectRuleActiveStatus = "active"
+	RejectRuleActiveStatus = 1
 )
 
 type RejectRule struct {

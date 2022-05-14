@@ -19,7 +19,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/util"
 	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
-	"github.com/penguin-statistics/backend-next/internal/util/reportutil/reportverifs"
+	"github.com/penguin-statistics/backend-next/internal/util/reportverifs"
 )
 
 var (

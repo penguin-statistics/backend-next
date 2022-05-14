@@ -14,6 +14,8 @@ var (
 	ErrAccountNotFound = errors.New("account not found with given id")
 )
 
+const UserViolationReliability = 4
+
 type UserVerifier struct {
 	AccountRepo *repo.Account
 }
@@ -31,13 +33,19 @@ func (u *UserVerifier) Name() string {
 	return "user"
 }
 
-func (u *UserVerifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) []error {
+func (u *UserVerifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) *Rejection {
 	id := reportTask.AccountID
 	if id == 0 {
-		return []error{ErrAccountIDEmpty}
+		return &Rejection{
+			Reliability: UserViolationReliability,
+			Message:     ErrAccountIDEmpty.Error(),
+		}
 	}
 	if !u.AccountRepo.IsAccountExistWithId(ctx, id) {
-		return []error{ErrAccountNotFound}
+		return &Rejection{
+			Reliability: UserViolationReliability,
+			Message:     ErrAccountNotFound.Error(),
+		}
 	}
 	return nil
 }

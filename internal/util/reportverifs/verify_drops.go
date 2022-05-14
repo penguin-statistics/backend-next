@@ -19,6 +19,8 @@ var (
 	ErrUnknownItemID        = errors.New("unknown item id")
 )
 
+const DropViolationReliability = 6
+
 type DropVerifier struct {
 	DropInfoRepo *repo.DropInfo
 }
@@ -36,14 +38,19 @@ func (d *DropVerifier) Name() string {
 	return "drop"
 }
 
-func (d *DropVerifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) (errs []error) {
+func (d *DropVerifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) *Rejection {
 	itemDropInfos, typeDropInfos, err := d.DropInfoRepo.GetForCurrentTimeRangeWithDropTypes(ctx, &repo.DropInfoQuery{
 		Server:     reportTask.Server,
 		ArkStageId: report.StageID,
 	})
 	if err != nil {
-		errs = append(errs, err)
+		return &Rejection{
+			Reliability: RejectRuleUnexpectedViolationReliability,
+			Message:     err.Error(),
+		}
 	}
+
+	var errs []error
 
 	if innerErrs := d.verifyDropType(report, typeDropInfos); innerErrs != nil {
 		errs = append(errs, innerErrs...)
@@ -53,7 +60,14 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.ReportTaskSingl
 		errs = append(errs, innerErrs...)
 	}
 
-	return errs
+	if len(errs) > 0 {
+		return &Rejection{
+			Reliability: DropViolationReliability,
+			Message:     fmt.Sprintf("%v", errs),
+		}
+	}
+
+	return nil
 }
 
 func (d *DropVerifier) verifyDropType(report *types.ReportTaskSingleReport, dropInfos []*model.DropInfo) (errs []error) {

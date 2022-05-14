@@ -11,6 +11,8 @@ import (
 
 var ErrMD5Conflict = errors.New("report with specified md5 has already existed")
 
+const MD5ViolationReliability = 5
+
 type MD5Verifier struct {
 	DropReportExtraRepo *repo.DropReportExtra
 }
@@ -28,9 +30,12 @@ func (u *MD5Verifier) Name() string {
 	return "md5"
 }
 
-func (u *MD5Verifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) []error {
+func (u *MD5Verifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) *Rejection {
 	if report.Metadata != nil && report.Metadata.MD5 != "" && u.DropReportExtraRepo.IsDropReportExtraMD5Exist(ctx, report.Metadata.MD5) {
-		return []error{ErrMD5Conflict}
+		return &Rejection{
+			Reliability: MD5ViolationReliability,
+			Message:     ErrMD5Conflict.Error(),
+		}
 	}
 	return nil
 }
