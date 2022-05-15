@@ -110,7 +110,7 @@ func (s *DropMatrix) GetShimCustomizedDropMatrixResults(
 	return s.applyShimForDropMatrixQuery(ctx, server, true, "", "", customizedDropMatrixQueryResult)
 }
 
-func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server string) error {
+func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server string, sourceCategories []string) error {
 	allTimeRanges, err := s.TimeRangeService.GetTimeRangesByServer(ctx, server)
 	if err != nil {
 		return err
@@ -118,20 +118,14 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 
 	elements, err := async.FlatMap(allTimeRanges, 15, func(timeRange *model.TimeRange) ([]*model.DropMatrixElement, error) {
 		timeRanges := []*model.TimeRange{timeRange}
-		manualResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), constant.SourceCategoryManual)
-		if err != nil {
-			return nil, err
+		currentBatch := make([]*model.DropMatrixElement, 0)
+		for _, sourceCategory := range sourceCategories {
+			results, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), sourceCategory)
+			if err != nil {
+				return nil, err
+			}
+			currentBatch = append(currentBatch, results...)
 		}
-		automatedResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), constant.SourceCategoryAutomated)
-		if err != nil {
-			return nil, err
-		}
-		allResults, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), constant.SourceCategoryAll)
-		if err != nil {
-			return nil, err
-		}
-		currentBatch := append(manualResults, automatedResults...)
-		currentBatch = append(currentBatch, allResults...)
 		return currentBatch, nil
 	})
 

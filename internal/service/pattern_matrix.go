@@ -75,7 +75,7 @@ func (s *PatternMatrix) GetShimLatestPatternMatrixResults(ctx context.Context, s
 	}
 }
 
-func (s *PatternMatrix) RefreshAllPatternMatrixElements(ctx context.Context, server string) error {
+func (s *PatternMatrix) RefreshAllPatternMatrixElements(ctx context.Context, server string, sourceCategories []string) error {
 	timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
 	if err != nil {
 		return err
@@ -88,20 +88,14 @@ func (s *PatternMatrix) RefreshAllPatternMatrixElements(ctx context.Context, ser
 
 	elements, err := async.FlatMap(stageIdsTuples, 15, func(tuple *wrap.Tuple[int, []int]) ([]*model.PatternMatrixElement, error) {
 		timeRanges := []*model.TimeRange{timeRangesMap[tuple.Key]}
-		manualResults, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, tuple.Val, null.NewInt(0, false), constant.SourceCategoryManual)
-		if err != nil {
-			return nil, err
+		currentBatch := make([]*model.PatternMatrixElement, 0)
+		for _, sourceCategory := range sourceCategories {
+			results, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, tuple.Val, null.NewInt(0, false), sourceCategory)
+			if err != nil {
+				return nil, err
+			}
+			currentBatch = append(currentBatch, results...)
 		}
-		automatedResults, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, tuple.Val, null.NewInt(0, false), constant.SourceCategoryAutomated)
-		if err != nil {
-			return nil, err
-		}
-		allResults, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, tuple.Val, null.NewInt(0, false), constant.SourceCategoryAll)
-		if err != nil {
-			return nil, err
-		}
-		currentBatch := append(manualResults, automatedResults...)
-		currentBatch = append(currentBatch, allResults...)
 		return currentBatch, nil
 	})
 	if err != nil {

@@ -95,7 +95,7 @@ func (s *Trend) QueryTrend(
 	return s.convertTrendElementsToTrendQueryResult(trendElements)
 }
 
-func (s *Trend) RefreshTrendElements(ctx context.Context, server string) error {
+func (s *Trend) RefreshTrendElements(ctx context.Context, server string, sourceCategories []string) error {
 	maxAccumulableTimeRanges, err := s.TimeRangeService.GetMaxAccumulableTimeRangesByServer(ctx, server)
 	if err != nil {
 		return err
@@ -167,20 +167,15 @@ func (s *Trend) RefreshTrendElements(ctx context.Context, server string) error {
 		itemIds := m["itemIds"].([]int)
 		startTime := m["startTime"].(time.Time)
 		intervalNum := m["intervalNum"].(int)
-		manualResults, err := s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, null.NewInt(0, false), constant.SourceCategoryManual)
-		if err != nil {
-			return nil, err
+
+		currentBatch := make([]*model.TrendElement, 0)
+		for _, sourceCategory := range sourceCategories {
+			results, err := s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, null.NewInt(0, false), sourceCategory)
+			if err != nil {
+				return nil, err
+			}
+			currentBatch = append(currentBatch, results...)
 		}
-		automatedResults, err := s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, null.NewInt(0, false), constant.SourceCategoryAutomated)
-		if err != nil {
-			return nil, err
-		}
-		allResults, err := s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, null.NewInt(0, false), constant.SourceCategoryAll)
-		if err != nil {
-			return nil, err
-		}
-		currentBatch := append(manualResults, automatedResults...)
-		currentBatch = append(currentBatch, allResults...)
 		return currentBatch, nil
 	})
 	if err != nil {

@@ -68,6 +68,10 @@ type Config struct {
 
 	// AdminKey is the key used to authenticate the admin API.
 	AdminKey string `split_words:"true"`
+
+	// MatrixWorkerSourceCategories is a list of categories that the matrix worker will run for.
+	// Available categories are: all, automated, manual.
+	MatrixWorkerSourceCategories []string `required:"true" split_words:"true" default:"all"`
 }
 
 func Parse() (*Config, error) {
