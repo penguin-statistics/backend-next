@@ -48,7 +48,6 @@ func (verifiers ReportVerifiers) Verify(ctx context.Context, reportTask *types.R
 	violations = map[int]*Violation{}
 
 	for reportIndex, report := range reportTask.Reports {
-	VERIFIERLOOP:
 		for _, pipe := range verifiers {
 			start := time.Now()
 
@@ -61,7 +60,7 @@ func (verifiers ReportVerifiers) Verify(ctx context.Context, reportTask *types.R
 					Rejection: *rejection,
 				}
 
-				break VERIFIERLOOP
+				break
 			}
 
 			observability.ReportVerifyDuration.
