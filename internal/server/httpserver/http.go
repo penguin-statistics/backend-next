@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/bwmarrin/snowflake"
 	"github.com/gofiber/contrib/fibersentry"
 	"github.com/gofiber/fiber/v2"
@@ -33,6 +34,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
 	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
+	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
 )
 
 func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
@@ -94,6 +96,9 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 			log.Error().Msgf("panic: %v\n%s\n", e, buf)
 		},
 	}))
+	fiberprom := fiberprometheus.New(observability.ServiceName)
+	fiberprom.RegisterAt(app, "/metrics")
+
 	if conf.TracingEnabled {
 		exporter, err := jaeger.New(jaeger.WithCollectorEndpoint())
 		if err != nil {
@@ -114,6 +119,7 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 			SpanName: "HTTP {{ .Method }} {{ .Path }}",
 		}))
 	}
+
 	if conf.DevMode {
 		log.Info().Msg("Running in DEV mode")
 		app.Use(pprof.New())

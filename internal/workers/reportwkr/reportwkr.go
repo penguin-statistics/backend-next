@@ -15,6 +15,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/config"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
+	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
 
@@ -95,6 +96,11 @@ func (w *Worker) Consumer(ctx context.Context, ch chan error) error {
 				}
 
 				start := time.Now()
+				defer func() {
+					observability.ReportConsumeDuration.
+						WithLabelValues().
+						Observe(time.Since(start).Seconds())
+				}()
 
 				err = w.consumeReport(taskCtx, reportTask)
 				if err != nil {
@@ -124,12 +130,12 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 		Logger()
 
 	L.Info().Msg("now processing new report task")
-	taskReliability := 0
-	if violation := w.ReportServices.ReportVerifier.Verify(ctx, reportTask); violation != nil {
-		taskReliability = violation.Reliability
+
+	violations := w.ReportServices.ReportVerifier.Verify(ctx, reportTask)
+	if len(violations) > 0 {
 		L.Warn().
-			Interface("violation", violation).
-			Msg("report task verification failed, marking task as unreliable")
+			Interface("violations", violations).
+			Msg("report task verification failed on some or all reports")
 	}
 
 	// reportTask.CreatedAt is in microseconds
@@ -155,7 +161,7 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 	}()
 
 	// calculate drop pattern hash for each report
-	for _, report := range reportTask.Reports {
+	for idx, report := range reportTask.Reports {
 		dropPattern, created, err := w.ReportServices.DropPatternRepo.GetOrCreateDropPatternFromDrops(ctx, tx, report.Drops)
 		if err != nil {
 			return errors.Wrap(err, "failed to calculate drop pattern hash")
@@ -171,12 +177,13 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 		if err != nil {
 			return errors.Wrap(err, "failed to get stage")
 		}
+
 		dropReport := &model.DropReport{
 			StageID:     stage.StageID,
 			PatternID:   dropPattern.PatternID,
 			Times:       report.Times,
 			CreatedAt:   &taskCreatedAt,
-			Reliability: taskReliability,
+			Reliability: violations.Reliability(idx),
 			Server:      reportTask.Server,
 			AccountID:   reportTask.AccountID,
 		}
