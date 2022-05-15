@@ -10,6 +10,14 @@ const (
 	DropTypeExtra           = "EXTRA"
 	DropTypeRecognitionOnly = "RECOGNITION_ONLY"
 	DropTypeFurniture       = "FURNITURE"
+
+	ViolationReliabilityUser                 = 1 << 2
+	ViolationReliabilityMD5                  = 1<<2 + 1
+	ViolationReliabilityDrop                 = 1<<2 + 2
+	ViolationReliabilityRejectRuleUnexpected = 1<<2 + 3
+
+	ViolationReliabilityRejectRuleRangeLeast = 1 << 8
+	ViolationReliabilityRejectRuleRangeMost  = 1 << 10
 )
 
 // DropTypeMap maps an API drop type to a database drop type.

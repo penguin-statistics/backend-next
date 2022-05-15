@@ -120,11 +120,10 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 
 	L.Info().Msg("now processing new report task")
 	taskReliability := 0
-	if errs := w.ReportServices.ReportVerifier.Verify(ctx, reportTask); len(errs) > 0 {
-		// TODO: use different error code for different types of error
-		taskReliability = 1
+	if violation := w.ReportServices.ReportVerifier.Verify(ctx, reportTask); violation != nil {
+		taskReliability = violation.Reliability
 		L.Warn().
-			Interface("errors", errs).
+			Interface("violation", violation).
 			Msg("report task verification failed, marking task as unreliable")
 	}
 

@@ -17,7 +17,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/server/httpserver"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/util/reportutil/reportverifs"
+	"github.com/penguin-statistics/backend-next/internal/util/reportverifs"
 	"github.com/penguin-statistics/backend-next/internal/workers/calcwkr"
 	"github.com/penguin-statistics/backend-next/internal/workers/reportwkr"
 )
@@ -45,6 +45,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 			reportverifs.NewUserVerifier,
 			reportverifs.NewDropVerifier,
 			reportverifs.NewReportVerifier,
+			reportverifs.NewRejectRuleVerifier,
 		),
 
 		// Repositories
@@ -60,6 +61,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 			repo.NewProperty,
 			repo.NewTimeRange,
 			repo.NewDropReport,
+			repo.NewRejectRule,
 			repo.NewDropPattern,
 			repo.NewTrendElement,
 			repo.NewDropReportExtra,
