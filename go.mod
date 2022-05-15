@@ -4,6 +4,8 @@ go 1.18
 
 require (
 	github.com/ahmetb/go-linq/v3 v3.2.0
+	github.com/ansrivas/fiberprometheus/v2 v2.2.0
+	github.com/antonmedv/expr v1.9.0
 	github.com/bwmarrin/snowflake v0.3.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/uniuri v0.0.0-20200228104902-7aecb25e1fe5
@@ -23,6 +25,7 @@ require (
 	github.com/penguin-statistics/fiber-swagger/v3 v3.0.2
 	github.com/penguin-statistics/fiberotel v0.8.2
 	github.com/pkg/errors v0.9.1
+	github.com/prometheus/client_golang v1.12.2
 	github.com/rs/zerolog v1.26.1
 	github.com/samber/lo v1.11.0
 	github.com/stretchr/testify v1.7.0
@@ -39,26 +42,22 @@ require (
 	go.opentelemetry.io/otel/exporters/jaeger v1.4.1
 	go.opentelemetry.io/otel/sdk v1.4.1
 	go.uber.org/fx v1.17.0
+	golang.org/x/exp v0.0.0-20220428152302-39d4317da171
+	golang.org/x/mod v0.6.0-dev.0.20211013180041-c96bc1413d57
 	golang.org/x/text v0.3.7
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/guregu/null.v3 v3.5.0
 )
 
 require (
-	github.com/ansrivas/fiberprometheus/v2 v2.2.0 // indirect
-	github.com/antonmedv/expr v1.9.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/gofiber/adaptor/v2 v2.1.23 // indirect
 	github.com/gofiber/utils v0.1.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
-	github.com/prometheus/client_golang v1.12.2 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.34.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
-	golang.org/x/exp v0.0.0-20220428152302-39d4317da171 // indirect
-	golang.org/x/mod v0.6.0-dev.0.20211013180041-c96bc1413d57 // indirect
-	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29 // indirect
 )
 
 require (
