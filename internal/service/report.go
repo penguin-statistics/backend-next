@@ -84,7 +84,7 @@ func (s *Report) pipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []
 	for _, drop := range drops {
 		item, err := s.ItemService.GetItemByArkId(ctx, drop.ItemID)
 		if err != nil {
-			if err != pgerr.ErrNotFound {
+			if !errors.Is(err, pgerr.ErrNotFound) {
 				return nil, err
 			} else {
 				log.Warn().Msgf("failed to get item by ark id '%s', will ignore it", drop.ItemID)
