@@ -38,9 +38,9 @@ func (s *PatternMatrixElement) DeleteByServer(ctx context.Context, server string
 	return err
 }
 
-func (s *PatternMatrixElement) GetElementsByServer(ctx context.Context, server string) ([]*model.PatternMatrixElement, error) {
+func (s *PatternMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.PatternMatrixElement, error) {
 	var elements []*model.PatternMatrixElement
-	err := s.db.NewSelect().Model(&elements).Where("server = ?", server).Scan(ctx)
+	err := s.db.NewSelect().Model(&elements).Where("server = ?", server).Where("source_category = ?", sourceCategory).Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	} else if err != nil {

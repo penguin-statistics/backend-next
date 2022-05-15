@@ -43,16 +43,18 @@ func Start(conf *config.Config, deps WorkerDeps) {
 			interval:   conf.WorkerInterval,
 			timeout:    conf.WorkerTimeout,
 			WorkerDeps: deps,
-		}).do()
+		}).do(conf.MatrixWorkerSourceCategories)
 	} else {
 		log.Info().Msg("worker is disabled due to configuration")
 	}
 }
 
-func (w *Worker) do() {
+func (w *Worker) do(sourceCategories []string) {
 	ctx := context.Background()
 
 	go func() {
+		time.Sleep(time.Second * 3)
+
 		for {
 			log.Info().
 				Int("count", w.count).
@@ -70,7 +72,7 @@ func (w *Worker) do() {
 				go func() {
 					for _, server := range constant.Servers {
 						log.Info().Str("server", server).Str("service", "DropMatrixService").Msg("worker microtask started calculating")
-						if err := w.DropMatrixService.RefreshAllDropMatrixElements(sessCtx, server); err != nil {
+						if err := w.DropMatrixService.RefreshAllDropMatrixElements(sessCtx, server, sourceCategories); err != nil {
 							log.Error().Err(err).Str("server", server).Str("service", "DropMatrixService").Msg("worker microtask failed")
 							errChan <- err
 							return
@@ -79,7 +81,7 @@ func (w *Worker) do() {
 						time.Sleep(w.sep)
 
 						log.Info().Str("server", server).Str("service", "PatternMatrixService").Msg("worker microtask started calculating")
-						if err := w.PatternMatrixService.RefreshAllPatternMatrixElements(sessCtx, server); err != nil {
+						if err := w.PatternMatrixService.RefreshAllPatternMatrixElements(sessCtx, server, sourceCategories); err != nil {
 							log.Error().Err(err).Str("server", server).Str("service", "PatternMatrixService").Msg("worker microtask failed")
 							errChan <- err
 							return
@@ -88,7 +90,7 @@ func (w *Worker) do() {
 						time.Sleep(w.sep)
 
 						log.Info().Str("server", server).Str("service", "TrendService").Msg("worker microtask started calculating")
-						if err := w.TrendService.RefreshTrendElements(sessCtx, server); err != nil {
+						if err := w.TrendService.RefreshTrendElements(sessCtx, server, sourceCategories); err != nil {
 							log.Error().Err(err).Str("server", server).Str("service", "TrendService").Msg("worker microtask failed")
 							errChan <- err
 							return

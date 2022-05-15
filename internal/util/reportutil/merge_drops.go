@@ -26,7 +26,7 @@ func MergeDropsByDropTypeAndItemID(drops []types.ArkDrop) (mergedDrops []types.A
 	return mergedDrops
 }
 
-// MergeDrops merges drops with same (DropType, ItemID) pair into one drop, summing up their Quantity values.
+// MergeDrops merges drops with same ItemID pair into one drop, summing up their Quantity values.
 func MergeDropsByItemID(drops []*types.Drop) (mergedDrops []*types.Drop) {
 	linq.
 		From(drops).

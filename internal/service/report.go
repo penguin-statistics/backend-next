@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
@@ -83,7 +84,12 @@ func (s *Report) pipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []
 	for _, drop := range drops {
 		item, err := s.ItemService.GetItemByArkId(ctx, drop.ItemID)
 		if err != nil {
-			return nil, err
+			if !errors.Is(err, pgerr.ErrNotFound) {
+				return nil, err
+			} else {
+				log.Warn().Msgf("failed to get item by ark id '%s', will ignore it", drop.ItemID)
+				continue
+			}
 		}
 
 		convertedDrops = append(convertedDrops, &types.Drop{

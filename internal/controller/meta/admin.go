@@ -14,6 +14,7 @@ import (
 	"github.com/zeebo/xxh3"
 	"go.uber.org/fx"
 
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/model/gamedata"
@@ -29,6 +30,7 @@ type AdminController struct {
 	fx.In
 
 	PatternRepo          *repo.DropPattern
+	PatternElementRepo   *repo.DropPatternElement
 	AdminService         *service.Admin
 	ItemService          *service.Item
 	DropMatrixService    *service.DropMatrix
@@ -43,7 +45,8 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Post("/purge", c.PurgeCache)
 
 	admin.Get("/cli/gamedata/seed", c.GetCliGameDataSeed)
-	admin.Get("/_temp/pattern", c.FindPatterns)
+	admin.Get("/_temp/pattern/merging", c.FindPatterns)
+	admin.Get("/_temp/pattern/disambiguation", c.DisambiguatePatterns)
 
 	admin.Get("/refresh/matrix/:server", c.RefreshAllDropMatrixElements)
 	admin.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
@@ -114,6 +117,88 @@ UPDATE drop_reports SET pattern_id = (select pattern_id from inserted_id) WHERE 
 	return ctx.SendString(sb.String())
 }
 
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+func (c AdminController) DisambiguatePatterns(ctx *fiber.Ctx) error {
+	patterns, err := c.PatternRepo.GetDropPatterns(ctx.Context())
+	if err != nil {
+		return err
+	}
+
+	elements, err := c.PatternElementRepo.GetDropPatternElements(ctx.Context())
+	if err != nil {
+		return err
+	}
+
+	getElementsByPatternId := func(patternId int) []*model.DropPatternElement {
+		var filtered []*model.DropPatternElement
+		for _, element := range elements {
+			if element.DropPatternID == patternId {
+				filtered = append(filtered, element)
+			}
+		}
+		return filtered
+	}
+
+	var sb strings.Builder
+	sb.WriteString("BEGIN\n")
+
+	for _, pattern := range patterns {
+		segments := strings.Split(pattern.OriginalFingerprint, "|")
+		if len(segments) == 1 && segments[0] == "" {
+			continue
+		}
+		storedPatterns := getElementsByPatternId(pattern.PatternID)
+		calculatedPatterns := make([]*model.DropPatternElement, 0)
+		for _, segment := range segments {
+			a := strings.Split(segment, ":")
+			itemId := must(strconv.Atoi(a[0]))
+			quantity := must(strconv.Atoi(a[1]))
+			calculatedPatterns = append(calculatedPatterns, &model.DropPatternElement{
+				DropPatternID: pattern.PatternID,
+				ItemID:        itemId,
+				Quantity:      quantity,
+			})
+		}
+		// // compare calculated and stored patterns
+		// if len(storedPatterns) != len(calculatedPatterns) {
+		// 	sb.WriteString(fmt.Sprintf("LENGTH: (patternId: %d) %d != %d\n", pattern.PatternID, len(storedPatterns), len(calculatedPatterns)))
+		// 	continue
+		// } else {
+
+		// }
+		storedPatternsOF, storedPatternsHash := c.calculateDropPatternHashFromElements(storedPatterns)
+		calculatedPatternsOF, calculatedPatternsHash := c.calculateDropPatternHashFromElements(calculatedPatterns)
+		if storedPatternsHash != calculatedPatternsHash {
+			sb.WriteString(fmt.Sprintf("HASH: (patternId: %d) %s (%s) != %s (%s)\n", pattern.PatternID, storedPatternsHash, storedPatternsOF, calculatedPatternsHash, calculatedPatternsOF))
+			continue
+		}
+	}
+
+	sb.WriteString("END\n")
+
+	return ctx.SendString(sb.String())
+}
+
+func (c AdminController) calculateDropPatternHashFromElements(elements []*model.DropPatternElement) (originalFingerprint, hexHash string) {
+	segments := make([]string, len(elements))
+
+	for i, element := range elements {
+		segments[i] = fmt.Sprintf("%d:%d", element.ItemID, element.Quantity)
+	}
+
+	sort.Strings(segments)
+
+	originalFingerprint = strings.Join(segments, "|")
+	hash := xxh3.HashStringSeed(originalFingerprint, 0)
+	return originalFingerprint, strconv.FormatUint(hash, 16)
+}
+
 func (c AdminController) calculateDropPatternHash(segments []string) (originalFingerprint, hexHash string) {
 	sort.Strings(segments)
 
@@ -175,17 +260,17 @@ func (c *AdminController) PurgeCache(ctx *fiber.Ctx) error {
 
 func (c *AdminController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
-	return c.DropMatrixService.RefreshAllDropMatrixElements(ctx.Context(), server)
+	return c.DropMatrixService.RefreshAllDropMatrixElements(ctx.Context(), server, []string{constant.SourceCategoryAll})
 }
 
 func (c *AdminController) RefreshAllPatternMatrixElements(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
-	return c.PatternMatrixService.RefreshAllPatternMatrixElements(ctx.Context(), server)
+	return c.PatternMatrixService.RefreshAllPatternMatrixElements(ctx.Context(), server, []string{constant.SourceCategoryAll})
 }
 
 func (c *AdminController) RefreshAllTrendElements(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
-	return c.TrendService.RefreshTrendElements(ctx.Context(), server)
+	return c.TrendService.RefreshTrendElements(ctx.Context(), server, []string{constant.SourceCategoryAll})
 }
 
 func (c *AdminController) RefreshAllSiteStats(ctx *fiber.Ctx) error {

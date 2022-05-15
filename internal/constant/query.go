@@ -5,4 +5,8 @@ const (
 	DefaultIntervalNum = 60
 
 	StdDevDigits = 4
+
+	SourceCategoryManual    = "manual"
+	SourceCategoryAutomated = "automated"
+	SourceCategoryAll       = "all"
 )

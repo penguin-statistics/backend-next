@@ -25,6 +25,6 @@ func (s *DropMatrixElement) DeleteByServer(ctx context.Context, server string) e
 	return s.DropMatrixElementRepo.DeleteByServer(ctx, server)
 }
 
-func (s *DropMatrixElement) GetElementsByServer(ctx context.Context, server string) ([]*model.DropMatrixElement, error) {
-	return s.DropMatrixElementRepo.GetElementsByServer(ctx, server)
+func (s *DropMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.DropMatrixElement, error) {
+	return s.DropMatrixElementRepo.GetElementsByServerAndSourceCategory(ctx, server, sourceCategory)
 }

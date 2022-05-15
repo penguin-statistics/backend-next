@@ -38,9 +38,9 @@ func (s *TrendElement) DeleteByServer(ctx context.Context, server string) error 
 	return err
 }
 
-func (s *TrendElement) GetElementsByServer(ctx context.Context, server string) ([]*model.TrendElement, error) {
+func (s *TrendElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.TrendElement, error) {
 	var elements []*model.TrendElement
-	err := s.db.NewSelect().Model(&elements).Where("server = ?", server).Scan(ctx)
+	err := s.db.NewSelect().Model(&elements).Where("server = ?", server).Where("source_category = ?", sourceCategory).Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	} else if err != nil {

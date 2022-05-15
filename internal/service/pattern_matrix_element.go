@@ -25,6 +25,6 @@ func (s *PatternMatrixElement) DeleteByServer(ctx context.Context, server string
 	return s.PatternMatrixElementRepo.DeleteByServer(ctx, server)
 }
 
-func (s *PatternMatrixElement) GetElementsByServer(ctx context.Context, server string) ([]*model.PatternMatrixElement, error) {
-	return s.PatternMatrixElementRepo.GetElementsByServer(ctx, server)
+func (s *PatternMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.PatternMatrixElement, error) {
+	return s.PatternMatrixElementRepo.GetElementsByServerAndSourceCategory(ctx, server, sourceCategory)
 }

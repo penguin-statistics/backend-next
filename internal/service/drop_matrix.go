@@ -2,10 +2,8 @@ package service
 
 import (
 	"context"
-	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
@@ -17,6 +15,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
+	"github.com/penguin-statistics/backend-next/internal/pkg/async"
 	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
@@ -71,9 +70,11 @@ func NewDropMatrix(
 }
 
 // Cache: shimMaxAccumulableDropMatrixResults#server|showClosedZoned:{server}|{showClosedZones}, 24 hrs, records last modified time
-func (s *DropMatrix) GetShimMaxAccumulableDropMatrixResults(ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId null.Int) (*modelv2.DropMatrixQueryResult, error) {
+func (s *DropMatrix) GetShimMaxAccumulableDropMatrixResults(
+	ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId null.Int,
+) (*modelv2.DropMatrixQueryResult, error) {
 	valueFunc := func() (*modelv2.DropMatrixQueryResult, error) {
-		savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId)
+		savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId, constant.SourceCategoryAll)
 		if err != nil {
 			return nil, err
 		}
@@ -99,60 +100,37 @@ func (s *DropMatrix) GetShimMaxAccumulableDropMatrixResults(ctx context.Context,
 	}
 }
 
-func (s *DropMatrix) GetShimCustomizedDropMatrixResults(ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, itemIds []int, accountId null.Int) (*modelv2.DropMatrixQueryResult, error) {
-	customizedDropMatrixQueryResult, err := s.QueryDropMatrix(ctx, server, []*model.TimeRange{timeRange}, stageIds, itemIds, accountId)
+func (s *DropMatrix) GetShimCustomizedDropMatrixResults(
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, itemIds []int, accountId null.Int,
+) (*modelv2.DropMatrixQueryResult, error) {
+	customizedDropMatrixQueryResult, err := s.QueryDropMatrix(ctx, server, []*model.TimeRange{timeRange}, stageIds, itemIds, accountId, constant.SourceCategoryAll)
 	if err != nil {
 		return nil, err
 	}
 	return s.applyShimForDropMatrixQuery(ctx, server, true, "", "", customizedDropMatrixQueryResult)
 }
 
-func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server string) error {
-	toSave := []*model.DropMatrixElement{}
+func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server string, sourceCategories []string) error {
 	allTimeRanges, err := s.TimeRangeService.GetTimeRangesByServer(ctx, server)
 	if err != nil {
 		return err
 	}
-	ch := make(chan []*model.DropMatrixElement, 15)
-	var wg sync.WaitGroup
 
-	go func() {
-		for {
-			m, ok := <-ch
-			if !ok {
-				return
-			}
-			toSave = append(toSave, m...)
-			wg.Done()
-		}
-	}()
-
-	usedTimeMap := sync.Map{}
-
-	limiter := make(chan struct{}, runtime.NumCPU())
-	wg.Add(len(allTimeRanges))
-	for _, timeRange := range allTimeRanges {
-		limiter <- struct{}{}
-		go func(timeRange *model.TimeRange) {
-			startTime := time.Now()
-
-			timeRanges := []*model.TimeRange{timeRange}
-			currentBatch, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false))
+	elements, err := async.FlatMap(allTimeRanges, 15, func(timeRange *model.TimeRange) ([]*model.DropMatrixElement, error) {
+		timeRanges := []*model.TimeRange{timeRange}
+		currentBatch := make([]*model.DropMatrixElement, 0)
+		for _, sourceCategory := range sourceCategories {
+			results, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), sourceCategory)
 			if err != nil {
-				return
+				return nil, err
 			}
+			currentBatch = append(currentBatch, results...)
+		}
+		return currentBatch, nil
+	})
 
-			ch <- currentBatch
-			<-limiter
-
-			usedTimeMap.Store(timeRange.RangeID, int(time.Since(startTime).Microseconds()))
-		}(timeRange)
-	}
-
-	wg.Wait()
-	close(ch)
-
-	if err := s.DropMatrixElementService.BatchSaveElements(ctx, toSave, server); err != nil {
+	// process results
+	if err := s.DropMatrixElementService.BatchSaveElements(ctx, elements, server); err != nil {
 		return err
 	}
 	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constant.CacheSep + "true"); err != nil {
@@ -166,9 +144,9 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 
 // calc DropMatrixQueryResult for customized conditions
 func (s *DropMatrix) QueryDropMatrix(
-	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId null.Int,
+	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId null.Int, sourceCategory string,
 ) (*model.DropMatrixQueryResult, error) {
-	dropMatrixElements, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, stageIdFilter, itemIdFilter, accountId)
+	dropMatrixElements, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, stageIdFilter, itemIdFilter, accountId, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -176,8 +154,8 @@ func (s *DropMatrix) QueryDropMatrix(
 }
 
 // calc DropMatrixQueryResult for max accumulable timeranges
-func (s *DropMatrix) getMaxAccumulableDropMatrixResults(ctx context.Context, server string, accountId null.Int) (*model.DropMatrixQueryResult, error) {
-	dropMatrixElements, err := s.getDropMatrixElements(ctx, server, accountId)
+func (s *DropMatrix) getMaxAccumulableDropMatrixResults(ctx context.Context, server string, accountId null.Int, sourceCategory string) (*model.DropMatrixQueryResult, error) {
+	dropMatrixElements, err := s.getDropMatrixElements(ctx, server, accountId, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +163,7 @@ func (s *DropMatrix) getMaxAccumulableDropMatrixResults(ctx context.Context, ser
 }
 
 // For global, get elements from DB; For personal, calc elements
-func (s *DropMatrix) getDropMatrixElements(ctx context.Context, server string, accountId null.Int) ([]*model.DropMatrixElement, error) {
+func (s *DropMatrix) getDropMatrixElements(ctx context.Context, server string, accountId null.Int, sourceCategory string) ([]*model.DropMatrixElement, error) {
 	if accountId.Valid {
 		maxAccumulableTimeRanges, err := s.TimeRangeService.GetMaxAccumulableTimeRangesByServer(ctx, server)
 		if err != nil {
@@ -204,14 +182,18 @@ func (s *DropMatrix) getDropMatrixElements(ctx context.Context, server string, a
 		for _, timeRange := range timeRangesMap {
 			timeRanges = append(timeRanges, timeRange)
 		}
-		return s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId)
+		dropMatrixElements, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId, sourceCategory)
+		if err != nil {
+			return nil, err
+		}
+		return dropMatrixElements, nil
 	} else {
-		return s.DropMatrixElementService.GetElementsByServer(ctx, server)
+		return s.DropMatrixElementService.GetElementsByServerAndSourceCategory(ctx, server, sourceCategory)
 	}
 }
 
 func (s *DropMatrix) calcDropMatrixForTimeRanges(
-	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId null.Int,
+	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId null.Int, sourceCategory string,
 ) ([]*model.DropMatrixElement, error) {
 	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, itemIdFilter)
 	if err != nil {
@@ -221,15 +203,15 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 	var combinedResults []*model.CombinedResultForDropMatrix
 	for _, timeRange := range timeRanges {
 		stageIdItemIdMap := util.GetStageIdItemIdMapFromDropInfos(dropInfos)
-		quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, stageIdItemIdMap, accountId)
+		quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, stageIdItemIdMap, accountId, sourceCategory)
 		if err != nil {
 			return nil, err
 		}
-		timesResults, err := s.DropReportService.CalcTotalTimesForDropMatrix(ctx, server, timeRange, util.GetStageIdsFromDropInfos(dropInfos), accountId)
+		timesResults, err := s.DropReportService.CalcTotalTimesForDropMatrix(ctx, server, timeRange, util.GetStageIdsFromDropInfos(dropInfos), accountId, sourceCategory)
 		if err != nil {
 			return nil, err
 		}
-		quantityUniqCountResults, err := s.DropReportService.CalcQuantityUniqCount(ctx, server, timeRange, stageIdItemIdMap, accountId)
+		quantityUniqCountResults, err := s.DropReportService.CalcQuantityUniqCount(ctx, server, timeRange, stageIdItemIdMap, accountId, sourceCategory)
 		if err != nil {
 			return nil, err
 		}
@@ -300,6 +282,7 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 					QuantityBuckets: quantityBuckets,
 					Times:           times,
 					Server:          server,
+					SourceCategory:  sourceCategory,
 				}
 				if rangeId == 0 {
 					dropMatrixElement.TimeRange = timeRange
@@ -319,6 +302,7 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 					QuantityBuckets: map[int]int{0: times},
 					Times:           times,
 					Server:          server,
+					SourceCategory:  sourceCategory,
 				}
 				if rangeId == 0 {
 					dropMatrixElementWithZeroQuantity.TimeRange = timeRange

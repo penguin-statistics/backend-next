@@ -25,6 +25,6 @@ func (s *TrendElement) DeleteByServer(ctx context.Context, server string) error 
 	return s.TrendElementRepo.DeleteByServer(ctx, server)
 }
 
-func (s *TrendElement) GetElementsByServer(ctx context.Context, server string) ([]*model.TrendElement, error) {
-	return s.TrendElementRepo.GetElementsByServer(ctx, server)
+func (s *TrendElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.TrendElement, error) {
+	return s.TrendElementRepo.GetElementsByServerAndSourceCategory(ctx, server, sourceCategory)
 }
