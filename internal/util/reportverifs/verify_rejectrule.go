@@ -53,10 +53,10 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 
 	for _, rejectRule := range rejectRules {
 		if rejectRule.WithReliability < constant.ViolationReliabilityRejectRuleRangeLeast ||
-			rejectRule.WithReliability > constant.ViolationReliabilityRejectRuleRangeMost {
+			rejectRule.WithReliability >= constant.ViolationReliabilityRejectRuleRangeMost {
 			log.Error().
 				Interface("rule", rejectRule).
-				Msgf("reject rule with reliability %d is out of range (%d, %d)", rejectRule.WithReliability, constant.ViolationReliabilityRejectRuleRangeLeast, constant.ViolationReliabilityRejectRuleRangeMost)
+				Msgf("reject rule with reliability %d is out of range [%d, %d)", rejectRule.WithReliability, constant.ViolationReliabilityRejectRuleRangeLeast, constant.ViolationReliabilityRejectRuleRangeMost)
 
 			continue
 		}
