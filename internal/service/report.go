@@ -20,7 +20,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/util"
 	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
-	"github.com/penguin-statistics/backend-next/internal/util/reportutil/reportverifs"
+	"github.com/penguin-statistics/backend-next/internal/util/reportverifs"
 )
 
 var (
@@ -104,7 +104,7 @@ func (s *Report) pipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []
 }
 
 func (s *Report) pipelineTaskId(ctx *fiber.Ctx) string {
-	return ctx.Locals("requestid").(string) + "-" + uniuri.NewLen(32)
+	return ctx.Locals(constant.ContextKeyRequestID).(string) + "-" + uniuri.NewLen(16)
 }
 
 func (s *Report) pipelineAggregateGachaboxDrops(ctx context.Context, singleReport *types.ReportTaskSingleReport) error {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
@@ -31,13 +32,19 @@ func (u *UserVerifier) Name() string {
 	return "user"
 }
 
-func (u *UserVerifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) []error {
+func (u *UserVerifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) *Rejection {
 	id := reportTask.AccountID
 	if id == 0 {
-		return []error{ErrAccountIDEmpty}
+		return &Rejection{
+			Reliability: constant.ViolationReliabilityUser,
+			Message:     ErrAccountIDEmpty.Error(),
+		}
 	}
 	if !u.AccountRepo.IsAccountExistWithId(ctx, id) {
-		return []error{ErrAccountNotFound}
+		return &Rejection{
+			Reliability: constant.ViolationReliabilityUser,
+			Message:     ErrAccountNotFound.Error(),
+		}
 	}
 	return nil
 }

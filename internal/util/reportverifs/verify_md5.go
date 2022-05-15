@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
@@ -28,9 +29,12 @@ func (u *MD5Verifier) Name() string {
 	return "md5"
 }
 
-func (u *MD5Verifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) []error {
+func (u *MD5Verifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) *Rejection {
 	if report.Metadata != nil && report.Metadata.MD5 != "" && u.DropReportExtraRepo.IsDropReportExtraMD5Exist(ctx, report.Metadata.MD5) {
-		return []error{ErrMD5Conflict}
+		return &Rejection{
+			Reliability: constant.ViolationReliabilityMD5,
+			Message:     ErrMD5Conflict.Error(),
+		}
 	}
 	return nil
 }

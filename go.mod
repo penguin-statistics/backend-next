@@ -45,6 +45,7 @@ require (
 )
 
 require (
+	github.com/antonmedv/expr v1.9.0 // indirect
 	golang.org/x/exp v0.0.0-20220428152302-39d4317da171 // indirect
 	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29 // indirect
 )
