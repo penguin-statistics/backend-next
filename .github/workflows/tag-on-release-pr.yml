@@ -30,6 +30,7 @@ jobs:
       - name: Tag Release
         uses: actions/github-script@v6
         with:
+          github-token: ${{ secrets.PAT_FOR_RELEASE_TAGGER }}
           script: |
             const { repo, owner } = context.repo;
             const sha1 = context.payload.pull_request.head.sha;
