@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
@@ -13,8 +14,6 @@ var (
 	ErrAccountIDEmpty  = errors.New("account id is empty")
 	ErrAccountNotFound = errors.New("account not found with given id")
 )
-
-const UserViolationReliability = 4
 
 type UserVerifier struct {
 	AccountRepo *repo.Account
@@ -37,13 +36,13 @@ func (u *UserVerifier) Verify(ctx context.Context, report *types.ReportTaskSingl
 	id := reportTask.AccountID
 	if id == 0 {
 		return &Rejection{
-			Reliability: UserViolationReliability,
+			Reliability: constant.ViolationReliabilityUser,
 			Message:     ErrAccountIDEmpty.Error(),
 		}
 	}
 	if !u.AccountRepo.IsAccountExistWithId(ctx, id) {
 		return &Rejection{
-			Reliability: UserViolationReliability,
+			Reliability: constant.ViolationReliabilityUser,
 			Message:     ErrAccountNotFound.Error(),
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/repo"
@@ -18,8 +19,6 @@ var (
 	ErrInvalidDropInfoCount = errors.New("invalid drop info count")
 	ErrUnknownItemID        = errors.New("unknown item id")
 )
-
-const DropViolationReliability = 6
 
 type DropVerifier struct {
 	DropInfoRepo *repo.DropInfo
@@ -45,7 +44,7 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.ReportTaskSingl
 	})
 	if err != nil {
 		return &Rejection{
-			Reliability: RejectRuleUnexpectedViolationReliability,
+			Reliability: constant.ViolationReliabilityDrop,
 			Message:     err.Error(),
 		}
 	}
@@ -62,7 +61,7 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.ReportTaskSingl
 
 	if len(errs) > 0 {
 		return &Rejection{
-			Reliability: DropViolationReliability,
+			Reliability: constant.ViolationReliabilityDrop,
 			Message:     fmt.Sprintf("%v", errs),
 		}
 	}

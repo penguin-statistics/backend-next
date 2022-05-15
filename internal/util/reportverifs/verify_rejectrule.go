@@ -8,11 +8,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 )
-
-const RejectRuleUnexpectedViolationReliability = 7
 
 var ErrExprMatched = errors.New("reject expr matched")
 
@@ -42,7 +41,7 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 	rejectRules, err := d.RejectRuleRepo.GetAllActiveRejectRules(ctx)
 	if err != nil {
 		return &Rejection{
-			Reliability: RejectRuleUnexpectedViolationReliability,
+			Reliability: constant.ViolationReliabilityRejectRuleUnexpected,
 			Message:     err.Error(),
 		}
 	}
@@ -53,11 +52,20 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 	}
 
 	for _, rejectRule := range rejectRules {
+		if rejectRule.WithReliability < constant.ViolationReliabilityRejectRuleRangeLeast ||
+			rejectRule.WithReliability > constant.ViolationReliabilityRejectRuleRangeMost {
+			log.Error().
+				Interface("rule", rejectRule).
+				Msgf("reject rule with reliability %d is out of range (%d, %d)", rejectRule.WithReliability, constant.ViolationReliabilityRejectRuleRangeLeast, constant.ViolationReliabilityRejectRuleRangeMost)
+
+			continue
+		}
+
 		result, err := expr.Eval(rejectRule.Expr, reportContext)
 		if err != nil {
 			log.Error().
 				Interface("context", reportContext).
-				Str("expr", rejectRule.Expr).
+				Interface("rule", rejectRule).
 				Err(err).
 				Msgf("failed to evaluate reject rule %d", rejectRule.RuleID)
 			continue
@@ -68,7 +76,7 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 		if shouldReject {
 			log.Warn().
 				Interface("context", reportContext).
-				Str("expr", rejectRule.Expr).
+				Interface("rule", rejectRule).
 				Bool("shouldReject", shouldReject).
 				Msgf("reject rule %d matched (rejecting using reliability value %d)", rejectRule.RuleID, rejectRule.WithReliability)
 
