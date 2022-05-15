@@ -14,7 +14,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/goccy/go-json v0.9.5
 	github.com/gofiber/contrib/fibersentry v0.0.0-20220308072908-2bb8d753d425
-	github.com/gofiber/fiber/v2 v2.29.0
+	github.com/gofiber/fiber/v2 v2.33.0
 	github.com/gofiber/helmet/v2 v2.2.8
 	github.com/joho/godotenv v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -40,13 +40,24 @@ require (
 	go.opentelemetry.io/otel/sdk v1.4.1
 	go.uber.org/fx v1.17.0
 	golang.org/x/text v0.3.7
-	google.golang.org/protobuf v1.27.1
+	google.golang.org/protobuf v1.28.0
 	gopkg.in/guregu/null.v3 v3.5.0
 )
 
 require (
+	github.com/ansrivas/fiberprometheus/v2 v2.2.0 // indirect
 	github.com/antonmedv/expr v1.9.0 // indirect
+	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/gofiber/adaptor/v2 v2.1.23 // indirect
+	github.com/gofiber/utils v0.1.2 // indirect
+	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
+	github.com/prometheus/client_golang v1.12.2 // indirect
+	github.com/prometheus/client_model v0.2.0 // indirect
+	github.com/prometheus/common v0.34.0 // indirect
+	github.com/prometheus/procfs v0.7.3 // indirect
 	golang.org/x/exp v0.0.0-20220428152302-39d4317da171 // indirect
+	golang.org/x/mod v0.6.0-dev.0.20211013180041-c96bc1413d57 // indirect
 	golang.org/x/sync v0.0.0-20220513210516-0976fa681c29 // indirect
 )
 
@@ -66,7 +77,7 @@ require (
 	github.com/go-openapi/swag v0.21.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/klauspost/compress v1.15.1 // indirect
+	github.com/klauspost/compress v1.15.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.11 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
@@ -85,7 +96,7 @@ require (
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
 	github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.8 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.34.0
+	github.com/valyala/fasthttp v1.36.0
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/otel/internal/metric v0.27.0 // indirect
@@ -97,7 +108,7 @@ require (
 	go.uber.org/zap v1.16.0 // indirect
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f // indirect
-	golang.org/x/sys v0.0.0-20220310020820-b874c991c1a5 // indirect
+	golang.org/x/sys v0.0.0-20220513210249-45d2b4557a2a // indirect
 	golang.org/x/tools v0.1.8-0.20211029000441-d6a9af8af023 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect

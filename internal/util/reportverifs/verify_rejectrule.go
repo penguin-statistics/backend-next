@@ -3,10 +3,12 @@ package reportverifs
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/antonmedv/expr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/mod/semver"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
@@ -37,6 +39,10 @@ type ReportContext struct {
 	Task   *types.ReportTask
 }
 
+func (ReportContext) SemVerCompare(a, b string) int {
+	return semver.Compare(a, b)
+}
+
 func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) *Rejection {
 	rejectRules, err := d.RejectRuleRepo.GetAllActiveRejectRules(ctx)
 	if err != nil {
@@ -51,21 +57,36 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 		Task:   reportTask,
 	}
 
+	start := time.Now()
+	defer func() {
+		if l := log.Trace(); l.Enabled() {
+			l.Dur("duration", time.Since(start)).
+				Msg("reject rule(s) evaluated")
+		}
+	}()
+
 	for _, rejectRule := range rejectRules {
 		if rejectRule.WithReliability < constant.ViolationReliabilityRejectRuleRangeLeast ||
 			rejectRule.WithReliability >= constant.ViolationReliabilityRejectRuleRangeMost {
 			log.Error().
-				Interface("rule", rejectRule).
+				Int("ruleId", rejectRule.RuleID).
 				Msgf("reject rule with reliability %d is out of range [%d, %d)", rejectRule.WithReliability, constant.ViolationReliabilityRejectRuleRangeLeast, constant.ViolationReliabilityRejectRuleRangeMost)
 
 			continue
 		}
 
+		options := []expr.Option{
+			expr.Env(reportContext),
+			expr.AsBool(),
+		}
+
+		expr.Compile(rejectRule.Expr, options...)
+
 		result, err := expr.Eval(rejectRule.Expr, reportContext)
 		if err != nil {
 			log.Error().
 				Interface("context", reportContext).
-				Interface("rule", rejectRule).
+				Int("ruleId", rejectRule.RuleID).
 				Err(err).
 				Msgf("failed to evaluate reject rule %d", rejectRule.RuleID)
 			continue
@@ -76,7 +97,7 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 		if shouldReject {
 			log.Warn().
 				Interface("context", reportContext).
-				Interface("rule", rejectRule).
+				Int("ruleId", rejectRule.RuleID).
 				Bool("shouldReject", shouldReject).
 				Msgf("reject rule %d matched (rejecting using reliability value %d)", rejectRule.RuleID, rejectRule.WithReliability)
 
@@ -87,8 +108,8 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 		} else {
 			if l := log.Trace(); l.Enabled() {
 				l.Interface("context", reportContext).
-					Str("expr", rejectRule.Expr).
-					Msgf("reject rule %d verification passed", rejectRule.RuleID)
+					Int("ruleId", rejectRule.RuleID).
+					Msgf("reject rule verification passed")
 			}
 		}
 	}

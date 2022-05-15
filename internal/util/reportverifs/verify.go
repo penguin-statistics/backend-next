@@ -2,9 +2,21 @@ package reportverifs
 
 import (
 	"context"
+	"time"
 
 	"github.com/penguin-statistics/backend-next/internal/model/types"
+	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
 )
+
+type Violations map[int]*Violation
+
+func (v Violations) Reliability(index int) int {
+	if violation, ok := v[index]; ok {
+		return violation.Reliability
+	}
+
+	return 0
+}
 
 type Violation struct {
 	Rejection
@@ -21,10 +33,10 @@ type Verifier interface {
 	Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) *Rejection
 }
 
-type ReportVerifier []Verifier
+type ReportVerifiers []Verifier
 
-func NewReportVerifier(userVerifier *UserVerifier, dropVerifier *DropVerifier, md5Verifier *MD5Verifier, rejectRuleVerifier *RejectRuleVerifier) *ReportVerifier {
-	return &ReportVerifier{
+func NewReportVerifier(userVerifier *UserVerifier, dropVerifier *DropVerifier, md5Verifier *MD5Verifier, rejectRuleVerifier *RejectRuleVerifier) *ReportVerifiers {
+	return &ReportVerifiers{
 		userVerifier,
 		md5Verifier,
 		dropVerifier,
@@ -32,19 +44,31 @@ func NewReportVerifier(userVerifier *UserVerifier, dropVerifier *DropVerifier, m
 	}
 }
 
-func (verifier ReportVerifier) Verify(ctx context.Context, reportTask *types.ReportTask) *Violation {
-	for _, report := range reportTask.Reports {
-		for _, pipe := range verifier {
+func (verifiers ReportVerifiers) Verify(ctx context.Context, reportTask *types.ReportTask) (violations Violations) {
+	violations = map[int]*Violation{}
+
+	for reportIndex, report := range reportTask.Reports {
+	VERIFIERLOOP:
+		for _, pipe := range verifiers {
+			start := time.Now()
+
+			name := pipe.Name()
 			rejection := pipe.Verify(ctx, report, reportTask)
 
 			if rejection != nil {
-				return &Violation{
-					Name:      pipe.Name(),
+				violations[reportIndex] = &Violation{
+					Name:      name,
 					Rejection: *rejection,
 				}
+
+				break VERIFIERLOOP
 			}
+
+			observability.ReportVerifyDuration.
+				WithLabelValues(name).
+				Observe(time.Since(start).Seconds())
 		}
 	}
 
-	return nil
+	return violations
 }
