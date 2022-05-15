@@ -14,6 +14,7 @@ import (
 	"github.com/zeebo/xxh3"
 	"go.uber.org/fx"
 
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/model/gamedata"
@@ -259,17 +260,17 @@ func (c *AdminController) PurgeCache(ctx *fiber.Ctx) error {
 
 func (c *AdminController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
-	return c.DropMatrixService.RefreshAllDropMatrixElements(ctx.Context(), server)
+	return c.DropMatrixService.RefreshAllDropMatrixElements(ctx.Context(), server, []string{constant.SourceCategoryAll})
 }
 
 func (c *AdminController) RefreshAllPatternMatrixElements(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
-	return c.PatternMatrixService.RefreshAllPatternMatrixElements(ctx.Context(), server)
+	return c.PatternMatrixService.RefreshAllPatternMatrixElements(ctx.Context(), server, []string{constant.SourceCategoryAll})
 }
 
 func (c *AdminController) RefreshAllTrendElements(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
-	return c.TrendService.RefreshTrendElements(ctx.Context(), server)
+	return c.TrendService.RefreshTrendElements(ctx.Context(), server, []string{constant.SourceCategoryAll})
 }
 
 func (c *AdminController) RefreshAllSiteStats(ctx *fiber.Ctx) error {

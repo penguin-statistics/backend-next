@@ -50,7 +50,7 @@ func NewPatternMatrix(
 // Cache: shimLatestPatternMatrixResults#server:{server}, 24hrs, records last modified time
 func (s *PatternMatrix) GetShimLatestPatternMatrixResults(ctx context.Context, server string, accountId null.Int) (*modelv2.PatternMatrixQueryResult, error) {
 	valueFunc := func() (*modelv2.PatternMatrixQueryResult, error) {
-		queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId)
+		queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId, constant.SourceCategoryAll)
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +75,7 @@ func (s *PatternMatrix) GetShimLatestPatternMatrixResults(ctx context.Context, s
 	}
 }
 
-func (s *PatternMatrix) RefreshAllPatternMatrixElements(ctx context.Context, server string) error {
+func (s *PatternMatrix) RefreshAllPatternMatrixElements(ctx context.Context, server string, sourceCategories []string) error {
 	timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
 	if err != nil {
 		return err
@@ -88,7 +88,15 @@ func (s *PatternMatrix) RefreshAllPatternMatrixElements(ctx context.Context, ser
 
 	elements, err := async.FlatMap(stageIdsTuples, 15, func(tuple *wrap.Tuple[int, []int]) ([]*model.PatternMatrixElement, error) {
 		timeRanges := []*model.TimeRange{timeRangesMap[tuple.Key]}
-		return s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, tuple.Val, null.NewInt(0, false))
+		currentBatch := make([]*model.PatternMatrixElement, 0)
+		for _, sourceCategory := range sourceCategories {
+			results, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, tuple.Val, null.NewInt(0, false), sourceCategory)
+			if err != nil {
+				return nil, err
+			}
+			currentBatch = append(currentBatch, results...)
+		}
+		return currentBatch, nil
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed to calculate pattern matrix")
@@ -100,15 +108,15 @@ func (s *PatternMatrix) RefreshAllPatternMatrixElements(ctx context.Context, ser
 	return cache.ShimLatestPatternMatrixResults.Delete(server)
 }
 
-func (s *PatternMatrix) getLatestPatternMatrixResults(ctx context.Context, server string, accountId null.Int) (*model.PatternMatrixQueryResult, error) {
-	patternMatrixElements, err := s.getLatestPatternMatrixElements(ctx, server, accountId)
+func (s *PatternMatrix) getLatestPatternMatrixResults(ctx context.Context, server string, accountId null.Int, sourceCategory string) (*model.PatternMatrixQueryResult, error) {
+	patternMatrixElements, err := s.getLatestPatternMatrixElements(ctx, server, accountId, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
 	return s.convertPatternMatrixElementsToDropPatternQueryResult(ctx, server, patternMatrixElements)
 }
 
-func (s *PatternMatrix) getLatestPatternMatrixElements(ctx context.Context, server string, accountId null.Int) ([]*model.PatternMatrixElement, error) {
+func (s *PatternMatrix) getLatestPatternMatrixElements(ctx context.Context, server string, accountId null.Int, sourceCategory string) ([]*model.PatternMatrixElement, error) {
 	if accountId.Valid {
 		timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
 		if err != nil {
@@ -122,7 +130,7 @@ func (s *PatternMatrix) getLatestPatternMatrixElements(ctx context.Context, serv
 		elements := make([]*model.PatternMatrixElement, 0)
 		for rangeId, stageIds := range stageIdsMap {
 			timeRanges := []*model.TimeRange{timeRangesMap[rangeId]}
-			currentBatch, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, stageIds, accountId)
+			currentBatch, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, stageIds, accountId, sourceCategory)
 			if err != nil {
 				return nil, err
 			}
@@ -130,12 +138,12 @@ func (s *PatternMatrix) getLatestPatternMatrixElements(ctx context.Context, serv
 		}
 		return elements, nil
 	} else {
-		return s.PatternMatrixElementService.GetElementsByServer(ctx, server)
+		return s.PatternMatrixElementService.GetElementsByServerAndSourceCategory(ctx, server, sourceCategory)
 	}
 }
 
 func (s *PatternMatrix) calcPatternMatrixForTimeRanges(
-	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, accountId null.Int,
+	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, accountId null.Int, sourceCategory string,
 ) ([]*model.PatternMatrixElement, error) {
 	results := make([]*model.PatternMatrixElement, 0)
 
@@ -164,23 +172,24 @@ func (s *PatternMatrix) calcPatternMatrixForTimeRanges(
 	}
 
 	for _, timeRange := range timeRanges {
-		quantityResults, err := s.DropReportService.CalcTotalQuantityForPatternMatrix(ctx, server, timeRange, stageIds, accountId)
+		quantityResults, err := s.DropReportService.CalcTotalQuantityForPatternMatrix(ctx, server, timeRange, stageIds, accountId, sourceCategory)
 		if err != nil {
 			return nil, err
 		}
-		timesResults, err := s.DropReportService.CalcTotalTimesForPatternMatrix(ctx, server, timeRange, stageIds, accountId)
+		timesResults, err := s.DropReportService.CalcTotalTimesForPatternMatrix(ctx, server, timeRange, stageIds, accountId, sourceCategory)
 		if err != nil {
 			return nil, err
 		}
 		combinedResults := s.combineQuantityAndTimesResults(quantityResults, timesResults)
 		for _, result := range combinedResults {
 			results = append(results, &model.PatternMatrixElement{
-				StageID:   result.StageID,
-				PatternID: result.PatternID,
-				RangeID:   timeRange.RangeID,
-				Quantity:  result.Quantity,
-				Times:     result.Times,
-				Server:    server,
+				StageID:        result.StageID,
+				PatternID:      result.PatternID,
+				RangeID:        timeRange.RangeID,
+				Quantity:       result.Quantity,
+				Times:          result.Times,
+				Server:         server,
+				SourceCategory: sourceCategory,
 			})
 		}
 	}
