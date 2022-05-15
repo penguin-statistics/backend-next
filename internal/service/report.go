@@ -35,6 +35,7 @@ type Report struct {
 	ItemService            *Item
 	StageService           *Stage
 	AccountService         *Account
+	StageRepo              *repo.Stage
 	DropInfoRepo           *repo.DropInfo
 	DropReportRepo         *repo.DropReport
 	DropPatternRepo        *repo.DropPattern
@@ -43,7 +44,7 @@ type Report struct {
 	ReportVerifier         *reportverifs.ReportVerifier
 }
 
-func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *Item, stageService *Stage, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *Account, reportVerifier *reportverifs.ReportVerifier) *Report {
+func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *Item, stageService *Stage, stageRepo *repo.Stage, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *Account, reportVerifier *reportverifs.ReportVerifier) *Report {
 	service := &Report{
 		DB:                     db,
 		Redis:                  redisClient,
@@ -51,6 +52,7 @@ func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamConte
 		ItemService:            itemService,
 		StageService:           stageService,
 		AccountService:         accountService,
+		StageRepo:              stageRepo,
 		DropInfoRepo:           dropInfoRepo,
 		DropReportRepo:         dropReportRepo,
 		DropPatternRepo:        dropPatternRepo,

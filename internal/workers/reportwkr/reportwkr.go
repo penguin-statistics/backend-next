@@ -6,8 +6,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/nats-io/nats.go"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
@@ -73,7 +73,7 @@ func (w *Worker) Consumer(ctx context.Context, ch chan error) error {
 		select {
 		case msg := <-msgChan:
 			func() {
-				taskCtx, cancelTask := context.WithDeadline(ctx, time.Now().Add(time.Second*10))
+				taskCtx, cancelTask := context.WithTimeout(ctx, time.Second*10)
 				inprogressInformer := time.AfterFunc(time.Second*5, func() {
 					err = msg.InProgress()
 					if err != nil {
@@ -94,18 +94,23 @@ func (w *Worker) Consumer(ctx context.Context, ch chan error) error {
 					return
 				}
 
+				start := time.Now()
+
 				err = w.consumeReport(taskCtx, reportTask)
 				if err != nil {
 					log.Error().
 						Err(err).
 						Str("taskId", reportTask.TaskID).
-						Str("reportTask", spew.Sdump(reportTask)).
+						Interface("reportTask", reportTask).
 						Msg("failed to consume report task")
 					ch <- err
 					return
 				}
 
-				log.Info().Str("taskId", reportTask.TaskID).Msg("report task processed successfully")
+				log.Info().
+					Str("taskId", reportTask.TaskID).
+					Dur("duration", time.Since(start)).
+					Msg("report task processed successfully")
 			}()
 		case <-ctx.Done():
 			return ctx.Err()
@@ -153,21 +158,18 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 	for _, report := range reportTask.Reports {
 		dropPattern, created, err := w.ReportServices.DropPatternRepo.GetOrCreateDropPatternFromDrops(ctx, tx, report.Drops)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to calculate drop pattern hash")
 		}
 		if created {
 			_, err := w.ReportServices.DropPatternElementRepo.CreateDropPatternElements(ctx, tx, dropPattern.PatternID, report.Drops)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "failed to create drop pattern elements")
 			}
 		}
 
-		// FIXME: the param is context.Context, so we have to use repo here, can we change it to use context.Context?
-		// unable: consumer workers are not able to use context.Context as ops here are not initiated due to a fiber request,
-		// but rather a message dispatch
-		stage, err := w.ReportServices.StageService.StageRepo.GetStageByArkId(ctx, report.StageID)
+		stage, err := w.ReportServices.StageRepo.GetStageByArkId(ctx, report.StageID)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to get stage")
 		}
 		dropReport := &model.DropReport{
 			StageID:     stage.StageID,
@@ -179,7 +181,7 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 			AccountID:   reportTask.AccountID,
 		}
 		if err = w.ReportServices.DropReportRepo.CreateDropReport(ctx, tx, dropReport); err != nil {
-			return err
+			return errors.Wrap(err, "failed to create drop report")
 		}
 
 		md5 := ""
@@ -198,11 +200,11 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 			Metadata: report.Metadata,
 			MD5:      null.NewString(md5, md5 != ""),
 		}); err != nil {
-			return err
+			return errors.Wrap(err, "failed to create drop report extra")
 		}
 
 		if err := w.ReportServices.Redis.Set(ctx, reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
-			return err
+			return errors.Wrap(err, "failed to set report id in redis")
 		}
 	}
 
