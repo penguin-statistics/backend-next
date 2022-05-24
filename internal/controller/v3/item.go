@@ -1,4 +1,4 @@
-package controller
+package v3
 
 import (
 	"strings"
@@ -18,7 +18,7 @@ type ItemController struct {
 	ItemService *service.Item
 }
 
-func RegisterItemController(v3 *svr.V3, c ItemController) {
+func RegisterItem(v3 *svr.V3, c ItemController) {
 	v3.Get("/items", c.GetItems)
 	v3.Get("/items/:itemId", buildSanitizer(util.NonNullString, util.IsInt), c.GetItemById)
 }

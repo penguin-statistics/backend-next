@@ -1,4 +1,4 @@
-package controller
+package v3
 
 import (
 	"github.com/gofiber/fiber/v2"
@@ -14,7 +14,7 @@ type StageController struct {
 	StageService *service.Stage
 }
 
-func RegisterStageController(v3 *svr.V3, c StageController) {
+func RegisterStage(v3 *svr.V3, c StageController) {
 	v3.Get("/stages", c.GetStages)
 	v3.Get("/stages/:stageId", c.GetStageById)
 }

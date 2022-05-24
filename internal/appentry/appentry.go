@@ -8,6 +8,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/config"
 	controllermeta "github.com/penguin-statistics/backend-next/internal/controller/meta"
 	controllerv2 "github.com/penguin-statistics/backend-next/internal/controller/v2"
+	controllerv3 "github.com/penguin-statistics/backend-next/internal/controller/v3"
 	"github.com/penguin-statistics/backend-next/internal/infra"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/crypto"
@@ -50,82 +51,27 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		),
 
 		// Repositories
-		fx.Provide(
-			repo.NewItem,
-			repo.NewZone,
-			repo.NewAdmin,
-			repo.NewStage,
-			repo.NewNotice,
-			repo.NewAccount,
-			repo.NewActivity,
-			repo.NewDropInfo,
-			repo.NewProperty,
-			repo.NewTimeRange,
-			repo.NewDropReport,
-			repo.NewRejectRule,
-			repo.NewDropPattern,
-			repo.NewTrendElement,
-			repo.NewDropReportExtra,
-			repo.NewDropMatrixElement,
-			repo.NewDropPatternElement,
-			repo.NewPatternMatrixElement,
-		),
+		repo.Module(),
 
 		// Services
-		fx.Provide(
-			service.NewItem,
-			service.NewZone,
-			service.NewStage,
-			service.NewGeoIP,
-			service.NewTrend,
-			service.NewAdmin,
-			service.NewHealth,
-			service.NewNotice,
-			service.NewReport,
-			service.NewAccount,
-			service.NewFormula,
-			service.NewActivity,
-			service.NewDropInfo,
-			service.NewShortURL,
-			service.NewTimeRange,
-			service.NewSiteStats,
-			service.NewDropMatrix,
-			service.NewDropReport,
-			service.NewTrendElement,
-			service.NewPatternMatrix,
-			service.NewDropMatrixElement,
-			service.NewDropPatternElement,
-			service.NewPatternMatrixElement,
-		),
+		service.Module(),
 
-		// Global Singleton Inits
+		// Global Singleton Inits: Keep those before controllers to ensure they are initialized
+		// before controllers are registered as controllers are also fx#Invoke functions which
+		// are called in the order of their registration.
 		fx.Invoke(logger.Configure),
 		fx.Invoke(infra.SentryInit),
 		fx.Invoke(cache.Initialize),
 		fx.Invoke(observability.Launch),
 
 		// Controllers (v2)
-		fx.Invoke(
-			controllerv2.RegisterItem,
-			controllerv2.RegisterZone,
-			controllerv2.RegisterStage,
-			controllerv2.RegisterNotice,
-			controllerv2.RegisterResult,
-			controllerv2.RegisterReport,
-			controllerv2.RegisterAccount,
-			controllerv2.RegisterFormula,
-			controllerv2.RegisterPrivate,
-			controllerv2.RegisterSiteStats,
-			controllerv2.RegisterEventPeriod,
-			controllerv2.RegisterShortURL,
-		),
+		controllerv2.Module(),
+
+		// Controllers (v3)
+		controllerv3.Module(),
 
 		// Controllers (meta)
-		fx.Invoke(
-			controllermeta.RegisterMeta,
-			controllermeta.RegisterIndex,
-			controllermeta.RegisterAdmin,
-		),
+		controllermeta.Module(),
 
 		// Workers
 		fx.Invoke(calcwkr.Start),

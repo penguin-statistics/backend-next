@@ -9,6 +9,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/config"
 	"github.com/penguin-statistics/backend-next/internal/constant"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
 type V2 struct {
@@ -34,7 +35,15 @@ func CreateEndpointGroups(app *fiber.App, conf *config.Config) (*V2, *V3, *Admin
 		return c.Next()
 	})
 
-	v3 := app.Group("/api/v3")
+	v3 := app.Group("/api/v3-alpha", func(c *fiber.Ctx) error {
+		msg := "The v3 API is in alpha and may change in the future. Please report any issues and/or suggestions to https://github.com/penguin-statistics/backend-next/issues."
+		c.Set("X-Penguin-Notes", msg)
+		if c.Accepts("application/vnd.penguin.v3+json") == "" {
+			return pgerr.ErrInvalidReq.Msg(msg + " To use the v3 API, please use the application/vnd.penguin.v3+json Accept header to explicitly opt-in to the alpha version of API.")
+		}
+
+		return c.Next()
+	})
 
 	admin := app.Group("/api/admin", func(c *fiber.Ctx) error {
 		if len(conf.AdminKey) < 64 {
