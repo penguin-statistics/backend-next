@@ -34,21 +34,10 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Provide(crypto.NewCrypto),
 
 		// Infrastructures
-		fx.Provide(
-			infra.NATS,
-			infra.Redis,
-			infra.Postgres,
-			infra.GeoIPDatabase,
-		),
+		infra.Module(),
 
 		// Verifiers
-		fx.Provide(
-			reportverifs.NewMD5Verifier,
-			reportverifs.NewUserVerifier,
-			reportverifs.NewDropVerifier,
-			reportverifs.NewReportVerifier,
-			reportverifs.NewRejectRuleVerifier,
-		),
+		reportverifs.Module(),
 
 		// Repositories
 		repo.Module(),

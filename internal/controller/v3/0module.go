@@ -10,5 +10,6 @@ func Module() fx.Option {
 		RegisterLive,
 		RegisterStage,
 		RegisterZone,
+		RegisterDataset,
 	))
 }
