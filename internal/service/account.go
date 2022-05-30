@@ -28,7 +28,7 @@ func (s *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.
 	return s.AccountRepo.CreateAccountWithRandomPenguinId(ctx)
 }
 
-// Cache: account#accountId:{accountId}, 24hrs
+// Cache: account#accountId:{accountId}, 1 hr
 func (s *Account) GetAccountById(ctx context.Context, accountId string) (*model.Account, error) {
 	var account model.Account
 	err := cache.AccountByID.Get(accountId, &account)
@@ -44,7 +44,7 @@ func (s *Account) GetAccountById(ctx context.Context, accountId string) (*model.
 	return dbAccount, nil
 }
 
-// Cache: account#penguinId:{penguinId}, 24hrs
+// Cache: account#penguinId:{penguinId}, 1 hr
 func (s *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (*model.Account, error) {
 	var account model.Account
 	err := cache.AccountByPenguinID.Get(penguinId, &account)

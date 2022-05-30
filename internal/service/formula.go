@@ -20,7 +20,7 @@ func NewFormula(propertyRepo *repo.Property) *Formula {
 	}
 }
 
-// Cache: (singular) formula, 24hrs
+// Cache: (singular) formula, 1 hr
 func (s *Formula) GetFormula(ctx context.Context) (json.RawMessage, error) {
 	var formula json.RawMessage
 	err := cache.Formula.Get(&formula)

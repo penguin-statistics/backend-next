@@ -23,7 +23,7 @@ func NewActivity(activityRepo *repo.Activity) *Activity {
 	}
 }
 
-// Cache: (singular) activities, 24hrs; records last modified time
+// Cache: (singular) activities, 1 hr; records last modified time
 func (s *Activity) GetActivities(ctx context.Context) ([]*model.Activity, error) {
 	var activities []*model.Activity
 	err := cache.Activities.Get(&activities)
@@ -40,7 +40,7 @@ func (s *Activity) GetActivities(ctx context.Context) ([]*model.Activity, error)
 	return activities, err
 }
 
-// Cache: (singular) shimActivities, 24hrs; records last modified time
+// Cache: (singular) shimActivities, 1 hr; records last modified time
 func (s *Activity) GetShimActivities(ctx context.Context) ([]*modelv2.Activity, error) {
 	var shimActivitiesFromCache []*modelv2.Activity
 	err := cache.ShimActivities.Get(&shimActivitiesFromCache)
