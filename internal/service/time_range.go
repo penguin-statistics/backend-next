@@ -24,7 +24,7 @@ func NewTimeRange(timeRangeRepo *repo.TimeRange, dropInfoRepo *repo.DropInfo) *T
 	}
 }
 
-// Cache: timeRanges#server:{server}, 24hrs
+// Cache: timeRanges#server:{server}, 1 hr
 func (s *TimeRange) GetTimeRangesByServer(ctx context.Context, server string) ([]*model.TimeRange, error) {
 	var timeRanges []*model.TimeRange
 	err := cache.TimeRanges.Get(server, &timeRanges)
@@ -40,7 +40,7 @@ func (s *TimeRange) GetTimeRangesByServer(ctx context.Context, server string) ([
 	return timeRanges, nil
 }
 
-// Cache: timeRange#rangeId:{rangeId}, 24hrs
+// Cache: timeRange#rangeId:{rangeId}, 1 hr
 func (s *TimeRange) GetTimeRangeById(ctx context.Context, rangeId int) (*model.TimeRange, error) {
 	var timeRange model.TimeRange
 	err := cache.TimeRangeByID.Get(strconv.Itoa(rangeId), &timeRange)
@@ -66,7 +66,7 @@ func (s *TimeRange) GetCurrentTimeRangesByServer(ctx context.Context, server str
 	return timeRanges, nil
 }
 
-// Cache: timeRangesMap#server:{server}, 24hrs
+// Cache: timeRangesMap#server:{server}, 1 hr
 func (s *TimeRange) GetTimeRangesMap(ctx context.Context, server string) (map[int]*model.TimeRange, error) {
 	var timeRangesMap map[int]*model.TimeRange
 	err := cache.TimeRangesMap.Get(server, &timeRangesMap)
@@ -88,7 +88,7 @@ func (s *TimeRange) GetTimeRangesMap(ctx context.Context, server string) (map[in
 	return timeRangesMap, nil
 }
 
-// Cache: maxAccumulableTimeRanges#server:{server}, 24hrs
+// Cache: maxAccumulableTimeRanges#server:{server}, 1 hr
 func (s *TimeRange) GetMaxAccumulableTimeRangesByServer(ctx context.Context, server string) (map[int]map[int][]*model.TimeRange, error) {
 	var maxAccumulableTimeRanges map[int]map[int][]*model.TimeRange
 	err := cache.MaxAccumulableTimeRanges.Get(server, &maxAccumulableTimeRanges)
