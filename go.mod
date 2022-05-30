@@ -50,6 +50,7 @@ require (
 )
 
 require (
+	github.com/avast/retry-go v3.0.0+incompatible // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/gofiber/adaptor/v2 v2.1.23 // indirect
 	github.com/gofiber/utils v0.1.2 // indirect

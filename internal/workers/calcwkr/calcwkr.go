@@ -2,8 +2,11 @@ package calcwkr
 
 import (
 	"context"
+	"net/http"
 	"time"
 
+	"github.com/avast/retry-go"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 
@@ -33,16 +36,24 @@ type Worker struct {
 	// timeout describes the timeout for the worker
 	timeout time.Duration
 
+	// heartbeatURL allows the worker to ping a specified URL on succeed, to ensure worker is alive
+	heartbeatURL string
+
 	WorkerDeps
 }
 
 func Start(conf *config.Config, deps WorkerDeps) {
 	if conf.WorkerEnabled {
+		if conf.WorkerHeartbeatURL == "" {
+			log.Info().
+				Msg("No heartbeat URL found. The worker will NOT send a heartbeat when it is finished.")
+		}
 		(&Worker{
-			sep:        conf.WorkerSeparation,
-			interval:   conf.WorkerInterval,
-			timeout:    conf.WorkerTimeout,
-			WorkerDeps: deps,
+			sep:          conf.WorkerSeparation,
+			interval:     conf.WorkerInterval,
+			timeout:      conf.WorkerTimeout,
+			heartbeatURL: conf.WorkerHeartbeatURL,
+			WorkerDeps:   deps,
 		}).do(conf.MatrixWorkerSourceCategories)
 	} else {
 		log.Info().Msg("worker is disabled due to configuration")
@@ -122,9 +133,39 @@ func (w *Worker) do(sourceCategories []string) {
 				}
 
 				log.Info().Int("count", w.count).Msg("worker batch finished")
+
+				go func() {
+					w.NotifySucceeded()
+				}()
 			}()
 		}
 	}()
+}
+
+func (w *Worker) NotifySucceeded() {
+	if w.heartbeatURL == "" {
+		// we simply ignore if there's no heartbeat URL
+		return
+	}
+
+	c := (&http.Client{
+		Timeout: time.Second * 5,
+	})
+	err := retry.Do(func() error {
+		r, err := c.Get(w.heartbeatURL)
+		if err != nil {
+			return err
+		}
+		if r.StatusCode < 200 || r.StatusCode >= 300 {
+			return errors.Errorf("succeeded notification: invalid status code: %d", r.StatusCode)
+		}
+		return nil
+	}, retry.Attempts(5))
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("worker succeeded notification eventually failed")
+	}
 }
 
 func (w *Worker) Count() int {
