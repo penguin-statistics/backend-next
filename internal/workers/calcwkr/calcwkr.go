@@ -135,14 +135,14 @@ func (w *Worker) do(sourceCategories []string) {
 				log.Info().Int("count", w.count).Msg("worker batch finished")
 
 				go func() {
-					w.NotifySucceeded()
+					w.heartbeat()
 				}()
 			}()
 		}
 	}()
 }
 
-func (w *Worker) NotifySucceeded() {
+func (w *Worker) heartbeat() {
 	if w.heartbeatURL == "" {
 		// we simply ignore if there's no heartbeat URL
 		return
