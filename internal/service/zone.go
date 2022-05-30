@@ -22,7 +22,7 @@ func NewZone(zoneRepo *repo.Zone) *Zone {
 	}
 }
 
-// Cache: (singular) zones, 24hrs
+// Cache: (singular) zones, 1 hr
 func (s *Zone) GetZones(ctx context.Context) ([]*model.Zone, error) {
 	var zones []*model.Zone
 	err := cache.Zones.Get(&zones)
@@ -42,7 +42,7 @@ func (s *Zone) GetZoneById(ctx context.Context, id int) (*model.Zone, error) {
 	return s.ZoneRepo.GetZoneById(ctx, id)
 }
 
-// Cache: zone#arkZoneId:{arkZoneId}, 24hrs
+// Cache: zone#arkZoneId:{arkZoneId}, 1 hr
 func (s *Zone) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model.Zone, error) {
 	var zone model.Zone
 	err := cache.ZoneByArkID.Get(arkZoneId, &zone)
@@ -58,7 +58,7 @@ func (s *Zone) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model.Zon
 	return dbZone, nil
 }
 
-// Cache: (singular) shimZones, 24hrs; records last modified time
+// Cache: (singular) shimZones, 1 hr; records last modified time
 func (s *Zone) GetShimZones(ctx context.Context) ([]*modelv2.Zone, error) {
 	var zones []*modelv2.Zone
 	err := cache.ShimZones.Get(&zones)
@@ -78,7 +78,7 @@ func (s *Zone) GetShimZones(ctx context.Context) ([]*modelv2.Zone, error) {
 	return zones, nil
 }
 
-// Cache: shimZone#arkZoneId:{arkZoneId}, 24hrs
+// Cache: shimZone#arkZoneId:{arkZoneId}, 1 hr
 func (s *Zone) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*modelv2.Zone, error) {
 	var zone modelv2.Zone
 	err := cache.ShimZoneByArkID.Get(arkZoneId, &zone)

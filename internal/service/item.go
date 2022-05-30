@@ -28,7 +28,7 @@ func NewItem(itemRepo *repo.Item) *Item {
 	}
 }
 
-// Cache: items, 24hrs
+// Cache: items, 1 hr
 func (s *Item) GetItems(ctx context.Context) ([]*model.Item, error) {
 	var items []*model.Item
 	err := cache.Items.Get(&items)
@@ -56,7 +56,7 @@ func (s *Item) GetItemById(ctx context.Context, itemId int) (*model.Item, error)
 	return item, nil
 }
 
-// Cache: item#arkItemId:{arkItemId}, 24hrs
+// Cache: item#arkItemId:{arkItemId}, 1 hr
 func (s *Item) GetItemByArkId(ctx context.Context, arkItemId string) (*model.Item, error) {
 	var item model.Item
 	err := cache.ItemByArkID.Get(arkItemId, &item)
@@ -76,7 +76,7 @@ func (s *Item) SearchItemByName(ctx context.Context, name string) (*model.Item, 
 	return s.ItemRepo.SearchItemByName(ctx, name)
 }
 
-// Cache: (singular) shimItems, 24hrs; records last modified time
+// Cache: (singular) shimItems, 1 hr; records last modified time
 func (s *Item) GetShimItems(ctx context.Context) ([]*modelv2.Item, error) {
 	var items []*modelv2.Item
 	err := cache.ShimItems.Get(&items)
@@ -96,7 +96,7 @@ func (s *Item) GetShimItems(ctx context.Context) ([]*modelv2.Item, error) {
 	return items, nil
 }
 
-// Cache: shimItem#arkItemId:{arkItemId}, 24hrs
+// Cache: shimItem#arkItemId:{arkItemId}, 1 hr
 func (s *Item) GetShimItemByArkId(ctx context.Context, arkItemId string) (*modelv2.Item, error) {
 	var item modelv2.Item
 	err := cache.ShimItemByArkID.Get(arkItemId, &item)
@@ -113,7 +113,7 @@ func (s *Item) GetShimItemByArkId(ctx context.Context, arkItemId string) (*model
 	return dbItem, nil
 }
 
-// Cache: (singular) itemsMapById, 24hrs
+// Cache: (singular) itemsMapById, 1 hr
 func (s *Item) GetItemsMapById(ctx context.Context) (map[int]*model.Item, error) {
 	var itemsMapById map[int]*model.Item
 	err := cache.ItemsMapById.MutexGetSet(&itemsMapById, func() (map[int]*model.Item, error) {
@@ -133,7 +133,7 @@ func (s *Item) GetItemsMapById(ctx context.Context) (map[int]*model.Item, error)
 	return itemsMapById, nil
 }
 
-// Cache: (singular) itemsMapByArkId, 24hrs
+// Cache: (singular) itemsMapByArkId, 1 hr
 func (s *Item) GetItemsMapByArkId(ctx context.Context) (map[string]*model.Item, error) {
 	var itemsMapByArkId map[string]*model.Item
 	err := cache.ItemsMapByArkID.MutexGetSet(&itemsMapByArkId, func() (map[string]*model.Item, error) {

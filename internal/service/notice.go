@@ -19,7 +19,7 @@ func NewNotice(noticeRepo *repo.Notice) *Notice {
 	}
 }
 
-// Cache: (singular) notices, 24hrs; records last modified time
+// Cache: (singular) notices, 1 hr; records last modified time
 func (s *Notice) GetNotices(ctx context.Context) ([]*model.Notice, error) {
 	var noticesFromCache []*model.Notice
 	err := cache.Notices.Get(&noticesFromCache)
