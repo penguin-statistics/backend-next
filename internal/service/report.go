@@ -176,6 +176,8 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 		return "", err
 	}
 
+	s.pipelineMaaAct18d3TemporaryMitigation(ctx, req)
+
 	singleReport := &types.ReportTaskSingleReport{
 		FragmentStageID: req.FragmentStageID,
 		Drops:           drops,
@@ -189,8 +191,6 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 	if err != nil {
 		return "", err
 	}
-
-	s.pipelineMaaAct18d3TemporaryMitigation(ctx, req)
 
 	// construct ReportContext
 	reportTask := &types.ReportTask{
