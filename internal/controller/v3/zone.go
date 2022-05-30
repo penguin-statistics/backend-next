@@ -1,4 +1,4 @@
-package controller
+package v3
 
 import (
 	"github.com/gofiber/fiber/v2"
@@ -14,7 +14,7 @@ type ZoneController struct {
 	ZoneService *service.Zone
 }
 
-func RegisterZoneController(v3 *svr.V3, c ZoneController) {
+func RegisterZone(v3 *svr.V3, c ZoneController) {
 	v3.Get("/zones", c.GetZones)
 	v3.Get("/zones/:zoneId", c.GetZoneById)
 }

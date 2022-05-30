@@ -1,4 +1,4 @@
-package controller
+package v3
 
 import (
 	"github.com/gofiber/fiber/v2"
@@ -8,7 +8,7 @@ import (
 
 type LiveController struct{}
 
-func RegisterLiveController(v3 *svr.V3) {
+func RegisterLive(v3 *svr.V3) {
 	c := &LiveController{}
 
 	v3.Get("/live", c.Live())

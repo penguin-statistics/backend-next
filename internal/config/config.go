@@ -63,6 +63,8 @@ type Config struct {
 	// WorkerTimeout describes the timeout for a single batch to run
 	WorkerTimeout time.Duration `required:"true" split_words:"true" default:"10m"`
 
+	WorkerHeartbeatURL string `split_words:"true"`
+
 	// WorkerEnabled is a flag to indicate whether to enable the worker.
 	WorkerEnabled bool `split_words:"true"`
 
