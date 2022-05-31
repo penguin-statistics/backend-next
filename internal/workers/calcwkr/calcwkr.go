@@ -82,40 +82,40 @@ func (w *Worker) do(sourceCategories []string) {
 				errChan := make(chan error)
 				go func() {
 					for _, server := range constant.Servers {
-						log.Info().Str("server", server).Str("service", "DropMatrixService").Msg("worker microtask started calculating")
+						log.Info().Str("server", server).Str("component", "DropMatrixService").Msg("worker microtask started calculating")
 						if err := w.DropMatrixService.RefreshAllDropMatrixElements(sessCtx, server, sourceCategories); err != nil {
-							log.Error().Err(err).Str("server", server).Str("service", "DropMatrixService").Msg("worker microtask failed")
+							log.Error().Err(err).Str("server", server).Str("component", "DropMatrixService").Msg("worker microtask failed")
 							errChan <- err
 							return
 						}
-						log.Info().Str("server", server).Str("service", "DropMatrixService").Msg("worker microtask finished")
+						log.Info().Str("server", server).Str("component", "DropMatrixService").Msg("worker microtask finished")
 						time.Sleep(w.sep)
 
-						log.Info().Str("server", server).Str("service", "PatternMatrixService").Msg("worker microtask started calculating")
+						log.Info().Str("server", server).Str("component", "PatternMatrixService").Msg("worker microtask started calculating")
 						if err := w.PatternMatrixService.RefreshAllPatternMatrixElements(sessCtx, server, sourceCategories); err != nil {
-							log.Error().Err(err).Str("server", server).Str("service", "PatternMatrixService").Msg("worker microtask failed")
+							log.Error().Err(err).Str("server", server).Str("component", "PatternMatrixService").Msg("worker microtask failed")
 							errChan <- err
 							return
 						}
-						log.Info().Str("server", server).Str("service", "PatternMatrixService").Msg("worker microtask finished")
+						log.Info().Str("server", server).Str("component", "PatternMatrixService").Msg("worker microtask finished")
 						time.Sleep(w.sep)
 
-						log.Info().Str("server", server).Str("service", "TrendService").Msg("worker microtask started calculating")
+						log.Info().Str("server", server).Str("component", "TrendService").Msg("worker microtask started calculating")
 						if err := w.TrendService.RefreshTrendElements(sessCtx, server, sourceCategories); err != nil {
-							log.Error().Err(err).Str("server", server).Str("service", "TrendService").Msg("worker microtask failed")
+							log.Error().Err(err).Str("server", server).Str("component", "TrendService").Msg("worker microtask failed")
 							errChan <- err
 							return
 						}
-						log.Info().Str("server", server).Str("service", "TrendService").Msg("worker microtask finished")
+						log.Info().Str("server", server).Str("component", "TrendService").Msg("worker microtask finished")
 						time.Sleep(w.sep)
 
-						log.Info().Str("server", server).Str("service", "SiteStatsService").Msg("worker microtask started calculating")
+						log.Info().Str("server", server).Str("component", "SiteStatsService").Msg("worker microtask started calculating")
 						if _, err := w.SiteStatsService.RefreshShimSiteStats(sessCtx, server); err != nil {
-							log.Error().Err(err).Str("server", server).Str("service", "SiteStatsService").Msg("worker microtask failed")
+							log.Error().Err(err).Str("server", server).Str("component", "SiteStatsService").Msg("worker microtask failed")
 							errChan <- err
 							return
 						}
-						log.Info().Str("server", server).Str("service", "SiteStatsService").Msg("worker microtask finished")
+						log.Info().Str("server", server).Str("component", "SiteStatsService").Msg("worker microtask finished")
 						time.Sleep(w.sep)
 					}
 					errChan <- nil
