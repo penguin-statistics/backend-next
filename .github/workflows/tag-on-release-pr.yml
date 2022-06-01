@@ -33,7 +33,9 @@ jobs:
           github-token: ${{ secrets.PAT_FOR_RELEASE_TAGGER }}
           script: |
             const { repo, owner } = context.repo;
-            const sha1 = context.payload.pull_request.base.sha;
+            // get the last commit on the main branch using API
+            const lastCommit = await context.github.repos.getCommit({ owner, repo, ref: 'main' });
+            const sha1 = lastCommit.data.sha;
             const title = context.payload.pull_request.title;
             // tag is the semver version of the PR title
             const tag = title.substring(title.indexOf('Release') + 'Release'.length).trim();
