@@ -33,11 +33,13 @@ jobs:
           github-token: ${{ secrets.PAT_FOR_RELEASE_TAGGER }}
           script: |
             const { repo, owner } = context.repo;
-            const sha1 = context.payload.pull_request.head.sha;
+            const sha1 = context.payload.pull_request.base.sha;
             const title = context.payload.pull_request.title;
+            // tag is the semver version of the PR title
             const tag = title.substring(title.indexOf('Release') + 'Release'.length).trim();
             const tagger = context.actor;
-            const result = await github.rest.git.createRef({
+            // tag old ones
+            await github.rest.git.createRef({
               owner,
               repo,
               ref: `refs/tags/${tag}`,

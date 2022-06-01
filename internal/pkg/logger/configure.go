@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
+	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
 )
@@ -17,11 +18,6 @@ func Configure(conf *config.Config) {
 
 	_ = os.Mkdir("logs", os.ModePerm)
 
-	logFile, err := os.OpenFile("logs/app.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o644)
-	if err != nil {
-		log.Panic().Err(err).Msg("failed to open log file")
-	}
-
 	var level zerolog.Level
 	if conf.DevMode {
 		level = zerolog.TraceLevel
@@ -30,7 +26,12 @@ func Configure(conf *config.Config) {
 	}
 
 	writer := zerolog.MultiLevelWriter(
-		logFile,
+		&lumberjack.Logger{
+			Filename: "logs/app.log",
+			MaxSize:  100, // megabytes
+			MaxAge:   90,  // days
+			Compress: true,
+		},
 		zerolog.ConsoleWriter{
 			Out:        os.Stdout,
 			TimeFormat: time.RFC3339Nano,
