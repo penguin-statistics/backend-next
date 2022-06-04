@@ -81,8 +81,6 @@ func (s *Report) pipelineAccount(ctx *fiber.Ctx) (accountId int, err error) {
 }
 
 func (s *Report) pipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []types.ArkDrop) ([]*types.Drop, error) {
-	drops = reportutil.MergeDropsByDropTypeAndItemID(drops)
-
 	convertedDrops := make([]*types.Drop, 0, len(drops))
 	for _, drop := range drops {
 		item, err := s.ItemService.GetItemByArkId(ctx, drop.ItemID)
@@ -102,6 +100,8 @@ func (s *Report) pipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []
 			Quantity: drop.Quantity,
 		})
 	}
+
+	drops = reportutil.MergeDropsByDropTypeAndItemID(drops)
 
 	return convertedDrops, nil
 }

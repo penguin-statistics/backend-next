@@ -25,10 +25,12 @@ func NewAccount(db *bun.DB) *Account {
 	return &Account{db: db}
 }
 
-// PenguinID is an 8 number string and padded with 0
+// Before v3.3.7, approximately released at 2022-06-05 01:00, PenguinIDs are generated as 8 digits number string.
+// After v3.3.7, newly generated PenguinIDs will be a 9 digits number string.
+// PenguinID can start with 0, with generated number padded to the corresponding length with 0.
 func generateRandomPenguinId() string {
 	rand.Seed(time.Now().UnixNano())
-	return fmt.Sprintf("%08d", rand.Intn(1e8))
+	return fmt.Sprintf("%09d", rand.Intn(1e9))
 }
 
 func (c *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.Account, error) {

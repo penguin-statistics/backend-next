@@ -17,6 +17,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
 	"github.com/penguin-statistics/backend-next/internal/service"
+	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
 )
 
 type WorkerDeps struct {
@@ -162,6 +163,8 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 
 	// calculate drop pattern hash for each report
 	for idx, report := range reportTask.Reports {
+		report.Drops = reportutil.MergeDropsByItemID(report.Drops)
+
 		dropPattern, created, err := w.ReportServices.DropPatternRepo.GetOrCreateDropPatternFromDrops(ctx, tx, report.Drops)
 		if err != nil {
 			return errors.Wrap(err, "failed to calculate drop pattern hash")
