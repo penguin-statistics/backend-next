@@ -28,7 +28,7 @@ func injectLogger() func(ctx *fiber.Ctx) error {
 func requestLogger() func(ctx *fiber.Ctx) error {
 	return flog.AccessHandler(func(ctx *fiber.Ctx, duration time.Duration) {
 		flog.InfoFrom(ctx).
-			Str("component", "httpreq").
+			Str("service", "backend:httpreq").
 			Bytes("userAgent", ctx.Context().UserAgent()).
 			Int("status", ctx.Response().StatusCode()).
 			Int("size", len(ctx.Response().Body())).

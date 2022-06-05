@@ -7,6 +7,7 @@ import (
 
 	"github.com/avast/retry-go"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 
@@ -61,78 +62,101 @@ func Start(conf *config.Config, deps WorkerDeps) {
 }
 
 func (w *Worker) do(sourceCategories []string) {
-	ctx := context.Background()
+	logger := log.With().Str("service", "worker:calculator").Logger()
+	parentCtx := logger.WithContext(context.Background())
 
 	go func() {
 		time.Sleep(time.Second * 3)
 
 		for {
-			log.Info().
-				Int("count", w.count).
-				Msg("worker batch started")
+			ctx, cancel := context.WithTimeout(parentCtx, w.timeout)
+			log.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
+				return c.Int("count", w.count)
+			})
+			log.Ctx(ctx).Info().Msg("worker batch started")
 
 			func() {
-				sessCtx, sessCancel := context.WithTimeout(ctx, w.timeout)
 				defer func() {
 					w.count++
 					time.Sleep(w.interval)
-					sessCancel()
+					cancel()
 				}()
 
 				errChan := make(chan error)
 				go func() {
 					for _, server := range constant.Servers {
-						log.Info().Str("server", server).Str("component", "DropMatrixService").Msg("worker microtask started calculating")
-						if err := w.DropMatrixService.RefreshAllDropMatrixElements(sessCtx, server, sourceCategories); err != nil {
-							log.Error().Err(err).Str("server", server).Str("component", "DropMatrixService").Msg("worker microtask failed")
+						// DropMatrixService
+						log.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
+							return c.Str("server", server).Str("service", "worker:calculator:dropMatrix")
+						})
+
+						log.Ctx(ctx).Info().Msg("worker microtask started calculating")
+						if err := w.DropMatrixService.RefreshAllDropMatrixElements(ctx, server, sourceCategories); err != nil {
+							log.Ctx(ctx).Error().Err(err).Msg("worker microtask failed")
 							errChan <- err
 							return
 						}
-						log.Info().Str("server", server).Str("component", "DropMatrixService").Msg("worker microtask finished")
+						log.Ctx(ctx).Info().Msg("worker microtask finished")
 						time.Sleep(w.sep)
 
-						log.Info().Str("server", server).Str("component", "PatternMatrixService").Msg("worker microtask started calculating")
-						if err := w.PatternMatrixService.RefreshAllPatternMatrixElements(sessCtx, server, sourceCategories); err != nil {
-							log.Error().Err(err).Str("server", server).Str("component", "PatternMatrixService").Msg("worker microtask failed")
+						// PatternMatrixService
+						log.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
+							return c.Str("service", "worker:calculator:patternMatrix")
+						})
+						log.Ctx(ctx).Info().Msg("worker microtask started calculating")
+						if err := w.PatternMatrixService.RefreshAllPatternMatrixElements(ctx, server, sourceCategories); err != nil {
+							log.Ctx(ctx).Error().Err(err).Msg("worker microtask failed")
 							errChan <- err
 							return
 						}
-						log.Info().Str("server", server).Str("component", "PatternMatrixService").Msg("worker microtask finished")
+						log.Ctx(ctx).Info().Msg("worker microtask finished")
 						time.Sleep(w.sep)
 
-						log.Info().Str("server", server).Str("component", "TrendService").Msg("worker microtask started calculating")
-						if err := w.TrendService.RefreshTrendElements(sessCtx, server, sourceCategories); err != nil {
-							log.Error().Err(err).Str("server", server).Str("component", "TrendService").Msg("worker microtask failed")
+						// TrendService
+						log.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
+							return c.Str("service", "worker:calculator:trend")
+						})
+						log.Ctx(ctx).Info().Msg("worker microtask started calculating")
+						if err := w.TrendService.RefreshTrendElements(ctx, server, sourceCategories); err != nil {
+							log.Ctx(ctx).Error().Err(err).Msg("worker microtask failed")
 							errChan <- err
 							return
 						}
-						log.Info().Str("server", server).Str("component", "TrendService").Msg("worker microtask finished")
+						log.Ctx(ctx).Info().Msg("worker microtask finished")
 						time.Sleep(w.sep)
 
-						log.Info().Str("server", server).Str("component", "SiteStatsService").Msg("worker microtask started calculating")
-						if _, err := w.SiteStatsService.RefreshShimSiteStats(sessCtx, server); err != nil {
-							log.Error().Err(err).Str("server", server).Str("component", "SiteStatsService").Msg("worker microtask failed")
+						// SiteStatsService
+						log.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
+							return c.Str("service", "worker:calculator:siteStats")
+						})
+						log.Ctx(ctx).Info().Msg("worker microtask started calculating")
+						if _, err := w.SiteStatsService.RefreshShimSiteStats(ctx, server); err != nil {
+							log.Ctx(ctx).Error().Err(err).Msg("worker microtask failed")
 							errChan <- err
 							return
 						}
-						log.Info().Str("server", server).Str("component", "SiteStatsService").Msg("worker microtask finished")
+						log.Ctx(ctx).Info().Msg("worker microtask finished")
 						time.Sleep(w.sep)
 					}
 					errChan <- nil
 				}()
 
 				select {
-				case <-sessCtx.Done():
-					log.Error().Err(sessCtx.Err()).Int("count", w.count).Msg("worker timeout reached")
+				case <-ctx.Done():
+					log.Ctx(ctx).Error().Err(ctx.Err()).Msg("worker timeout reached")
 					return
 				case err := <-errChan:
 					if err != nil {
-						log.Error().Err(err).Int("count", w.count).Msg("worker unexpected error occurred while running batch")
+						log.Ctx(ctx).Error().Err(err).Msg("worker unexpected error occurred while running batch")
 						return
 					}
 				}
 
-				log.Info().Int("count", w.count).Msg("worker batch finished")
+				log.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
+					return c.Str("service", "worker:calculator")
+				})
+
+				log.Ctx(ctx).Info().Msg("worker batch finished")
 
 				go func() {
 					w.heartbeat()

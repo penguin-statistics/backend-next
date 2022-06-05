@@ -136,11 +136,6 @@ func Create(conf *config.Config) *fiber.App {
 		// 	Max:        30,
 		// 	Expiration: time.Minute,
 		// }))
-		// app.Use(logger.New(logger.Config{
-		// 	Format:     "${pid} ${locals:requestid} ${status} ${latency}\t${ip}\t- ${method} ${url}\n",
-		// 	TimeFormat: time.RFC3339,
-		// 	Output:     log.Logger.With().Str("component", "httpreq").Logger(),
-		// }))
 
 		// Cache requests with itemFilter and stageFilter as there appears to be an unknown source requesting
 		// with such behaviors very eagerly, causing a relatively high load on the database.
