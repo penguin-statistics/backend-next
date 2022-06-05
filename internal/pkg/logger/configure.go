@@ -41,6 +41,7 @@ func Configure(conf *config.Config) {
 	log.Logger = zerolog.New(writer).
 		With().
 		Timestamp().
+		Caller().
 		Logger().
 		Level(level)
 }

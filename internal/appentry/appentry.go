@@ -11,9 +11,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/infra"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/crypto"
-	"github.com/penguin-statistics/backend-next/internal/pkg/flake"
 	"github.com/penguin-statistics/backend-next/internal/pkg/logger"
-	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/server/httpserver"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
@@ -27,7 +25,6 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 	opts := []fx.Option{
 		// Misc
 		fx.Provide(config.Parse),
-		fx.Provide(flake.New),
 		fx.Provide(httpserver.Create),
 		fx.Provide(svr.CreateEndpointGroups),
 		fx.Provide(crypto.NewCrypto),
@@ -50,7 +47,6 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Invoke(logger.Configure),
 		fx.Invoke(infra.SentryInit),
 		fx.Invoke(cache.Initialize),
-		fx.Invoke(observability.Launch),
 
 		// Controllers (v2)
 		controllerv2.Module(),

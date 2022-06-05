@@ -1,24 +1,20 @@
 package httpserver
 
 import (
-	"encoding/hex"
 	"fmt"
-	"os"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/ansrivas/fiberprometheus/v2"
-	"github.com/bwmarrin/snowflake"
 	"github.com/gofiber/contrib/fibersentry"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cache"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/gofiber/fiber/v2/utils"
 	"github.com/gofiber/helmet/v2"
 	"github.com/penguin-statistics/fiberotel"
@@ -31,13 +27,15 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
 	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
 	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
-func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
+var registerPromOnce sync.Once
+
+func Create(conf *config.Config) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:      "Penguin Stats Backend v3",
 		ServerHeader: fmt.Sprintf("Penguin/%s", bininfo.Version),
@@ -71,16 +69,26 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 		AllowCredentials: true,
 	}))
 	// requestid is used by report service to identify requests and generate taskId there afterwards
-	app.Use(requestid.New(
-		requestid.Config{
-			Header: "X-Penguin-Request-ID",
-			Generator: func() string {
-				id := flake.Generate().IntBytes()
-				return hex.EncodeToString(id[:])
-			},
-			ContextKey: constant.ContextKeyRequestID,
-		},
-	))
+	// app.Use(func(c *fiber.Ctx) error {
+	// 	i := xid.New()
+	// 	c.Locals(constant.ContextKeyRequestID, i.String())
+	// 	c.Set("X-Penguin-Request-ID", i.String())
+	// 	return c.Next()
+	// })
+	middlewares.Logger(app)
+	// the logger middleware injects RequestID into the context,
+	// and we need an extra middleware to extract it and repopulate it into ctx.Locals
+	app.Use(middlewares.RequestID())
+
+	app.Use(func(c *fiber.Ctx) error {
+		// Use custom error handler to return customized error responses
+		err := c.Next()
+		if e, ok := err.(*pgerr.PenguinError); ok {
+			return HandleCustomError(c, e)
+		}
+		return err
+	})
+
 	app.Use(helmet.New(helmet.Config{
 		HSTSMaxAge:         31356000,
 		HSTSPreloadEnabled: true,
@@ -96,8 +104,10 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 			log.Error().Msgf("panic: %v\n%s\n", e, buf)
 		},
 	}))
-	fiberprom := fiberprometheus.New(observability.ServiceName)
-	fiberprom.RegisterAt(app, "/metrics")
+	registerPromOnce.Do(func() {
+		fiberprom := fiberprometheus.New(observability.ServiceName)
+		fiberprom.RegisterAt(app, "/metrics")
+	})
 
 	if conf.TracingEnabled {
 		exporter, err := jaeger.New(jaeger.WithCollectorEndpoint())
@@ -123,12 +133,6 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 	if conf.DevMode {
 		log.Info().Msg("Running in DEV mode")
 		app.Use(pprof.New())
-
-		app.Use(logger.New(logger.Config{
-			Format:     "${pid} ${locals:requestid} ${status} ${latency}\t${ip}\t- ${method} ${url}\n",
-			TimeFormat: time.RFC3339,
-			Output:     os.Stdout,
-		}))
 	}
 
 	if !conf.DevMode {
@@ -137,11 +141,6 @@ func Create(conf *config.Config, flake *snowflake.Node) *fiber.App {
 		// 	Max:        30,
 		// 	Expiration: time.Minute,
 		// }))
-		app.Use(logger.New(logger.Config{
-			Format:     "${pid} ${locals:requestid} ${status} ${latency}\t${ip}\t- ${method} ${url}\n",
-			TimeFormat: time.RFC3339,
-			Output:     log.Logger.With().Str("component", "httpreq").Logger(),
-		}))
 
 		// Cache requests with itemFilter and stageFilter as there appears to be an unknown source requesting
 		// with such behaviors very eagerly, causing a relatively high load on the database.
