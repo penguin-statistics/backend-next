@@ -6,7 +6,7 @@ require (
 	github.com/ahmetb/go-linq/v3 v3.2.0
 	github.com/ansrivas/fiberprometheus/v2 v2.2.0
 	github.com/antonmedv/expr v1.9.0
-	github.com/bwmarrin/snowflake v0.3.0
+	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/uniuri v0.0.0-20200228104902-7aecb25e1fe5
 	github.com/getsentry/sentry-go v0.12.0
@@ -26,6 +26,7 @@ require (
 	github.com/penguin-statistics/fiberotel v0.8.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.2
+	github.com/rs/xid v1.3.0
 	github.com/rs/zerolog v1.26.1
 	github.com/samber/lo v1.11.0
 	github.com/stretchr/testify v1.7.0
@@ -47,10 +48,10 @@ require (
 	golang.org/x/text v0.3.7
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/guregu/null.v3 v3.5.0
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
 require (
-	github.com/avast/retry-go v3.0.0+incompatible // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/gofiber/adaptor/v2 v2.1.23 // indirect
 	github.com/gofiber/utils v0.1.2 // indirect
@@ -59,9 +60,7 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.34.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
-	github.com/rs/xid v1.3.0 // indirect
 	github.com/swaggo/files v0.0.0-20210815190702-a29dd2bc99b2 // indirect
-	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 )
 
 require (
