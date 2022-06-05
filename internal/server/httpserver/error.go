@@ -16,7 +16,7 @@ import (
 
 var sentryHubKey = "sentry-hub"
 
-func handleCustomError(ctx *fiber.Ctx, e *pgerr.PenguinError) error {
+func HandleCustomError(ctx *fiber.Ctx, e *pgerr.PenguinError) error {
 	log.Warn().
 		Err(e).
 		Str("method", ctx.Method()).
@@ -60,11 +60,6 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 		}
 	}()
 
-	// Use custom error handler to return customized error responses
-	if e, ok := err.(*pgerr.PenguinError); ok {
-		return handleCustomError(ctx, e)
-	}
-
 	// Return default error handler
 	// Default 500 statuscode
 	re := pgerr.ErrInternalErrorImmutable
@@ -85,7 +80,7 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 
 	reportSentry(ctx, err, re.StatusCode)
 
-	return handleCustomError(ctx, &re)
+	return HandleCustomError(ctx, &re)
 }
 
 func reportSentry(ctx *fiber.Ctx, err error, status int) {
