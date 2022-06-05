@@ -11,11 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
+	"github.com/penguin-statistics/backend-next/internal/pkg/testentry"
 )
 
 func TestV2Result(t *testing.T) {
 	var app *fiber.App
-	populate(t, &app)
+	testentry.Populate(t, &app)
 
 	t.Run("GetsPrivateAPIs", func(t *testing.T) {
 		sourcedPaths := []string{
@@ -34,10 +35,8 @@ func TestV2Result(t *testing.T) {
 					req = requestChanger(req)
 
 					resp, err := app.Test(req, 6000)
-					if err != nil {
-						t.Error(err)
-					}
 
+					assert.NoError(t, err, "expect success response")
 					assert.Equal(t, 200, resp.StatusCode, "expect success response")
 				})
 			}
@@ -70,18 +69,20 @@ func TestV2Result(t *testing.T) {
 
 		testServer := func(path string, isPersonal bool, requestChanger func(*http.Request) *http.Request) {
 			for _, server := range constant.Servers {
-				replacedPath := strings.Replace(path, ":server", server, 1)
-				replacedPath = strings.Replace(replacedPath, ":isPersonal", strconv.FormatBool(isPersonal), 1)
+				t.Run("GetsResultFor"+strings.Title(server)+"WithIsPersonal"+strings.Title(strconv.FormatBool(isPersonal)), func(t *testing.T) {
+					t.Parallel()
 
-				req := httptest.NewRequest("GET", replacedPath, nil)
-				req = requestChanger(req)
+					replacedPath := strings.Replace(path, ":server", server, 1)
+					replacedPath = strings.Replace(replacedPath, ":isPersonal", strconv.FormatBool(isPersonal), 1)
 
-				resp, err := app.Test(req, 5000)
-				if err != nil {
-					t.Error(err)
-				}
+					req := httptest.NewRequest("GET", replacedPath, nil)
+					req = requestChanger(req)
 
-				assert.Equal(t, 200, resp.StatusCode, "expect success response")
+					resp, err := app.Test(req, 5000)
+
+					assert.NoError(t, err, "expect success response")
+					assert.Equal(t, 200, resp.StatusCode, "expect success response")
+				})
 			}
 		}
 

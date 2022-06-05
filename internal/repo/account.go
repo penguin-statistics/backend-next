@@ -96,13 +96,13 @@ func (c *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (
 func (c *Account) IsAccountExistWithId(ctx context.Context, accountId int) bool {
 	var account model.Account
 
-	count, err := c.db.NewSelect().
+	err := c.db.NewSelect().
 		Model(&account).
 		Where("account_id = ?", accountId).
-		Count(ctx)
+		Scan(ctx, &account)
 	if err != nil {
 		return false
 	}
 
-	return count > 0
+	return account.AccountID > 0
 }

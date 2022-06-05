@@ -13,12 +13,13 @@ import (
 	"github.com/vmihailenco/msgpack/v5"
 
 	"github.com/penguin-statistics/backend-next/internal/model"
+	"github.com/penguin-statistics/backend-next/internal/pkg/testentry"
 )
 
 func BenchmarkJsonOrGobOrMsgpackEncoding(b *testing.B) {
 	b.Skip("enable when needed")
 	var db *bun.DB
-	populate(b, &db)
+	testentry.Populate(b, &db)
 	var stage model.Stage
 	err := db.NewSelect().Model(&stage).Scan(context.Background())
 	if err != nil {
@@ -107,7 +108,7 @@ func BenchmarkJsonOrGobOrMsgpackEncoding(b *testing.B) {
 func BenchmarkJsonOrGobOrMsgpackDecoding(b *testing.B) {
 	b.Skip("enable when needed")
 	var db *bun.DB
-	populate(b, &db)
+	testentry.Populate(b, &db)
 	var stage model.Stage
 	err := db.NewSelect().Model(&stage).Scan(context.Background())
 	if err != nil {

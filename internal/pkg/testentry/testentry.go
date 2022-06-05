@@ -1,4 +1,4 @@
-package main
+package testentry
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/appentry"
 )
 
-func populate(t zerolog.TestingLog, targets ...any) {
+func Populate(t zerolog.TestingLog, targets ...any) {
 	// for testing, logger is too annoying. therefore, we use a NopLogger here
 	opts := []fx.Option{fx.NopLogger}
 	opts = append(opts, appentry.ProvideOptions(false)...)
