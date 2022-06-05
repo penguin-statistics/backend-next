@@ -10,7 +10,7 @@ import (
 
 func TestV2Stats(t *testing.T) {
 	var app *fiber.App
-	populate(&app)
+	populate(t, &app)
 
 	t.Run("GetsSiteStats", func(t *testing.T) {
 		resp, err := app.Test(httptest.NewRequest("GET", "/PenguinStats/api/v2/stats", nil), 5000)

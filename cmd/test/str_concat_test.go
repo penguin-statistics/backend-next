@@ -6,6 +6,7 @@ import (
 )
 
 func BenchmarkStrConcat(b *testing.B) {
+	b.Skip("enable when needed")
 	prefix := "item#itemId:"
 	prefixBytes := []byte(prefix)
 	key := "123"

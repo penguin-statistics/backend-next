@@ -16,8 +16,9 @@ import (
 )
 
 func BenchmarkJsonOrGobOrMsgpackEncoding(b *testing.B) {
+	b.Skip("enable when needed")
 	var db *bun.DB
-	populate(&db)
+	populate(b, &db)
 	var stage model.Stage
 	err := db.NewSelect().Model(&stage).Scan(context.Background())
 	if err != nil {
@@ -104,8 +105,9 @@ func BenchmarkJsonOrGobOrMsgpackEncoding(b *testing.B) {
 }
 
 func BenchmarkJsonOrGobOrMsgpackDecoding(b *testing.B) {
+	b.Skip("enable when needed")
 	var db *bun.DB
-	populate(&db)
+	populate(b, &db)
 	var stage model.Stage
 	err := db.NewSelect().Model(&stage).Scan(context.Background())
 	if err != nil {

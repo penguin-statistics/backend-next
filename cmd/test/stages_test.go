@@ -9,8 +9,9 @@ import (
 )
 
 func BenchmarkV2Stages(b *testing.B) {
+	b.Skip("enable when needed")
 	var app *fiber.App
-	populate(&app)
+	populate(b, &app)
 
 	b.Run("GetsV2StagesWithRedisCache", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {

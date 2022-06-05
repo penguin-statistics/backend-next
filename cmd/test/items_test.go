@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/penguin-statistics/backend-next/cmd/test/comparator"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/penguin-statistics/backend-next/cmd/test/comparator"
 )
 
 func TestV2Items(t *testing.T) {
 	var app *fiber.App
-	populate(&app)
+	populate(t, &app)
 
 	t.Run("GetsShimFormatItems", func(t *testing.T) {
 		resp, err := app.Test(httptest.NewRequest("GET", "/PenguinStats/api/v2/items", nil))

@@ -3,6 +3,7 @@ package httpserver
 import (
 	"fmt"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/ansrivas/fiberprometheus/v2"
@@ -31,6 +32,8 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
+
+var registerPromOnce sync.Once
 
 func Create(conf *config.Config) *fiber.App {
 	app := fiber.New(fiber.Config{
@@ -101,8 +104,10 @@ func Create(conf *config.Config) *fiber.App {
 			log.Error().Msgf("panic: %v\n%s\n", e, buf)
 		},
 	}))
-	fiberprom := fiberprometheus.New(observability.ServiceName)
-	fiberprom.RegisterAt(app, "/metrics")
+	registerPromOnce.Do(func() {
+		fiberprom := fiberprometheus.New(observability.ServiceName)
+		fiberprom.RegisterAt(app, "/metrics")
+	})
 
 	if conf.TracingEnabled {
 		exporter, err := jaeger.New(jaeger.WithCollectorEndpoint())

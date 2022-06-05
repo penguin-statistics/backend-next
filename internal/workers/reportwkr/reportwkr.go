@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -181,18 +182,22 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 			return errors.Wrap(err, "failed to get stage")
 		}
 
+		reliability := violations.Reliability(idx)
+
 		dropReport := &model.DropReport{
 			StageID:     stage.StageID,
 			PatternID:   dropPattern.PatternID,
 			Times:       report.Times,
 			CreatedAt:   &taskCreatedAt,
-			Reliability: violations.Reliability(idx),
+			Reliability: reliability,
 			Server:      reportTask.Server,
 			AccountID:   reportTask.AccountID,
 		}
 		if err = w.ReportServices.DropReportRepo.CreateDropReport(ctx, tx, dropReport); err != nil {
 			return errors.Wrap(err, "failed to create drop report")
 		}
+
+		observability.ReportReliability.WithLabelValues(strconv.Itoa(reliability), reportTask.Source).Inc()
 
 		md5 := ""
 		if report.Metadata != nil && report.Metadata.MD5 != "" {

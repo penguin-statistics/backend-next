@@ -15,7 +15,7 @@ import (
 
 func TestV2Result(t *testing.T) {
 	var app *fiber.App
-	populate(&app)
+	populate(t, &app)
 
 	t.Run("GetsPrivateAPIs", func(t *testing.T) {
 		sourcedPaths := []string{
@@ -25,18 +25,21 @@ func TestV2Result(t *testing.T) {
 
 		testSource := func(path, source string, requestChanger func(*http.Request) *http.Request) {
 			for _, server := range constant.Servers {
-				replacedPath := strings.Replace(path, ":server", server, 1)
-				replacedPath = strings.Replace(replacedPath, ":source", source, 1)
+				t.Run("Gets"+strings.Title(source)+"ResultFor"+strings.Title(server), func(t *testing.T) {
+					t.Parallel()
+					replacedPath := strings.Replace(path, ":server", server, 1)
+					replacedPath = strings.Replace(replacedPath, ":source", source, 1)
 
-				req := httptest.NewRequest("GET", replacedPath, nil)
-				req = requestChanger(req)
+					req := httptest.NewRequest("GET", replacedPath, nil)
+					req = requestChanger(req)
 
-				resp, err := app.Test(req, 5000)
-				if err != nil {
-					t.Error(err)
-				}
+					resp, err := app.Test(req, 6000)
+					if err != nil {
+						t.Error(err)
+					}
 
-				assert.Equal(t, 200, resp.StatusCode, "expect success response")
+					assert.Equal(t, 200, resp.StatusCode, "expect success response")
+				})
 			}
 		}
 

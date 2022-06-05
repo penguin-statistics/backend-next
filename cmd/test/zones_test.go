@@ -13,7 +13,7 @@ import (
 
 func TestV2Zones(t *testing.T) {
 	var app *fiber.App
-	populate(&app)
+	populate(t, &app)
 
 	t.Run("GetsShimFormatZones", func(t *testing.T) {
 		resp, err := app.Test(httptest.NewRequest("GET", "/PenguinStats/api/v2/zones", nil))
