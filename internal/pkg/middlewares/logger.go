@@ -13,11 +13,10 @@ func Logger(app *fiber.App) {
 	Chained(
 		app,
 		injectLogger(),
-		flog.RequestIDHandler("request_id", "X-Penguin-Request-ID"),
+		flog.RequestIDHandler("requestId", "X-Penguin-Request-ID"),
 		flog.RemoteAddrHandler("ip"),
 		flog.MethodHandler("method"),
 		flog.URLHandler("url"),
-		flog.UserAgentHandler("user_agent"),
 		requestLogger(),
 	)
 }
@@ -28,8 +27,9 @@ func injectLogger() func(ctx *fiber.Ctx) error {
 
 func requestLogger() func(ctx *fiber.Ctx) error {
 	return flog.AccessHandler(func(ctx *fiber.Ctx, duration time.Duration) {
-		flog.FromFiberCtx(ctx).Info().
+		flog.InfoFrom(ctx).
 			Str("component", "httpreq").
+			Bytes("userAgent", ctx.Context().UserAgent()).
 			Int("status", ctx.Response().StatusCode()).
 			Int("size", len(ctx.Response().Body())).
 			Dur("duration", duration).

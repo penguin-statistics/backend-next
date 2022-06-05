@@ -178,3 +178,32 @@ func AccessHandler(f func(ctx *fiber.Ctx, duration time.Duration)) fiber.Handler
 		return err
 	}
 }
+
+// Logger Level Method Helpers
+func TraceFrom(ctx *fiber.Ctx) *zerolog.Event {
+	return FromFiberCtx(ctx).Trace()
+}
+
+func DebugFrom(ctx *fiber.Ctx) *zerolog.Event {
+	return FromFiberCtx(ctx).Debug()
+}
+
+func InfoFrom(ctx *fiber.Ctx) *zerolog.Event {
+	return FromFiberCtx(ctx).Info()
+}
+
+func WarnFrom(ctx *fiber.Ctx) *zerolog.Event {
+	return FromFiberCtx(ctx).Warn()
+}
+
+func ErrorFrom(ctx *fiber.Ctx) *zerolog.Event {
+	return FromFiberCtx(ctx).Error()
+}
+
+func FatalFrom(ctx *fiber.Ctx) *zerolog.Event {
+	return FromFiberCtx(ctx).Fatal()
+}
+
+func PanicFrom(ctx *fiber.Ctx) *zerolog.Event {
+	return FromFiberCtx(ctx).Panic()
+}
