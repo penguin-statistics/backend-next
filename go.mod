@@ -14,7 +14,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.0
 	github.com/go-playground/validator/v10 v10.10.1
 	github.com/go-redis/redis/v8 v8.11.4
-	github.com/goccy/go-json v0.9.5
+	github.com/goccy/go-json v0.9.7
 	github.com/gofiber/contrib/fibersentry v0.0.0-20220308072908-2bb8d753d425
 	github.com/gofiber/fiber/v2 v2.33.0
 	github.com/gofiber/helmet/v2 v2.2.8
