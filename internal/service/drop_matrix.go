@@ -226,6 +226,15 @@ func (s *DropMatrix) getDropMatrixElements(ctx context.Context, server string, a
 func (s *DropMatrix) calcDropMatrixForTimeRanges(
 	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId null.Int, sourceCategory string,
 ) ([]*model.DropMatrixElement, error) {
+	// For one time range whose end time is FakeEndTimeMilli, we will make separate query to get times, quantity and quantity buckets.
+	// We need to make sure they are queried based on the same set of drop reports. So we will use a unified end time instead of FakeEndTimeMilli.
+	unifiedEndTime := time.Now()
+	for _, timeRange := range timeRanges {
+		if timeRange.EndTime.After(unifiedEndTime) {
+			timeRange.EndTime = &unifiedEndTime
+		}
+	}
+
 	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, itemIdFilter)
 	if err != nil {
 		return nil, err
