@@ -6,7 +6,7 @@ require (
 	github.com/ahmetb/go-linq/v3 v3.2.0
 	github.com/ansrivas/fiberprometheus/v2 v2.2.0
 	github.com/antonmedv/expr v1.9.0
-	github.com/avast/retry-go v3.1.1+incompatible
+	github.com/avast/retry-go/v3 v3.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/uniuri v0.0.0-20200228104902-7aecb25e1fe5
 	github.com/getsentry/sentry-go v0.12.0
