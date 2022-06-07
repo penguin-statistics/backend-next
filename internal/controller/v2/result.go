@@ -15,6 +15,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
+	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
@@ -36,9 +37,9 @@ type Result struct {
 }
 
 func RegisterResult(v2 *svr.V2, c Result) {
-	v2.Get("/result/matrix", c.GetDropMatrix)
-	v2.Get("/result/pattern", c.GetPatternMatrix)
-	v2.Get("/result/trends", c.GetTrends)
+	v2.Get("/result/matrix", middlewares.ValidateServerAsQuery, c.GetDropMatrix)
+	v2.Get("/result/pattern", middlewares.ValidateServerAsQuery, c.GetPatternMatrix)
+	v2.Get("/result/trends", middlewares.ValidateServerAsQuery, c.GetTrends)
 	v2.Post("/result/advanced", limiter.New(limiter.Config{
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{

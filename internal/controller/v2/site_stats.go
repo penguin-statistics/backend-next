@@ -9,6 +9,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
+	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/util/rekuest"
@@ -23,7 +24,7 @@ type SiteStats struct {
 }
 
 func RegisterSiteStats(v2 *svr.V2, c SiteStats) {
-	v2.Get("/stats", c.GetSiteStats)
+	v2.Get("/stats", middlewares.ValidateServerAsQuery, c.GetSiteStats)
 }
 
 // @Summary  Get Site Stats

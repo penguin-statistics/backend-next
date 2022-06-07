@@ -34,8 +34,8 @@ func TestMergeDrops(t *testing.T) {
 				{"c", 2, 1},
 			},
 			[]types.Drop{
-				{"a", 1, 2},
-				{"b", 2, 1},
+				{"_ignored0", 1, 2},
+				{"_ignored1", 2, 1},
 			},
 		},
 		{
@@ -45,8 +45,8 @@ func TestMergeDrops(t *testing.T) {
 				{"c", 2, 1},
 			},
 			[]types.Drop{
-				{"b", 1, 1},
-				{"c", 2, 2},
+				{"_ignored0", 1, 1},
+				{"_ignored1", 2, 2},
 			},
 		},
 	}
