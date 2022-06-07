@@ -20,7 +20,7 @@ jobs:
     if: github.event.pull_request.merged && github.event.pull_request.base.ref == 'main' && startsWith(github.event.pull_request.title, 'Release')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch_depth: 0
           ref: 'main'
