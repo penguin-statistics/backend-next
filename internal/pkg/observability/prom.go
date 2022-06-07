@@ -24,4 +24,8 @@ var (
 		Name: prometheus.BuildFQName(ServiceName, "report", "reliability"),
 		Help: "Reliability distribution of report consumption",
 	}, []string{"reliability", "source_name"})
+	WorkerCalcDuration = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: prometheus.BuildFQName(ServiceName, "worker", "calc_duration_seconds"),
+		Help: "Duration of last worker calculation in seconds",
+	}, []string{"service", "server"})
 )
