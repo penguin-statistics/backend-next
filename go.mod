@@ -16,8 +16,8 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/goccy/go-json v0.9.7
 	github.com/gofiber/contrib/fibersentry v0.0.0-20220524060257-8ccfafc37b12
-	github.com/gofiber/fiber/v2 v2.33.0
-	github.com/gofiber/helmet/v2 v2.2.8
+	github.com/gofiber/fiber/v2 v2.34.0
+	github.com/gofiber/helmet/v2 v2.2.13
 	github.com/gofiber/swagger v0.0.1
 	github.com/joho/godotenv v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -95,7 +95,7 @@ require (
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
 	github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.8 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.36.0
+	github.com/valyala/fasthttp v1.37.0
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/otel/internal/metric v0.27.0 // indirect
