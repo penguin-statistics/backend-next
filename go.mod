@@ -32,7 +32,7 @@ require (
 	github.com/stretchr/testify v1.7.2
 	github.com/swaggo/swag v1.8.2
 	github.com/tidwall/gjson v1.12.0
-	github.com/uptrace/bun v1.0.25
+	github.com/uptrace/bun v1.1.5
 	github.com/uptrace/bun/dialect/pgdialect v1.0.25
 	github.com/uptrace/bun/driver/pgdriver v1.0.25
 	github.com/uptrace/bun/extra/bundebug v1.0.25
