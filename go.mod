@@ -31,7 +31,7 @@ require (
 	github.com/samber/lo v1.21.0
 	github.com/stretchr/testify v1.7.2
 	github.com/swaggo/swag v1.8.2
-	github.com/tidwall/gjson v1.12.0
+	github.com/tidwall/gjson v1.14.1
 	github.com/uptrace/bun v1.1.5
 	github.com/uptrace/bun/dialect/pgdialect v1.1.5
 	github.com/uptrace/bun/driver/pgdriver v1.1.5
@@ -40,8 +40,8 @@ require (
 	github.com/vmihailenco/msgpack/v5 v5.3.5
 	github.com/zeebo/xxh3 v1.0.2
 	go.opentelemetry.io/otel v1.7.0
-	go.opentelemetry.io/otel/exporters/jaeger v1.4.1
-	go.opentelemetry.io/otel/sdk v1.4.1
+	go.opentelemetry.io/otel/exporters/jaeger v1.7.0
+	go.opentelemetry.io/otel/sdk v1.7.0
 	go.uber.org/fx v1.17.1
 	golang.org/x/exp v0.0.0-20220428152302-39d4317da171
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
