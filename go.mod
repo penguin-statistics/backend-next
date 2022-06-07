@@ -15,7 +15,7 @@ require (
 	github.com/go-playground/validator/v10 v10.10.1
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/goccy/go-json v0.9.7
-	github.com/gofiber/contrib/fibersentry v0.0.0-20220308072908-2bb8d753d425
+	github.com/gofiber/contrib/fibersentry v0.0.0-20220524060257-8ccfafc37b12
 	github.com/gofiber/fiber/v2 v2.33.0
 	github.com/gofiber/helmet/v2 v2.2.8
 	github.com/gofiber/swagger v0.0.1
@@ -42,7 +42,7 @@ require (
 	go.opentelemetry.io/otel v1.4.1
 	go.opentelemetry.io/otel/exporters/jaeger v1.4.1
 	go.opentelemetry.io/otel/sdk v1.4.1
-	go.uber.org/fx v1.17.0
+	go.uber.org/fx v1.17.1
 	golang.org/x/exp v0.0.0-20220428152302-39d4317da171
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
 	golang.org/x/text v0.3.7
