@@ -147,7 +147,7 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 		return err
 	}
 
-	elements, err := async.FlatMap(allTimeRanges, 15, func(timeRange *model.TimeRange) ([]*model.DropMatrixElement, error) {
+	elements, err := async.FlatMap(allTimeRanges, 5, func(timeRange *model.TimeRange) ([]*model.DropMatrixElement, error) {
 		timeRanges := []*model.TimeRange{timeRange}
 		currentBatch := make([]*model.DropMatrixElement, 0)
 		for _, sourceCategory := range sourceCategories {
@@ -469,7 +469,7 @@ func (s *DropMatrix) convertDropMatrixElementsToMaxAccumulableDropMatrixQueryRes
 					ItemID:   itemId,
 					Quantity: element.Quantity,
 					Times:    element.Times,
-					StdDev:   util.RoundFloat64(util.CalcStdDevFromQuantityBuckets(element.QuantityBuckets, element.Times), constant.StdDevDigits),
+					StdDev:   util.RoundFloat64(util.CalcStdDevFromQuantityBuckets(element.QuantityBuckets, element.Times, false), constant.StdDevDigits),
 				}
 				if timeRange.StartTime.Before(*startTime) {
 					startTime = timeRange.StartTime
@@ -558,7 +558,7 @@ func (s *DropMatrix) convertDropMatrixElementsToDropMatrixQueryResult(ctx contex
 				ItemID:    dropMatrixElement.ItemID,
 				Quantity:  dropMatrixElement.Quantity,
 				Times:     dropMatrixElement.Times,
-				StdDev:    util.RoundFloat64(util.CalcStdDevFromQuantityBuckets(dropMatrixElement.QuantityBuckets, dropMatrixElement.Times), constant.StdDevDigits),
+				StdDev:    util.RoundFloat64(util.CalcStdDevFromQuantityBuckets(dropMatrixElement.QuantityBuckets, dropMatrixElement.Times, false), constant.StdDevDigits),
 				TimeRange: timeRange,
 			})
 		}
