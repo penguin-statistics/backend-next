@@ -85,58 +85,43 @@ func (w *Worker) do(sourceCategories []string) {
 				errChan := make(chan error)
 				go func() {
 					for _, server := range constant.Servers {
-						// DropMatrixService
-						log.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
-							return c.Str("server", server).Str("service", "worker:calculator:dropMatrix")
-						})
+						var err error
 
-						log.Ctx(ctx).Info().Msg("worker microtask started calculating")
-						if err := w.DropMatrixService.RefreshAllDropMatrixElements(ctx, server, sourceCategories); err != nil {
-							log.Ctx(ctx).Error().Err(err).Msg("worker microtask failed")
+						// DropMatrixService
+						if err = w.microtask(ctx, "dropMatrix", server, func() error {
+							return w.DropMatrixService.RefreshAllDropMatrixElements(ctx, server, sourceCategories)
+						}); err != nil {
 							errChan <- err
 							return
 						}
-						log.Ctx(ctx).Info().Msg("worker microtask finished")
 						time.Sleep(w.sep)
 
 						// PatternMatrixService
-						log.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
-							return c.Str("service", "worker:calculator:patternMatrix")
-						})
-						log.Ctx(ctx).Info().Msg("worker microtask started calculating")
-						if err := w.PatternMatrixService.RefreshAllPatternMatrixElements(ctx, server, sourceCategories); err != nil {
-							log.Ctx(ctx).Error().Err(err).Msg("worker microtask failed")
+						if err = w.microtask(ctx, "patternMatrix", server, func() error {
+							return w.PatternMatrixService.RefreshAllPatternMatrixElements(ctx, server, sourceCategories)
+						}); err != nil {
 							errChan <- err
 							return
 						}
-						log.Ctx(ctx).Info().Msg("worker microtask finished")
 						time.Sleep(w.sep)
 
 						// TrendService
-						log.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
-							return c.Str("service", "worker:calculator:trend")
-						})
-						log.Ctx(ctx).Info().Msg("worker microtask started calculating")
-						if err := w.TrendService.RefreshTrendElements(ctx, server, sourceCategories); err != nil {
-							log.Ctx(ctx).Error().Err(err).Msg("worker microtask failed")
+						if err := w.microtask(ctx, "trend", server, func() error {
+							return w.TrendService.RefreshTrendElements(ctx, server, sourceCategories)
+						}); err != nil {
 							errChan <- err
 							return
 						}
-						log.Ctx(ctx).Info().Msg("worker microtask finished")
 						time.Sleep(w.sep)
 
 						// SiteStatsService
-						log.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
-							return c.Str("service", "worker:calculator:siteStats")
-						})
-						log.Ctx(ctx).Info().Msg("worker microtask started calculating")
-						if _, err := w.SiteStatsService.RefreshShimSiteStats(ctx, server); err != nil {
-							log.Ctx(ctx).Error().Err(err).Msg("worker microtask failed")
+						if err := w.microtask(ctx, "siteStats", server, func() error {
+							_, err := w.SiteStatsService.RefreshShimSiteStats(ctx, server)
+							return err
+						}); err != nil {
 							errChan <- err
 							return
 						}
-						log.Ctx(ctx).Info().Msg("worker microtask finished")
-						time.Sleep(w.sep)
 					}
 					errChan <- nil
 				}()
@@ -164,6 +149,21 @@ func (w *Worker) do(sourceCategories []string) {
 			}()
 		}
 	}()
+}
+
+func (w *Worker) microtask(ctx context.Context, service, server string, f func() error) error {
+	log.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
+		return c.Str("service", "worker:calculator:"+service).Str("server", server)
+	})
+
+	log.Ctx(ctx).Info().Msg("worker microtask started calculating")
+	if err := observeCalcDuration(service, server, f); err != nil {
+		log.Ctx(ctx).Error().Err(err).Msg("worker microtask failed")
+		return err
+	}
+	log.Ctx(ctx).Info().Msg("worker microtask finished")
+
+	return nil
 }
 
 func (w *Worker) heartbeat() {
