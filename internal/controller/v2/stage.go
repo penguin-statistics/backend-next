@@ -9,6 +9,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
+	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
@@ -22,8 +23,8 @@ type Stage struct {
 }
 
 func RegisterStage(v2 *svr.V2, c Stage) {
-	v2.Get("/stages", c.GetStages)
-	v2.Get("/stages/:stageId", c.GetStageByArkId)
+	v2.Get("/stages", middlewares.ValidateServerAsQuery, c.GetStages)
+	v2.Get("/stages/:stageId", middlewares.ValidateServerAsQuery, c.GetStageByArkId)
 }
 
 // @Summary  Get All Stages

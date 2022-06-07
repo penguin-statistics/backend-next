@@ -9,6 +9,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
+	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
@@ -22,8 +23,8 @@ type Item struct {
 }
 
 func RegisterItem(v2 *svr.V2, c Item) {
-	v2.Get("/items", c.GetItems)
-	v2.Get("/items/:itemId", c.GetItemByArkId)
+	v2.Get("/items", middlewares.ValidateServerAsQuery, c.GetItems)
+	v2.Get("/items/:itemId", middlewares.ValidateServerAsQuery, c.GetItemByArkId)
 }
 
 // @Summary  Get All Items

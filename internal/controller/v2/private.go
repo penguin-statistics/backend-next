@@ -30,9 +30,9 @@ type Private struct {
 }
 
 func RegisterPrivate(v2 *svr.V2, c Private) {
-	v2.Get("/_private/result/matrix/:server/:source", middlewares.ValidateServer, c.GetDropMatrix)
-	v2.Get("/_private/result/pattern/:server/:source", middlewares.ValidateServer, c.GetPatternMatrix)
-	v2.Get("/_private/result/trend/:server", middlewares.ValidateServer, c.GetTrends)
+	v2.Get("/_private/result/matrix/:server/:source", middlewares.ValidateServerAsParam, c.GetDropMatrix)
+	v2.Get("/_private/result/pattern/:server/:source", middlewares.ValidateServerAsParam, c.GetPatternMatrix)
+	v2.Get("/_private/result/trend/:server", middlewares.ValidateServerAsParam, c.GetTrends)
 }
 
 // @Summary  Get Drop Matrix

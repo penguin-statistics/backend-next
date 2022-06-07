@@ -10,6 +10,8 @@ const (
 
 	ShimCompatibilityHeaderKey   = "X-Penguin-Compatible"
 	ShimCompatibilityHeaderValue = "frontend-v2@v3.4.0"
+
+	DefaultServer = "CN"
 )
 
 var SiteHosts = []string{

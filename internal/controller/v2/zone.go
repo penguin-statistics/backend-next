@@ -9,6 +9,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
+	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
 )
@@ -22,8 +23,8 @@ type Zone struct {
 }
 
 func RegisterZone(v2 *svr.V2, c Zone) {
-	v2.Get("/zones", c.GetZones)
-	v2.Get("/zones/:zoneId", c.GetZoneByArkId)
+	v2.Get("/zones", middlewares.ValidateServerAsQuery, c.GetZones)
+	v2.Get("/zones/:zoneId", middlewares.ValidateServerAsQuery, c.GetZoneByArkId)
 }
 
 // @Summary  Get All Zones

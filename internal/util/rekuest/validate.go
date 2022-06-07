@@ -148,7 +148,7 @@ func ValidVar(ctx *fiber.Ctx, field any, tag string) error {
 }
 
 type request struct {
-	Server string `validate:"required,alpha,oneof=CN US JP KR"`
+	Server string `validate:"required,oneof=CN US JP KR"`
 }
 
 func ValidServer(ctx *fiber.Ctx, server string) error {
