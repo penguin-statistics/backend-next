@@ -21,7 +21,7 @@ require (
 	github.com/gofiber/swagger v0.0.1
 	github.com/joho/godotenv v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/nats-io/nats.go v1.13.1-0.20220121202836-972a071d373d
+	github.com/nats-io/nats.go v1.16.0
 	github.com/oschwald/geoip2-golang v1.6.1
 	github.com/penguin-statistics/fiberotel v0.8.2
 	github.com/pkg/errors v0.9.1
