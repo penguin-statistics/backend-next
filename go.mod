@@ -42,7 +42,7 @@ require (
 	go.opentelemetry.io/otel v1.4.1
 	go.opentelemetry.io/otel/exporters/jaeger v1.4.1
 	go.opentelemetry.io/otel/sdk v1.4.1
-	go.uber.org/fx v1.17.0
+	go.uber.org/fx v1.17.1
 	golang.org/x/exp v0.0.0-20220428152302-39d4317da171
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
 	golang.org/x/text v0.3.7
