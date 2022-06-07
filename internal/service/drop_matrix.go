@@ -147,7 +147,7 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 		return err
 	}
 
-	elements, err := async.FlatMap(allTimeRanges, 5, func(timeRange *model.TimeRange) ([]*model.DropMatrixElement, error) {
+	elements, err := async.FlatMap(allTimeRanges, 1, func(timeRange *model.TimeRange) ([]*model.DropMatrixElement, error) {
 		timeRanges := []*model.TimeRange{timeRange}
 		currentBatch := make([]*model.DropMatrixElement, 0)
 		for _, sourceCategory := range sourceCategories {
