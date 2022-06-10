@@ -5,7 +5,7 @@ import (
 )
 
 func Module() fx.Option {
-	return fx.Module("controllers.v3", fx.Invoke(
+	return fx.Module("controller.v3", fx.Invoke(
 		RegisterItem,
 		RegisterLive,
 		RegisterStage,

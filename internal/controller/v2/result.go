@@ -55,7 +55,7 @@ func RegisterResult(v2 *svr.V2, c Result) {
 // @Summary   Get Drop Matrix
 // @Tags      Result
 // @Produce   json
-// @Param     server             query     string                         true   "Server; default to CN"  Enums(CN, US, JP, KR)
+// @Param     server             query     string                         true   "Server; default to CN"  Enums(CN, TW, US, JP, KR)
 // @Param     is_personal        query     bool                           false  "Whether to query for personal drop matrix or not. If `is_personal` equals to `true`, a valid PenguinID would be required to be provided (PenguinIDAuth)"
 // @Param     show_closed_zones  query     bool                           false  "Whether to show closed stages or not"
 // @Param     stageFilter        query     []string                       false  "Comma separated list of stage IDs to filter"  collectionFormat(csv)
@@ -112,7 +112,7 @@ func (c *Result) GetDropMatrix(ctx *fiber.Ctx) error {
 // @Summary   Get Pattern Matrix
 // @Tags      Result
 // @Produce   json
-// @Param     server       query     string  true   "Server; default to CN"  Enums(CN, US, JP, KR)
+// @Param     server       query     string  true   "Server; default to CN"  Enums(CN, TW, US, JP, KR)
 // @Param     is_personal  query     bool    false  "Whether to query for personal drop matrix or not. If `is_personal` equals to `true`, a valid PenguinID would be required to be provided (PenguinIDAuth)"
 // @Success   200          {object}  modelv2.PatternMatrixQueryResult
 // @Failure   500          {object}  pgerr.PenguinError  "An unexpected error occurred"
@@ -158,7 +158,7 @@ func (c *Result) GetPatternMatrix(ctx *fiber.Ctx) error {
 // @Summary  Get Trends
 // @Tags     Result
 // @Produce  json
-// @Param    server  query     string  true  "Server; default to CN"  Enums(CN, US, JP, KR)
+// @Param    server  query     string  true  "Server; default to CN"  Enums(CN, TW, US, JP, KR)
 // @Success  200     {object}  modelv2.TrendQueryResult
 // @Failure  500     {object}  pgerr.PenguinError  "An unexpected error occurred"
 // @Router   /PenguinStats/api/v2/result/trends [GET]
