@@ -12,6 +12,9 @@ definitions:
       KR:
         $ref: '#/definitions/model.ServerExistence'
         description: 'KR: 韩服 Korea Server (maintained by Yostar Limited)'
+      TW:
+        $ref: '#/definitions/model.ServerExistence'
+        description: 'TW: 台服 Taiwan Server (maintained by 龍成網路有限公司)'
       US:
         $ref: '#/definitions/model.ServerExistence'
         description: 'US: 美服/国际服 Global Server (maintained by Yostar Limited)'
@@ -19,6 +22,7 @@ definitions:
     - CN
     - JP
     - KR
+    - TW
     - US
     type: object
   model.I18nString:
@@ -33,13 +37,17 @@ definitions:
         description: 'KR: 한국어 (ko)'
         type: string
       zh:
-        description: 'ZH: 中文 (zh-CN)'
+        description: 'ZH: 简体中文 (zh-CN)'
+        type: string
+      zh-Hant:
+        description: 'ZH_HANT: 繁体中文 (zh-TW)'
         type: string
     required:
     - en
     - ja
     - ko
     - zh
+    - zh-Hant
     type: object
   model.Notice:
     properties:
@@ -494,6 +502,7 @@ paths:
       - description: Server; default to CN
         enum:
         - CN
+        - TW
         - US
         - JP
         - KR
@@ -529,6 +538,7 @@ paths:
       - description: Server; default to CN
         enum:
         - CN
+        - TW
         - US
         - JP
         - KR
@@ -564,6 +574,7 @@ paths:
       - description: Server; default to CN
         enum:
         - CN
+        - TW
         - US
         - JP
         - KR
@@ -846,6 +857,7 @@ paths:
       - description: Server; default to CN
         enum:
         - CN
+        - TW
         - US
         - JP
         - KR
@@ -898,6 +910,7 @@ paths:
       - description: Server; default to CN
         enum:
         - CN
+        - TW
         - US
         - JP
         - KR
@@ -932,6 +945,7 @@ paths:
       - description: Server; default to CN
         enum:
         - CN
+        - TW
         - US
         - JP
         - KR
@@ -1019,6 +1033,7 @@ paths:
       - description: Server; default to CN
         enum:
         - CN
+        - TW
         - US
         - JP
         - KR

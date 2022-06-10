@@ -25,7 +25,11 @@ func InjectI18n() func(c *fiber.Ctx) error {
 		var langs []string
 
 		for _, tag := range tags {
-			langs = append(langs, strings.ReplaceAll(strings.ToLower(tag.String()), "-", "_"))
+			sanitized := strings.ReplaceAll(strings.ToLower(tag.String()), "-", "_")
+			if sanitized == "zh_tw" {
+				sanitized = "zh_hant"
+			}
+			langs = append(langs, sanitized)
 		}
 
 		trans, _ := i18n.UT.FindTranslator(langs...)
