@@ -27,7 +27,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.2
 	github.com/rs/xid v1.4.0
-	github.com/rs/zerolog v1.26.1
+	github.com/rs/zerolog v1.27.0
 	github.com/samber/lo v1.21.0
 	github.com/stretchr/testify v1.7.2
 	github.com/swaggo/swag v1.8.2
