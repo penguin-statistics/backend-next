@@ -7,8 +7,6 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/guregu/null.v3"
-
-	"github.com/penguin-statistics/backend-next/internal/constant"
 )
 
 var (
@@ -21,7 +19,6 @@ func NewValidator() *validator.Validate {
 	validate := validator.New()
 	validate.RegisterValidation("caseinsensitiveoneof", caseInsensitiveOneOf)
 	validate.RegisterValidation("semverprefixed", semverPrefixed)
-	validate.RegisterValidation("arkserver", arkServer)
 	validate.RegisterCustomTypeFunc(nullStringValuer, null.String{})
 
 	return validate
@@ -42,12 +39,6 @@ func semverPrefixed(fl validator.FieldLevel) bool {
 	val := fl.Field().String()
 	trimmed := strings.TrimPrefix(val, "v")
 	return semverRegex.MatchString(trimmed)
-}
-
-func arkServer(fl validator.FieldLevel) bool {
-	val := fl.Field().String()
-	_, ok := constant.ServerMap[val]
-	return ok
 }
 
 func nullStringValuer(field reflect.Value) interface{} {
