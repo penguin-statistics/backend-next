@@ -210,11 +210,9 @@ func (s *DropMatrix) GetMaxAccumulableDropMatrixResults(ctx context.Context, ser
 	var results model.DropMatrixQueryResult
 	if !accountId.Valid {
 		key := server + constant.CacheSep + sourceCategory
-		calculated, err := cache.MaxAccumulableDropMatrixResults.MutexGetSet(key, &results, valueFunc, 24*time.Hour)
+		_, err := cache.MaxAccumulableDropMatrixResults.MutexGetSet(key, &results, valueFunc, 24*time.Hour)
 		if err != nil {
 			return nil, err
-		} else if calculated {
-			cache.LastModifiedTime.Set("[maxAccumulableDropMatrixResults#server|sourceCategory:"+key+"]", time.Now(), 0)
 		}
 		return &results, nil
 	} else {
