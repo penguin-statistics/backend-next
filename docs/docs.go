@@ -37,7 +37,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "CN",
-                            "TW",
                             "US",
                             "JP",
                             "KR"
@@ -89,7 +88,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "CN",
-                            "TW",
                             "US",
                             "JP",
                             "KR"
@@ -141,7 +139,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "CN",
-                            "TW",
                             "US",
                             "JP",
                             "KR"
@@ -592,7 +589,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "CN",
-                            "TW",
                             "US",
                             "JP",
                             "KR"
@@ -670,7 +666,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "CN",
-                            "TW",
                             "US",
                             "JP",
                             "KR"
@@ -717,7 +712,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "CN",
-                            "TW",
                             "US",
                             "JP",
                             "KR"
@@ -856,7 +850,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "CN",
-                            "TW",
                             "US",
                             "JP",
                             "KR"
@@ -1037,7 +1030,6 @@ const docTemplate = `{
                 "CN",
                 "JP",
                 "KR",
-                "TW",
                 "US"
             ],
             "properties": {
@@ -1053,10 +1045,6 @@ const docTemplate = `{
                     "description": "KR: 韩服 Korea Server (maintained by Yostar Limited)",
                     "$ref": "#/definitions/model.ServerExistence"
                 },
-                "TW": {
-                    "description": "TW: 台服 Taiwan Server (maintained by 龍成網路有限公司)",
-                    "$ref": "#/definitions/model.ServerExistence"
-                },
                 "US": {
                     "description": "US: 美服/国际服 Global Server (maintained by Yostar Limited)",
                     "$ref": "#/definitions/model.ServerExistence"
@@ -1069,8 +1057,7 @@ const docTemplate = `{
                 "en",
                 "ja",
                 "ko",
-                "zh",
-                "zh-Hant"
+                "zh"
             ],
             "properties": {
                 "en": {
@@ -1086,11 +1073,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "zh": {
-                    "description": "ZH: 简体中文 (zh-CN)",
-                    "type": "string"
-                },
-                "zh-Hant": {
-                    "description": "ZH_HANT: 繁体中文 (zh-TW)",
+                    "description": "ZH: 中文 (zh-CN)",
                     "type": "string"
                 }
             }
@@ -1285,6 +1268,12 @@ const docTemplate = `{
                 },
                 "server": {
                     "type": "string",
+                    "enum": [
+                        "CN",
+                        "US",
+                        "JP",
+                        "KR"
+                    ],
                     "example": "CN"
                 },
                 "source": {
