@@ -33,6 +33,13 @@ var ServerNameMapping = map[string]string{
 	"KR": "韩服",
 }
 
+var ServerMap = map[string]struct{}{
+	"CN": {},
+	"US": {},
+	"JP": {},
+	"KR": {},
+}
+
 var LocMap = map[string]*time.Location{
 	"CN": time.FixedZone("UTC+8", +8*60*60),
 	"US": time.FixedZone("UTC-7", -7*60*60),

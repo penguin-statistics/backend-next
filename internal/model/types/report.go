@@ -23,7 +23,7 @@ type SingleReportRequest struct {
 }
 
 type SingleReportRecallRequest struct {
-	ReportHash string `json:"reportHash" validate:"required,printascii" example:"0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ"`
+	ReportHash string `json:"reportHash" validate:"required,printascii" example:"cahbuch1eqliv7dopen0-5ejlUrfzNMXNHY6Q"`
 }
 
 type BatchReportDrop struct {

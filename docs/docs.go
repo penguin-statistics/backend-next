@@ -790,7 +790,7 @@ const docTemplate = `{
                 "tags": [
                     "Stage"
                 ],
-                "summary": "Get an Stage with ID",
+                "summary": "Get a Stage with ID",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1208,6 +1208,34 @@ const docTemplate = `{
                 }
             }
         },
+        "types.ReportRequestMetadata": {
+            "type": "object",
+            "properties": {
+                "fileName": {
+                    "type": "string",
+                    "maxLength": 512
+                },
+                "fingerprint": {
+                    "type": "string",
+                    "maxLength": 128
+                },
+                "lastModified": {
+                    "type": "integer"
+                },
+                "md5": {
+                    "type": "string",
+                    "maxLength": 32
+                },
+                "recognizerAssetsVersion": {
+                    "type": "string",
+                    "maxLength": 32
+                },
+                "recognizerVersion": {
+                    "type": "string",
+                    "maxLength": 32
+                }
+            }
+        },
         "types.SingleReportRecallRequest": {
             "type": "object",
             "required": [
@@ -1216,7 +1244,7 @@ const docTemplate = `{
             "properties": {
                 "reportHash": {
                     "type": "string",
-                    "example": "0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ"
+                    "example": "cahbuch1eqliv7dopen0-5ejlUrfzNMXNHY6Q"
                 }
             }
         },
@@ -1235,14 +1263,23 @@ const docTemplate = `{
                         "$ref": "#/definitions/types.ArkDrop"
                     }
                 },
+                "metadata": {
+                    "$ref": "#/definitions/types.ReportRequestMetadata"
+                },
                 "server": {
                     "type": "string",
+                    "enum": [
+                        "CN",
+                        "US",
+                        "JP",
+                        "KR"
+                    ],
                     "example": "CN"
                 },
                 "source": {
                     "description": "Source describes a source of the report. Third-party API consumers should change this to their own name.",
                     "type": "string",
-                    "maxLength": 32,
+                    "maxLength": 128,
                     "example": "your-app-name"
                 },
                 "stageId": {
@@ -1252,7 +1289,7 @@ const docTemplate = `{
                 "version": {
                     "description": "Version describes the version of the source app used to submit this report. Third-party API consumers should change this to their own app version.",
                     "type": "string",
-                    "maxLength": 32,
+                    "maxLength": 128,
                     "example": "v0.0.0+0000000"
                 }
             }
@@ -1399,6 +1436,10 @@ const docTemplate = `{
                 "start": {
                     "type": "integer",
                     "example": 1556676000000
+                },
+                "stdDev": {
+                    "type": "number",
+                    "example": 0.114514
                 },
                 "times": {
                     "type": "integer",
