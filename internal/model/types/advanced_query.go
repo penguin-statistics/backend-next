@@ -7,7 +7,7 @@ type AdvancedQueryRequest struct {
 }
 
 type AdvancedQuery struct {
-	Server     string    `json:"server" validate:"required,arkserver" required:"true"`
+	Server     string    `json:"server" validate:"required,oneof=CN US JP KR" required:"true"`
 	StageID    string    `json:"stageId" validate:"required" required:"true"`
 	ItemIDs    []string  `json:"itemIds"`
 	IsPersonal null.Bool `json:"isPersonal" swaggertype:"boolean"`

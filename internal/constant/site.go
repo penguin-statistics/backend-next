@@ -21,18 +21,16 @@ var SiteHosts = []string{
 
 var Servers = []string{
 	"CN",
-	"TW",
 	"US",
 	"JP",
 	"KR",
 }
 
-var ServerMap = map[string]struct{}{
-	"CN": {},
-	"TW": {},
-	"US": {},
-	"JP": {},
-	"KR": {},
+var ServerNameMapping = map[string]string{
+	"CN": "国服",
+	"US": "美服",
+	"JP": "日服",
+	"KR": "韩服",
 }
 
 var ServerMap = map[string]struct{}{
@@ -44,7 +42,6 @@ var ServerMap = map[string]struct{}{
 
 var LocMap = map[string]*time.Location{
 	"CN": time.FixedZone("UTC+8", +8*60*60),
-	"TW": time.FixedZone("UTC+8", +8*60*60),
 	"US": time.FixedZone("UTC-7", -7*60*60),
 	"JP": time.FixedZone("UTC+9", +9*60*60),
 	"KR": time.FixedZone("UTC+9", +9*60*60),

@@ -37,7 +37,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "CN",
-                            "TW",
                             "US",
                             "JP",
                             "KR"
@@ -89,7 +88,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "CN",
-                            "TW",
                             "US",
                             "JP",
                             "KR"
@@ -141,7 +139,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "CN",
-                            "TW",
                             "US",
                             "JP",
                             "KR"
@@ -592,7 +589,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "CN",
-                            "TW",
                             "US",
                             "JP",
                             "KR"
@@ -670,7 +666,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "CN",
-                            "TW",
                             "US",
                             "JP",
                             "KR"
@@ -717,7 +712,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "CN",
-                            "TW",
                             "US",
                             "JP",
                             "KR"
@@ -796,7 +790,7 @@ const docTemplate = `{
                 "tags": [
                     "Stage"
                 ],
-                "summary": "Get a Stage with ID",
+                "summary": "Get an Stage with ID",
                 "parameters": [
                     {
                         "type": "integer",
@@ -856,7 +850,6 @@ const docTemplate = `{
                     {
                         "enum": [
                             "CN",
-                            "TW",
                             "US",
                             "JP",
                             "KR"
@@ -1037,7 +1030,6 @@ const docTemplate = `{
                 "CN",
                 "JP",
                 "KR",
-                "TW",
                 "US"
             ],
             "properties": {
@@ -1053,10 +1045,6 @@ const docTemplate = `{
                     "description": "KR: 韩服 Korea Server (maintained by Yostar Limited)",
                     "$ref": "#/definitions/model.ServerExistence"
                 },
-                "TW": {
-                    "description": "TW: 台服 Taiwan Server (maintained by 龍成網路有限公司)",
-                    "$ref": "#/definitions/model.ServerExistence"
-                },
                 "US": {
                     "description": "US: 美服/国际服 Global Server (maintained by Yostar Limited)",
                     "$ref": "#/definitions/model.ServerExistence"
@@ -1069,8 +1057,7 @@ const docTemplate = `{
                 "en",
                 "ja",
                 "ko",
-                "zh",
-                "zh-Hant"
+                "zh"
             ],
             "properties": {
                 "en": {
@@ -1086,11 +1073,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "zh": {
-                    "description": "ZH: 简体中文 (zh-CN)",
-                    "type": "string"
-                },
-                "zh-Hant": {
-                    "description": "ZH_HANT: 繁体中文 (zh-TW)",
+                    "description": "ZH: 中文 (zh-CN)",
                     "type": "string"
                 }
             }
@@ -1225,34 +1208,6 @@ const docTemplate = `{
                 }
             }
         },
-        "types.ReportRequestMetadata": {
-            "type": "object",
-            "properties": {
-                "fileName": {
-                    "type": "string",
-                    "maxLength": 512
-                },
-                "fingerprint": {
-                    "type": "string",
-                    "maxLength": 128
-                },
-                "lastModified": {
-                    "type": "integer"
-                },
-                "md5": {
-                    "type": "string",
-                    "maxLength": 32
-                },
-                "recognizerAssetsVersion": {
-                    "type": "string",
-                    "maxLength": 32
-                },
-                "recognizerVersion": {
-                    "type": "string",
-                    "maxLength": 32
-                }
-            }
-        },
         "types.SingleReportRecallRequest": {
             "type": "object",
             "required": [
@@ -1261,7 +1216,7 @@ const docTemplate = `{
             "properties": {
                 "reportHash": {
                     "type": "string",
-                    "example": "cahbuch1eqliv7dopen0-5ejlUrfzNMXNHY6Q"
+                    "example": "0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ"
                 }
             }
         },
@@ -1280,9 +1235,6 @@ const docTemplate = `{
                         "$ref": "#/definitions/types.ArkDrop"
                     }
                 },
-                "metadata": {
-                    "$ref": "#/definitions/types.ReportRequestMetadata"
-                },
                 "server": {
                     "type": "string",
                     "enum": [
@@ -1296,7 +1248,7 @@ const docTemplate = `{
                 "source": {
                     "description": "Source describes a source of the report. Third-party API consumers should change this to their own name.",
                     "type": "string",
-                    "maxLength": 128,
+                    "maxLength": 32,
                     "example": "your-app-name"
                 },
                 "stageId": {
@@ -1306,7 +1258,7 @@ const docTemplate = `{
                 "version": {
                     "description": "Version describes the version of the source app used to submit this report. Third-party API consumers should change this to their own app version.",
                     "type": "string",
-                    "maxLength": 128,
+                    "maxLength": 32,
                     "example": "v0.0.0+0000000"
                 }
             }
@@ -1453,10 +1405,6 @@ const docTemplate = `{
                 "start": {
                     "type": "integer",
                     "example": 1556676000000
-                },
-                "stdDev": {
-                    "type": "number",
-                    "example": 0.114514
                 },
                 "times": {
                     "type": "integer",

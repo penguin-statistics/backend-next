@@ -1,8 +1,6 @@
 package rekuest
 
 import (
-	"strings"
-
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 	enTranslations "github.com/go-playground/validator/v10/translations/en"
@@ -12,7 +10,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 
-	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/util"
 	"github.com/penguin-statistics/backend-next/internal/util/i18n"
@@ -63,17 +60,6 @@ func init() {
 
 		if err != nil {
 			log.Warn().Err(err).Str("locale", l).Msg("could not register translation for function caseinsensitiveoneof")
-		}
-
-		err = Validate.RegisterTranslation("arkserver", t, func(ut ut.Translator) error {
-			return nil
-		}, func(ut ut.Translator, fe validator.FieldError) string {
-			t, _ := ut.T("oneof", fe.Field(), strings.Join(constant.Servers, " "))
-			return t
-		})
-
-		if err != nil {
-			log.Warn().Err(err).Str("locale", l).Msg("could not register translation for function arkserver")
 		}
 	}
 }
@@ -162,7 +148,7 @@ func ValidVar(ctx *fiber.Ctx, field any, tag string) error {
 }
 
 type request struct {
-	Server string `validate:"required,arkserver"`
+	Server string `validate:"required,oneof=CN US JP KR"`
 }
 
 func ValidServer(ctx *fiber.Ctx, server string) error {

@@ -30,7 +30,7 @@ func RegisterSiteStats(v2 *svr.V2, c SiteStats) {
 // @Summary  Get Site Stats
 // @Tags     SiteStats
 // @Produce  json
-// @Param    server  query     string  true  "Server; default to CN"  Enums(CN, TW, US, JP, KR)
+// @Param    server  query     string  true  "Server; default to CN"  Enums(CN, US, JP, KR)
 // @Success  200     {array}   modelv2.SiteStats
 // @Failure  500     {object}  pgerr.PenguinError  "An unexpected error occurred"
 // @Router   /PenguinStats/api/v2/stats [GET]

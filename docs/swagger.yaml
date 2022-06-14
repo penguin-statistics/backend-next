@@ -12,9 +12,6 @@ definitions:
       KR:
         $ref: '#/definitions/model.ServerExistence'
         description: 'KR: 韩服 Korea Server (maintained by Yostar Limited)'
-      TW:
-        $ref: '#/definitions/model.ServerExistence'
-        description: 'TW: 台服 Taiwan Server (maintained by 龍成網路有限公司)'
       US:
         $ref: '#/definitions/model.ServerExistence'
         description: 'US: 美服/国际服 Global Server (maintained by Yostar Limited)'
@@ -22,7 +19,6 @@ definitions:
     - CN
     - JP
     - KR
-    - TW
     - US
     type: object
   model.I18nString:
@@ -37,17 +33,13 @@ definitions:
         description: 'KR: 한국어 (ko)'
         type: string
       zh:
-        description: 'ZH: 简体中文 (zh-CN)'
-        type: string
-      zh-Hant:
-        description: 'ZH_HANT: 繁体中文 (zh-TW)'
+        description: 'ZH: 中文 (zh-CN)'
         type: string
     required:
     - en
     - ja
     - ko
     - zh
-    - zh-Hant
     type: object
   model.Notice:
     properties:
@@ -139,30 +131,10 @@ definitions:
     - itemId
     - quantity
     type: object
-  types.ReportRequestMetadata:
-    properties:
-      fileName:
-        maxLength: 512
-        type: string
-      fingerprint:
-        maxLength: 128
-        type: string
-      lastModified:
-        type: integer
-      md5:
-        maxLength: 32
-        type: string
-      recognizerAssetsVersion:
-        maxLength: 32
-        type: string
-      recognizerVersion:
-        maxLength: 32
-        type: string
-    type: object
   types.SingleReportRecallRequest:
     properties:
       reportHash:
-        example: cahbuch1eqliv7dopen0-5ejlUrfzNMXNHY6Q
+        example: 0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ
         type: string
     required:
     - reportHash
@@ -173,8 +145,6 @@ definitions:
         items:
           $ref: '#/definitions/types.ArkDrop'
         type: array
-      metadata:
-        $ref: '#/definitions/types.ReportRequestMetadata'
       server:
         enum:
         - CN
@@ -187,7 +157,7 @@ definitions:
         description: Source describes a source of the report. Third-party API consumers
           should change this to their own name.
         example: your-app-name
-        maxLength: 128
+        maxLength: 32
         type: string
       stageId:
         example: main_01-07
@@ -197,7 +167,7 @@ definitions:
           this report. Third-party API consumers should change this to their own app
           version.
         example: v0.0.0+0000000
-        maxLength: 128
+        maxLength: 32
         type: string
     required:
     - server
@@ -300,9 +270,6 @@ definitions:
       start:
         example: 1556676000000
         type: integer
-      stdDev:
-        example: 0.114514
-        type: number
       times:
         example: 1061347
         type: integer
@@ -502,7 +469,6 @@ paths:
       - description: Server; default to CN
         enum:
         - CN
-        - TW
         - US
         - JP
         - KR
@@ -538,7 +504,6 @@ paths:
       - description: Server; default to CN
         enum:
         - CN
-        - TW
         - US
         - JP
         - KR
@@ -574,7 +539,6 @@ paths:
       - description: Server; default to CN
         enum:
         - CN
-        - TW
         - US
         - JP
         - KR
@@ -857,7 +821,6 @@ paths:
       - description: Server; default to CN
         enum:
         - CN
-        - TW
         - US
         - JP
         - KR
@@ -910,7 +873,6 @@ paths:
       - description: Server; default to CN
         enum:
         - CN
-        - TW
         - US
         - JP
         - KR
@@ -945,7 +907,6 @@ paths:
       - description: Server; default to CN
         enum:
         - CN
-        - TW
         - US
         - JP
         - KR
@@ -1024,7 +985,7 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/pgerr.PenguinError'
-      summary: Get a Stage with ID
+      summary: Get an Stage with ID
       tags:
       - Stage
   /PenguinStats/api/v2/stats:
@@ -1033,7 +994,6 @@ paths:
       - description: Server; default to CN
         enum:
         - CN
-        - TW
         - US
         - JP
         - KR
