@@ -69,12 +69,13 @@ func NewDropMatrix(
 	}
 }
 
+// FIXME: this will be used for v3 api
 // Cache: maxAccumulableDropMatrixResults#server:{server}, 24 hrs, records last modified time
-func (s *DropMatrix) GetMaxAccumulableDropMatrixResults(
+func (s *DropMatrix) GetMaxAccumulableDropMatrixResultsForV3(
 	ctx context.Context, server string, stageFilterStr string, itemFilterStr string, accountId null.Int,
 ) (*modelv2.DropMatrixQueryResult, error) {
 	valueFunc := func() (*modelv2.DropMatrixQueryResult, error) {
-		savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId, constant.SourceCategoryAll)
+		savedDropMatrixResults, err := s.GetMaxAccumulableDropMatrixResults(ctx, server, accountId, constant.SourceCategoryAll)
 		if err != nil {
 			return nil, err
 		}
@@ -105,7 +106,7 @@ func (s *DropMatrix) GetShimMaxAccumulableDropMatrixResults(
 	ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId null.Int,
 ) (*modelv2.DropMatrixQueryResult, error) {
 	valueFunc := func() (*modelv2.DropMatrixQueryResult, error) {
-		savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId, constant.SourceCategoryAll)
+		savedDropMatrixResults, err := s.GetMaxAccumulableDropMatrixResults(ctx, server, accountId, constant.SourceCategoryAll)
 		if err != nil {
 			return nil, err
 		}
@@ -172,6 +173,14 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constant.CacheSep + "false"); err != nil {
 		return err
 	}
+	for _, sourceCategory := range sourceCategories {
+		if err := cache.MaxAccumulableDropMatrixResults.Delete(server + constant.CacheSep + sourceCategory); err != nil {
+			return err
+		}
+	}
+
+	//TODO: call GetMaxAccumulableDropMatrixResults() here to send results and generation num to LiveHouse
+
 	return nil
 }
 
@@ -188,12 +197,29 @@ func (s *DropMatrix) QueryDropMatrix(
 }
 
 // calc DropMatrixQueryResult for max accumulable timeranges
-func (s *DropMatrix) getMaxAccumulableDropMatrixResults(ctx context.Context, server string, accountId null.Int, sourceCategory string) (*model.DropMatrixQueryResult, error) {
-	dropMatrixElements, err := s.getDropMatrixElements(ctx, server, accountId, sourceCategory)
-	if err != nil {
-		return nil, err
+// Cache: maxAccumulableDropMatrixResults#server|sourceCategory:{server}|{sourceCategory}, 24 hrs
+func (s *DropMatrix) GetMaxAccumulableDropMatrixResults(ctx context.Context, server string, accountId null.Int, sourceCategory string) (*model.DropMatrixQueryResult, error) {
+	valueFunc := func() (*model.DropMatrixQueryResult, error) {
+		dropMatrixElements, err := s.getDropMatrixElements(ctx, server, accountId, sourceCategory)
+		if err != nil {
+			return nil, err
+		}
+		return s.convertDropMatrixElementsToMaxAccumulableDropMatrixQueryResult(ctx, server, dropMatrixElements)
 	}
-	return s.convertDropMatrixElementsToMaxAccumulableDropMatrixQueryResult(ctx, server, dropMatrixElements)
+
+	var results model.DropMatrixQueryResult
+	if !accountId.Valid {
+		key := server + constant.CacheSep + sourceCategory
+		calculated, err := cache.MaxAccumulableDropMatrixResults.MutexGetSet(key, &results, valueFunc, 24*time.Hour)
+		if err != nil {
+			return nil, err
+		} else if calculated {
+			cache.LastModifiedTime.Set("[maxAccumulableDropMatrixResults#server|sourceCategory:"+key+"]", time.Now(), 0)
+		}
+		return &results, nil
+	} else {
+		return valueFunc()
+	}
 }
 
 // For global, get elements from DB; For personal, calc elements

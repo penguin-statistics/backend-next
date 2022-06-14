@@ -23,6 +23,7 @@ var (
 	ItemDropSetByStageIDAndRangeID   *cache.Set[[]int]
 	ItemDropSetByStageIdAndTimeRange *cache.Set[[]int]
 
+	MaxAccumulableDropMatrixResults     *cache.Set[model.DropMatrixQueryResult]
 	ShimMaxAccumulableDropMatrixResults *cache.Set[modelv2.DropMatrixQueryResult]
 
 	Formula *cache.Singular[json.RawMessage]
@@ -121,8 +122,10 @@ func initializeCaches() {
 	SetMap["itemDropSet#server|stageId|startTime|endTime"] = ItemDropSetByStageIdAndTimeRange.Flush
 
 	// drop_matrix
+	MaxAccumulableDropMatrixResults = cache.NewSet[model.DropMatrixQueryResult]("maxAccumulableDropMatrixResults#server|sourceCategory")
 	ShimMaxAccumulableDropMatrixResults = cache.NewSet[modelv2.DropMatrixQueryResult]("shimMaxAccumulableDropMatrixResults#server|showClosedZoned")
 
+	SetMap["maxAccumulableDropMatrixResults#server|sourceCategory"] = MaxAccumulableDropMatrixResults.Flush
 	SetMap["shimMaxAccumulableDropMatrixResults#server|showClosedZoned"] = ShimMaxAccumulableDropMatrixResults.Flush
 
 	// formula
