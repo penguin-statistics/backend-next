@@ -174,6 +174,8 @@ github.com/gofiber/adaptor/v2 v2.1.23 h1:VG0yAPnB2EJZjxy4Ul+Ra9e92PnqwXE97SUVuPG
 github.com/gofiber/adaptor/v2 v2.1.23/go.mod h1:hnYEQBPF2x1JaBHygutJJF5d0+J2eYnKKsUMCSsfxKk=
 github.com/gofiber/contrib/fibersentry v0.0.0-20220524060257-8ccfafc37b12 h1:7+p+nGrf6YdcYvheDbZtK1yGjdKhnCLXDB7f/PCsRy4=
 github.com/gofiber/contrib/fibersentry v0.0.0-20220524060257-8ccfafc37b12/go.mod h1:jCdXE0d8ROiQqIEtJrC6qRlRqQ83GoQ6928p/3NuCqI=
+github.com/gofiber/contrib/fibersentry v0.0.0-20220615054408-99317a0bbee9 h1:mYwQ1c3kfbHrR4Kk0Jr5kgSjqfqEiJ7Yq4QEc6u1Rls=
+github.com/gofiber/contrib/fibersentry v0.0.0-20220615054408-99317a0bbee9/go.mod h1:jCdXE0d8ROiQqIEtJrC6qRlRqQ83GoQ6928p/3NuCqI=
 github.com/gofiber/fiber/v2 v2.22.0/go.mod h1:MR1usVH3JHYRyQwMe2eZXRSZHRX38fkV+A7CPB+DlDQ=
 github.com/gofiber/fiber/v2 v2.24.0/go.mod h1:MR1usVH3JHYRyQwMe2eZXRSZHRX38fkV+A7CPB+DlDQ=
 github.com/gofiber/fiber/v2 v2.28.0/go.mod h1:0bPXdTu+jRqINrEq1T6mHeVBnE0lQd67PGu35jD3hLk=

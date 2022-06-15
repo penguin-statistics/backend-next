@@ -15,7 +15,7 @@ require (
 	github.com/go-playground/validator/v10 v10.11.0
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/goccy/go-json v0.9.7
-	github.com/gofiber/contrib/fibersentry v0.0.0-20220524060257-8ccfafc37b12
+	github.com/gofiber/contrib/fibersentry v0.0.0-20220615054408-99317a0bbee9
 	github.com/gofiber/fiber/v2 v2.34.0
 	github.com/gofiber/helmet/v2 v2.2.13
 	github.com/gofiber/swagger v0.0.1
