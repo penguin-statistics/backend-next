@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+option go_package = "github.com/penguin-statistics/backend-next/internal/model/pb";
+
+service ConnectedLiveService {
+    rpc PushReportBatch(ReportBatchRequest) returns (ReportBatchACK) {}
+    rpc PushMatrixBatch(MatrixBatchRequest) returns (MatrixBatchACK) {}
+}
+
+message ReportBatchRequest {
+    uint32 generation = 1;
+    repeated Report report = 2;
+}
+
+message Report {
+    uint32 stage_id = 1;
+    repeated Drop drops = 2;
+}
+
+message Drop {
+    uint32 item_id = 1;
+    uint32 quantity = 2;
+}
+
+message ReportBatchACK {
+    uint32 generation = 1;
+}
+
+message MatrixBatchRequest {
+    uint32 generation = 1;
+    repeated Matrix matrix = 2;
+}
+
+message Matrix {
+    uint32 stage_id = 1;
+    uint32 item_id = 2;
+    uint64 quantity = 3;
+    uint64 times = 4;
+}
+
+message MatrixBatchACK {
+    uint32 generation = 1;
+}

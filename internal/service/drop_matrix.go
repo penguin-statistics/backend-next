@@ -142,6 +142,8 @@ func (s *DropMatrix) GetShimCustomizedDropMatrixResults(
 }
 
 func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server string, sourceCategories []string) error {
+	unifiedEndTime := time.Now()
+
 	allTimeRanges, err := s.TimeRangeService.GetTimeRangesByServer(ctx, server)
 	if err != nil {
 		return err
@@ -151,7 +153,7 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 		timeRanges := []*model.TimeRange{timeRange}
 		currentBatch := make([]*model.DropMatrixElement, 0)
 		for _, sourceCategory := range sourceCategories {
-			results, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), sourceCategory)
+			results, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, null.NewInt(0, false), sourceCategory, &unifiedEndTime)
 			if err != nil {
 				return nil, err
 			}
@@ -177,7 +179,8 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 func (s *DropMatrix) QueryDropMatrix(
 	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId null.Int, sourceCategory string,
 ) (*model.DropMatrixQueryResult, error) {
-	dropMatrixElements, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, stageIdFilter, itemIdFilter, accountId, sourceCategory)
+	unifiedEndTime := time.Now()
+	dropMatrixElements, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, stageIdFilter, itemIdFilter, accountId, sourceCategory, &unifiedEndTime)
 	if err != nil {
 		return nil, err
 	}
@@ -196,6 +199,7 @@ func (s *DropMatrix) getMaxAccumulableDropMatrixResults(ctx context.Context, ser
 // For global, get elements from DB; For personal, calc elements
 func (s *DropMatrix) getDropMatrixElements(ctx context.Context, server string, accountId null.Int, sourceCategory string) ([]*model.DropMatrixElement, error) {
 	if accountId.Valid {
+		unifiedEndTime := time.Now()
 		maxAccumulableTimeRanges, err := s.TimeRangeService.GetMaxAccumulableTimeRangesByServer(ctx, server)
 		if err != nil {
 			return nil, err
@@ -213,7 +217,7 @@ func (s *DropMatrix) getDropMatrixElements(ctx context.Context, server string, a
 		for _, timeRange := range timeRangesMap {
 			timeRanges = append(timeRanges, timeRange)
 		}
-		dropMatrixElements, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId, sourceCategory)
+		dropMatrixElements, err := s.calcDropMatrixForTimeRanges(ctx, server, timeRanges, nil, nil, accountId, sourceCategory, &unifiedEndTime)
 		if err != nil {
 			return nil, err
 		}
@@ -224,14 +228,13 @@ func (s *DropMatrix) getDropMatrixElements(ctx context.Context, server string, a
 }
 
 func (s *DropMatrix) calcDropMatrixForTimeRanges(
-	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId null.Int, sourceCategory string,
+	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId null.Int, sourceCategory string, unifiedEndTime *time.Time,
 ) ([]*model.DropMatrixElement, error) {
 	// For one time range whose end time is FakeEndTimeMilli, we will make separate query to get times, quantity and quantity buckets.
 	// We need to make sure they are queried based on the same set of drop reports. So we will use a unified end time instead of FakeEndTimeMilli.
-	unifiedEndTime := time.Now()
 	for _, timeRange := range timeRanges {
-		if timeRange.EndTime.After(unifiedEndTime) {
-			timeRange.EndTime = &unifiedEndTime
+		if timeRange.EndTime.After(*unifiedEndTime) {
+			timeRange.EndTime = unifiedEndTime
 		}
 	}
 

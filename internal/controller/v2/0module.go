@@ -14,6 +14,7 @@ func Module() fx.Option {
 		RegisterReport,
 		RegisterAccount,
 		RegisterFormula,
+		RegisterFrontendConfig,
 		RegisterPrivate,
 		RegisterSiteStats,
 		RegisterEventPeriod,

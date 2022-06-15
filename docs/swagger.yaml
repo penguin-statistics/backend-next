@@ -131,10 +131,30 @@ definitions:
     - itemId
     - quantity
     type: object
+  types.ReportRequestMetadata:
+    properties:
+      fileName:
+        maxLength: 512
+        type: string
+      fingerprint:
+        maxLength: 128
+        type: string
+      lastModified:
+        type: integer
+      md5:
+        maxLength: 32
+        type: string
+      recognizerAssetsVersion:
+        maxLength: 32
+        type: string
+      recognizerVersion:
+        maxLength: 32
+        type: string
+    type: object
   types.SingleReportRecallRequest:
     properties:
       reportHash:
-        example: 0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ
+        example: cahbuch1eqliv7dopen0-5ejlUrfzNMXNHY6Q
         type: string
     required:
     - reportHash
@@ -145,14 +165,21 @@ definitions:
         items:
           $ref: '#/definitions/types.ArkDrop'
         type: array
+      metadata:
+        $ref: '#/definitions/types.ReportRequestMetadata'
       server:
+        enum:
+        - CN
+        - US
+        - JP
+        - KR
         example: CN
         type: string
       source:
         description: Source describes a source of the report. Third-party API consumers
           should change this to their own name.
         example: your-app-name
-        maxLength: 32
+        maxLength: 128
         type: string
       stageId:
         example: main_01-07
@@ -162,7 +189,7 @@ definitions:
           this report. Third-party API consumers should change this to their own app
           version.
         example: v0.0.0+0000000
-        maxLength: 32
+        maxLength: 128
         type: string
     required:
     - server
@@ -265,6 +292,9 @@ definitions:
       start:
         example: 1556676000000
         type: integer
+      stdDev:
+        example: 0.114514
+        type: number
       times:
         example: 1061347
         type: integer
@@ -980,7 +1010,7 @@ paths:
           description: An unexpected error occurred
           schema:
             $ref: '#/definitions/pgerr.PenguinError'
-      summary: Get an Stage with ID
+      summary: Get a Stage with ID
       tags:
       - Stage
   /PenguinStats/api/v2/stats:

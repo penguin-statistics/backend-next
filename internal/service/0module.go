@@ -17,6 +17,7 @@ func Module() fx.Option {
 		NewReport,
 		NewAccount,
 		NewFormula,
+		NewFrontendConfig,
 		NewActivity,
 		NewDropInfo,
 		NewShortURL,
