@@ -27,6 +27,8 @@ var (
 
 	Formula *cache.Singular[json.RawMessage]
 
+	FrontendConfig *cache.Singular[json.RawMessage]
+
 	Items           *cache.Singular[[]*model.Item]
 	ItemByArkID     *cache.Set[model.Item]
 	ShimItems       *cache.Singular[[]*modelv2.Item]
@@ -128,6 +130,10 @@ func initializeCaches() {
 	// formula
 	Formula = cache.NewSingular[json.RawMessage]("formula")
 	SingularFlusherMap["formula"] = Formula.Delete
+
+	// frontend_config
+	FrontendConfig = cache.NewSingular[json.RawMessage]("frontendConfig")
+	SingularFlusherMap["frontendConfig"] = FrontendConfig.Delete
 
 	// item
 	Items = cache.NewSingular[[]*model.Item]("items")

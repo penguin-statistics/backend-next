@@ -256,6 +256,28 @@
                 }
             }
         },
+        "/PenguinStats/api/v2/config": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "FrontendConfig"
+                ],
+                "summary": "Get Frontend Config",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/pgerr.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
         "/PenguinStats/api/v2/items": {
             "get": {
                 "produces": [
