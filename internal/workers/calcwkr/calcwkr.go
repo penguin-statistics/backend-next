@@ -7,7 +7,6 @@ import (
 
 	"github.com/avast/retry-go/v3"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 
@@ -70,10 +69,7 @@ func (w *Worker) do(sourceCategories []string) {
 
 		for {
 			ctx, cancel := context.WithTimeout(parentCtx, w.timeout)
-			log.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
-				return c.Int("count", w.count)
-			})
-			log.Ctx(ctx).Info().Msg("worker batch started")
+			log.Ctx(ctx).Info().Int("count", w.count).Msg("worker batch started")
 
 			func() {
 				defer func() {
@@ -128,20 +124,16 @@ func (w *Worker) do(sourceCategories []string) {
 
 				select {
 				case <-ctx.Done():
-					log.Ctx(ctx).Error().Err(ctx.Err()).Msg("worker timeout reached")
+					log.Ctx(ctx).Error().Int("count", w.count).Err(ctx.Err()).Msg("worker timeout reached")
 					return
 				case err := <-errChan:
 					if err != nil {
-						log.Ctx(ctx).Error().Err(err).Msg("worker unexpected error occurred while running batch")
+						log.Ctx(ctx).Error().Int("count", w.count).Err(err).Msg("worker unexpected error occurred while running batch")
 						return
 					}
 				}
 
-				log.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
-					return c.Str("service", "worker:calculator")
-				})
-
-				log.Ctx(ctx).Info().Msg("worker batch finished")
+				log.Ctx(ctx).Info().Str("service", "worker:calculator").Msg("worker batch finished")
 
 				go func() {
 					w.heartbeat()
@@ -152,16 +144,12 @@ func (w *Worker) do(sourceCategories []string) {
 }
 
 func (w *Worker) microtask(ctx context.Context, service, server string, f func() error) error {
-	log.Ctx(ctx).UpdateContext(func(c zerolog.Context) zerolog.Context {
-		return c.Str("service", "worker:calculator:"+service).Str("server", server)
-	})
-
-	log.Ctx(ctx).Info().Msg("worker microtask started calculating")
+	log.Ctx(ctx).Info().Str("service", "worker:calculator:"+service).Str("server", server).Msg("worker microtask started calculating")
 	if err := observeCalcDuration(service, server, f); err != nil {
-		log.Ctx(ctx).Error().Err(err).Msg("worker microtask failed")
+		log.Ctx(ctx).Error().Str("service", "worker:calculator:"+service).Str("server", server).Err(err).Msg("worker microtask failed")
 		return err
 	}
-	log.Ctx(ctx).Info().Msg("worker microtask finished")
+	log.Ctx(ctx).Info().Str("service", "worker:calculator:"+service).Str("server", server).Msg("worker microtask finished")
 
 	return nil
 }
