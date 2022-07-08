@@ -41,7 +41,7 @@ type Worker struct {
 
 	// heartbeatURL allows the worker to ping a specified URL on succeed, to ensure worker is alive.
 	// The key is the name of the worker, and the value is the URL.
-	// Possible keys are: "main", "trend"
+	// Possible keys are: "stats", "trends"
 	heartbeatURL map[string]string
 
 	limiterCh chan struct{}
