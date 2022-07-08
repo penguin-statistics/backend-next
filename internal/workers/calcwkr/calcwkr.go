@@ -33,7 +33,7 @@ type Worker struct {
 	// interval describes the interval in-between different batches of stats job running
 	interval time.Duration
 
-	// trendInterval describes the interval in-between different batches of trend job running
+	// trendInterval describes the interval in-between different batches of trends job running
 	trendInterval time.Duration
 
 	// timeout describes the timeout for the worker
