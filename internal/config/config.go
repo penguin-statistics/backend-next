@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/joho/godotenv/autoload"
@@ -57,13 +59,19 @@ type Config struct {
 	// WorkerInterval describes the interval in-between different batches
 	WorkerInterval time.Duration `required:"true" split_words:"true" default:"10m"`
 
+	// WorkerTrendInterval describes the interval in-between different batches
+	WorkerTrendInterval time.Duration `required:"true" split_words:"true" default:"6h"`
+
 	// WorkerSeparation describes the separation time in-between different microtasks
 	WorkerSeparation time.Duration `required:"true" split_words:"true" default:"3s"`
 
 	// WorkerTimeout describes the timeout for a single batch to run
 	WorkerTimeout time.Duration `required:"true" split_words:"true" default:"10m"`
 
-	WorkerHeartbeatURL string `split_words:"true"`
+	// WorkerHeartbeatURL is the map of URLs to ping to check if the worker is alive.
+	// The key is the name of the worker, and the value is the URL.
+	// Possible keys are: "main", "trend"
+	WorkerHeartbeatURL WorkerHeartbeatURLMap `split_words:"true"`
 
 	// WorkerEnabled is a flag to indicate whether to enable the worker.
 	WorkerEnabled bool `split_words:"true"`
@@ -74,6 +82,24 @@ type Config struct {
 	// MatrixWorkerSourceCategories is a list of categories that the matrix worker will run for.
 	// Available categories are: all, automated, manual.
 	MatrixWorkerSourceCategories []string `required:"true" split_words:"true" default:"all"`
+}
+
+type WorkerHeartbeatURLMap map[string]string
+
+func (m *WorkerHeartbeatURLMap) Decode(value string) error {
+	*m = WorkerHeartbeatURLMap{}
+	for _, pair := range strings.Split(value, ",") {
+		kv := strings.Split(pair, ":")
+		if len(kv) != 2 {
+			return fmt.Errorf("invalid heartbeat URL map: expect a `:` separated key pair for each element, but got: %s", value)
+		}
+		val, err := base64.StdEncoding.DecodeString(strings.TrimSpace(kv[1]))
+		if err != nil {
+			return fmt.Errorf("invalid value in worker heartbeat URL map: base64 decoding failed: %s (%w)", val, err)
+		}
+		(*m)[kv[0]] = string(val)
+	}
+	return nil
 }
 
 func Parse() (*Config, error) {
