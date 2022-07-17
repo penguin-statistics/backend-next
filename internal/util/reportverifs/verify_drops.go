@@ -51,7 +51,7 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.ReportTaskSingl
 		}
 	}
 
-	log.Info().
+	log.Trace().
 		Interface("itemDropInfos", itemDropInfos).
 		Interface("typeDropInfos", typeDropInfos).
 		Msg("verifying drop")
@@ -86,7 +86,7 @@ func (d *DropVerifier) verifyDropType(report *types.ReportTaskSingleReport, drop
 		return len(drops)
 	})
 
-	log.Debug().
+	log.Trace().
 		Interface("grouped", grouped).
 		Interface("dropTypeAmountMap", dropTypeAmountMap).
 		Msg("dropTypeAmountMap")
@@ -144,7 +144,7 @@ func (d *DropVerifier) verifyDropItem(report *types.ReportTaskSingleReport, drop
 		dropItemQuantityMap[drop.ItemID][drop.DropType] += drop.Quantity
 	}
 
-	log.Debug().
+	log.Trace().
 		Interface("dropItemQuantityMap", dropItemQuantityMap).
 		Msg("dropItemQuantityMap")
 
