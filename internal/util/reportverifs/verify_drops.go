@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
+	"github.com/rs/zerolog/log"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
@@ -18,6 +19,7 @@ var (
 	ErrInvalidDropItem      = errors.New("invalid drop item")
 	ErrInvalidDropInfoCount = errors.New("invalid drop info count")
 	ErrUnknownItemID        = errors.New("unknown item id")
+	ErrUnknownDropInfoTuple        = errors.New("unknown drop type + item id tuple")
 )
 
 type DropVerifier struct {
@@ -49,6 +51,11 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.ReportTaskSingl
 		}
 	}
 
+	log.Info().
+		Interface("itemDropInfos", itemDropInfos).
+		Interface("typeDropInfos", typeDropInfos).
+		Msg("verifying drop")
+
 	var errs []error
 
 	if innerErrs := d.verifyDropType(report, typeDropInfos); innerErrs != nil {
@@ -79,6 +86,11 @@ func (d *DropVerifier) verifyDropType(report *types.ReportTaskSingleReport, drop
 		return len(drops)
 	})
 
+	log.Debug().
+		Interface("grouped", grouped).
+		Interface("dropTypeAmountMap", dropTypeAmountMap).
+		Msg("dropTypeAmountMap")
+
 	for _, dropInfo := range dropInfos {
 		count := dropTypeAmountMap[dropInfo.DropType]
 		if dropInfo.Bounds.Lower > count {
@@ -95,29 +107,46 @@ func (d *DropVerifier) verifyDropType(report *types.ReportTaskSingleReport, drop
 	return errs
 }
 
+type DropInfoTuple struct {
+	ItemID int64
+	DropType string
+}
+
 /**
  * Verify drop item quantity
  * Check 1: iterate drops, check if any item is not in dropInfos
  * Check 2: iterate dropInfos, check if quantity is within bounds
  */
 func (d *DropVerifier) verifyDropItem(report *types.ReportTaskSingleReport, dropInfos []*model.DropInfo) (errs []error) {
-	itemIdSetFromDropInfos := make(map[int]struct{})
+	dropInfoSetFromDropInfos := make(map[DropInfoTuple]struct{})
 	for _, dropInfo := range dropInfos {
-		itemIdSetFromDropInfos[int(dropInfo.ItemID.Int64)] = struct{}{}
+		tuple := DropInfoTuple{
+			ItemID: dropInfo.ItemID.Int64,
+			DropType: dropInfo.DropType,
+		}
+		dropInfoSetFromDropInfos[tuple] = struct{}{}
 	}
 
 	// dropItemQuantityMap: key is item id, value is a sub map, key is drop type, value is quantity
 	dropItemQuantityMap := make(map[int]map[string]int)
 	for _, drop := range report.Drops {
+		tuple := DropInfoTuple{
+			ItemID: int64(drop.ItemID),
+			DropType: drop.DropType,
+		}
 		// Check 1
-		if _, ok := itemIdSetFromDropInfos[drop.ItemID]; !ok {
-			errs = append(errs, errors.Wrap(ErrUnknownItemID, fmt.Sprintf("item ID %d not found in drop info", drop.ItemID)))
+		if _, ok := dropInfoSetFromDropInfos[tuple]; !ok {
+			errs = append(errs, errors.Wrap(ErrUnknownDropInfoTuple, fmt.Sprintf("dropInfo tuple (dropType %s, itemId %d) not found in drop info", drop.DropType, drop.ItemID)))
 		}
 		if _, ok := dropItemQuantityMap[drop.ItemID]; !ok {
 			dropItemQuantityMap[drop.ItemID] = make(map[string]int)
 		}
 		dropItemQuantityMap[drop.ItemID][drop.DropType] += drop.Quantity
 	}
+
+	log.Debug().
+		Interface("dropItemQuantityMap", dropItemQuantityMap).
+		Msg("dropItemQuantityMap")
 
 	// Check 2
 	for _, dropInfo := range dropInfos {

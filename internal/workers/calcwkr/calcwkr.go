@@ -242,14 +242,20 @@ func (w *Worker) heartbeat(typ WorkerCalcType) {
 			return err
 		}
 		if r.StatusCode < 200 || r.StatusCode >= 300 {
-			return errors.Errorf("succeeded notification: invalid status code: %d", r.StatusCode)
+			return errors.Errorf("worker succeeded notification: invalid status code: %d", r.StatusCode)
 		}
 		return nil
 	}, retry.Attempts(5))
+
 	if err != nil {
 		log.Error().
 			Err(err).
+			Str("url", url).
 			Msg("worker succeeded notification eventually failed")
+	} else {
+		log.Info().
+			Str("url", url).
+			Msg("worker succeeded notification succeeded")
 	}
 }
 
