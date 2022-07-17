@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"io/fs"
 	"strconv"
 
 	"github.com/davecgh/go-spew/spew"
@@ -67,6 +68,11 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 	if e, ok := err.(*fiber.Error); ok {
 		// Use default error handler if not a custom error
 		return fiber.DefaultErrorHandler(ctx, e)
+	}
+
+	if _, ok := err.(*fs.PathError); ok {
+		// File not found
+		return HandleCustomError(ctx, pgerr.ErrInvalidReq)
 	}
 
 	// must be an unexpected runtime error then
