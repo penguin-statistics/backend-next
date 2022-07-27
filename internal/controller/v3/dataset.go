@@ -42,7 +42,7 @@ func (c *Dataset) AggregatedItem(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	queryResult, err := c.DropMatrixService.GetMaxAccumulableDropMatrixResults(ctx.Context(), server, "", ctx.Params("itemId"), accountId)
+	queryResult, err := c.DropMatrixService.GetMaxAccumulableDropMatrixResultsForV3(ctx.Context(), server, "", ctx.Params("itemId"), accountId)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func (c *Dataset) AggregatedStage(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	queryResult, err := c.DropMatrixService.GetMaxAccumulableDropMatrixResults(ctx.Context(), server, "stageId", "", accountId)
+	queryResult, err := c.DropMatrixService.GetMaxAccumulableDropMatrixResultsForV3(ctx.Context(), server, "stageId", "", accountId)
 	if err != nil {
 		return err
 	}
