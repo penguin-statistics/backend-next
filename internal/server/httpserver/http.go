@@ -46,11 +46,12 @@ func Create(conf *config.Config) *fiber.App {
 		ReadBufferSize: 8192,
 		// allow possibility for graceful shutdown, otherwise app#Shutdown() will block forever
 		IdleTimeout:             conf.HTTPServerShutdownTimeout,
-		ProxyHeader:             fiber.HeaderXForwardedFor,
+		ProxyHeader:             "X-Original-Forwarded-For",
 		EnableTrustedProxyCheck: true,
 		TrustedProxies:          conf.TrustedProxies,
-		ErrorHandler:            ErrorHandler,
-		Immutable:               true,
+
+		ErrorHandler: ErrorHandler,
+		Immutable:    true,
 	})
 
 	app.Use(favicon.New())
