@@ -9,6 +9,8 @@ import (
 	"github.com/rs/xid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
 // FromFiberCtx gets the logger in the request's context.
@@ -72,7 +74,7 @@ func RemoteAddrHandler(fieldKey string) func(ctx *fiber.Ctx) error {
 	return func(ctx *fiber.Ctx) error {
 		log := zerolog.Ctx(ctx.UserContext())
 		log.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str(fieldKey, ctx.IP())
+			return c.Str(fieldKey, util.ExtractIP(ctx))
 		})
 		return ctx.Next()
 	}
