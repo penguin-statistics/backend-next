@@ -51,6 +51,7 @@ func Create(conf *config.Config) *fiber.App {
 		TrustedProxies: []string{
 			"::1",
 			"127.0.0.1",
+			"10.0.0.0/8",
 		},
 		ErrorHandler: ErrorHandler,
 		Immutable:    true,
