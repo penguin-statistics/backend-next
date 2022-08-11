@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v3"
+	"github.com/go-redsync/redsync/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
@@ -21,6 +22,7 @@ type WorkerDeps struct {
 	PatternMatrixService *service.PatternMatrix
 	TrendService         *service.Trend
 	SiteStatsService     *service.SiteStats
+	RedSync              *redsync.Redsync
 }
 
 type Worker struct {
@@ -44,7 +46,7 @@ type Worker struct {
 	// Possible keys are: "stats", "trends"
 	heartbeatURL map[string]string
 
-	limiterCh chan struct{}
+	syncMutex *redsync.Mutex
 
 	WorkerDeps
 }
@@ -87,7 +89,7 @@ func Start(conf *config.Config, deps WorkerDeps) {
 			trendInterval: conf.WorkerTrendInterval,
 			timeout:       conf.WorkerTimeout,
 			heartbeatURL:  conf.WorkerHeartbeatURL,
-			limiterCh:     make(chan struct{}, 1),
+			syncMutex:     deps.RedSync.NewMutex("calcwkr", redsync.WithExpiry(30*time.Minute)),
 			WorkerDeps:    deps,
 		}
 		w.checkConfig()
@@ -160,6 +162,20 @@ func (w *Worker) doTrendCalc(sourceCategories []string) {
 	})
 }
 
+func (w *Worker) lock() error {
+	return w.syncMutex.Lock()
+}
+
+func (w *Worker) unlock() {
+	b, err := w.syncMutex.Unlock()
+	if err != nil {
+		log.Error().Err(err).Msg("unlock failed")
+	}
+	if !b {
+		log.Error().Msg("unlock failed: not locked")
+	}
+}
+
 func (w *Worker) spin(ctx context.Context, typ WorkerCalcType, f func(ctx context.Context, server string) error) {
 	logger := log.With().Str("service", "worker:calculator:"+string(typ)).Logger()
 	parentCtx := logger.WithContext(ctx)
@@ -169,7 +185,11 @@ func (w *Worker) spin(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 
 		for {
 			log.Ctx(parentCtx).Info().Int("count", w.count).Msg("worker batch timer fired. acquiring limiter lock...")
-			w.limiterCh <- struct{}{}
+			if err := w.lock(); err != nil {
+				log.Ctx(parentCtx).Error().Err(err).Msg("failed to acquire lock")
+				time.Sleep(time.Second * 30)
+				continue
+			}
 			log.Ctx(parentCtx).Info().Int("count", w.count).Msg("acquired limiter lock")
 
 			ctx, cancel := context.WithTimeout(parentCtx, w.timeout)
@@ -177,8 +197,8 @@ func (w *Worker) spin(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 			func() {
 				defer func() {
 					w.count++
-					<-w.limiterCh
 					cancel()
+					w.unlock()
 					time.Sleep(typ.Interval(w))
 				}()
 
