@@ -48,13 +48,9 @@ func Create(conf *config.Config) *fiber.App {
 		IdleTimeout:             conf.HTTPServerShutdownTimeout,
 		ProxyHeader:             fiber.HeaderXForwardedFor,
 		EnableTrustedProxyCheck: true,
-		TrustedProxies: []string{
-			"::1",
-			"127.0.0.1",
-			"10.0.0.0/8",
-		},
-		ErrorHandler: ErrorHandler,
-		Immutable:    true,
+		TrustedProxies:          conf.TrustedProxies,
+		ErrorHandler:            ErrorHandler,
+		Immutable:               true,
 	})
 
 	app.Use(favicon.New())

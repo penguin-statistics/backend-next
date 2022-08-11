@@ -14,6 +14,8 @@ type Config struct {
 	// Address is the listen address would listen on.
 	Address string
 
+	TrustedProxies []string `required:"true" split_words:"true" default:"::1,127.0.0.1,10.0.0.0/8"`
+
 	// DevMode to indicate development mode. When true, the program would spin up utilities for debugging and
 	// provide a more contextual message when encountered a panic. See internal/server/httpserver/http.go for the
 	// actual implementation details.
