@@ -77,7 +77,8 @@ func (s *ShortURL) Resolve(ctx *fiber.Ctx, path string) string {
 		return s.siteURL(ctx, resolved)
 	}
 
-	return s.resolveUnknown(path)
+	resolved := s.resolveUnknown(path)
+	return s.siteURL(ctx, resolved)
 }
 
 func (s *ShortURL) resolveByItemName(ctx context.Context, path string) (string, error) {
