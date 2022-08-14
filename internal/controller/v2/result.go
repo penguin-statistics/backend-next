@@ -5,7 +5,10 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	cachemiddleware "github.com/gofiber/fiber/v2/middleware/cache"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/gofiber/fiber/v2/utils"
+	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
@@ -37,10 +40,50 @@ type Result struct {
 }
 
 func RegisterResult(v2 *svr.V2, c Result) {
-	v2.Get("/result/matrix", middlewares.ValidateServerAsQuery, c.GetDropMatrix)
-	v2.Get("/result/pattern", middlewares.ValidateServerAsQuery, c.GetPatternMatrix)
-	v2.Get("/result/trends", middlewares.ValidateServerAsQuery, c.GetTrends)
-	v2.Post("/result/advanced", limiter.New(limiter.Config{
+	group := v2.Group("/result")
+
+	// Cache requests with itemFilter and stageFilter as there appears to be an unknown source requesting
+	// with such behaviors very eagerly, causing a relatively high load on the database.
+	log.Info().Msg("enabling fiber-level cache & limiter for requests under /result group which contain itemFilter or stageFilter query params.")
+
+	group.Use(limiter.New(limiter.Config{
+		Next: func(c *fiber.Ctx) bool {
+			if c.Query("itemFilter") != "" || c.Query("stageFilter") != "" {
+				return false
+			}
+			return true
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"code":    "TOO_MANY_REQUESTS",
+				"message": "Your client is sending requests too frequently. The Penguin Stats result matrix are updated periodically and should not be requested too frequently.",
+			})
+		},
+		Max:        300,
+		Expiration: time.Minute * 5,
+	}))
+
+	group.Use(cachemiddleware.New(cachemiddleware.Config{
+		Next: func(c *fiber.Ctx) bool {
+			// only cache requests with itemFilter and stageFilter query params
+			if c.Query("itemFilter") != "" || c.Query("stageFilter") != "" {
+				time.Sleep(time.Second) // simulate a slow request
+				return false
+			}
+			return true
+		},
+		CacheHeader:  "X-Penguin-Cache",
+		CacheControl: true,
+		Expiration:   time.Minute * 5,
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return utils.CopyString(c.OriginalURL())
+		},
+	}))
+
+	group.Get("/matrix", middlewares.ValidateServerAsQuery, c.GetDropMatrix)
+	group.Get("/pattern", middlewares.ValidateServerAsQuery, c.GetPatternMatrix)
+	group.Get("/trends", middlewares.ValidateServerAsQuery, c.GetTrends)
+	group.Post("/advanced", limiter.New(limiter.Config{
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"code":    "TOO_MANY_REQUESTS",
