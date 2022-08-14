@@ -3,9 +3,6 @@ package repo
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
