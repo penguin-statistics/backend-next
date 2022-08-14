@@ -169,10 +169,10 @@ func (w *Worker) lock() error {
 func (w *Worker) unlock() {
 	b, err := w.syncMutex.Unlock()
 	if err != nil {
-		log.Error().Err(err).Msg("unlock failed")
+		log.Error().Str("service", "worker").Err(err).Msg("unlock sync mutex failed")
 	}
 	if !b {
-		log.Error().Msg("unlock failed: not locked")
+		log.Error().Str("service", "worker").Msg("unlock sync mutex failed: not locked. this should not happen as it indicates the mutex is unlocked before the worker finished.")
 	}
 }
 
@@ -190,7 +190,7 @@ func (w *Worker) spin(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 				time.Sleep(time.Second * 30)
 				continue
 			}
-			log.Ctx(parentCtx).Info().Int("count", w.count).Msg("acquired limiter lock")
+			log.Ctx(parentCtx).Info().Int("count", w.count).Msg("successfully acquired limiter lock")
 
 			ctx, cancel := context.WithTimeout(parentCtx, w.timeout)
 
@@ -242,6 +242,9 @@ func (w *Worker) microtask(ctx context.Context, typ WorkerCalcType, service, ser
 		return err
 	}
 	log.Ctx(ctx).Info().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Msg("worker microtask finished")
+
+	// extends the sync mutex to ensure lock is held for enough duration
+	w.syncMutex.Extend()
 
 	return nil
 }
