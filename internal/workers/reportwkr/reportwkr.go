@@ -7,9 +7,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/uptrace/bun"
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
@@ -17,13 +19,22 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
-	"github.com/penguin-statistics/backend-next/internal/service"
+	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
+	"github.com/penguin-statistics/backend-next/internal/util/reportverifs"
 )
 
 type WorkerDeps struct {
 	fx.In
-	ReportServices *service.Report
+	DB                     *bun.DB
+	Redis                  *redis.Client
+	NatsJS                 nats.JetStreamContext
+	StageRepo              *repo.Stage
+	DropReportRepo         *repo.DropReport
+	DropPatternRepo        *repo.DropPattern
+	DropReportExtraRepo    *repo.DropReportExtra
+	DropPatternElementRepo *repo.DropPatternElement
+	ReportVerifier         *reportverifs.ReportVerifiers
 }
 
 type Worker struct {
@@ -66,7 +77,7 @@ func Start(conf *config.Config, deps WorkerDeps) {
 func (w *Worker) Consumer(ctx context.Context, ch chan error) error {
 	msgChan := make(chan *nats.Msg, 16)
 
-	_, err := w.ReportServices.NatsJS.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.AckWait(time.Second*10), nats.MaxAckPending(128))
+	_, err := w.NatsJS.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.AckWait(time.Second*10), nats.MaxAckPending(128))
 	if err != nil {
 		log.Err(err).Msg("failed to subscribe to REPORT.*")
 		return err
@@ -133,7 +144,7 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 
 	L.Info().Msg("now processing new report task")
 
-	violations := w.ReportServices.ReportVerifier.Verify(ctx, reportTask)
+	violations := w.ReportVerifier.Verify(ctx, reportTask)
 	if len(violations) > 0 {
 		L.Warn().
 			Interface("violations", violations).
@@ -148,7 +159,7 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 		taskCreatedAt = time.Now()
 	}
 
-	tx, err := w.ReportServices.DB.BeginTx(ctx, nil)
+	tx, err := w.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -166,18 +177,18 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 	for idx, report := range reportTask.Reports {
 		report.Drops = reportutil.MergeDropsByItemID(report.Drops)
 
-		dropPattern, created, err := w.ReportServices.DropPatternRepo.GetOrCreateDropPatternFromDrops(ctx, tx, report.Drops)
+		dropPattern, created, err := w.DropPatternRepo.GetOrCreateDropPatternFromDrops(ctx, tx, report.Drops)
 		if err != nil {
 			return errors.Wrap(err, "failed to calculate drop pattern hash")
 		}
 		if created {
-			_, err := w.ReportServices.DropPatternElementRepo.CreateDropPatternElements(ctx, tx, dropPattern.PatternID, report.Drops)
+			_, err := w.DropPatternElementRepo.CreateDropPatternElements(ctx, tx, dropPattern.PatternID, report.Drops)
 			if err != nil {
 				return errors.Wrap(err, "failed to create drop pattern elements")
 			}
 		}
 
-		stage, err := w.ReportServices.StageRepo.GetStageByArkId(ctx, report.StageID)
+		stage, err := w.StageRepo.GetStageByArkId(ctx, report.StageID)
 		if err != nil {
 			return errors.Wrap(err, "failed to get stage")
 		}
@@ -193,7 +204,7 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 			Server:      reportTask.Server,
 			AccountID:   reportTask.AccountID,
 		}
-		if err = w.ReportServices.DropReportRepo.CreateDropReport(ctx, tx, dropReport); err != nil {
+		if err = w.DropReportRepo.CreateDropReport(ctx, tx, dropReport); err != nil {
 			return errors.Wrap(err, "failed to create drop report")
 		}
 
@@ -207,7 +218,7 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 			// FIXME: temporary hack; find why ip is empty
 			reportTask.IP = "127.0.0.1"
 		}
-		if err = w.ReportServices.DropReportExtraRepo.CreateDropReportExtra(ctx, tx, &model.DropReportExtra{
+		if err = w.DropReportExtraRepo.CreateDropReportExtra(ctx, tx, &model.DropReportExtra{
 			ReportID: dropReport.ReportID,
 			IP:       reportTask.IP,
 			Source:   reportTask.Source,
@@ -218,7 +229,7 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 			return errors.Wrap(err, "failed to create drop report extra")
 		}
 
-		if err := w.ReportServices.Redis.Set(ctx, reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
+		if err := w.Redis.Set(ctx, reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
 			return errors.Wrap(err, "failed to set report id in redis")
 		}
 	}
