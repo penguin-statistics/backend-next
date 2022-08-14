@@ -89,7 +89,7 @@ func Start(conf *config.Config, deps WorkerDeps) {
 			trendInterval: conf.WorkerTrendInterval,
 			timeout:       conf.WorkerTimeout,
 			heartbeatURL:  conf.WorkerHeartbeatURL,
-			syncMutex:     deps.RedSync.NewMutex("calcwkr", redsync.WithExpiry(30*time.Minute)),
+			syncMutex:     deps.RedSync.NewMutex("mutex:calcwkr", redsync.WithExpiry(10*time.Minute)),
 			WorkerDeps:    deps,
 		}
 		w.checkConfig()
@@ -186,7 +186,7 @@ func (w *Worker) spin(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 		for {
 			log.Ctx(parentCtx).Info().Int("count", w.count).Msg("worker batch timer fired. acquiring limiter lock...")
 			if err := w.lock(); err != nil {
-				log.Ctx(parentCtx).Error().Err(err).Msg("failed to acquire lock")
+				log.Ctx(parentCtx).Warn().Err(err).Msg("failed to acquire lock, perhaps the resource is currently busy. sleeping for 30 seconds and trying again...")
 				time.Sleep(time.Second * 30)
 				continue
 			}
