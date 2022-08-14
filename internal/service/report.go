@@ -242,7 +242,7 @@ func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchR
 
 func (s *Report) RecallSingularReport(ctx context.Context, req *types.SingleReportRecallRequest) error {
 	var reportId int
-	r := s.Redis.Get(ctx, req.ReportHash)
+	r := s.Redis.Get(ctx, constant.ReportRedisPrefix+req.ReportHash)
 
 	if errors.Is(r.Err(), redis.Nil) {
 		return ErrReportNotFound

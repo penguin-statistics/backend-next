@@ -5,6 +5,8 @@ const (
 
 	ExtraProcessTypeGachaBox = "GACHABOX"
 
+	ReportRedisPrefix = "report:"
+
 	DropTypeRegular         = "REGULAR"
 	DropTypeSpecial         = "SPECIAL"
 	DropTypeExtra           = "EXTRA"
