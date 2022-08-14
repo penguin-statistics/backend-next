@@ -134,3 +134,4 @@ debug/
 **/logs/
 
 .env
+__debug_bin

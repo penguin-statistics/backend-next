@@ -3,14 +3,19 @@ package v2
 import (
 	"encoding/json"
 	"strings"
+	"time"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/crypto"
+	"github.com/penguin-statistics/backend-next/internal/pkg/fiberstore"
+	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
@@ -20,12 +25,24 @@ import (
 type Report struct {
 	fx.In
 
+	Redis         *redis.Client
 	Crypto        *crypto.Crypto
 	ReportService *service.Report
 }
 
 func RegisterReport(v2 *svr.V2, c Report) {
-	v2.Post("/report", c.SingularReport)
+	v2.Post("/report", middlewares.Idempotency(&middlewares.IdempotencyConfig{
+		Lifetime:  time.Hour * 24,
+		KeyHeader: constant.IdempotencyKeyHeader,
+		KeepResponseHeaders: []string{
+			fiber.HeaderContentType,
+			fiber.HeaderContentLength,
+			fiber.HeaderSetCookie,
+			constant.PenguinIDSetHeader,
+			constant.ShimCompatibilityHeaderKey,
+		},
+		Storage: fiberstore.NewRedis(c.Redis, "report-idempotency"),
+	}), c.SingularReport)
 	v2.Post("/report/recall", c.RecallSingularReport)
 	v2.Post("/report/recognition", c.RecognitionReport)
 }
