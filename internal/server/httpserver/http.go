@@ -9,13 +9,10 @@ import (
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/contrib/fibersentry"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cache"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
-	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/gofiber/fiber/v2/utils"
 	"github.com/gofiber/helmet/v2"
 	"github.com/penguin-statistics/fiberotel"
 	"github.com/rs/zerolog/log"
@@ -67,15 +64,9 @@ func Create(conf *config.Config) *fiber.App {
 		AllowCredentials: true,
 	}))
 	// requestid is used by report service to identify requests and generate taskId there afterwards
-	// app.Use(func(c *fiber.Ctx) error {
-	// 	i := xid.New()
-	// 	c.Locals(constant.ContextKeyRequestID, i.String())
-	// 	c.Set("X-Penguin-Request-ID", i.String())
-	// 	return c.Next()
-	// })
+	// the logger middleware now injects RequestID into the context
 	middlewares.Logger(app)
-	// the logger middleware injects RequestID into the context,
-	// and we need an extra middleware to extract it and repopulate it into ctx.Locals
+	// then we need an extra middleware to extract it and repopulate it into ctx.Locals
 	app.Use(middlewares.RequestID())
 
 	app.Use(func(c *fiber.Ctx) error {
@@ -135,47 +126,6 @@ func Create(conf *config.Config) *fiber.App {
 
 	if !conf.DevMode {
 		app.Use(middlewares.EnrichSentry())
-		// app.Use(limiter.New(limiter.Config{
-		// 	Max:        30,
-		// 	Expiration: time.Minute,
-		// }))
-
-		// Cache requests with itemFilter and stageFilter as there appears to be an unknown source requesting
-		// with such behaviors very eagerly, causing a relatively high load on the database.
-		log.Info().Msg("enabling fiber-level cache & limiter for all requests containing itemFilter or stageFilter query params.")
-		app.Use(limiter.New(limiter.Config{
-			Next: func(c *fiber.Ctx) bool {
-				if c.Query("itemFilter") != "" || c.Query("stageFilter") != "" {
-					return false
-				}
-				return true
-			},
-			LimitReached: func(c *fiber.Ctx) error {
-				return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
-					"code":    "TOO_MANY_REQUESTS",
-					"message": "Your client is sending requests too frequently. The Penguin Stats result matrix are updated periodically and should not be requested too frequently.",
-				})
-			},
-			Max:        300,
-			Expiration: time.Minute * 5,
-		}))
-
-		app.Use(cache.New(cache.Config{
-			Next: func(c *fiber.Ctx) bool {
-				// only cache requests with itemFilter and stageFilter query params
-				if c.Query("itemFilter") != "" || c.Query("stageFilter") != "" {
-					time.Sleep(time.Second) // simulate a slow request
-					return false
-				}
-				return true
-			},
-			CacheHeader:  "X-Penguin-Cache",
-			CacheControl: true,
-			Expiration:   time.Minute * 5,
-			KeyGenerator: func(c *fiber.Ctx) string {
-				return utils.CopyString(c.OriginalURL())
-			},
-		}))
 	}
 
 	return app
