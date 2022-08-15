@@ -55,9 +55,6 @@ type Config struct {
 	// HTTPServerShutdownTimeout is the timeout for the HTTP server to shut down gracefully.
 	HTTPServerShutdownTimeout time.Duration `required:"true" split_words:"true" default:"60s"`
 
-	// GeoIPDBPath is the path to the GeoIP2 database.
-	GeoIPDBPath string `required:"true" split_words:"true" default:"vendors/maxmind/assets/geolite2/GeoLite2-Country.mmdb"`
-
 	// WorkerInterval describes the interval in-between different batches
 	WorkerInterval time.Duration `required:"true" split_words:"true" default:"10m"`
 
