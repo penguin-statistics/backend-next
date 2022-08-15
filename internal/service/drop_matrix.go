@@ -149,7 +149,7 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 		return err
 	}
 
-	elements, err := async.FlatMap(allTimeRanges, 1, func(timeRange *model.TimeRange) ([]*model.DropMatrixElement, error) {
+	elements, err := async.FlatMap(allTimeRanges, constant.WorkerParallelism, func(timeRange *model.TimeRange) ([]*model.DropMatrixElement, error) {
 		timeRanges := []*model.TimeRange{timeRange}
 		currentBatch := make([]*model.DropMatrixElement, 0)
 		for _, sourceCategory := range sourceCategories {
@@ -161,6 +161,9 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 		}
 		return currentBatch, nil
 	})
+	if err != nil {
+		return errors.Wrap(err, "failed to calculate drop matrix")
+	}
 
 	// process results
 	if err := s.DropMatrixElementService.BatchSaveElements(ctx, elements, server); err != nil {

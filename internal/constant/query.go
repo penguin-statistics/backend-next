@@ -9,4 +9,6 @@ const (
 	SourceCategoryManual    = "manual"
 	SourceCategoryAutomated = "automated"
 	SourceCategoryAll       = "all"
+
+	WorkerParallelism = 2
 )
