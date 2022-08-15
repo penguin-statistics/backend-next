@@ -116,7 +116,7 @@ func (w *Worker) checkConfig() {
 }
 
 func (w *Worker) doMainCalc(sourceCategories []string) {
-	w.spin(context.Background(), WorkerCalcTypeStatsCalc, func(ctx context.Context, server string) error {
+	w.task(context.Background(), WorkerCalcTypeStatsCalc, func(ctx context.Context, server string) error {
 		var err error
 
 		// DropMatrixService
@@ -148,7 +148,7 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 }
 
 func (w *Worker) doTrendCalc(sourceCategories []string) {
-	w.spin(context.Background(), WorkerCalcTypeTrendsCalc, func(ctx context.Context, server string) error {
+	w.task(context.Background(), WorkerCalcTypeTrendsCalc, func(ctx context.Context, server string) error {
 		var err error
 
 		// TrendService
@@ -176,7 +176,7 @@ func (w *Worker) unlock() {
 	}
 }
 
-func (w *Worker) spin(ctx context.Context, typ WorkerCalcType, f func(ctx context.Context, server string) error) {
+func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx context.Context, server string) error) {
 	logger := log.With().Str("service", "worker:calculator:"+string(typ)).Logger()
 	parentCtx := logger.WithContext(ctx)
 
@@ -244,7 +244,15 @@ func (w *Worker) microtask(ctx context.Context, typ WorkerCalcType, service, ser
 	log.Ctx(ctx).Info().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Msg("worker microtask finished")
 
 	// extends the sync mutex to ensure lock is held for enough duration
-	w.syncMutex.Extend()
+	ok, err := w.syncMutex.Extend()
+	if err != nil {
+		log.Ctx(ctx).Error().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Err(err).Msg("failed to extend sync mutex")
+		return err
+	}
+	if !ok {
+		log.Ctx(ctx).Error().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Msg("failed to extend sync mutex: not locked. this should not happen as it indicates the mutex is unlocked before the worker finished.")
+		return errors.New("failed to extend sync mutex: not locked")
+	}
 
 	return nil
 }
