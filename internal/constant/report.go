@@ -1,5 +1,7 @@
 package constant
 
+import "time"
+
 const (
 	FurnitureArkItemID = "furni"
 
@@ -20,6 +22,9 @@ const (
 
 	ViolationReliabilityRejectRuleRangeLeast = 1 << 8
 	ViolationReliabilityRejectRuleRangeMost  = 1 << 10
+
+	ReportIdempotencyLifetime     = time.Hour * 24
+	ReportIdempotencyRedisHashKey = "report-idempotency"
 )
 
 // DropTypeMap maps an API drop type to a database drop type.

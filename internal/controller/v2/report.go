@@ -3,7 +3,6 @@ package v2
 import (
 	"encoding/json"
 	"strings"
-	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/gofiber/fiber/v2"
@@ -32,7 +31,7 @@ type Report struct {
 
 func RegisterReport(v2 *svr.V2, c Report) {
 	v2.Post("/report", middlewares.Idempotency(&middlewares.IdempotencyConfig{
-		Lifetime:  time.Hour * 24,
+		Lifetime:  constant.ReportIdempotencyLifetime,
 		KeyHeader: constant.IdempotencyKeyHeader,
 		KeepResponseHeaders: []string{
 			fiber.HeaderContentType,
@@ -41,7 +40,7 @@ func RegisterReport(v2 *svr.V2, c Report) {
 			constant.PenguinIDSetHeader,
 			constant.ShimCompatibilityHeaderKey,
 		},
-		Storage: fiberstore.NewRedis(c.Redis, "report-idempotency"),
+		Storage: fiberstore.NewRedis(c.Redis, constant.ReportIdempotencyRedisHashKey),
 	}), c.SingularReport)
 	v2.Post("/report/recall", c.RecallSingularReport)
 	v2.Post("/report/recognition", c.RecognitionReport)
