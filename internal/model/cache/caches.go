@@ -64,6 +64,8 @@ var (
 	ShimZones       *cache.Singular[[]*modelv2.Zone]
 	ShimZoneByArkID *cache.Set[modelv2.Zone]
 
+	RecruitTagMap *cache.Singular[map[string]string]
+
 	DropPatternElementsByPatternID *cache.Set[[]*model.DropPatternElement]
 
 	LastModifiedTime *cache.Set[time.Time]
@@ -213,6 +215,10 @@ func initializeCaches() {
 	SetMap["zone#arkZoneId"] = ZoneByArkID.Flush
 	SingularFlusherMap["shimZones"] = ShimZones.Delete
 	SetMap["shimZone#arkZoneId"] = ShimZoneByArkID.Flush
+
+	// recruit tag maps (for report)
+	RecruitTagMap = cache.NewSingular[map[string]string]("recruitTagMap#bilingualTagName")
+	SingularFlusherMap["recruitTagMap#bilingualTagName"] = RecruitTagMap.Delete
 
 	// drop_pattern_elements
 	DropPatternElementsByPatternID = cache.NewSet[[]*model.DropPatternElement]("dropPatternElements#patternId")
