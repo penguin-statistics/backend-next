@@ -36,6 +36,8 @@ var (
 	ItemsMapById    *cache.Singular[map[int]*model.Item]
 	ItemsMapByArkID *cache.Singular[map[string]*model.Item]
 
+	RecruitTagMap *cache.Singular[map[string]string]
+
 	Notices *cache.Singular[[]*model.Notice]
 
 	Activities     *cache.Singular[[]*model.Activity]
@@ -63,8 +65,6 @@ var (
 	ZoneByArkID     *cache.Set[model.Zone]
 	ShimZones       *cache.Singular[[]*modelv2.Zone]
 	ShimZoneByArkID *cache.Set[modelv2.Zone]
-
-	RecruitTagMap *cache.Singular[map[string]string]
 
 	DropPatternElementsByPatternID *cache.Set[[]*model.DropPatternElement]
 
@@ -152,6 +152,10 @@ func initializeCaches() {
 	SingularFlusherMap["itemsMapById"] = ItemsMapById.Delete
 	SingularFlusherMap["itemsMapByArkId"] = ItemsMapByArkID.Delete
 
+	// recruit tag maps (for report)
+	RecruitTagMap = cache.NewSingular[map[string]string]("recruitTagMap#bilingualTagName")
+	SingularFlusherMap["recruitTagMap#bilingualTagName"] = RecruitTagMap.Delete
+
 	// notice
 	Notices = cache.NewSingular[[]*model.Notice]("notices")
 
@@ -215,10 +219,6 @@ func initializeCaches() {
 	SetMap["zone#arkZoneId"] = ZoneByArkID.Flush
 	SingularFlusherMap["shimZones"] = ShimZones.Delete
 	SetMap["shimZone#arkZoneId"] = ShimZoneByArkID.Flush
-
-	// recruit tag maps (for report)
-	RecruitTagMap = cache.NewSingular[map[string]string]("recruitTagMap#bilingualTagName")
-	SingularFlusherMap["recruitTagMap#bilingualTagName"] = RecruitTagMap.Delete
 
 	// drop_pattern_elements
 	DropPatternElementsByPatternID = cache.NewSet[[]*model.DropPatternElement]("dropPatternElements#patternId")
