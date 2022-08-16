@@ -153,6 +153,30 @@ func (s *Item) GetItemsMapByArkId(ctx context.Context) (map[string]*model.Item, 
 	return itemsMapByArkId, nil
 }
 
+// Cache: (singular) recruitTagMap, 1 hr
+func (s *Item) GetRecruitTagItemsByBilingualName(ctx context.Context) (map[string]string, error) {
+	var m map[string]string
+	err := cache.RecruitTagMap.MutexGetSet(&m, func() (map[string]string, error) {
+		items, err := s.ItemRepo.GetRecruitTagItems(ctx)
+		if err != nil {
+			return nil, err
+		}
+		m := make(map[string]string)
+		for _, item := range items {
+			names := gjson.ParseBytes(item.Name)
+			names.ForEach(func(key, value gjson.Result) bool {
+				m[value.Str] = item.ArkItemID
+				return true
+			})
+		}
+		return m, nil
+	}, time.Hour)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (s *Item) applyShim(item *modelv2.Item) {
 	nameI18n := gjson.ParseBytes(item.NameI18n)
 	item.Name = nameI18n.Map()["zh"].String()

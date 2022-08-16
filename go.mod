@@ -14,11 +14,13 @@ require (
 	github.com/go-playground/universal-translator v0.18.0
 	github.com/go-playground/validator/v10 v10.11.0
 	github.com/go-redis/redis/v8 v8.11.5
+	github.com/go-redsync/redsync/v4 v4.5.1
 	github.com/goccy/go-json v0.9.7
 	github.com/gofiber/contrib/fibersentry v0.0.0-20220524060257-8ccfafc37b12
 	github.com/gofiber/fiber/v2 v2.34.1
 	github.com/gofiber/helmet/v2 v2.2.13
 	github.com/gofiber/swagger v0.0.1
+	github.com/jinzhu/copier v0.3.5
 	github.com/joho/godotenv v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/nats-io/nats.go v1.16.0
@@ -46,14 +48,12 @@ require (
 	golang.org/x/exp v0.0.0-20220428152302-39d4317da171
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3
 	golang.org/x/text v0.3.7
-	google.golang.org/protobuf v1.28.0
 	gopkg.in/guregu/null.v3 v3.5.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/go-redsync/redsync/v4 v4.5.1 // indirect
 	github.com/gofiber/adaptor/v2 v2.1.23 // indirect
 	github.com/gofiber/utils v0.1.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
@@ -64,6 +64,7 @@ require (
 	github.com/prometheus/common v0.34.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/swaggo/files v0.0.0-20210815190702-a29dd2bc99b2 // indirect
+	google.golang.org/protobuf v1.28.0 // indirect
 )
 
 require (
@@ -92,7 +93,6 @@ require (
 	github.com/oschwald/maxminddb-golang v1.9.0 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/stretchr/objx v0.4.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect

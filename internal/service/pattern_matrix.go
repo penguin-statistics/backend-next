@@ -320,7 +320,8 @@ func (s *PatternMatrix) applyShimForPatternMatrixQuery(ctx context.Context, quer
 			}
 			// create pattern object from dropPatternElements
 			pattern := modelv2.Pattern{
-				Drops: make([]*modelv2.OneDrop, 0),
+				PatternID: patternId,
+				Drops:     make([]*modelv2.OneDrop, 0),
 			}
 			linq.From(dropPatternElements).SortT(func(el1, el2 *model.DropPatternElement) bool {
 				item1 := itemsMapById[el1.ItemID]

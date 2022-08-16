@@ -79,6 +79,42 @@ func (s *Report) pipelineAccount(ctx *fiber.Ctx) (accountId int, err error) {
 	return accountId, nil
 }
 
+func (s *Report) pipelinePreprocessRecruitmentTags(ctx context.Context, req *types.SingleReportRequest) error {
+	if req.StageID == constant.RecruitStageID {
+		recruitTagMap, err := s.ItemService.GetRecruitTagItemsByBilingualName(ctx)
+		if err != nil {
+			return err
+		}
+
+		itemsMap, err := s.ItemService.GetItemsMapByArkId(ctx)
+		if err != nil {
+			return err
+		}
+
+		drops := make([]types.ArkDrop, 0, len(req.Drops))
+		for _, v := range req.Drops {
+			tag := v.ItemID
+			var itemId string
+			if _, ok := itemsMap[tag]; ok {
+				itemId = tag
+			} else if _, ok := recruitTagMap[tag]; ok {
+				itemId = recruitTagMap[tag]
+			} else {
+				return pgerr.ErrInvalidReq.Msg("unexpected recruit tag '%s': not found", tag)
+			}
+			drops = append(drops, types.ArkDrop{
+				DropType: v.DropType,
+				ItemID:   itemId,
+				Quantity: v.Quantity,
+			})
+		}
+
+		req.Drops = drops
+	}
+
+	return nil
+}
+
 func (s *Report) pipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []types.ArkDrop) ([]*types.Drop, error) {
 	convertedDrops := make([]*types.Drop, 0, len(drops))
 	for _, drop := range drops {
@@ -152,6 +188,11 @@ func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.Re
 func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingleReportRequest) (taskId string, err error) {
 	// if account is not found, create new account
 	accountId, err := s.pipelineAccount(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	err = s.pipelinePreprocessRecruitmentTags(ctx.Context(), req)
 	if err != nil {
 		return "", err
 	}

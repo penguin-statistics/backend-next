@@ -32,7 +32,8 @@ type OnePatternMatrixElement struct {
 }
 
 type Pattern struct {
-	Drops []*OneDrop `json:"drops"`
+	PatternID int        `json:"-" example:"1"`
+	Drops     []*OneDrop `json:"drops"`
 }
 
 type OneDrop struct {

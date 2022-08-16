@@ -3,7 +3,6 @@ package infra
 import (
 	"context"
 	"database/sql"
-	"runtime"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -33,10 +32,10 @@ func Postgres(conf *config.Config) (*bun.DB, error) {
 		return nil, err
 	}
 
-	pgdb.SetMaxOpenConns(runtime.NumCPU() * 2)
-	pgdb.SetMaxIdleConns(2)
-	pgdb.SetConnMaxLifetime(time.Minute * 5)
-	pgdb.SetConnMaxIdleTime(time.Minute * 5)
+	pgdb.SetMaxOpenConns(conf.PostgresMaxOpenConns)
+	pgdb.SetMaxIdleConns(conf.PostgresMaxIdleConns)
+	pgdb.SetConnMaxLifetime(conf.PostgresConnMaxLifetime)
+	pgdb.SetConnMaxIdleTime(conf.PostgresConnMaxIdleTime)
 
 	return db, nil
 }

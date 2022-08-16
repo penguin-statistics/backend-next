@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
@@ -113,4 +114,20 @@ func (c *Item) SearchItemByName(ctx context.Context, name string) (*model.Item, 
 	}
 
 	return &item, nil
+}
+
+func (c *Item) GetRecruitTagItems(ctx context.Context) ([]*model.Item, error) {
+	var items []*model.Item
+	err := c.DB.NewSelect().
+		Model(&items).
+		Where("type = ?", constant.RecruitItemType).
+		Scan(ctx)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, pgerr.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return items, nil
 }

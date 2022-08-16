@@ -36,6 +36,8 @@ var (
 	ItemsMapById    *cache.Singular[map[int]*model.Item]
 	ItemsMapByArkID *cache.Singular[map[string]*model.Item]
 
+	RecruitTagMap *cache.Singular[map[string]string]
+
 	Notices *cache.Singular[[]*model.Notice]
 
 	Activities     *cache.Singular[[]*model.Activity]
@@ -149,6 +151,10 @@ func initializeCaches() {
 	SetMap["shimItem#arkItemId"] = ShimItemByArkID.Flush
 	SingularFlusherMap["itemsMapById"] = ItemsMapById.Delete
 	SingularFlusherMap["itemsMapByArkId"] = ItemsMapByArkID.Delete
+
+	// recruit tag maps (for report)
+	RecruitTagMap = cache.NewSingular[map[string]string]("recruitTagMap#bilingualTagName")
+	SingularFlusherMap["recruitTagMap#bilingualTagName"] = RecruitTagMap.Delete
 
 	// notice
 	Notices = cache.NewSingular[[]*model.Notice]("notices")

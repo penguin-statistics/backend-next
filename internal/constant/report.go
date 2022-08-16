@@ -25,6 +25,9 @@ const (
 
 	ReportIdempotencyLifetime     = time.Hour * 24
 	ReportIdempotencyRedisHashKey = "report-idempotency"
+
+	RecruitStageID  = "recruit"
+	RecruitItemType = "RECRUIT_TAG"
 )
 
 // DropTypeMap maps an API drop type to a database drop type.
