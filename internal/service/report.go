@@ -81,7 +81,12 @@ func (s *Report) pipelineAccount(ctx *fiber.Ctx) (accountId int, err error) {
 
 func (s *Report) pipelinePreprocessRecruitmentTags(ctx context.Context, req *types.SingleReportRequest) error {
 	if req.StageID == constant.RecruitStageID {
-		m, err := s.ItemService.GetRecruitTagItemsByBilingualName(ctx)
+		recruitTagMap, err := s.ItemService.GetRecruitTagItemsByBilingualName(ctx)
+		if err != nil {
+			return err
+		}
+
+		itemsMap, err := s.ItemService.GetItemsMapByArkId(ctx)
 		if err != nil {
 			return err
 		}
@@ -89,15 +94,19 @@ func (s *Report) pipelinePreprocessRecruitmentTags(ctx context.Context, req *typ
 		drops := make([]types.ArkDrop, 0, len(req.Drops))
 		for _, v := range req.Drops {
 			tag := v.ItemID
-			if _, ok := m[tag]; ok {
-				drops = append(drops, types.ArkDrop{
-					DropType: v.DropType,
-					ItemID:   m[tag],
-					Quantity: v.Quantity,
-				})
+			var itemId string
+			if _, ok := itemsMap[tag]; ok {
+				itemId = tag
+			} else if _, ok := recruitTagMap[tag]; ok {
+				itemId = recruitTagMap[tag]
 			} else {
 				return pgerr.ErrInvalidReq.Msg("unexpected recruit tag '%s': not found", tag)
 			}
+			drops = append(drops, types.ArkDrop{
+				DropType: v.DropType,
+				ItemID:   itemId,
+				Quantity: v.Quantity,
+			})
 		}
 
 		req.Drops = drops
