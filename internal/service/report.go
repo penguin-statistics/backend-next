@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"time"
 
 	"github.com/dchest/uniuri"
@@ -159,19 +158,6 @@ func (s *Report) pipelineAggregateGachaboxDrops(ctx context.Context, singleRepor
 	return nil
 }
 
-// FIXME: temporary compensation for reports from MaaAssistant, where stageId passed for act18d3 is currently ambiguous
-// this function will mutate req with the correct stageId, if detected that such request matches the following criteria:
-// 1. report time < 1654718400000
-// 2. is from MeoAssistant
-// 3. stageId is in form `act18d3_0$_perm` where $ represents integers [1-9]
-func (s *Report) pipelineMaaAct18d3TemporaryMitigation(ctx *fiber.Ctx, req *types.SingleReportRequest) {
-	if time.Now().UnixMilli() < 1654718400000 && req.Source == "MeoAssistant" {
-		if strings.HasPrefix(req.StageID, "act18d3_") && strings.HasSuffix(req.StageID, "_perm") {
-			req.StageID = strings.Replace(req.StageID, "_perm", "_rep", 1)
-		}
-	}
-}
-
 func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.ReportTask) (taskId string, err error) {
 	taskId = s.pipelineTaskId(ctx)
 	task.TaskID = taskId
@@ -230,8 +216,6 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 	if err != nil {
 		return "", err
 	}
-
-	s.pipelineMaaAct18d3TemporaryMitigation(ctx, req)
 
 	// construct ReportContext
 	reportTask := &types.ReportTask{
