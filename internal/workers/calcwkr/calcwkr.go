@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v3"
+	"github.com/go-redsync/redsync/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
@@ -21,6 +22,7 @@ type WorkerDeps struct {
 	PatternMatrixService *service.PatternMatrix
 	TrendService         *service.Trend
 	SiteStatsService     *service.SiteStats
+	RedSync              *redsync.Redsync
 }
 
 type Worker struct {
@@ -44,7 +46,7 @@ type Worker struct {
 	// Possible keys are: "stats", "trends"
 	heartbeatURL map[string]string
 
-	limiterCh chan struct{}
+	syncMutex *redsync.Mutex
 
 	WorkerDeps
 }
@@ -87,7 +89,7 @@ func Start(conf *config.Config, deps WorkerDeps) {
 			trendInterval: conf.WorkerTrendInterval,
 			timeout:       conf.WorkerTimeout,
 			heartbeatURL:  conf.WorkerHeartbeatURL,
-			limiterCh:     make(chan struct{}, 1),
+			syncMutex:     deps.RedSync.NewMutex("mutex:calcwkr", redsync.WithExpiry(10*time.Minute)),
 			WorkerDeps:    deps,
 		}
 		w.checkConfig()
@@ -114,7 +116,7 @@ func (w *Worker) checkConfig() {
 }
 
 func (w *Worker) doMainCalc(sourceCategories []string) {
-	w.spin(context.Background(), WorkerCalcTypeStatsCalc, func(ctx context.Context, server string) error {
+	w.task(context.Background(), WorkerCalcTypeStatsCalc, func(ctx context.Context, server string) error {
 		var err error
 
 		// DropMatrixService
@@ -146,7 +148,7 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 }
 
 func (w *Worker) doTrendCalc(sourceCategories []string) {
-	w.spin(context.Background(), WorkerCalcTypeTrendsCalc, func(ctx context.Context, server string) error {
+	w.task(context.Background(), WorkerCalcTypeTrendsCalc, func(ctx context.Context, server string) error {
 		var err error
 
 		// TrendService
@@ -160,7 +162,21 @@ func (w *Worker) doTrendCalc(sourceCategories []string) {
 	})
 }
 
-func (w *Worker) spin(ctx context.Context, typ WorkerCalcType, f func(ctx context.Context, server string) error) {
+func (w *Worker) lock() error {
+	return w.syncMutex.Lock()
+}
+
+func (w *Worker) unlock() {
+	b, err := w.syncMutex.Unlock()
+	if err != nil {
+		log.Error().Str("service", "worker").Err(err).Msg("unlock sync mutex failed")
+	}
+	if !b {
+		log.Error().Str("service", "worker").Msg("unlock sync mutex failed: not locked. this should not happen as it indicates the mutex is unlocked before the worker finished.")
+	}
+}
+
+func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx context.Context, server string) error) {
 	logger := log.With().Str("service", "worker:calculator:"+string(typ)).Logger()
 	parentCtx := logger.WithContext(ctx)
 
@@ -169,16 +185,20 @@ func (w *Worker) spin(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 
 		for {
 			log.Ctx(parentCtx).Info().Int("count", w.count).Msg("worker batch timer fired. acquiring limiter lock...")
-			w.limiterCh <- struct{}{}
-			log.Ctx(parentCtx).Info().Int("count", w.count).Msg("acquired limiter lock")
+			if err := w.lock(); err != nil {
+				log.Ctx(parentCtx).Warn().Err(err).Msg("failed to acquire lock, perhaps the resource is currently busy. sleeping for 30 seconds and trying again...")
+				time.Sleep(time.Second * 30)
+				continue
+			}
+			log.Ctx(parentCtx).Info().Int("count", w.count).Msg("successfully acquired limiter lock")
 
 			ctx, cancel := context.WithTimeout(parentCtx, w.timeout)
 
 			func() {
 				defer func() {
 					w.count++
-					<-w.limiterCh
 					cancel()
+					w.unlock()
 					time.Sleep(typ.Interval(w))
 				}()
 
@@ -222,6 +242,17 @@ func (w *Worker) microtask(ctx context.Context, typ WorkerCalcType, service, ser
 		return err
 	}
 	log.Ctx(ctx).Info().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Msg("worker microtask finished")
+
+	// extends the sync mutex to ensure lock is held for enough duration
+	ok, err := w.syncMutex.Extend()
+	if err != nil {
+		log.Ctx(ctx).Error().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Err(err).Msg("failed to extend sync mutex")
+		return err
+	}
+	if !ok {
+		log.Ctx(ctx).Error().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Msg("failed to extend sync mutex: not locked. this should not happen as it indicates the mutex is unlocked before the worker finished.")
+		return errors.New("failed to extend sync mutex: not locked")
+	}
 
 	return nil
 }

@@ -6,6 +6,7 @@ func Module() fx.Option {
 	return fx.Module("infra", fx.Provide(
 		NATS,
 		Redis,
+		RedSync,
 		Postgres,
 		GeoIPDatabase,
 	))

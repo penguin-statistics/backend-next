@@ -86,7 +86,7 @@ func (s *PatternMatrix) RefreshAllPatternMatrixElements(ctx context.Context, ser
 	}
 	stageIdsTuples := wrap.TuplePtrsFromMap(s.getStageIdsMapByTimeRange(allTimeRanges))
 
-	elements, err := async.FlatMap(stageIdsTuples, 1, func(tuple *wrap.Tuple[int, []int]) ([]*model.PatternMatrixElement, error) {
+	elements, err := async.FlatMap(stageIdsTuples, constant.WorkerParallelism, func(tuple *wrap.Tuple[int, []int]) ([]*model.PatternMatrixElement, error) {
 		timeRanges := []*model.TimeRange{timeRangesMap[tuple.Key]}
 		currentBatch := make([]*model.PatternMatrixElement, 0)
 		for _, sourceCategory := range sourceCategories {

@@ -162,7 +162,7 @@ func (s *Trend) RefreshTrendElements(ctx context.Context, server string, sourceC
 		}
 	}
 
-	elements, err := async.FlatMap(calcq, 1, func(m map[string]any) ([]*model.TrendElement, error) {
+	elements, err := async.FlatMap(calcq, constant.WorkerParallelism, func(m map[string]any) ([]*model.TrendElement, error) {
 		stageId := m["stageId"].(int)
 		itemIds := m["itemIds"].([]int)
 		startTime := m["startTime"].(time.Time)

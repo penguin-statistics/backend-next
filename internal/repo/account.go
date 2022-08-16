@@ -3,9 +3,6 @@ package repo
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -13,6 +10,7 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 )
 
 const AccountMaxRetries = 100
@@ -25,19 +23,11 @@ func NewAccount(db *bun.DB) *Account {
 	return &Account{db: db}
 }
 
-// Before v3.3.7, approximately released at 2022-06-05 01:00, PenguinIDs are generated as 8 digits number string.
-// After v3.3.7, newly generated PenguinIDs will be a 9 digits number string.
-// PenguinID can start with 0, with generated number padded to the corresponding length with 0.
-func generateRandomPenguinId() string {
-	rand.Seed(time.Now().UnixNano())
-	return fmt.Sprintf("%09d", rand.Intn(1e9))
-}
-
 func (c *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.Account, error) {
 	// retry if account already exists
 	for i := 0; i < AccountMaxRetries; i++ {
 		account := &model.Account{
-			PenguinID: generateRandomPenguinId(),
+			PenguinID: pgid.New(),
 		}
 		_, err := c.db.NewInsert().
 			Model(account).
