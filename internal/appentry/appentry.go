@@ -8,6 +8,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/config"
 	controllermeta "github.com/penguin-statistics/backend-next/internal/controller/meta"
 	controllerv2 "github.com/penguin-statistics/backend-next/internal/controller/v2"
+	controllerv3 "github.com/penguin-statistics/backend-next/internal/controller/v3"
 	"github.com/penguin-statistics/backend-next/internal/infra"
 	"github.com/penguin-statistics/backend-next/internal/model/cache"
 	"github.com/penguin-statistics/backend-next/internal/pkg/crypto"
@@ -52,7 +53,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		controllerv2.Module(),
 
 		// Controllers (v3)
-		// controllerv3.Module(),
+		controllerv3.Module(),
 
 		// Controllers (meta)
 		controllermeta.Module(),

@@ -10,7 +10,7 @@ type AggregatedItemStats struct {
 }
 
 type AggregatedStageStats struct {
-	Matrix   []*modelv2.OneDropMatrixElement    `json:"matrix"`
-	Trends   map[string]*modelv2.StageTrend     `json:"trends"`
-	Patterns []*modelv2.OnePatternMatrixElement `json:"patterns"`
+	Matrix   []*modelv2.OneDropMatrixElement `json:"matrix"`
+	Trends   map[string]*modelv2.StageTrend  `json:"trends"`
+	Patterns []*OnePatternMatrixElement      `json:"patterns"`
 }

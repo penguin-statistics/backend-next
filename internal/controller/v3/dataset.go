@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/jinzhu/copier"
 	"github.com/samber/lo"
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
@@ -71,7 +72,7 @@ func (c Dataset) aggregateTrend(ctx *fiber.Ctx) (*modelv2.TrendQueryResult, erro
 	return result, nil
 }
 
-func (c Dataset) aggregatePattern(ctx *fiber.Ctx) (*modelv2.PatternMatrixQueryResult, error) {
+func (c Dataset) aggregatePattern(ctx *fiber.Ctx) (*modelv3.PatternMatrixQueryResult, error) {
 	server := ctx.Query("server", "CN")
 	if err := rekuest.ValidServer(ctx, server); err != nil {
 		return nil, err
@@ -97,7 +98,10 @@ func (c Dataset) aggregatePattern(ctx *fiber.Ctx) (*modelv2.PatternMatrixQueryRe
 		return nil, err
 	}
 
-	return shimResult, nil
+	var result modelv3.PatternMatrixQueryResult
+	copier.Copy(&result, shimResult)
+
+	return &result, nil
 }
 
 func (c Dataset) AggregatedItem(ctx *fiber.Ctx) error {
@@ -170,7 +174,7 @@ func (c Dataset) AggregatedStage(ctx *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	aggregated.Patterns = lo.Filter(pattern.PatternMatrix, func(el *modelv2.OnePatternMatrixElement, _ int) bool {
+	aggregated.Patterns = lo.Filter(pattern.PatternMatrix, func(el *modelv3.OnePatternMatrixElement, _ int) bool {
 		return el.StageID == ctx.Params("stageId")
 	})
 
