@@ -17,8 +17,8 @@ require (
 	github.com/go-redsync/redsync/v4 v4.5.1
 	github.com/goccy/go-json v0.9.7
 	github.com/gofiber/contrib/fibersentry v0.0.0-20220524060257-8ccfafc37b12
-	github.com/gofiber/fiber/v2 v2.34.1
-	github.com/gofiber/helmet/v2 v2.2.13
+	github.com/gofiber/fiber/v2 v2.36.0
+	github.com/gofiber/helmet/v2 v2.2.15
 	github.com/gofiber/swagger v0.0.1
 	github.com/jinzhu/copier v0.3.5
 	github.com/joho/godotenv v1.4.0
