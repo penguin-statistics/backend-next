@@ -307,20 +307,15 @@ func (s *DropReport) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, 
 	return results, nil
 }
 
-func (s *DropReport) CalcRecentUniqueUserCountBySource(ctx context.Context, duration string) ([]*modelv2.UniqueUserCountBySource, error) {
+func (s *DropReport) CalcRecentUniqueUserCountBySource(ctx context.Context, duration time.Duration) ([]*modelv2.UniqueUserCountBySource, error) {
 	results := make([]*modelv2.UniqueUserCountBySource, 0)
-
-	d, err := time.ParseDuration(duration)
-	if err != nil {
-		return nil, err
-	}
 
 	subq := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
 		Column("dre.source_name", "dr.account_id").
 		Join("LEFT JOIN drop_report_extras AS dre").
 		JoinOn("dr.report_id = dre.report_id")
-	s.handleCreatedAtWithTime(subq, time.Now().Add(-d), time.Now())
+	s.handleCreatedAtWithTime(subq, time.Now().Add(-duration), time.Now())
 	subq = subq.Group("dre.source_name", "dr.account_id")
 
 	mainq := s.DB.NewSelect().
