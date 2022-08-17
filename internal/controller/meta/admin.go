@@ -37,6 +37,7 @@ type AdminController struct {
 	PatternMatrixService *service.PatternMatrix
 	TrendService         *service.Trend
 	SiteStatsService     *service.SiteStats
+	AnalyticsService     *service.Analytics
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
@@ -47,6 +48,8 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Get("/cli/gamedata/seed", c.GetCliGameDataSeed)
 	admin.Get("/_temp/pattern/merging", c.FindPatterns)
 	admin.Get("/_temp/pattern/disambiguation", c.DisambiguatePatterns)
+
+	admin.Get("/analytics/report-unique-users/by-source", c.GetRecentUniqueUserCountBySource)
 
 	admin.Get("/refresh/matrix/:server", c.RefreshAllDropMatrixElements)
 	admin.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
@@ -256,6 +259,15 @@ func (c *AdminController) PurgeCache(ctx *fiber.Ctx) error {
 		}
 	}
 	return nil
+}
+
+func (c *AdminController) GetRecentUniqueUserCountBySource(ctx *fiber.Ctx) error {
+	recent := ctx.Query("recent", constant.DefaultRecentDuration)
+	result, err := c.AnalyticsService.GetRecentUniqueUserCountBySource(ctx.Context(), recent)
+	if err != nil {
+		return err
+	}
+	return ctx.JSON(result)
 }
 
 func (c *AdminController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
