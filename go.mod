@@ -32,7 +32,7 @@ require (
 	github.com/rs/zerolog v1.27.0
 	github.com/samber/lo v1.21.0
 	github.com/stretchr/testify v1.8.0
-	github.com/swaggo/swag v1.8.3
+	github.com/swaggo/swag v1.8.4
 	github.com/tidwall/gjson v1.14.1
 	github.com/uptrace/bun v1.1.5
 	github.com/uptrace/bun/dialect/pgdialect v1.1.5
