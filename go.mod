@@ -34,9 +34,9 @@ require (
 	github.com/stretchr/testify v1.8.0
 	github.com/swaggo/swag v1.8.3
 	github.com/tidwall/gjson v1.14.1
-	github.com/uptrace/bun v1.1.5
+	github.com/uptrace/bun v1.1.7
 	github.com/uptrace/bun/dialect/pgdialect v1.1.5
-	github.com/uptrace/bun/driver/pgdriver v1.1.5
+	github.com/uptrace/bun/driver/pgdriver v1.1.7
 	github.com/uptrace/bun/extra/bundebug v1.1.5
 	github.com/uptrace/bun/extra/bunotel v1.1.5
 	github.com/vmihailenco/msgpack/v5 v5.3.5
@@ -107,9 +107,9 @@ require (
 	go.uber.org/dig v1.14.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0 // indirect
-	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
+	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
 	golang.org/x/net v0.0.0-20220513224357-95641704303c // indirect
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
+	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
 	golang.org/x/tools v0.1.10 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
