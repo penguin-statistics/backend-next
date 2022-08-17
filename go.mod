@@ -1,6 +1,6 @@
 module github.com/penguin-statistics/backend-next
 
-go 1.18
+go 1.19
 
 require (
 	github.com/ahmetb/go-linq/v3 v3.2.0
