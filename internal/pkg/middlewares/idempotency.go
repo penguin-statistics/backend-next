@@ -9,6 +9,8 @@ import (
 	"github.com/vmihailenco/msgpack/v5"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"github.com/penguin-statistics/backend-next/internal/util/rekuest"
 )
 
 type IdempotencyConfig struct {
@@ -55,6 +57,11 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 		if key == "" {
 			log.Trace().Msg("IdempotencyMiddleware: idempotency key is missing. Skipping middleware.")
 			return c.Next()
+		}
+
+		if err := rekuest.Validate.Var(key, "max=128,alphanum"); err != nil {
+			log.Trace().Err(err).Msg("IdempotencyMiddleware: idempotency key is invalid. Returning error.")
+			return pgerr.ErrInvalidReq.Msg("invalid idempotency key: idempotency key can only be at most %d characters, consist of only alphanumeric characters", constant.IdempotencyKeyLengthLimit)
 		}
 
 		// Idempotency key not empty. Check if it is in the storage
