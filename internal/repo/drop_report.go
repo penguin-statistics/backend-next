@@ -307,6 +307,35 @@ func (s *DropReport) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, 
 	return results, nil
 }
 
+func (s *DropReport) CalcRecentUniqueUserCountBySource(ctx context.Context, duration string) ([]*modelv2.UniqueUserCountBySource, error) {
+	results := make([]*modelv2.UniqueUserCountBySource, 0)
+
+	d, err := time.ParseDuration(duration)
+	if err != nil {
+		return nil, err
+	}
+
+	subq := s.DB.NewSelect().
+		TableExpr("drop_reports AS dr").
+		Column("dre.source_name", "dr.account_id").
+		Join("LEFT JOIN drop_report_extras AS dre").
+		JoinOn("dr.report_id = dre.report_id")
+	s.handleCreatedAtWithTime(subq, time.Now().Add(-d), time.Now())
+	subq = subq.Group("dre.source_name", "dr.account_id")
+
+	mainq := s.DB.NewSelect().
+		TableExpr("(?) AS a", subq).
+		Column("source_name").
+		ColumnExpr("COUNT(*) AS count").
+		Group("source_name")
+
+	if err := mainq.
+		Scan(ctx, &results); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 func (s *DropReport) handleStagesAndItems(query *bun.SelectQuery, stageIdItemIdMap map[int][]int) {
 	stageConditions := make([]string, 0)
 	for stageId, itemIds := range stageIdItemIdMap {
