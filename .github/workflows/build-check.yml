@@ -38,7 +38,7 @@ jobs:
       #     password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+        uses: docker/build-push-action@965c6a410d446a30e95d35052c67d6eded60dad6
         with:
           context: .
           push: false # for check workflow, we don't want to push
