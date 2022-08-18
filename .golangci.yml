@@ -41,7 +41,7 @@ linters:
     - exhaustive
     - funlen
     - goconst
-    - gocritic
+    # - gocritic
     - gocyclo
     # - revive
     # - gomnd

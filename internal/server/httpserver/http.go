@@ -3,7 +3,6 @@ package httpserver
 import (
 	"fmt"
 	"runtime"
-	"sync"
 	"time"
 
 	"github.com/ansrivas/fiberprometheus/v2"
@@ -30,17 +29,24 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 )
 
-var registerPromOnce sync.Once
+type DevOpsApp struct {
+	*fiber.App
+}
 
-func Create(conf *config.Config) *fiber.App {
+func Create(conf *config.Config) (*fiber.App, DevOpsApp) {
+	return CreateServiceApp(conf), DevOpsApp{
+		App: CreateDevOpsApp(conf),
+	}
+}
+
+func CreateServiceApp(conf *config.Config) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:      "Penguin Stats Backend v3",
 		ServerHeader: fmt.Sprintf("Penguin/%s", bininfo.Version),
 		// NOTICE: This will also affect WebSocket. Be aware if this fiber instance service is re-used
 		//         for long connection services.
-		ReadTimeout:    time.Second * 20,
-		WriteTimeout:   time.Second * 20,
-		ReadBufferSize: 8192,
+		ReadTimeout:  time.Second * 20,
+		WriteTimeout: time.Second * 20,
 		// allow possibility for graceful shutdown, otherwise app#Shutdown() will block forever
 		IdleTimeout:             conf.HTTPServerShutdownTimeout,
 		ProxyHeader:             "X-Original-Forwarded-For",
@@ -93,10 +99,6 @@ func Create(conf *config.Config) *fiber.App {
 			log.Error().Msgf("panic: %v\n%s\n", e, buf)
 		},
 	}))
-	registerPromOnce.Do(func() {
-		fiberprom := fiberprometheus.New(observability.ServiceName)
-		fiberprom.RegisterAt(app, "/metrics")
-	})
 
 	if conf.TracingEnabled {
 		exporter, err := jaeger.New(jaeger.WithCollectorEndpoint())
@@ -119,14 +121,43 @@ func Create(conf *config.Config) *fiber.App {
 		}))
 	}
 
+	fiberprometheus.New(observability.ServiceName).RegisterAt(app, "/metrics")
+
 	if conf.DevMode {
 		log.Info().Msg("Running in DEV mode")
-		app.Use(pprof.New())
 	}
 
 	if !conf.DevMode {
 		app.Use(middlewares.EnrichSentry())
 	}
+
+	return app
+}
+
+func CreateDevOpsApp(conf *config.Config) *fiber.App {
+	app := fiber.New(fiber.Config{
+		AppName:      "Penguin Stats Backend v3 (DevOps)",
+		ServerHeader: fmt.Sprintf("PenguinDevOps/%s", bininfo.Version),
+		// allow possibility for graceful shutdown, otherwise app#Shutdown() will block forever
+		IdleTimeout:             conf.HTTPServerShutdownTimeout,
+		ProxyHeader:             "X-Original-Forwarded-For",
+		EnableTrustedProxyCheck: true,
+		TrustedProxies:          conf.TrustedProxies,
+
+		ErrorHandler: ErrorHandler,
+		Immutable:    true,
+	})
+
+	app.Use(pprof.New())
+
+	app.Use(recover.New(recover.Config{
+		EnableStackTrace: true,
+		StackTraceHandler: func(c *fiber.Ctx, e any) {
+			buf := make([]byte, 4096)
+			buf = buf[:runtime.Stack(buf, false)]
+			log.Error().Msgf("panic: %v\n%s\n", e, buf)
+		},
+	}))
 
 	return app
 }
