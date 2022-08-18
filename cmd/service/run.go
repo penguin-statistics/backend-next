@@ -13,21 +13,37 @@ import (
 
 	"github.com/penguin-statistics/backend-next/internal/config"
 	"github.com/penguin-statistics/backend-next/internal/pkg/async"
+	"github.com/penguin-statistics/backend-next/internal/server/httpserver"
 )
 
-func run(app *fiber.App, conf *config.Config, lc fx.Lifecycle) {
+func run(serviceApp *fiber.App, devOpsApp httpserver.DevOpsApp, conf *config.Config, lc fx.Lifecycle) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			ln, err := net.Listen("tcp", conf.Address)
+			serviceLn, err := net.Listen("tcp", conf.ServiceAddress)
 			if err != nil {
 				return err
 			}
 
 			go func() {
-				if err := app.Listener(ln); err != nil {
+				if err := serviceApp.Listener(serviceLn); err != nil {
 					log.Error().Err(err).Msg("server terminated unexpectedly")
 				}
 			}()
+
+			if conf.DevOpsAddress == "" {
+				log.Info().Msg("DevOps server is disabled")
+			} else {
+				devOpsLn, err := net.Listen("tcp", conf.DevOpsAddress)
+				if err != nil {
+					return err
+				}
+
+				go func() {
+					if err := devOpsApp.Listener(devOpsLn); err != nil {
+						log.Error().Err(err).Msg("server terminated unexpectedly")
+					}
+				}()
+			}
 
 			return nil
 		},
@@ -37,7 +53,8 @@ func run(app *fiber.App, conf *config.Config, lc fx.Lifecycle) {
 			}
 
 			return async.WaitAll(
-				async.Errable(app.Shutdown),
+				async.Errable(serviceApp.Shutdown),
+				async.Errable(devOpsApp.Shutdown),
 				async.Errable(func() error {
 					flushed := sentry.Flush(time.Second * 30)
 					if !flushed {

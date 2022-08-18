@@ -11,8 +11,13 @@ import (
 )
 
 type Config struct {
-	// Address is the listen address would listen on.
-	Address string
+	// ServiceAddress is the listen address would listen on for serving normal service requests.
+	ServiceAddress string `required:"true" split_words:"true" default:"localhost:9010"`
+
+	// DevOpsAddress is the listen address would listen on for serving devops requests.
+	// Leaving this empty will disable devops server.
+	// This address is only intended to be used in intra-cluster devops requests, and is not intended to be exposed to the public.
+	DevOpsAddress string `split_words:"true"`
 
 	TrustedProxies []string `required:"true" split_words:"true" default:"::1,127.0.0.1,10.0.0.0/8"`
 
