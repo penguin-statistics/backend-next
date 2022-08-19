@@ -39,15 +39,24 @@ jobs:
           echo "VERSION=${GITHUB_REF/refs\/tags\//}+${TRUNCATED_GITHUB_SHA}" >> $GITHUB_ENV
           echo "GIT_TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
 
-      - name: Build and Publish to Registry
-        uses: elgohr/Publish-Docker-Github-Action@3.04
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4
         with:
-          name: penguin-statistics/backend-next
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          registry: ghcr.io
-          tags: "latest,${{ env.GIT_TAG }}"
-          buildargs: VERSION
+          images: ghcr.io/penguin-statistics/backend-next
+          tags: |
+            type=semver,pattern=v{{version}}
+            type=ref,event=branch
+            type=ref,event=pr
+          flavor: |
+            latest=auto
+      
+      - name: Build Docker Image
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
       - name: Create Sentry release
         uses: getsentry/action-release@v1
