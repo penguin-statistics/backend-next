@@ -20,8 +20,9 @@ type Config struct {
 	DevOpsAddress string `split_words:"true"`
 
 	// LogJsonStdout is whether to log JSON logs (instead of pretty-print logs) to stdout for the ease of log collection.
-	LogJsonStdout bool `default:"true"`
+	LogJsonStdout bool `default:"false"`
 
+	// TrustedProxies is a list of trusted proxies that are trusted to report a real IP via the X-Forwarded-For header.
 	TrustedProxies []string `required:"true" split_words:"true" default:"::1,127.0.0.1,10.0.0.0/8"`
 
 	// DevMode to indicate development mode. When true, the program would spin up utilities for debugging and
@@ -31,6 +32,14 @@ type Config struct {
 
 	// TracingEnabled to indicate whether to enable OpenTelemetry tracing.
 	TracingEnabled bool `split_words:"true"`
+
+	// TracingExporters to indicate which exporters to use for tracing.
+	// Valid values are: jaeger, otlp, stdout (for debug).
+	TracingExporters []string `split_words:"true" default:"jaeger"`
+
+	// TracingSampleRate to indicate the sampling rate for tracing.
+	// Valid values are: 0.0 (disabled), 1.0 (all traces), or a value between 0.0 and 1.0 (sampling rate).
+	TracingSampleRate float64 `split_words:"true" default:"1.0"`
 
 	// infrastructure components connection instructions
 

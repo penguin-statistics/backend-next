@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/ansrivas/fiberprometheus/v2"
@@ -19,8 +20,10 @@ import (
 	"github.com/samber/lo"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
@@ -103,32 +106,26 @@ func CreateServiceApp(conf *config.Config) *fiber.App {
 		},
 	}))
 
-	if conf.TracingEnabled {
-		exporter, err := otlptrace.New(context.Background(), otlptracegrpc.NewClient())
-		if err != nil {
-			panic(err)
-		}
-		// debugExporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
-		// if err != nil {
-		// 	panic(err)
-		// }
-		// exporter, err := jaeger.New(jaeger.WithAgentEndpoint())
-		// if err != nil {
-		// 	panic(err)
-		// }
-		tracerProvider := tracesdk.NewTracerProvider(
-			tracesdk.WithBatcher(exporter),
-			tracesdk.WithResource(resource.NewWithAttributes(
-				semconv.SchemaURL,
-				semconv.ServiceNameKey.String("pgbackend"),
-				semconv.ServiceVersionKey.String(bininfo.Version),
-				attribute.String("environment", lo.Ternary(conf.DevMode, "dev", "prod")),
-			)),
-		)
-		otel.SetTracerProvider(tracerProvider)
+	tracerProvider := tracesdk.NewTracerProvider(
+		append(
+			[]tracesdk.TracerProviderOption{
+				tracesdk.WithResource(resource.NewWithAttributes(
+					semconv.SchemaURL,
+					semconv.ServiceNameKey.String("pgbackend"),
+					semconv.ServiceVersionKey.String(bininfo.Version),
+					attribute.String("environment", lo.Ternary(conf.DevMode, "dev", "prod")),
+				)),
+				tracesdk.WithSampler(
+					tracesdk.ParentBased(
+						tracesdk.TraceIDRatioBased(
+							conf.TracingSampleRate))),
+			},
+			tracingProviderOptions(conf)...,
+		)...,
+	)
+	otel.SetTracerProvider(tracerProvider)
 
-		app.Use(otelfiber.Middleware("pgbackend"))
-	}
+	app.Use(otelfiber.Middleware("pgbackend"))
 
 	fiberprometheus.New(observability.ServiceName).RegisterAt(app, "/metrics")
 
@@ -169,4 +166,42 @@ func CreateDevOpsApp(conf *config.Config) *fiber.App {
 	}))
 
 	return app
+}
+
+func tracingProviderOptions(conf *config.Config) []tracesdk.TracerProviderOption {
+	options := []tracesdk.TracerProviderOption{}
+	if !conf.TracingEnabled {
+		log.Info().Msg("Tracing is disabled: no spans will be reported")
+		return options
+	}
+
+	optionsstr := make([]string, 0)
+
+	if conf.TracingExporters != nil {
+		exporters := lo.Uniq(conf.TracingExporters)
+		for _, exporter := range exporters {
+			switch exporter {
+			case "jaeger":
+				exp := lo.Must(jaeger.New(jaeger.WithAgentEndpoint()))
+				options = append(options, tracesdk.WithBatcher(exp))
+				optionsstr = append(optionsstr, "jaeger")
+			case "otlpgrpc":
+				exp := lo.Must(otlptrace.New(context.Background(), otlptracegrpc.NewClient()))
+				options = append(options, tracesdk.WithBatcher(exp))
+				optionsstr = append(optionsstr, "otlpgrpc")
+			case "stdout":
+				exp := lo.Must(stdouttrace.New(stdouttrace.WithPrettyPrint()))
+				options = append(options, tracesdk.WithSyncer(exp))
+				optionsstr = append(optionsstr, "stdout")
+			}
+		}
+	}
+
+	if len(options) == 0 {
+		log.Warn().Msg("Tracing is enabled via configuration, but no tracing exporters are provided")
+	} else {
+		log.Info().Msgf("Tracing enabled with exporters: %s", strings.Join(optionsstr, ", "))
+	}
+
+	return options
 }
