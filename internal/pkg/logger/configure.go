@@ -28,7 +28,7 @@ func Configure(conf *config.Config) {
 
 	var writer io.Writer
 
-	if conf.LogStdout {
+	if conf.LogJsonStdout {
 		writer = os.Stdout
 	} else {
 		writer = zerolog.MultiLevelWriter(

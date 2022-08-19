@@ -19,8 +19,8 @@ type Config struct {
 	// This address is only intended to be used in intra-cluster devops requests, and is not intended to be exposed to the public.
 	DevOpsAddress string `split_words:"true"`
 
-	// LogStdout is whether to log JSON logs (instead of pretty-print logs) to stdout for the ease of log collection.
-	LogStdout bool `default:"true"`
+	// LogJsonStdout is whether to log JSON logs (instead of pretty-print logs) to stdout for the ease of log collection.
+	LogJsonStdout bool `default:"true"`
 
 	TrustedProxies []string `required:"true" split_words:"true" default:"::1,127.0.0.1,10.0.0.0/8"`
 
