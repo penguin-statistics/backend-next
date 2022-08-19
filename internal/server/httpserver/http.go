@@ -19,7 +19,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
@@ -107,17 +106,16 @@ func CreateServiceApp(conf *config.Config) *fiber.App {
 		// if err != nil {
 		// 	panic(err)
 		// }
-		debugExporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
-		if err != nil {
-			panic(err)
-		}
+		// debugExporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
+		// if err != nil {
+		// 	panic(err)
+		// }
 		exporter, err := jaeger.New(jaeger.WithAgentEndpoint())
 		if err != nil {
 			panic(err)
 		}
 		tracerProvider := tracesdk.NewTracerProvider(
 			tracesdk.WithBatcher(exporter),
-			tracesdk.WithSyncer(debugExporter),
 			tracesdk.WithResource(resource.NewWithAttributes(
 				semconv.SchemaURL,
 				semconv.ServiceNameKey.String("pgbackend"),
