@@ -29,7 +29,7 @@ func requestLogger() func(ctx *fiber.Ctx) error {
 	return flog.AccessHandler(func(ctx *fiber.Ctx, duration time.Duration) {
 		flog.InfoFrom(ctx).
 			Str("service", "backend:httpreq").
-			Bytes("userAgent", ctx.Context().UserAgent()).
+			Bytes("userAgent", ctx.Request().Header.UserAgent()).
 			Int("status", ctx.Response().StatusCode()).
 			Int("size", len(ctx.Response().Body())).
 			Dur("duration", duration).

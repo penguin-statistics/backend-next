@@ -7,17 +7,19 @@ import (
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/contrib/fibersentry"
+	"github.com/gofiber/contrib/otelfiber"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/helmet/v2"
-	"github.com/penguin-statistics/fiberotel"
 	"github.com/rs/zerolog/log"
+	"github.com/samber/lo"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
@@ -101,24 +103,31 @@ func CreateServiceApp(conf *config.Config) *fiber.App {
 	}))
 
 	if conf.TracingEnabled {
-		exporter, err := jaeger.New(jaeger.WithCollectorEndpoint())
+		// exporter, err := otlptrace.New(context.Background(), otlptracegrpc.NewClient())
+		// if err != nil {
+		// 	panic(err)
+		// }
+		debugExporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
+		if err != nil {
+			panic(err)
+		}
+		exporter, err := jaeger.New(jaeger.WithAgentEndpoint())
 		if err != nil {
 			panic(err)
 		}
 		tracerProvider := tracesdk.NewTracerProvider(
-			tracesdk.WithSyncer(exporter),
+			tracesdk.WithBatcher(exporter),
+			tracesdk.WithSyncer(debugExporter),
 			tracesdk.WithResource(resource.NewWithAttributes(
 				semconv.SchemaURL,
-				semconv.ServiceNameKey.String("backendv3"),
-				attribute.String("environment", "dev"),
+				semconv.ServiceNameKey.String("pgbackend"),
+				semconv.ServiceVersionKey.String(bininfo.Version),
+				attribute.String("environment", lo.Ternary(conf.DevMode, "dev", "prod")),
 			)),
 		)
 		otel.SetTracerProvider(tracerProvider)
 
-		app.Use(fiberotel.New(fiberotel.Config{
-			Tracer:   tracerProvider.Tracer("backendv3"),
-			SpanName: "HTTP {{ .Method }} {{ .Path }}",
-		}))
+		app.Use(otelfiber.Middleware("pgbackend"))
 	}
 
 	fiberprometheus.New(observability.ServiceName).RegisterAt(app, "/metrics")

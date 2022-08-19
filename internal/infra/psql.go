@@ -22,7 +22,7 @@ func Postgres(conf *config.Config) (*bun.DB, error) {
 	db := bun.NewDB(pgdb, pgdialect.New())
 	if conf.DevMode {
 		db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithEnabled(true), bundebug.WithVerbose(conf.BunDebugVerbose)))
-		db.AddQueryHook(bunotel.NewQueryHook(bunotel.WithDBName("penguin_structured")))
+		db.AddQueryHook(bunotel.NewQueryHook(bunotel.WithDBName("penguin-postgres")))
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)

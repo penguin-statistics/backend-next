@@ -72,7 +72,7 @@ func (s *Account) GetAccountFromRequest(ctx *fiber.Ctx) (*model.Account, error) 
 	}
 
 	// check PenguinID validity
-	account, err := s.GetAccountByPenguinId(ctx.Context(), penguinId)
+	account, err := s.GetAccountByPenguinId(ctx.UserContext(), penguinId)
 	if err != nil {
 		flog.WarnFrom(ctx).
 			Err(err).

@@ -17,6 +17,7 @@ require (
 	github.com/go-redsync/redsync/v4 v4.5.1
 	github.com/goccy/go-json v0.9.10
 	github.com/gofiber/contrib/fibersentry v0.0.0-20220816060400-efb0c66d02e1
+	github.com/gofiber/contrib/otelfiber v0.0.0-20220817055430-40b5c4d0af9c
 	github.com/gofiber/fiber/v2 v2.36.0
 	github.com/gofiber/helmet/v2 v2.2.15
 	github.com/gofiber/swagger v0.1.0
@@ -25,7 +26,6 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/nats-io/nats.go v1.16.0
 	github.com/oschwald/geoip2-golang v1.8.0
-	github.com/penguin-statistics/fiberotel v0.8.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.13.0
 	github.com/rs/xid v1.4.0
@@ -63,6 +63,9 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/swaggo/files v0.0.0-20220728132757-551d4a08d97a // indirect
+	go.opentelemetry.io/contrib v1.9.0 // indirect
+	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.9.0 // indirect
+	go.uber.org/goleak v1.1.12 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 )
 
