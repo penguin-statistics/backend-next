@@ -38,7 +38,7 @@ func buildSanitizer(sanitizer ...func(string) bool) func(ctx *fiber.Ctx) error {
 }
 
 func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
-	items, err := c.ItemService.GetItems(ctx.Context())
+	items, err := c.ItemService.GetItems(ctx.UserContext())
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (c *ItemController) GetItems(ctx *fiber.Ctx) error {
 func (c *ItemController) GetItemById(ctx *fiber.Ctx) error {
 	itemId := ctx.Params("itemId")
 
-	item, err := c.ItemService.GetItemByArkId(ctx.Context(), itemId)
+	item, err := c.ItemService.GetItemByArkId(ctx.UserContext(), itemId)
 	if err != nil {
 		return err
 	}

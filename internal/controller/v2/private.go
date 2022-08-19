@@ -57,7 +57,7 @@ func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx.Context(), server, true, "", "", accountId)
+	shimResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx.UserContext(), server, true, "", "", accountId)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.Context(), server, accountId)
+	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.UserContext(), server, accountId)
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 // @Router   /PenguinStats/api/v2/_private/result/trend/{server} [GET]
 func (c *Private) GetTrends(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
-	shimResult, err := c.TrendService.GetShimSavedTrendResults(ctx.Context(), server)
+	shimResult, err := c.TrendService.GetShimSavedTrendResults(ctx.UserContext(), server)
 	if err != nil {
 		return err
 	}

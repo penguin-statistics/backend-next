@@ -20,7 +20,7 @@ func RegisterStage(v3 *svr.V3, c StageController) {
 }
 
 func (c *StageController) GetStages(ctx *fiber.Ctx) error {
-	stages, err := c.StageService.GetStages(ctx.Context())
+	stages, err := c.StageService.GetStages(ctx.UserContext())
 	if err != nil {
 		return err
 	}
@@ -31,7 +31,7 @@ func (c *StageController) GetStages(ctx *fiber.Ctx) error {
 func (c *StageController) GetStageById(ctx *fiber.Ctx) error {
 	stageId := ctx.Params("stageId")
 
-	stage, err := c.StageService.GetStageByArkId(ctx.Context(), stageId)
+	stage, err := c.StageService.GetStageByArkId(ctx.UserContext(), stageId)
 	if err != nil {
 		return err
 	}

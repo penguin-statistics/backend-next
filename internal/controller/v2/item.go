@@ -34,7 +34,7 @@ func RegisterItem(v2 *svr.V2, c Item) {
 // @Failure  500  {object}  pgerr.PenguinError  "An unexpected error occurred"
 // @Router   /PenguinStats/api/v2/items [GET]
 func (c *Item) GetItems(ctx *fiber.Ctx) error {
-	items, err := c.ItemService.GetShimItems(ctx.Context())
+	items, err := c.ItemService.GetShimItems(ctx.UserContext())
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func (c *Item) GetItems(ctx *fiber.Ctx) error {
 func (c *Item) GetItemByArkId(ctx *fiber.Ctx) error {
 	itemId := ctx.Params("itemId")
 
-	item, err := c.ItemService.GetShimItemByArkId(ctx.Context(), itemId)
+	item, err := c.ItemService.GetShimItemByArkId(ctx.UserContext(), itemId)
 	if err != nil {
 		return err
 	}

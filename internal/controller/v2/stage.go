@@ -36,7 +36,7 @@ func RegisterStage(v2 *svr.V2, c Stage) {
 func (c *Stage) GetStages(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 
-	stages, err := c.StageService.GetShimStages(ctx.Context(), server)
+	stages, err := c.StageService.GetShimStages(ctx.UserContext(), server)
 	if err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func (c *Stage) GetStageByArkId(ctx *fiber.Ctx) error {
 	stageId := ctx.Params("stageId")
 	server := ctx.Query("server", "CN")
 
-	stage, err := c.StageService.GetShimStageByArkId(ctx.Context(), stageId, server)
+	stage, err := c.StageService.GetShimStageByArkId(ctx.UserContext(), stageId, server)
 	if err != nil {
 		return err
 	}

@@ -134,7 +134,7 @@ func (c *Result) GetDropMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimQueryResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx.Context(), server, showClosedZones, stageFilterStr, itemFilterStr, accountId)
+	shimQueryResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx.UserContext(), server, showClosedZones, stageFilterStr, itemFilterStr, accountId)
 	if err != nil {
 		return err
 	}
@@ -182,7 +182,7 @@ func (c *Result) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.Context(), server, accountId)
+	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.UserContext(), server, accountId)
 	if err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func (c *Result) GetTrends(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	shimResult, err := c.TrendService.GetShimSavedTrendResults(ctx.Context(), server)
+	shimResult, err := c.TrendService.GetShimSavedTrendResults(ctx.UserContext(), server)
 	if err != nil {
 		return err
 	}
@@ -282,7 +282,7 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 	endTime := time.UnixMilli(endTimeMilli)
 
 	// handle ark stage id
-	stage, err := c.StageService.GetStageByArkId(ctx.Context(), query.StageID)
+	stage, err := c.StageService.GetStageByArkId(ctx.UserContext(), query.StageID)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +290,7 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 	// handle item ids
 	itemIds := make([]int, 0)
 	for _, arkItemID := range query.ItemIDs {
-		item, err := c.ItemService.GetItemByArkId(ctx.Context(), arkItemID)
+		item, err := c.ItemService.GetItemByArkId(ctx.UserContext(), arkItemID)
 		if err != nil {
 			return nil, err
 		}
@@ -303,7 +303,7 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 			StartTime: &startTime,
 			EndTime:   &endTime,
 		}
-		return c.DropMatrixService.GetShimCustomizedDropMatrixResults(ctx.Context(), query.Server, timeRange, []int{stage.StageID}, itemIds, accountId)
+		return c.DropMatrixService.GetShimCustomizedDropMatrixResults(ctx.UserContext(), query.Server, timeRange, []int{stage.StageID}, itemIds, accountId)
 	} else {
 		// interval originally is in milliseconds, so we need to convert it to nanoseconds
 		intervalLength := time.Duration(query.Interval.Int64 * 1e6).Round(time.Hour)
@@ -315,7 +315,7 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 			return nil, pgerr.ErrInvalidReq.Msg("too many sections: interval number is %d sections, which is larger than %d sections", intervalNum, constant.MaxIntervalNum)
 		}
 
-		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx.Context(), query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, accountId)
+		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx.UserContext(), query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, accountId)
 		if err != nil {
 			return nil, err
 		}

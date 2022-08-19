@@ -29,7 +29,7 @@ func RegisterNotice(v2 *svr.V2, c Notice) {
 // @Failure  500  {object}  pgerr.PenguinError  "An unexpected error occurred"
 // @Router   /PenguinStats/api/v2/notice [GET]
 func (c *Notice) GetNotices(ctx *fiber.Ctx) error {
-	notices, err := c.NoticeService.GetNotices(ctx.Context())
+	notices, err := c.NoticeService.GetNotices(ctx.UserContext())
 	if err != nil {
 		return err
 	}
