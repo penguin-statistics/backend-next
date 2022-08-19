@@ -19,7 +19,7 @@ func RegisterInit(v3 *svr.V3, c InitController) {
 }
 
 func (c *InitController) Init(ctx *fiber.Ctx) error {
-	inits, err := c.InitService.GetInit(ctx.Context())
+	inits, err := c.InitService.GetInit(ctx.UserContext())
 	if err != nil {
 		return err
 	}

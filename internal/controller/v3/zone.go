@@ -20,7 +20,7 @@ func RegisterZone(v3 *svr.V3, c ZoneController) {
 }
 
 func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
-	zones, err := c.ZoneService.GetZones(ctx.Context())
+	zones, err := c.ZoneService.GetZones(ctx.UserContext())
 	if err != nil {
 		return err
 	}
@@ -31,7 +31,7 @@ func (c *ZoneController) GetZones(ctx *fiber.Ctx) error {
 func (c *ZoneController) GetZoneById(ctx *fiber.Ctx) error {
 	zoneId := ctx.Params("zoneId")
 
-	zone, err := c.ZoneService.GetZoneByArkId(ctx.Context(), zoneId)
+	zone, err := c.ZoneService.GetZoneByArkId(ctx.UserContext(), zoneId)
 	if err != nil {
 		return err
 	}

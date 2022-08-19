@@ -40,7 +40,7 @@ func (c *SiteStats) GetSiteStats(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	siteStats, err := c.SiteStatsService.GetShimSiteStats(ctx.Context(), server)
+	siteStats, err := c.SiteStatsService.GetShimSiteStats(ctx.UserContext(), server)
 	if err != nil {
 		return err
 	}

@@ -35,7 +35,7 @@ func (c *Meta) BinInfo(ctx *fiber.Ctx) error {
 }
 
 func (c *Meta) Health(ctx *fiber.Ctx) error {
-	if err := c.HealthService.Ping(ctx.Context()); err != nil {
+	if err := c.HealthService.Ping(ctx.UserContext()); err != nil {
 		return err
 	}
 

@@ -25,7 +25,7 @@ func RegisterFrontendConfig(v2 *svr.V2, c FrontendConfig) {
 // @Failure  500  {object}  pgerr.PenguinError  "An unexpected error occurred"
 // @Router   /PenguinStats/api/v2/config [GET]
 func (c *FrontendConfig) GetFrontendConfig(ctx *fiber.Ctx) error {
-	formula, err := c.FrontendConfigService.GetFrontendConfig(ctx.Context())
+	formula, err := c.FrontendConfigService.GetFrontendConfig(ctx.UserContext())
 	if err != nil {
 		return err
 	}

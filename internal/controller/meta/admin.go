@@ -67,7 +67,7 @@ func (c AdminController) Bonjour(ctx *fiber.Ctx) error {
 }
 
 func (c AdminController) FindPatterns(ctx *fiber.Ctx) error {
-	patterns, err := c.PatternRepo.GetDropPatterns(ctx.Context())
+	patterns, err := c.PatternRepo.GetDropPatterns(ctx.UserContext())
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func (c AdminController) FindPatterns(ctx *fiber.Ctx) error {
 
 			fingerprint, hash := c.calculateDropPatternHash(segments)
 
-			correctPattern, err := c.PatternRepo.GetDropPatternByHash(ctx.Context(), hash)
+			correctPattern, err := c.PatternRepo.GetDropPatternByHash(ctx.UserContext(), hash)
 			if err != nil {
 				spew.Dump(hash, fingerprint, err)
 				sb.WriteString(fmt.Sprintf(`WITH inserted_id AS (INSERT INTO drop_patterns ("hash", "original_fingerprint") VALUES ('%s', '%s') RETURNING pattern_id)
@@ -128,12 +128,12 @@ func must[T any](v T, err error) T {
 }
 
 func (c AdminController) DisambiguatePatterns(ctx *fiber.Ctx) error {
-	patterns, err := c.PatternRepo.GetDropPatterns(ctx.Context())
+	patterns, err := c.PatternRepo.GetDropPatterns(ctx.UserContext())
 	if err != nil {
 		return err
 	}
 
-	elements, err := c.PatternElementRepo.GetDropPatternElements(ctx.Context())
+	elements, err := c.PatternElementRepo.GetDropPatternElements(ctx.UserContext())
 	if err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func (c AdminController) calculateDropPatternHash(segments []string) (originalFi
 }
 
 func (c AdminController) GetCliGameDataSeed(ctx *fiber.Ctx) error {
-	items, err := c.ItemService.GetItems(ctx.Context())
+	items, err := c.ItemService.GetItems(ctx.UserContext())
 	if err != nil {
 		return err
 	}
@@ -227,7 +227,7 @@ func (c *AdminController) SaveRenderedObjects(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	err := c.AdminService.SaveRenderedObjects(ctx.Context(), &request)
+	err := c.AdminService.SaveRenderedObjects(ctx.UserContext(), &request)
 	if err != nil {
 		return err
 	}
@@ -263,7 +263,7 @@ func (c *AdminController) PurgeCache(ctx *fiber.Ctx) error {
 
 func (c *AdminController) GetRecentUniqueUserCountBySource(ctx *fiber.Ctx) error {
 	recent := ctx.Query("recent", constant.DefaultRecentDuration)
-	result, err := c.AnalyticsService.GetRecentUniqueUserCountBySource(ctx.Context(), recent)
+	result, err := c.AnalyticsService.GetRecentUniqueUserCountBySource(ctx.UserContext(), recent)
 	if err != nil {
 		return err
 	}
@@ -272,21 +272,21 @@ func (c *AdminController) GetRecentUniqueUserCountBySource(ctx *fiber.Ctx) error
 
 func (c *AdminController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
-	return c.DropMatrixService.RefreshAllDropMatrixElements(ctx.Context(), server, []string{constant.SourceCategoryAll})
+	return c.DropMatrixService.RefreshAllDropMatrixElements(ctx.UserContext(), server, []string{constant.SourceCategoryAll})
 }
 
 func (c *AdminController) RefreshAllPatternMatrixElements(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
-	return c.PatternMatrixService.RefreshAllPatternMatrixElements(ctx.Context(), server, []string{constant.SourceCategoryAll})
+	return c.PatternMatrixService.RefreshAllPatternMatrixElements(ctx.UserContext(), server, []string{constant.SourceCategoryAll})
 }
 
 func (c *AdminController) RefreshAllTrendElements(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
-	return c.TrendService.RefreshTrendElements(ctx.Context(), server, []string{constant.SourceCategoryAll})
+	return c.TrendService.RefreshTrendElements(ctx.UserContext(), server, []string{constant.SourceCategoryAll})
 }
 
 func (c *AdminController) RefreshAllSiteStats(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
-	_, err := c.SiteStatsService.RefreshShimSiteStats(ctx.Context(), server)
+	_, err := c.SiteStatsService.RefreshShimSiteStats(ctx.UserContext(), server)
 	return err
 }

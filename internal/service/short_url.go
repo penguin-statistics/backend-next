@@ -64,16 +64,16 @@ func (s *ShortURL) Resolve(ctx *fiber.Ctx, path string) string {
 	}
 
 	// Item Name Matching
-	if resolved, err := s.resolveByItemName(ctx.Context(), path); err == nil {
+	if resolved, err := s.resolveByItemName(ctx.UserContext(), path); err == nil {
 		return s.siteURL(ctx, resolved)
 	}
-	if resolved, err := s.resolveByStageCode(ctx.Context(), path); err == nil {
+	if resolved, err := s.resolveByStageCode(ctx.UserContext(), path); err == nil {
 		return s.siteURL(ctx, resolved)
 	}
-	if resolved, err := s.resolveByItemId(ctx.Context(), path); err == nil {
+	if resolved, err := s.resolveByItemId(ctx.UserContext(), path); err == nil {
 		return s.siteURL(ctx, resolved)
 	}
-	if resolved, err := s.resolveByStageId(ctx.Context(), path); err == nil {
+	if resolved, err := s.resolveByStageId(ctx.UserContext(), path); err == nil {
 		return s.siteURL(ctx, resolved)
 	}
 

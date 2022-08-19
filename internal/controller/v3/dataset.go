@@ -50,7 +50,7 @@ func (c Dataset) aggregateMatrix(ctx *fiber.Ctx) (*modelv2.DropMatrixQueryResult
 		accountId.Valid = true
 	}
 
-	queryResult, err := c.DropMatrixService.GetMaxAccumulableDropMatrixResults(ctx.Context(), server, "", ctx.Params("itemId"), accountId)
+	queryResult, err := c.DropMatrixService.GetMaxAccumulableDropMatrixResults(ctx.UserContext(), server, "", ctx.Params("itemId"), accountId)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (c Dataset) aggregateTrend(ctx *fiber.Ctx) (*modelv2.TrendQueryResult, erro
 		return nil, err
 	}
 
-	result, err := c.TrendService.GetShimSavedTrendResults(ctx.Context(), server)
+	result, err := c.TrendService.GetShimSavedTrendResults(ctx.UserContext(), server)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (c Dataset) aggregatePattern(ctx *fiber.Ctx) (*modelv3.PatternMatrixQueryRe
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.Context(), server, accountId)
+	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.UserContext(), server, accountId)
 	if err != nil {
 		return nil, err
 	}

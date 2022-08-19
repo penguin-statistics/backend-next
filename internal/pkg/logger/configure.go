@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"io"
 	"os"
 	"time"
 
@@ -25,18 +26,24 @@ func Configure(conf *config.Config) {
 		level = zerolog.DebugLevel
 	}
 
-	writer := zerolog.MultiLevelWriter(
-		&lumberjack.Logger{
-			Filename: "logs/app.log",
-			MaxSize:  100, // megabytes
-			MaxAge:   90,  // days
-			Compress: true,
-		},
-		zerolog.ConsoleWriter{
-			Out:        os.Stdout,
-			TimeFormat: time.RFC3339Nano,
-		},
-	)
+	var writer io.Writer
+
+	if conf.LogJsonStdout {
+		writer = os.Stdout
+	} else {
+		writer = zerolog.MultiLevelWriter(
+			&lumberjack.Logger{
+				Filename: "logs/app.log",
+				MaxSize:  100, // megabytes
+				MaxAge:   90,  // days
+				Compress: true,
+			},
+			zerolog.ConsoleWriter{
+				Out:        os.Stdout,
+				TimeFormat: time.RFC3339Nano,
+			},
+		)
+	}
 
 	log.Logger = zerolog.New(writer).
 		With().

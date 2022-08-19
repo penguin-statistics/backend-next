@@ -66,7 +66,7 @@ func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamConte
 func (s *Report) pipelineAccount(ctx *fiber.Ctx) (accountId int, err error) {
 	account, err := s.AccountService.GetAccountFromRequest(ctx)
 	if err != nil {
-		createdAccount, err := s.AccountService.CreateAccountWithRandomPenguinId(ctx.Context())
+		createdAccount, err := s.AccountService.CreateAccountWithRandomPenguinId(ctx.UserContext())
 		if err != nil {
 			return 0, err
 		}
@@ -177,8 +177,8 @@ func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.Re
 		return "", err
 	case <-pub.Ok():
 		return taskId, nil
-	case <-ctx.Context().Done():
-		return "", ctx.Context().Err()
+	case <-ctx.UserContext().Done():
+		return "", ctx.UserContext().Err()
 	case <-time.After(time.Second * 10):
 		return "", ErrNatsTimeout
 	}
@@ -192,13 +192,13 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 		return "", err
 	}
 
-	err = s.pipelinePreprocessRecruitmentTags(ctx.Context(), req)
+	err = s.pipelinePreprocessRecruitmentTags(ctx.UserContext(), req)
 	if err != nil {
 		return "", err
 	}
 
 	// merge drops with same (dropType, itemId) pair
-	drops, err := s.pipelineMergeDropsAndMapDropTypes(ctx.Context(), req.Drops)
+	drops, err := s.pipelineMergeDropsAndMapDropTypes(ctx.UserContext(), req.Drops)
 	if err != nil {
 		return "", err
 	}
@@ -212,7 +212,7 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 	}
 
 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
-	err = s.pipelineAggregateGachaboxDrops(ctx.Context(), singleReport)
+	err = s.pipelineAggregateGachaboxDrops(ctx.UserContext(), singleReport)
 	if err != nil {
 		return "", err
 	}
@@ -244,7 +244,7 @@ func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchR
 
 	for i, drop := range req.BatchDrops {
 		// merge drops with same (dropType, itemId) pair
-		drops, err := s.pipelineMergeDropsAndMapDropTypes(ctx.Context(), drop.Drops)
+		drops, err := s.pipelineMergeDropsAndMapDropTypes(ctx.UserContext(), drop.Drops)
 		if err != nil {
 			return "", err
 		}
@@ -258,7 +258,7 @@ func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchR
 			Metadata:        &metadata,
 		}
 
-		err = s.pipelineAggregateGachaboxDrops(ctx.Context(), report)
+		err = s.pipelineAggregateGachaboxDrops(ctx.UserContext(), report)
 		if err != nil {
 			return "", err
 		}

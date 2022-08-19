@@ -12,6 +12,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
@@ -19,11 +23,14 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
+	"github.com/penguin-statistics/backend-next/internal/pkg/jetstream"
 	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
 	"github.com/penguin-statistics/backend-next/internal/repo"
 	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
 	"github.com/penguin-statistics/backend-next/internal/util/reportverifs"
 )
+
+var tracer = otel.Tracer("pgbackend.reportwkr")
 
 type WorkerDeps struct {
 	fx.In
@@ -89,6 +96,7 @@ func (w *Worker) Consumer(ctx context.Context, ch chan error) error {
 		case msg := <-msgChan:
 			func() {
 				taskCtx, cancelTask := context.WithTimeout(ctx, time.Second*10)
+
 				inprogressInformer := time.AfterFunc(time.Second*5, func() {
 					err = msg.InProgress()
 					if err != nil {
@@ -116,6 +124,24 @@ func (w *Worker) Consumer(ctx context.Context, ch chan error) error {
 						Observe(time.Since(start).Seconds())
 				}()
 
+				metadata, err := msg.Metadata()
+				if err != nil {
+					// should not happen: the message should be always a jetstream message
+					ch <- err
+					return
+				}
+
+				var span trace.Span
+				taskCtx, span = tracer.
+					Start(taskCtx, "reportwkr.Consumer",
+						trace.WithSpanKind(trace.SpanKindConsumer),
+						trace.WithAttributes(
+							semconv.MessagingSystemKey.String("nats"),
+							semconv.MessagingDestinationKey.String(msg.Subject),
+							semconv.MessagingMessageIDKey.String(jetstream.MessageID(metadata.Sequence)),
+							semconv.MessagingMessagePayloadSizeBytesKey.Int(len(msg.Data)),
+						))
+
 				err = w.consumeReport(taskCtx, reportTask)
 				if err != nil {
 					log.Error().
@@ -124,8 +150,11 @@ func (w *Worker) Consumer(ctx context.Context, ch chan error) error {
 						Interface("reportTask", reportTask).
 						Msg("failed to consume report task")
 					ch <- err
+					span.RecordError(err)
+					span.SetStatus(codes.Error, err.Error())
 					return
 				}
+				span.End()
 
 				log.Info().
 					Str("taskId", reportTask.TaskID).

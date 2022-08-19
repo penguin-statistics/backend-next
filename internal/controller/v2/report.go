@@ -86,7 +86,7 @@ func (c *Report) RecallSingularReport(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	err := c.ReportService.RecallSingularReport(ctx.Context(), &req)
+	err := c.ReportService.RecallSingularReport(ctx.UserContext(), &req)
 	if err != nil {
 		return err
 	}

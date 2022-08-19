@@ -25,7 +25,7 @@ func RegisterFormula(v2 *svr.V2, c Formula) {
 // @Failure  500  {object}  pgerr.PenguinError  "An unexpected error occurred"
 // @Router   /PenguinStats/api/v2/formula [GET]
 func (c *Formula) GetFormula(ctx *fiber.Ctx) error {
-	formula, err := c.FormulaService.GetFormula(ctx.Context())
+	formula, err := c.FormulaService.GetFormula(ctx.UserContext())
 	if err != nil {
 		return err
 	}

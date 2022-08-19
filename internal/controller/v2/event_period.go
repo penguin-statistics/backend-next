@@ -31,7 +31,7 @@ func RegisterEventPeriod(v2 *svr.V2, c EventPeriod) {
 // @Router   /PenguinStats/api/v2/period [GET]
 func (c *EventPeriod) GetEventPeriods(ctx *fiber.Ctx) (err error) {
 	var activities []*modelv2.Activity
-	activities, err = c.ActivityService.GetShimActivities(ctx.Context())
+	activities, err = c.ActivityService.GetShimActivities(ctx.UserContext())
 	if err != nil {
 		return err
 	}
