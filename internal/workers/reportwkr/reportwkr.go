@@ -94,80 +94,84 @@ func (w *Worker) Consumer(ctx context.Context, ch chan error) error {
 	for {
 		select {
 		case msg := <-msgChan:
-			func() {
-				taskCtx, cancelTask := context.WithTimeout(ctx, time.Second*10)
-
-				inprogressInformer := time.AfterFunc(time.Second*5, func() {
-					err = msg.InProgress()
-					if err != nil {
-						log.Error().Err(err).Msg("failed to set msg InProgress")
-					}
-				})
-				defer func() {
-					inprogressInformer.Stop()
-					cancelTask()
-					if err := msg.Ack(); err != nil {
-						log.Error().Err(err).Msg("failed to ack")
-					}
-				}()
-
-				reportTask := &types.ReportTask{}
-				if err := json.Unmarshal(msg.Data, reportTask); err != nil {
-					ch <- err
-					return
-				}
-
-				start := time.Now()
-				defer func() {
-					observability.ReportConsumeDuration.
-						WithLabelValues().
-						Observe(time.Since(start).Seconds())
-				}()
-
-				metadata, err := msg.Metadata()
-				if err != nil {
-					// should not happen: the message should be always a jetstream message
-					ch <- err
-					return
-				}
-
-				var span trace.Span
-				taskCtx, span = tracer.
-					Start(taskCtx, "reportwkr.Consumer",
-						trace.WithSpanKind(trace.SpanKindConsumer),
-						trace.WithAttributes(
-							semconv.MessagingSystemKey.String("nats"),
-							semconv.MessagingDestinationKey.String(msg.Subject),
-							semconv.MessagingMessageIDKey.String(jetstream.MessageID(metadata.Sequence)),
-							semconv.MessagingMessagePayloadSizeBytesKey.Int(len(msg.Data)),
-						))
-
-				err = w.consumeReport(taskCtx, reportTask)
-				if err != nil {
-					log.Error().
-						Err(err).
-						Str("taskId", reportTask.TaskID).
-						Interface("reportTask", reportTask).
-						Msg("failed to consume report task")
-					ch <- err
-					span.RecordError(err)
-					span.SetStatus(codes.Error, err.Error())
-					return
-				}
-				span.End()
-
-				log.Info().
-					Str("taskId", reportTask.TaskID).
-					Dur("duration", time.Since(start)).
-					Msg("report task processed successfully")
-			}()
+			err = w.ingestPreprocess(ctx, msg)
+			if err != nil {
+				log.Err(err).Msg("failed to ingest preprocess")
+				ch <- err
+			}
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 }
 
-func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask) error {
+func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
+	defer func() {
+		if err := msg.Ack(); err != nil {
+			log.Error().Err(err).Msg("failed to ack")
+		}
+	}()
+
+	taskCtx, cancelTask := context.WithTimeout(ctx, time.Second*10)
+	defer cancelTask()
+
+	inprogressInformer := time.AfterFunc(time.Second*5, func() {
+		err := msg.InProgress()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to set msg InProgress")
+		}
+	})
+	defer inprogressInformer.Stop()
+
+	reportTask := &types.ReportTask{}
+	if err := json.Unmarshal(msg.Data, reportTask); err != nil {
+		return err
+	}
+
+	start := time.Now()
+	defer observability.ReportConsumeDuration.
+		WithLabelValues().
+		Observe(time.Since(start).Seconds())
+
+	metadata, err := msg.Metadata()
+	if err != nil {
+		// should not happen: the message should be always a jetstream message
+		return err
+	}
+
+	var span trace.Span
+	taskCtx, span = tracer.
+		Start(taskCtx, "reportwkr.Consumer",
+			trace.WithSpanKind(trace.SpanKindConsumer),
+			trace.WithAttributes(
+				semconv.MessagingSystemKey.String("nats"),
+				semconv.MessagingDestinationKey.String(msg.Subject),
+				semconv.MessagingMessageIDKey.String(jetstream.MessageID(metadata.Sequence)),
+				semconv.MessagingMessagePayloadSizeBytesKey.Int(len(msg.Data)),
+			))
+
+	err = w.process(taskCtx, reportTask)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Str("taskId", reportTask.TaskID).
+			Interface("reportTask", reportTask).
+			Msg("failed to consume report task")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		span.End()
+		return err
+	}
+
+	log.Info().
+		Str("taskId", reportTask.TaskID).
+		Dur("duration", time.Since(start)).
+		Msg("report task processed successfully")
+
+	return nil
+}
+
+func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) error {
 	L := log.With().
 		Interface("task", reportTask).
 		Logger()
