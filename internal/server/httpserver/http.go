@@ -191,7 +191,7 @@ func tracingProviderOptions(conf *config.Config) []tracesdk.TracerProviderOption
 				options = append(options, tracesdk.WithBatcher(exp))
 				optionsstr = append(optionsstr, "otlpgrpc")
 			case "stdout":
-				exp := lo.Must(stdouttrace.New(stdouttrace.WithPrettyPrint()))
+				exp := lo.Must(stdouttrace.New())
 				options = append(options, tracesdk.WithSyncer(exp))
 				optionsstr = append(optionsstr, "stdout")
 			}
