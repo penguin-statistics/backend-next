@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -19,7 +20,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -113,7 +113,8 @@ func CreateServiceApp(conf *config.Config) *fiber.App {
 					semconv.SchemaURL,
 					semconv.ServiceNameKey.String("pgbackend"),
 					semconv.ServiceVersionKey.String(bininfo.Version),
-					attribute.String("environment", lo.Ternary(conf.DevMode, "dev", "prod")),
+					semconv.ServiceInstanceIDKey.String(lo.Must(os.Hostname())),
+					semconv.DeploymentEnvironmentKey.String(lo.Ternary(conf.DevMode, "dev", "prod")),
 				)),
 				tracesdk.WithSampler(
 					tracesdk.ParentBased(
