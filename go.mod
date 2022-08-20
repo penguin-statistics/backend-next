@@ -17,7 +17,7 @@ require (
 	github.com/go-redsync/redsync/v4 v4.5.1
 	github.com/goccy/go-json v0.9.10
 	github.com/gofiber/contrib/fibersentry v0.0.0-20220816060400-efb0c66d02e1
-	github.com/gofiber/contrib/otelfiber v0.0.0-20220817055430-40b5c4d0af9c
+	github.com/gofiber/contrib/otelfiber v0.0.0-20220819142806-50936a03a090
 	github.com/gofiber/fiber/v2 v2.36.0
 	github.com/gofiber/helmet/v2 v2.2.15
 	github.com/gofiber/swagger v0.1.0
@@ -43,6 +43,9 @@ require (
 	github.com/zeebo/xxh3 v1.0.2
 	go.opentelemetry.io/otel v1.9.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.9.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.9.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.9.0
+	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.9.0
 	go.opentelemetry.io/otel/sdk v1.9.0
 	go.uber.org/fx v1.18.1
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e
@@ -67,11 +70,7 @@ require (
 	github.com/swaggo/files v0.0.0-20220728132757-551d4a08d97a // indirect
 	go.opentelemetry.io/contrib v1.9.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.9.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.9.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.9.0 // indirect
-	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.9.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
-	go.uber.org/goleak v1.1.12 // indirect
 	google.golang.org/genproto v0.0.0-20211118181313-81c1377c94b1 // indirect
 	google.golang.org/grpc v1.46.2 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
@@ -112,7 +111,7 @@ require (
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/otel/metric v0.31.0 // indirect
-	go.opentelemetry.io/otel/trace v1.9.0 // indirect
+	go.opentelemetry.io/otel/trace v1.9.0
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/dig v1.15.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
