@@ -59,7 +59,7 @@ jobs:
             latest=auto
       
       - name: "Docker: Build and Push Image"
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
