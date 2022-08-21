@@ -38,8 +38,15 @@ jobs:
           export TRUNCATED_GITHUB_SHA=$(echo ${{ github.sha }} | cut -c1-7);
           echo "VERSION=${GITHUB_REF/refs\/tags\//}+${TRUNCATED_GITHUB_SHA}" >> $GITHUB_ENV
           echo "GIT_TAG=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+      
+      - name: "Docker: Login to GitHub Container Registry"
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker meta
+      - name: "Docker: Metadata"
         id: meta
         uses: docker/metadata-action@v4
         with:
@@ -51,14 +58,14 @@ jobs:
           flavor: |
             latest=auto
       
-      - name: Build Docker Image
+      - name: "Docker: Build and Push Image"
         uses: docker/build-push-action@v2
         with:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Create Sentry release
+      - name: "Sentry: Create Release"
         uses: getsentry/action-release@v1
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -68,7 +75,8 @@ jobs:
           environment: prod
           version: ${{ env.VERSION }}
 
-      - uses: "marvinpinto/action-automatic-releases@latest"
+      - name: "GitHub: Create Repository Release"
+        uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           prerelease: false
