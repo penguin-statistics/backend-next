@@ -14,6 +14,7 @@ import (
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	"github.com/penguin-statistics/backend-next/internal/pkg/crypto"
 	"github.com/penguin-statistics/backend-next/internal/pkg/fiberstore"
+	"github.com/penguin-statistics/backend-next/internal/pkg/flog"
 	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
 	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
@@ -110,7 +111,7 @@ func (c *Report) RecognitionReport(ctx *fiber.Ctx) error {
 	segments := strings.SplitN(encrypted, ":", 2)
 
 	if err := rekuest.Validate.Var(segments, "len=2"); err != nil {
-		log.Warn().
+		flog.WarnFrom(ctx).
 			Err(err).
 			Msg("failed to decrypt recognition request")
 		return pgerr.ErrInvalidReq
@@ -121,7 +122,7 @@ func (c *Report) RecognitionReport(ctx *fiber.Ctx) error {
 
 	decrypted, err := c.Crypto.Decrypt(privateKey, body)
 	if err != nil {
-		log.Warn().
+		flog.WarnFrom(ctx).
 			Err(err).
 			Msg("failed to decrypt recognition request")
 		return pgerr.ErrInvalidReq
@@ -129,7 +130,7 @@ func (c *Report) RecognitionReport(ctx *fiber.Ctx) error {
 
 	var request types.BatchReportRequest
 	if err = json.Unmarshal(decrypted, &request); err != nil {
-		log.Warn().
+		flog.WarnFrom(ctx).
 			Err(err).
 			Msg("failed to unmarshal recognition request")
 		return pgerr.ErrInvalidReq
