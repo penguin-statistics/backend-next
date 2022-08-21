@@ -55,12 +55,16 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 		// Don't execute middleware if the idempotent key is missing
 		key := c.Get(config.KeyHeader)
 		if key == "" {
-			log.Trace().Msg("IdempotencyMiddleware: idempotency key is missing. Skipping middleware.")
+			if l := log.Trace(); l.Enabled() {
+				l.Msg("IdempotencyMiddleware: idempotency key is missing. Skipping middleware.")
+			}
 			return c.Next()
 		}
 
 		if err := rekuest.Validate.Var(key, "max=128,alphanum"); err != nil {
-			log.Trace().Err(err).Msg("IdempotencyMiddleware: idempotency key is invalid. Returning error.")
+			if l := log.Trace(); l.Enabled() {
+				l.Err(err).Msg("IdempotencyMiddleware: idempotency key is invalid. Returning error.")
+			}
 			return pgerr.ErrInvalidReq.Msg("invalid idempotency key: idempotency key can only be at most %d characters, consist of only alphanumeric characters", constant.IdempotencyKeyLengthLimit)
 		}
 
@@ -68,9 +72,10 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 		response, err := config.Storage.Get(key)
 		if err == nil && response != nil {
 			// Idempotency key found in storage. Return the response
-			log.Debug().
-				Str("key", key).
-				Msg("IdempotencyMiddleware: idempotency key found in storage. Returning saved response.")
+			if l := log.Debug(); l.Enabled() {
+				l.Str("key", key).
+					Msg("IdempotencyMiddleware: idempotency key found in storage. Returning saved response.")
+			}
 			return unmarshalResponseToFiberResponse(c, config, response)
 		}
 
@@ -78,7 +83,9 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 		err = c.Next()
 		if err != nil {
 			// If the request handler returned an error, return it and skip idempotency
-			log.Trace().Msg("IdempotencyMiddleware: request handler returned an error. Skipping saving the idempotency response.")
+			if l := log.Trace(); l.Enabled() {
+				l.Msg("IdempotencyMiddleware: request handler returned an error. Skipping saving the idempotency response.")
+			}
 			return err
 		}
 
@@ -98,9 +105,10 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 		// Add idempotency header
 		c.Set(constant.IdempotencyHeader, "saved")
 
-		log.Debug().
-			Str("key", key).
-			Msg("IdempotencyMiddleware: Idempotency Key given and no response was saved. Executed request handler and saved returned response in storage.")
+		if l := log.Debug(); l.Enabled() {
+			l.Str("key", key).
+				Msg("IdempotencyMiddleware: Idempotency Key given and no response was saved. Executed request handler and saved returned response in storage.")
+		}
 
 		return nil
 	}

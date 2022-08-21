@@ -52,10 +52,11 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.ReportTaskSingl
 		}
 	}
 
-	log.Trace().
-		Interface("itemDropInfos", itemDropInfos).
-		Interface("typeDropInfos", typeDropInfos).
-		Msg("verifying drop")
+	if l := log.Trace(); l.Enabled() {
+		l.Interface("itemDropInfos", itemDropInfos).
+			Interface("typeDropInfos", typeDropInfos).
+			Msg("verifying drop")
+	}
 
 	var errs []error
 
@@ -95,10 +96,11 @@ func (d *DropVerifier) verifyDropType(report *types.ReportTaskSingleReport, drop
 		return len(drops)
 	})
 
-	log.Trace().
-		Interface("grouped", grouped).
-		Interface("dropTypeAmountMap", dropTypeAmountMap).
-		Msg("dropTypeAmountMap")
+	if l := log.Trace(); l.Enabled() {
+		l.Interface("grouped", grouped).
+			Interface("dropTypeAmountMap", dropTypeAmountMap).
+			Msg("dropTypeAmountMap")
+	}
 
 	for _, dropInfo := range dropInfos {
 		count := dropTypeAmountMap[dropInfo.DropType]
@@ -153,9 +155,10 @@ func (d *DropVerifier) verifyDropItem(report *types.ReportTaskSingleReport, drop
 		dropItemQuantityMap[drop.ItemID][drop.DropType] += drop.Quantity
 	}
 
-	log.Trace().
-		Interface("dropItemQuantityMap", dropItemQuantityMap).
-		Msg("dropItemQuantityMap")
+	if l := log.Trace(); l.Enabled() {
+		l.Interface("dropItemQuantityMap", dropItemQuantityMap).
+			Msg("dropItemQuantityMap")
+	}
 
 	// Check 2
 	for _, dropInfo := range dropInfos {
