@@ -4,9 +4,13 @@ import (
 	"context"
 	"time"
 
+	"go.opentelemetry.io/otel"
+
 	"github.com/penguin-statistics/backend-next/internal/model/types"
 	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
 )
+
+var tracer = otel.Tracer("pgbackend.reportverifs")
 
 type Verifier interface {
 	Name() string
@@ -32,7 +36,12 @@ func (verifiers ReportVerifiers) Verify(ctx context.Context, reportTask *types.R
 			start := time.Now()
 
 			name := pipe.Name()
+
+			ctx, span := tracer.
+				Start(ctx, "reportverifs.verifier."+name)
+
 			rejection := pipe.Verify(ctx, report, reportTask)
+			span.End()
 
 			if rejection != nil {
 				violations[reportIndex] = &Violation{

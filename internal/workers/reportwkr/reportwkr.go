@@ -141,7 +141,7 @@ func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
 
 	var span trace.Span
 	taskCtx, span = tracer.
-		Start(taskCtx, "reportwkr.Consumer",
+		Start(taskCtx, "reportwkr.ConsumeTask",
 			trace.WithSpanKind(trace.SpanKindConsumer),
 			trace.WithAttributes(
 				semconv.MessagingSystemKey.String("nats"),
@@ -162,6 +162,8 @@ func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
 		span.End()
 		return err
 	}
+	span.SetStatus(codes.Ok, "")
+	span.End()
 
 	log.Info().
 		Str("taskId", reportTask.TaskID).
@@ -178,22 +180,28 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 
 	L.Info().Msg("now processing new report task")
 
-	violations := w.ReportVerifier.Verify(ctx, reportTask)
+	verifyCtx, verifySpan := tracer.
+		Start(ctx, "reportwkr.process.Verify",
+			trace.WithSpanKind(trace.SpanKindInternal))
+
+	violations := w.ReportVerifier.Verify(verifyCtx, reportTask)
 	if len(violations) > 0 {
 		L.Warn().
-			Interface("violations", violations).
+			Stringer("violations", violations).
 			Msg("report task verification failed on some or all reports")
 	}
 
-	// reportTask.CreatedAt is in microseconds
-	var taskCreatedAt time.Time
-	if reportTask.CreatedAt != 0 {
-		taskCreatedAt = time.UnixMicro(reportTask.CreatedAt)
-	} else {
-		taskCreatedAt = time.Now()
-	}
+	verifySpan.End()
 
-	tx, err := w.DB.BeginTx(ctx, nil)
+	pstCtx, pstSpan := tracer.
+		Start(ctx, "reportwkr.process.Persistance",
+			trace.WithSpanKind(trace.SpanKindInternal))
+	defer pstSpan.End()
+
+	// reportTask.CreatedAt is in microseconds
+	taskCreatedAt := time.UnixMicro(reportTask.CreatedAt)
+
+	tx, err := w.DB.BeginTx(pstCtx, nil)
 	if err != nil {
 		return err
 	}
@@ -211,18 +219,18 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 	for idx, report := range reportTask.Reports {
 		report.Drops = reportutil.MergeDropsByItemID(report.Drops)
 
-		dropPattern, created, err := w.DropPatternRepo.GetOrCreateDropPatternFromDrops(ctx, tx, report.Drops)
+		dropPattern, created, err := w.DropPatternRepo.GetOrCreateDropPatternFromDrops(pstCtx, tx, report.Drops)
 		if err != nil {
 			return errors.Wrap(err, "failed to calculate drop pattern hash")
 		}
 		if created {
-			_, err := w.DropPatternElementRepo.CreateDropPatternElements(ctx, tx, dropPattern.PatternID, report.Drops)
+			_, err := w.DropPatternElementRepo.CreateDropPatternElements(pstCtx, tx, dropPattern.PatternID, report.Drops)
 			if err != nil {
 				return errors.Wrap(err, "failed to create drop pattern elements")
 			}
 		}
 
-		stage, err := w.StageRepo.GetStageByArkId(ctx, report.StageID)
+		stage, err := w.StageRepo.GetStageByArkId(pstCtx, report.StageID)
 		if err != nil {
 			return errors.Wrap(err, "failed to get stage")
 		}
@@ -238,7 +246,7 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 			Server:      reportTask.Server,
 			AccountID:   reportTask.AccountID,
 		}
-		if err = w.DropReportRepo.CreateDropReport(ctx, tx, dropReport); err != nil {
+		if err = w.DropReportRepo.CreateDropReport(pstCtx, tx, dropReport); err != nil {
 			return errors.Wrap(err, "failed to create drop report")
 		}
 
@@ -252,7 +260,7 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 			// FIXME: temporary hack; find why ip is empty
 			reportTask.IP = "127.0.0.1"
 		}
-		if err = w.DropReportExtraRepo.CreateDropReportExtra(ctx, tx, &model.DropReportExtra{
+		if err = w.DropReportExtraRepo.CreateDropReportExtra(pstCtx, tx, &model.DropReportExtra{
 			ReportID: dropReport.ReportID,
 			IP:       reportTask.IP,
 			Source:   reportTask.Source,
@@ -263,7 +271,7 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 			return errors.Wrap(err, "failed to create drop report extra")
 		}
 
-		if err := w.Redis.Set(ctx, constant.ReportRedisPrefix+reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
+		if err := w.Redis.Set(pstCtx, constant.ReportRedisPrefix+reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
 			return errors.Wrap(err, "failed to set report id in redis")
 		}
 	}

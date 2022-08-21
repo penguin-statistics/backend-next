@@ -3,10 +3,11 @@ package reportverifs
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/samber/lo"
 	"github.com/rs/zerolog/log"
+	"github.com/samber/lo"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model"
@@ -19,7 +20,7 @@ var (
 	ErrInvalidDropItem      = errors.New("invalid drop item")
 	ErrInvalidDropInfoCount = errors.New("invalid drop info count")
 	ErrUnknownItemID        = errors.New("unknown item id")
-	ErrUnknownDropInfoTuple        = errors.New("unknown drop type + item id tuple")
+	ErrUnknownDropInfoTuple = errors.New("unknown drop type + item id tuple")
 )
 
 type DropVerifier struct {
@@ -67,9 +68,17 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.ReportTaskSingl
 	}
 
 	if len(errs) > 0 {
+		var b strings.Builder
+		for i, err := range errs {
+			b.WriteString(err.Error())
+			if i < len(errs)-1 {
+				b.WriteString(", ")
+			}
+		}
+
 		return &Rejection{
 			Reliability: constant.ViolationReliabilityDrop,
-			Message:     fmt.Sprintf("%v", errs),
+			Message:     b.String(),
 		}
 	}
 
@@ -108,7 +117,7 @@ func (d *DropVerifier) verifyDropType(report *types.ReportTaskSingleReport, drop
 }
 
 type DropInfoTuple struct {
-	ItemID int64
+	ItemID   int64
 	DropType string
 }
 
@@ -121,7 +130,7 @@ func (d *DropVerifier) verifyDropItem(report *types.ReportTaskSingleReport, drop
 	dropInfoSetFromDropInfos := make(map[DropInfoTuple]struct{})
 	for _, dropInfo := range dropInfos {
 		tuple := DropInfoTuple{
-			ItemID: dropInfo.ItemID.Int64,
+			ItemID:   dropInfo.ItemID.Int64,
 			DropType: dropInfo.DropType,
 		}
 		dropInfoSetFromDropInfos[tuple] = struct{}{}
@@ -131,7 +140,7 @@ func (d *DropVerifier) verifyDropItem(report *types.ReportTaskSingleReport, drop
 	dropItemQuantityMap := make(map[int]map[string]int)
 	for _, drop := range report.Drops {
 		tuple := DropInfoTuple{
-			ItemID: int64(drop.ItemID),
+			ItemID:   int64(drop.ItemID),
 			DropType: drop.DropType,
 		}
 		// Check 1
