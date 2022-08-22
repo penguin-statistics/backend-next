@@ -94,102 +94,114 @@ func (w *Worker) Consumer(ctx context.Context, ch chan error) error {
 	for {
 		select {
 		case msg := <-msgChan:
-			func() {
-				taskCtx, cancelTask := context.WithTimeout(ctx, time.Second*10)
-
-				inprogressInformer := time.AfterFunc(time.Second*5, func() {
-					err = msg.InProgress()
-					if err != nil {
-						log.Error().Err(err).Msg("failed to set msg InProgress")
-					}
-				})
-				defer func() {
-					inprogressInformer.Stop()
-					cancelTask()
-					if err := msg.Ack(); err != nil {
-						log.Error().Err(err).Msg("failed to ack")
-					}
-				}()
-
-				reportTask := &types.ReportTask{}
-				if err := json.Unmarshal(msg.Data, reportTask); err != nil {
-					ch <- err
-					return
-				}
-
-				start := time.Now()
-				defer func() {
-					observability.ReportConsumeDuration.
-						WithLabelValues().
-						Observe(time.Since(start).Seconds())
-				}()
-
-				metadata, err := msg.Metadata()
-				if err != nil {
-					// should not happen: the message should be always a jetstream message
-					ch <- err
-					return
-				}
-
-				var span trace.Span
-				taskCtx, span = tracer.
-					Start(taskCtx, "reportwkr.Consumer",
-						trace.WithSpanKind(trace.SpanKindConsumer),
-						trace.WithAttributes(
-							semconv.MessagingSystemKey.String("nats"),
-							semconv.MessagingDestinationKey.String(msg.Subject),
-							semconv.MessagingMessageIDKey.String(jetstream.MessageID(metadata.Sequence)),
-							semconv.MessagingMessagePayloadSizeBytesKey.Int(len(msg.Data)),
-						))
-
-				err = w.consumeReport(taskCtx, reportTask)
-				if err != nil {
-					log.Error().
-						Err(err).
-						Str("taskId", reportTask.TaskID).
-						Interface("reportTask", reportTask).
-						Msg("failed to consume report task")
-					ch <- err
-					span.RecordError(err)
-					span.SetStatus(codes.Error, err.Error())
-					return
-				}
-				span.End()
-
-				log.Info().
-					Str("taskId", reportTask.TaskID).
-					Dur("duration", time.Since(start)).
-					Msg("report task processed successfully")
-			}()
+			err = w.ingestPreprocess(ctx, msg)
+			if err != nil {
+				log.Err(err).Msg("failed to ingest preprocess")
+				ch <- err
+			}
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 }
 
-func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask) error {
+func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
+	defer func() {
+		if err := msg.Ack(); err != nil {
+			log.Error().Err(err).Msg("failed to ack")
+		}
+	}()
+
+	taskCtx, cancelTask := context.WithTimeout(ctx, time.Second*10)
+	defer cancelTask()
+
+	inprogressInformer := time.AfterFunc(time.Second*5, func() {
+		err := msg.InProgress()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to set msg InProgress")
+		}
+	})
+	defer inprogressInformer.Stop()
+
+	reportTask := &types.ReportTask{}
+	if err := json.Unmarshal(msg.Data, reportTask); err != nil {
+		return err
+	}
+
+	start := time.Now()
+	defer observability.ReportConsumeDuration.
+		WithLabelValues().
+		Observe(time.Since(start).Seconds())
+
+	metadata, err := msg.Metadata()
+	if err != nil {
+		// should not happen: the message should be always a jetstream message
+		return err
+	}
+
+	var span trace.Span
+	taskCtx, span = tracer.
+		Start(taskCtx, "reportwkr.ConsumeTask",
+			trace.WithSpanKind(trace.SpanKindConsumer),
+			trace.WithAttributes(
+				semconv.MessagingSystemKey.String("nats"),
+				semconv.MessagingDestinationKey.String(msg.Subject),
+				semconv.MessagingMessageIDKey.String(jetstream.MessageID(metadata.Sequence)),
+				semconv.MessagingMessagePayloadSizeBytesKey.Int(len(msg.Data)),
+			))
+
+	err = w.process(taskCtx, reportTask)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Str("taskId", reportTask.TaskID).
+			Interface("reportTask", reportTask).
+			Msg("failed to consume report task")
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		span.End()
+		return err
+	}
+	span.SetStatus(codes.Ok, "")
+	span.End()
+
+	log.Info().
+		Str("taskId", reportTask.TaskID).
+		Dur("duration", time.Since(start)).
+		Msg("report task processed successfully")
+
+	return nil
+}
+
+func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) error {
 	L := log.With().
 		Interface("task", reportTask).
 		Logger()
 
 	L.Info().Msg("now processing new report task")
 
-	violations := w.ReportVerifier.Verify(ctx, reportTask)
+	verifyCtx, verifySpan := tracer.
+		Start(ctx, "reportwkr.process.Verify",
+			trace.WithSpanKind(trace.SpanKindInternal))
+
+	violations := w.ReportVerifier.Verify(verifyCtx, reportTask)
 	if len(violations) > 0 {
 		L.Warn().
-			Interface("violations", violations).
+			Stringer("violations", violations).
 			Msg("report task verification failed on some or all reports")
 	}
 
-	// reportTask.CreatedAt is in microseconds
-	var taskCreatedAt time.Time
-	if reportTask.CreatedAt != 0 {
-		taskCreatedAt = time.UnixMicro(reportTask.CreatedAt)
-	} else {
-		taskCreatedAt = time.Now()
-	}
+	verifySpan.End()
 
-	tx, err := w.DB.BeginTx(ctx, nil)
+	pstCtx, pstSpan := tracer.
+		Start(ctx, "reportwkr.process.Persistance",
+			trace.WithSpanKind(trace.SpanKindInternal))
+	defer pstSpan.End()
+
+	// reportTask.CreatedAt is in microseconds
+	taskCreatedAt := time.UnixMicro(reportTask.CreatedAt)
+
+	tx, err := w.DB.BeginTx(pstCtx, nil)
 	if err != nil {
 		return err
 	}
@@ -207,18 +219,18 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 	for idx, report := range reportTask.Reports {
 		report.Drops = reportutil.MergeDropsByItemID(report.Drops)
 
-		dropPattern, created, err := w.DropPatternRepo.GetOrCreateDropPatternFromDrops(ctx, tx, report.Drops)
+		dropPattern, created, err := w.DropPatternRepo.GetOrCreateDropPatternFromDrops(pstCtx, tx, report.Drops)
 		if err != nil {
 			return errors.Wrap(err, "failed to calculate drop pattern hash")
 		}
 		if created {
-			_, err := w.DropPatternElementRepo.CreateDropPatternElements(ctx, tx, dropPattern.PatternID, report.Drops)
+			_, err := w.DropPatternElementRepo.CreateDropPatternElements(pstCtx, tx, dropPattern.PatternID, report.Drops)
 			if err != nil {
 				return errors.Wrap(err, "failed to create drop pattern elements")
 			}
 		}
 
-		stage, err := w.StageRepo.GetStageByArkId(ctx, report.StageID)
+		stage, err := w.StageRepo.GetStageByArkId(pstCtx, report.StageID)
 		if err != nil {
 			return errors.Wrap(err, "failed to get stage")
 		}
@@ -234,7 +246,7 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 			Server:      reportTask.Server,
 			AccountID:   reportTask.AccountID,
 		}
-		if err = w.DropReportRepo.CreateDropReport(ctx, tx, dropReport); err != nil {
+		if err = w.DropReportRepo.CreateDropReport(pstCtx, tx, dropReport); err != nil {
 			return errors.Wrap(err, "failed to create drop report")
 		}
 
@@ -248,7 +260,7 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 			// FIXME: temporary hack; find why ip is empty
 			reportTask.IP = "127.0.0.1"
 		}
-		if err = w.DropReportExtraRepo.CreateDropReportExtra(ctx, tx, &model.DropReportExtra{
+		if err = w.DropReportExtraRepo.CreateDropReportExtra(pstCtx, tx, &model.DropReportExtra{
 			ReportID: dropReport.ReportID,
 			IP:       reportTask.IP,
 			Source:   reportTask.Source,
@@ -259,7 +271,7 @@ func (w *Worker) consumeReport(ctx context.Context, reportTask *types.ReportTask
 			return errors.Wrap(err, "failed to create drop report extra")
 		}
 
-		if err := w.Redis.Set(ctx, constant.ReportRedisPrefix+reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
+		if err := w.Redis.Set(pstCtx, constant.ReportRedisPrefix+reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
 			return errors.Wrap(err, "failed to set report id in redis")
 		}
 	}

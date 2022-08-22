@@ -22,6 +22,8 @@ func Postgres(conf *config.Config) (*bun.DB, error) {
 	db := bun.NewDB(pgdb, pgdialect.New())
 	if conf.DevMode {
 		db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithEnabled(true), bundebug.WithVerbose(conf.BunDebugVerbose)))
+	}
+	if conf.TracingEnabled {
 		db.AddQueryHook(bunotel.NewQueryHook(bunotel.WithDBName("penguin-postgres")))
 	}
 
@@ -34,7 +36,7 @@ func Postgres(conf *config.Config) (*bun.DB, error) {
 
 	pgdb.SetMaxOpenConns(conf.PostgresMaxOpenConns)
 	pgdb.SetMaxIdleConns(conf.PostgresMaxIdleConns)
-	pgdb.SetConnMaxLifetime(conf.PostgresConnMaxLifetime)
+	pgdb.SetConnMaxLifetime(conf.PostgresConnMaxLifeTime)
 	pgdb.SetConnMaxIdleTime(conf.PostgresConnMaxIdleTime)
 
 	return db, nil

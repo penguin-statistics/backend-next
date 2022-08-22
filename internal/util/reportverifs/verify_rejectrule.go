@@ -75,13 +75,6 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 			continue
 		}
 
-		options := []expr.Option{
-			expr.Env(reportContext),
-			expr.AsBool(),
-		}
-
-		expr.Compile(rejectRule.Expr, options...)
-
 		result, err := expr.Eval(rejectRule.Expr, reportContext)
 		if err != nil {
 			log.Error().
