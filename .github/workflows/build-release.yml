@@ -14,29 +14,35 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: "Go: Setup Cache Paths"
+        id: go-cache-paths
+        run: |
+          echo "::set-output name=go-build::$(go env GOCACHE)"
+          echo "::set-output name=go-mod::$(go env GOMODCACHE)"
+      
+      - name: "Checkout"
+        uses: actions/checkout@v3
 
-      # - name: Run Snyk to check for vulnerabilities
-      #   uses: snyk/actions/golang@master
-      #   continue-on-error: true
-      #   env:
-      #     SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      #   with:
-      #     args: --sarif-file-output=snyk.sarif
-
-      # - name: Upload result to GitHub Code Scanning
-      #   uses: github/codeql-action/upload-sarif@v1
-      #   with:
-      #     sarif_file: snyk.sarif
-
-      # - name: Run golangci-lint
-      #   uses: golangci/golangci-lint-action@v3.1.0
-
-      - name: Get Tag Version
+      - name: "Get Tag Version"
         id: get_version
         run: |
           export TRUNCATED_GITHUB_SHA=$(echo ${{ github.sha }} | cut -c1-7);
           echo "VERSION=${GITHUB_REF/refs\/tags\//}+${TRUNCATED_GITHUB_SHA}" >> $GITHUB_ENV
+      
+      # https://markphelps.me/posts/speed-up-your-go-builds-with-actions-cache/
+      # Cache go build cache, used to speedup compiles
+      - name: "Go: Cache: Builds"
+        uses: actions/cache@v2
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-build }}
+          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
+
+      # Cache go mod cache, used to speedup downloads
+      - name: "Go: Cache: Modules"
+        uses: actions/cache@v2
+        with:
+          path: ${{ steps.go-cache-paths.outputs.go-mod }}
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
       
       - name: "Docker: Login to GitHub Container Registry"
         uses: docker/login-action@v2
