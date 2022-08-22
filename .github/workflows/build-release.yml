@@ -65,6 +65,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=ghcr.io/penguin-statistics/backend-next:buildcache
+          cache-to: type=registry,ref=ghcr.io/penguin-statistics/backend-next:buildcache,mode=max
           build-args: |
             VERSION=${{ env.VERSION }}
 
