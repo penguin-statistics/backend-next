@@ -10,7 +10,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
 )
 
-var tracer = otel.Tracer("pgbackend.reportverifs")
+var tracer = otel.Tracer("reportverifs")
 
 type Verifier interface {
 	Name() string
