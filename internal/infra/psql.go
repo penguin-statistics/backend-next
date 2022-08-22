@@ -34,7 +34,7 @@ func Postgres(conf *config.Config) (*bun.DB, error) {
 
 	pgdb.SetMaxOpenConns(conf.PostgresMaxOpenConns)
 	pgdb.SetMaxIdleConns(conf.PostgresMaxIdleConns)
-	pgdb.SetConnMaxLifetime(conf.PostgresConnMaxLifetime)
+	pgdb.SetConnMaxLifetime(conf.PostgresConnMaxLifeTime)
 	pgdb.SetConnMaxIdleTime(conf.PostgresConnMaxIdleTime)
 
 	return db, nil
