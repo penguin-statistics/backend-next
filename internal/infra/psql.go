@@ -22,6 +22,8 @@ func Postgres(conf *config.Config) (*bun.DB, error) {
 	db := bun.NewDB(pgdb, pgdialect.New())
 	if conf.DevMode {
 		db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithEnabled(true), bundebug.WithVerbose(conf.BunDebugVerbose)))
+	}
+	if conf.TracingEnabled {
 		db.AddQueryHook(bunotel.NewQueryHook(bunotel.WithDBName("penguin-postgres")))
 	}
 
