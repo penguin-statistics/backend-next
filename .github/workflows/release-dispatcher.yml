@@ -1,4 +1,4 @@
-name: Release PR Tagger
+name: Release Dispatcher
 
 on:
   # trigger on pull-request merged to main branch
@@ -47,3 +47,34 @@ jobs:
               ref: `refs/tags/${tag}`,
               sha: sha1,
             });
+  # manifest-updater:
+  #   runs-on: ubuntu-latest
+  #   needs: tagger
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         fetch_depth: 0
+  #         ref: 'main'
+
+  #     # git tag the release, then push it
+  #     # The tag name is the string after `Release`, trimmed of whitespace
+  #     - name: Tag Release
+  #       uses: actions/github-script@v6
+  #       with:
+  #         github-token: ${{ secrets.PAT_FOR_RELEASE_TAGGER }}
+  #         script: |
+  #           const { repo, owner } = context.repo;
+  #           // get the last commit on the main branch using API
+  #           const lastCommit = await github.rest.repos.getCommit({ owner, repo, ref: 'main' });
+  #           const sha1 = lastCommit.data.sha;
+  #           const title = context.payload.pull_request.title;
+  #           // tag is the semver version of the PR title
+  #           const tag = title.substring(title.indexOf('Release') + 'Release'.length).trim();
+  #           const tagger = context.actor;
+  #           // tag old ones
+  #           await github.rest.git.createRef({
+  #             owner,
+  #             repo,
+  #             ref: `refs/tags/${tag}`,
+  #             sha: sha1,
+  #           });

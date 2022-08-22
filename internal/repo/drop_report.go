@@ -296,7 +296,7 @@ func (s *DropReport) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, 
 			Column("it.ark_item_id").
 			ColumnExpr("SUM(dpe.quantity) AS total_quantity").
 			Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id").
-			Where("dr.reliability = 0 AND dr.server = ? AND st.ark_stage_id != ? AND it.type IN (?)", server, constant.RecruitStageID, bun.In(types)).
+			Where("dr.reliability = 0 AND dr.server = ? AND it.type IN (?)", server, bun.In(types)).
 			Group("it.ark_item_id"),
 	).
 		UseItemById("dpe.item_id").
