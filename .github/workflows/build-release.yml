@@ -29,20 +29,16 @@ jobs:
           export TRUNCATED_GITHUB_SHA=$(echo ${{ github.sha }} | cut -c1-7);
           echo "VERSION=${GITHUB_REF/refs\/tags\//}+${TRUNCATED_GITHUB_SHA}" >> $GITHUB_ENV
       
-      # https://markphelps.me/posts/speed-up-your-go-builds-with-actions-cache/
-      # Cache go build cache, used to speedup compiles
+      # https://github.com/actions/cache/blob/main/examples.md#go---modules
       - name: "Go: Cache: Builds"
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
-          path: ${{ steps.go-cache-paths.outputs.go-build }}
-          key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
-
-      # Cache go mod cache, used to speedup downloads
-      - name: "Go: Cache: Modules"
-        uses: actions/cache@v2
-        with:
-          path: ${{ steps.go-cache-paths.outputs.go-mod }}
-          key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+          path: |
+            ${{ steps.go-cache-paths.outputs.go-build }}
+            ${{ steps.go-cache-paths.outputs.go-mod }}
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
       
       - name: "Docker: Login to GitHub Container Registry"
         uses: docker/login-action@v2
