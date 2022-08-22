@@ -20,7 +20,7 @@ type Config struct {
 	DevOpsAddress string `split_words:"true"`
 
 	// LogJsonStdout is whether to log JSON logs (instead of pretty-print logs) to stdout for the ease of log collection.
-	LogJsonStdout bool `default:"false"`
+	LogJsonStdout bool `split_words:"true" default:"false"`
 
 	// TrustedProxies is a list of trusted proxies that are trusted to report a real IP via the X-Forwarded-For header.
 	TrustedProxies []string `required:"true" split_words:"true" default:"::1,127.0.0.1,10.0.0.0/8"`
