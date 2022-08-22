@@ -49,7 +49,7 @@ type Config struct {
 
 	PostgresMaxOpenConns    int           `split_words:"true" default:"10"`
 	PostgresMaxIdleConns    int           `split_words:"true" default:"2"`
-	PostgresConnMaxLifetime time.Duration `split_words:"true" default:"5m"`
+	PostgresConnMaxLifeTime time.Duration `split_words:"true" default:"5m"`
 	PostgresConnMaxIdleTime time.Duration `split_words:"true" default:"5m"`
 
 	BunDebugVerbose bool `split_words:"true"`
