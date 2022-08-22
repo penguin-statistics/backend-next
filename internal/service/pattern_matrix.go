@@ -84,13 +84,26 @@ func (s *PatternMatrix) RefreshAllPatternMatrixElements(ctx context.Context, ser
 	if err != nil {
 		return err
 	}
+	excludeStageIdsSet, err := s.getExcludeStageIdsSet(ctx)
+	if err != nil {
+		return err
+	}
 	stageIdsTuples := wrap.TuplePtrsFromMap(s.getStageIdsMapByTimeRange(allTimeRanges))
 
 	elements, err := async.FlatMap(stageIdsTuples, constant.WorkerParallelism, func(tuple *wrap.Tuple[int, []int]) ([]*model.PatternMatrixElement, error) {
 		timeRanges := []*model.TimeRange{timeRangesMap[tuple.Key]}
 		currentBatch := make([]*model.PatternMatrixElement, 0)
 		for _, sourceCategory := range sourceCategories {
-			results, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, tuple.Val, null.NewInt(0, false), sourceCategory)
+			stageIds := tuple.Val
+			// exclude some stages (gachabox, recruit) before calc
+			linq.From(stageIds).WhereT(func(stageId int) bool {
+				_, ok := excludeStageIdsSet[stageId]
+				return !ok
+			}).ToSlice(&stageIds)
+			if len(stageIds) == 0 {
+				continue
+			}
+			results, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, stageIds, null.NewInt(0, false), sourceCategory)
 			if err != nil {
 				return nil, err
 			}
@@ -126,9 +139,23 @@ func (s *PatternMatrix) getLatestPatternMatrixElements(ctx context.Context, serv
 		if err != nil {
 			return nil, err
 		}
+		excludeStageIdsSet, err := s.getExcludeStageIdsSet(ctx)
+		if err != nil {
+			return nil, err
+		}
+
 		stageIdsMap := s.getStageIdsMapByTimeRange(allTimeRanges)
 		elements := make([]*model.PatternMatrixElement, 0)
 		for rangeId, stageIds := range stageIdsMap {
+			// exclude some stages (gachabox, recruit) before calc
+			linq.From(stageIds).WhereT(func(stageId int) bool {
+				_, ok := excludeStageIdsSet[stageId]
+				return !ok
+			}).ToSlice(&stageIds)
+			if len(stageIds) == 0 {
+				continue
+			}
+
 			timeRanges := []*model.TimeRange{timeRangesMap[rangeId]}
 			currentBatch, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, stageIds, accountId, sourceCategory)
 			if err != nil {
@@ -162,24 +189,6 @@ func (s *PatternMatrix) calcPatternMatrixForTimeRanges(
 	}
 
 	stageIds := util.GetStageIdsFromDropInfos(dropInfos)
-
-	// exclude gacha box stages
-	gachaboxStages, err := s.StageService.GetGachaBoxStages(ctx)
-	if err != nil {
-		return nil, err
-	}
-	excludeStageIdsSet := make(map[int]struct{}, len(gachaboxStages))
-	for _, stage := range gachaboxStages {
-		excludeStageIdsSet[stage.StageID] = struct{}{}
-	}
-	linq.From(stageIds).WhereT(func(stageId int) bool {
-		_, ok := excludeStageIdsSet[stageId]
-		return !ok
-	}).ToSlice(&stageIds)
-	if len(stageIds) == 0 {
-		return results, nil
-	}
-
 	for _, timeRange := range timeRanges {
 		quantityResults, err := s.DropReportService.CalcTotalQuantityForPatternMatrix(ctx, server, timeRange, stageIds, accountId, sourceCategory)
 		if err != nil {
@@ -261,6 +270,27 @@ func (s *PatternMatrix) getStageIdsMapByTimeRange(timeRangesMap map[int]*model.T
 		results[timeRange.RangeID] = append(results[timeRange.RangeID], stageId)
 	}
 	return results
+}
+
+func (s *PatternMatrix) getExcludeStageIdsSet(ctx context.Context) (map[int]struct{}, error) {
+	excludeStageIdsSet := make(map[int]struct{}, 0)
+	// exclude gacha box stages
+	gachaboxStages, err := s.StageService.GetGachaBoxStages(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, stage := range gachaboxStages {
+		excludeStageIdsSet[stage.StageID] = struct{}{}
+	}
+	// exclude recruit stage
+	stagesMapByArkId, err := s.StageService.GetStagesMapByArkId(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := stagesMapByArkId[constant.RecruitStageID]; ok {
+		excludeStageIdsSet[stagesMapByArkId[constant.RecruitStageID].StageID] = struct{}{}
+	}
+	return excludeStageIdsSet, nil
 }
 
 func (s *PatternMatrix) convertPatternMatrixElementsToDropPatternQueryResult(
