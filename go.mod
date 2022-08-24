@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/ahmetb/go-linq/v3 v3.2.0
-	github.com/ansrivas/fiberprometheus/v2 v2.4.0
+	github.com/ansrivas/fiberprometheus/v2 v2.4.1
 	github.com/antonmedv/expr v1.9.0
 	github.com/avast/retry-go/v3 v3.1.1
 	github.com/davecgh/go-spew v1.1.1
