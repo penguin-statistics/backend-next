@@ -71,3 +71,11 @@ jobs:
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           prerelease: false
+      
+      - name: "ManifestBot: Update Manifest"
+        uses: "penguin-statistics/manifestbot@v9"
+        with:
+          file-path: 'applications/backend/values-prod.yaml'
+          version-path: 'image.tag'
+          version: ${{ env.AUTOMATIC_RELEASES_TAG }}
+          token: ${{ secrets.PAT_FOR_MANIFESTBOT }}
