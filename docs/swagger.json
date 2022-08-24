@@ -234,15 +234,15 @@
                 }
             }
         },
-        "/PenguinStats/api/v2/formula": {
+        "/PenguinStats/api/v2/config": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Formula"
+                    "FrontendConfig"
                 ],
-                "summary": "Get Formula",
+                "summary": "Get FrontendConfig",
                 "responses": {
                     "200": {
                         "description": ""
@@ -256,15 +256,15 @@
                 }
             }
         },
-        "/PenguinStats/api/v2/config": {
+        "/PenguinStats/api/v2/formula": {
             "get": {
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "FrontendConfig"
+                    "Formula"
                 ],
-                "summary": "Get Frontend Config",
+                "summary": "Get Formula",
                 "responses": {
                     "200": {
                         "description": ""
@@ -477,7 +477,7 @@
                     }
                 ],
                 "responses": {
-                    "201": {
+                    "200": {
                         "description": "Report has been successfully submitted",
                         "schema": {
                             "$ref": "#/definitions/v2.ReportResponse"
@@ -1286,12 +1286,6 @@
                 },
                 "server": {
                     "type": "string",
-                    "enum": [
-                        "CN",
-                        "US",
-                        "JP",
-                        "KR"
-                    ],
                     "example": "CN"
                 },
                 "source": {

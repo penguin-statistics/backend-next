@@ -168,11 +168,6 @@ definitions:
       metadata:
         $ref: '#/definitions/types.ReportRequestMetadata'
       server:
-        enum:
-        - CN
-        - US
-        - JP
-        - KR
         example: CN
         type: string
       source:
@@ -630,6 +625,20 @@ paths:
       summary: Execute Advanced Query
       tags:
       - Result
+  /PenguinStats/api/v2/config:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: ""
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/pgerr.PenguinError'
+      summary: Get FrontendConfig
+      tags:
+      - FrontendConfig
   /PenguinStats/api/v2/formula:
     get:
       produces:
@@ -762,7 +771,7 @@ paths:
       produces:
       - application/json
       responses:
-        "201":
+        "200":
           description: Report has been successfully submitted
           schema:
             $ref: '#/definitions/v2.ReportResponse'

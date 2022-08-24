@@ -30,7 +30,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/util/reportverifs"
 )
 
-var tracer = otel.Tracer("pgbackend.reportwkr")
+var tracer = otel.Tracer("reportwkr")
 
 type WorkerDeps struct {
 	fx.In
@@ -194,7 +194,7 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 	verifySpan.End()
 
 	pstCtx, pstSpan := tracer.
-		Start(ctx, "reportwkr.process.Persistance",
+		Start(ctx, "reportwkr.process.Persistence",
 			trace.WithSpanKind(trace.SpanKindInternal))
 	defer pstSpan.End()
 

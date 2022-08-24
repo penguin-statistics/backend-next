@@ -111,9 +111,9 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 }
 
 func (d *RejectRuleVerifier) resultHandler(result any) bool {
-	switch result.(type) {
+	switch r := result.(type) {
 	case bool:
-		return result.(bool)
+		return r
 	default:
 		log.Error().Msgf("reject rule expr result type %T is not supported", result)
 		return false

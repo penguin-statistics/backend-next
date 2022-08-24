@@ -238,6 +238,28 @@ const docTemplate = `{
                 }
             }
         },
+        "/PenguinStats/api/v2/config": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "FrontendConfig"
+                ],
+                "summary": "Get FrontendConfig",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/pgerr.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
         "/PenguinStats/api/v2/formula": {
             "get": {
                 "produces": [
@@ -459,7 +481,7 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "201": {
+                    "200": {
                         "description": "Report has been successfully submitted",
                         "schema": {
                             "$ref": "#/definitions/v2.ReportResponse"
@@ -1268,12 +1290,6 @@ const docTemplate = `{
                 },
                 "server": {
                     "type": "string",
-                    "enum": [
-                        "CN",
-                        "US",
-                        "JP",
-                        "KR"
-                    ],
                     "example": "CN"
                 },
                 "source": {

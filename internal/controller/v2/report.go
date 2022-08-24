@@ -53,7 +53,7 @@ func RegisterReport(v2 *svr.V2, c Report) {
 // @Accept       json
 // @Produce      json
 // @Param        report  body      types.SingleReportRequest  true  "Report request"
-// @Success      201     {object}  modelv2.ReportResponse     "Report has been successfully submitted"
+// @Success      200     {object}  modelv2.ReportResponse     "Report has been successfully submitted"
 // @Failure      400     {object}  pgerr.PenguinError         "Invalid request"
 // @Failure      500     {object}  pgerr.PenguinError         "An unexpected error occurred"
 // @Security     PenguinIDAuth
