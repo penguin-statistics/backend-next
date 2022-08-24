@@ -14,12 +14,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: "Go: Setup Cache Paths"
-        id: go-cache-paths
-        run: |
-          echo "::set-output name=go-build::$(go env GOCACHE)"
-          echo "::set-output name=go-mod::$(go env GOMODCACHE)"
-      
       - name: "Checkout"
         uses: actions/checkout@v3
 
@@ -28,17 +22,6 @@ jobs:
         run: |
           export TRUNCATED_GITHUB_SHA=$(echo ${{ github.sha }} | cut -c1-7);
           echo "VERSION=${GITHUB_REF/refs\/tags\//}+${TRUNCATED_GITHUB_SHA}" >> $GITHUB_ENV
-      
-      # https://github.com/actions/cache/blob/main/examples.md#go---modules
-      - name: "Go: Cache: Builds"
-        uses: actions/cache@v3
-        with:
-          path: |
-            ${{ steps.go-cache-paths.outputs.go-build }}
-            ${{ steps.go-cache-paths.outputs.go-mod }}
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
       
       - name: "Docker: Setup Buildx"
         uses: docker/setup-buildx-action@v2
