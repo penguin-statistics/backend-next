@@ -16,14 +16,10 @@ jobs:
       - name: "Checkout"
         uses: actions/checkout@v3
 
-      - name: "Metadata: Git"
-        id: git-meta
-        uses: 'penguin-statistics/actions/git-meta@main'
-      
       - name: "Docker: Build and Push Image"
         id: ghcr-docker
         uses: 'penguin-statistics/actions/ghcr-docker@main'
         with:
-          version: ${{ steps.git-meta.outputs.version }}
+          version: '__check__'
           repository: 'penguin-statistics/backend-next'
           push: false
