@@ -538,6 +538,8 @@ github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljT
 github.com/ugorji/go/codec v1.1.7/go.mod h1:Ax+UKWsSmolVDwsd+7N3ZtXu+yMGCf907BLYF3GoBXY=
 github.com/uptrace/bun v1.1.7 h1:biOoh5dov69hQPBlaRsXSHoEOIEnCxFzQvUmbscSNJI=
 github.com/uptrace/bun v1.1.7/go.mod h1:Z2Pd3cRvNKbrYuL6Gp1XGjA9QEYz+rDz5KkEi9MZLnQ=
+github.com/uptrace/bun v1.1.8 h1:slxuaP4LYWFbPRUmTtQhfJN+6eX/6ar2HDKYTcI50SA=
+github.com/uptrace/bun v1.1.8/go.mod h1:iT89ESdV3uMupD9ixt6Khidht+BK0STabK/LeZE+B84=
 github.com/uptrace/bun/dialect/pgdialect v1.1.7 h1:94GPc8RRC9AVoQ+4KCqRX2zScevsVfOttk13wm60/P8=
 github.com/uptrace/bun/dialect/pgdialect v1.1.7/go.mod h1:kKHFmQIyBl0kvQDsoyrlXaKsceTH2TJnbCUFlK9QAmE=
 github.com/uptrace/bun/driver/pgdriver v1.1.7 h1:WExzNbsMBWmkjcylV8kKzcbA7pKWZ5UhPflknzUP2PA=
