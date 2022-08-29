@@ -161,12 +161,24 @@ func ValidVar(ctx *fiber.Ctx, field any, tag string) error {
 	return nil
 }
 
-type request struct {
-	Server string `validate:"required,arkserver"`
+func ValidServer(ctx *fiber.Ctx, server string) error {
+	type request struct {
+		Server string `validate:"required,arkserver"`
+	}
+
+	if err := ValidStruct(ctx, request{server}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func ValidServer(ctx *fiber.Ctx, server string) error {
-	if err := ValidStruct(ctx, request{server}); err != nil {
+func ValidCategory(ctx *fiber.Ctx, category string) error {
+	type request struct {
+		Category string `validate:"oneof=automated manual"`
+	}
+
+	if err := ValidStruct(ctx, request{category}); err != nil {
 		return err
 	}
 

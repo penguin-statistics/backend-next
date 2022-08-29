@@ -21,3 +21,10 @@ func ValidateServerAsQuery(c *fiber.Ctx) error {
 	}
 	return c.Next()
 }
+
+func ValidateCategoryAsParam(c *fiber.Ctx) error {
+	if err := rekuest.ValidCategory(c, c.Params("category", "all")); err != nil {
+		return err
+	}
+	return c.Next()
+}
