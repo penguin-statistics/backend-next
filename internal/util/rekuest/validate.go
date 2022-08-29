@@ -175,7 +175,7 @@ func ValidServer(ctx *fiber.Ctx, server string) error {
 
 func ValidCategory(ctx *fiber.Ctx, category string) error {
 	type request struct {
-		Category string `validate:"oneof=automated manual"`
+		Category string `validate:"oneof=all automated manual"`
 	}
 
 	if err := ValidStruct(ctx, request{category}); err != nil {
