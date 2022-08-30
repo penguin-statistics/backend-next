@@ -38,9 +38,9 @@ func RegisterPrivate(v2 *svr.V2, c Private) {
 // @Summary  Get Drop Matrix
 // @Tags     Private
 // @Produce  json
-// @Param    server    path      string  true  "Server; default to CN"                  Enums(CN, US, JP, KR)
-// @Param    source    path      string  true  "Global or Personal; default to global"  Enums(global, personal)
-// @Param    category  path      string  true  "Category; default to all"               Enums(all, automated, manual)
+// @Param    server    path      string  true   "Server; default to CN"                  Enums(CN, US, JP, KR)
+// @Param    source    path      string  true   "Global or Personal; default to global"  Enums(global, personal)
+// @Param    category  path      string  false  "Category; default to all"               Enums(all, automated, manual)
 // @Success  200       {object}  modelv2.DropMatrixQueryResult
 // @Failure  500       {object}  pgerr.PenguinError  "An unexpected error occurred"
 // @Router   /PenguinStats/api/v2/_private/result/matrix/{server}/{source}/{category} [GET]
@@ -79,9 +79,9 @@ func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 // @Summary  Get Pattern Matrix
 // @Tags     Private
 // @Produce  json
-// @Param    server    path      string  true  "Server; default to CN"                  Enums(CN, US, JP, KR)
-// @Param    source    path      string  true  "Global or Personal; default to global"  Enums(global, personal)
-// @Param    category  path      string  true  "Category; default to all"               Enums(all, automated, manual)
+// @Param    server    path      string  true   "Server; default to CN"                  Enums(CN, US, JP, KR)
+// @Param    source    path      string  true   "Global or Personal; default to global"  Enums(global, personal)
+// @Param    category  path      string  false  "Category; default to all"               Enums(all, automated, manual)
 // @Success  200       {object}  modelv2.PatternMatrixQueryResult
 // @Failure  500       {object}  pgerr.PenguinError  "An unexpected error occurred"
 // @Router   /PenguinStats/api/v2/_private/result/pattern/{server}/{source}/{category} [GET]

@@ -511,7 +511,6 @@ paths:
         - manual
         in: path
         name: category
-        required: true
         type: string
       produces:
       - application/json
@@ -555,7 +554,6 @@ paths:
         - manual
         in: path
         name: category
-        required: true
         type: string
       produces:
       - application/json

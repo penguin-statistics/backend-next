@@ -67,8 +67,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Category; default to all",
                         "name": "category",
-                        "in": "path",
-                        "required": true
+                        "in": "path"
                     }
                 ],
                 "responses": {
@@ -130,8 +129,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Category; default to all",
                         "name": "category",
-                        "in": "path",
-                        "required": true
+                        "in": "path"
                     }
                 ],
                 "responses": {
