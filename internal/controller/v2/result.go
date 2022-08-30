@@ -134,16 +134,16 @@ func (c *Result) GetDropMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimQueryResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx.UserContext(), server, showClosedZones, stageFilterStr, itemFilterStr, accountId)
+	shimQueryResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx.UserContext(), server, showClosedZones, stageFilterStr, itemFilterStr, accountId, constant.SourceCategoryAll)
 	if err != nil {
 		return err
 	}
 
 	useCache := !accountId.Valid && stageFilterStr == "" && itemFilterStr == ""
 	if useCache {
-		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones)
+		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones) + constant.CacheSep + constant.SourceCategoryAll
 		var lastModifiedTime time.Time
-		if err := cache.LastModifiedTime.Get("[shimMaxAccumulableDropMatrixResults#server|showClosedZoned:"+key+"]", &lastModifiedTime); err != nil {
+		if err := cache.LastModifiedTime.Get("[shimMaxAccumulableDropMatrixResults#server|showClosedZoned|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
 			lastModifiedTime = time.Now()
 		}
 		cachectrl.OptIn(ctx, lastModifiedTime)
@@ -182,14 +182,15 @@ func (c *Result) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.UserContext(), server, accountId)
+	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.UserContext(), server, accountId, constant.SourceCategoryAll)
 	if err != nil {
 		return err
 	}
 
 	if !accountId.Valid {
+		key := server + constant.CacheSep + constant.SourceCategoryAll
 		var lastModifiedTime time.Time
-		if err := cache.LastModifiedTime.Get("[shimLatestPatternMatrixResults#server:"+server+"]", &lastModifiedTime); err != nil {
+		if err := cache.LastModifiedTime.Get("[shimLatestPatternMatrixResults#server|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
 			lastModifiedTime = time.Now()
 		}
 		cachectrl.OptIn(ctx, lastModifiedTime)
@@ -303,7 +304,7 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 			StartTime: &startTime,
 			EndTime:   &endTime,
 		}
-		return c.DropMatrixService.GetShimCustomizedDropMatrixResults(ctx.UserContext(), query.Server, timeRange, []int{stage.StageID}, itemIds, accountId)
+		return c.DropMatrixService.GetShimCustomizedDropMatrixResults(ctx.UserContext(), query.Server, timeRange, []int{stage.StageID}, itemIds, accountId, constant.SourceCategoryAll)
 	} else {
 		// interval originally is in milliseconds, so we need to convert it to nanoseconds
 		intervalLength := time.Duration(query.Interval.Int64 * 1e6).Round(time.Hour)

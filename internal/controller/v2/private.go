@@ -1,7 +1,6 @@
 package v2
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -90,8 +89,6 @@ func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 	isPersonal := ctx.Params("source") == "personal"
 	category := ctx.Params("category", "all")
 
-	fmt.Println("category", category)
-
 	accountId := null.NewInt(0, false)
 	if isPersonal {
 		account, err := c.AccountService.GetAccountFromRequest(ctx)
@@ -102,14 +99,15 @@ func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.UserContext(), server, accountId)
+	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.UserContext(), server, accountId, category)
 	if err != nil {
 		return err
 	}
 
 	if !accountId.Valid {
+		key := server + constant.CacheSep + category
 		var lastModifiedTime time.Time
-		if err := cache.LastModifiedTime.Get("[shimLatestPatternMatrixResults#server:"+server+"]", &lastModifiedTime); err != nil {
+		if err := cache.LastModifiedTime.Get("[shimLatestPatternMatrixResults#server|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
 			lastModifiedTime = time.Now()
 		}
 		cachectrl.OptIn(ctx, lastModifiedTime)
