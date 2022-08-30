@@ -38,11 +38,11 @@ func RegisterPrivate(v2 *svr.V2, c Private) {
 // @Summary  Get Drop Matrix
 // @Tags     Private
 // @Produce  json
-// @Param    server  path      string  true  "Server; default to CN"                  Enums(CN, US, JP, KR)
-// @Param    source  path      string  true  "Global or Personal; default to global"  Enums(global, personal)
-// @Param    category  path      string  true  "Category; default to all"              Enums(all, automated, manual)
-// @Success  200     {object}  modelv2.DropMatrixQueryResult
-// @Failure  500     {object}  pgerr.PenguinError  "An unexpected error occurred"
+// @Param    server    path      string  true  "Server; default to CN"                  Enums(CN, US, JP, KR)
+// @Param    source    path      string  true  "Global or Personal; default to global"  Enums(global, personal)
+// @Param    category  path      string  true  "Category; default to all"               Enums(all, automated, manual)
+// @Success  200       {object}  modelv2.DropMatrixQueryResult
+// @Failure  500       {object}  pgerr.PenguinError  "An unexpected error occurred"
 // @Router   /PenguinStats/api/v2/_private/result/matrix/{server}/{source} [GET]
 func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
@@ -79,10 +79,11 @@ func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 // @Summary  Get Pattern Matrix
 // @Tags     Private
 // @Produce  json
-// @Param    server  path      string  true  "Server; default to CN"                  Enums(CN, US, JP, KR)
-// @Param    source  path      string  true  "Global or Personal; default to global"  Enums(global, personal)
-// @Success  200     {object}  modelv2.PatternMatrixQueryResult
-// @Failure  500     {object}  pgerr.PenguinError  "An unexpected error occurred"
+// @Param    server    path      string  true  "Server; default to CN"                  Enums(CN, US, JP, KR)
+// @Param    source    path      string  true  "Global or Personal; default to global"  Enums(global, personal)
+// @Param    category  path      string  true  "Category; default to all"               Enums(all, automated, manual)
+// @Success  200       {object}  modelv2.PatternMatrixQueryResult
+// @Failure  500       {object}  pgerr.PenguinError  "An unexpected error occurred"
 // @Router   /PenguinStats/api/v2/_private/result/pattern/{server}/{source} [GET]
 func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
