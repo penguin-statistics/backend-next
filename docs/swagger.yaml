@@ -504,6 +504,15 @@ paths:
         name: source
         required: true
         type: string
+      - description: Category; default to all
+        enum:
+        - all
+        - automated
+        - manual
+        in: path
+        name: category
+        required: true
+        type: string
       produces:
       - application/json
       responses:
@@ -537,6 +546,15 @@ paths:
         - personal
         in: path
         name: source
+        required: true
+        type: string
+      - description: Category; default to all
+        enum:
+        - all
+        - automated
+        - manual
+        in: path
+        name: category
         required: true
         type: string
       produces:

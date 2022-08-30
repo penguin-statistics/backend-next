@@ -57,6 +57,18 @@ const docTemplate = `{
                         "name": "source",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "enum": [
+                            "all",
+                            "automated",
+                            "manual"
+                        ],
+                        "type": "string",
+                        "description": "Category; default to all",
+                        "name": "category",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -106,6 +118,18 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Global or Personal; default to global",
                         "name": "source",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "all",
+                            "automated",
+                            "manual"
+                        ],
+                        "type": "string",
+                        "description": "Category; default to all",
+                        "name": "category",
                         "in": "path",
                         "required": true
                     }
