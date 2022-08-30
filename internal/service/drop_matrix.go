@@ -69,6 +69,7 @@ func NewDropMatrix(
 	}
 }
 
+// This is only for v3
 // Cache: maxAccumulableDropMatrixResults#server:{server}, 24 hrs, records last modified time
 func (s *DropMatrix) GetMaxAccumulableDropMatrixResults(
 	ctx context.Context, server string, stageFilterStr string, itemFilterStr string, accountId null.Int,
@@ -100,12 +101,12 @@ func (s *DropMatrix) GetMaxAccumulableDropMatrixResults(
 	}
 }
 
-// Cache: shimMaxAccumulableDropMatrixResults#server|showClosedZoned:{server}|{showClosedZones}, 24 hrs, records last modified time
+// Cache: shimMaxAccumulableDropMatrixResults#server|showClosedZoned|sourceCategory:{server}|{showClosedZones}|{sourceCategory}, 24 hrs, records last modified time
 func (s *DropMatrix) GetShimMaxAccumulableDropMatrixResults(
-	ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId null.Int,
+	ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId null.Int, sourceCategory string,
 ) (*modelv2.DropMatrixQueryResult, error) {
 	valueFunc := func() (*modelv2.DropMatrixQueryResult, error) {
-		savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId, constant.SourceCategoryAll)
+		savedDropMatrixResults, err := s.getMaxAccumulableDropMatrixResults(ctx, server, accountId, sourceCategory)
 		if err != nil {
 			return nil, err
 		}
@@ -118,12 +119,12 @@ func (s *DropMatrix) GetShimMaxAccumulableDropMatrixResults(
 
 	var results modelv2.DropMatrixQueryResult
 	if !accountId.Valid && stageFilterStr == "" && itemFilterStr == "" {
-		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones)
+		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones) + constant.CacheSep + sourceCategory
 		calculated, err := cache.ShimMaxAccumulableDropMatrixResults.MutexGetSet(key, &results, valueFunc, 24*time.Hour)
 		if err != nil {
 			return nil, err
 		} else if calculated {
-			cache.LastModifiedTime.Set("[shimMaxAccumulableDropMatrixResults#server|showClosedZoned:"+key+"]", time.Now(), 0)
+			cache.LastModifiedTime.Set("[shimMaxAccumulableDropMatrixResults#server|showClosedZoned|sourceCategory:"+key+"]", time.Now(), 0)
 		}
 		return &results, nil
 	} else {
@@ -132,9 +133,9 @@ func (s *DropMatrix) GetShimMaxAccumulableDropMatrixResults(
 }
 
 func (s *DropMatrix) GetShimCustomizedDropMatrixResults(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, itemIds []int, accountId null.Int,
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, itemIds []int, accountId null.Int, sourceCategory string,
 ) (*modelv2.DropMatrixQueryResult, error) {
-	customizedDropMatrixQueryResult, err := s.QueryDropMatrix(ctx, server, []*model.TimeRange{timeRange}, stageIds, itemIds, accountId, constant.SourceCategoryAll)
+	customizedDropMatrixQueryResult, err := s.QueryDropMatrix(ctx, server, []*model.TimeRange{timeRange}, stageIds, itemIds, accountId, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -169,11 +170,13 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 	if err := s.DropMatrixElementService.BatchSaveElements(ctx, elements, server); err != nil {
 		return err
 	}
-	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constant.CacheSep + "true"); err != nil {
-		return err
-	}
-	if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constant.CacheSep + "false"); err != nil {
-		return err
+	for _, sourceCategory := range sourceCategories {
+		if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constant.CacheSep + "true" + constant.CacheSep + sourceCategory); err != nil {
+			return err
+		}
+		if err := cache.ShimMaxAccumulableDropMatrixResults.Delete(server + constant.CacheSep + "false" + constant.CacheSep + sourceCategory); err != nil {
+			return err
+		}
 	}
 	return nil
 }

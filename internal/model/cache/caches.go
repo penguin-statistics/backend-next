@@ -125,9 +125,9 @@ func initializeCaches() {
 	SetMap["itemDropSet#server|stageId|startTime|endTime"] = ItemDropSetByStageIdAndTimeRange.Flush
 
 	// drop_matrix
-	ShimMaxAccumulableDropMatrixResults = cache.NewSet[modelv2.DropMatrixQueryResult]("shimMaxAccumulableDropMatrixResults#server|showClosedZoned")
+	ShimMaxAccumulableDropMatrixResults = cache.NewSet[modelv2.DropMatrixQueryResult]("shimMaxAccumulableDropMatrixResults#server|showClosedZoned|sourceCategory")
 
-	SetMap["shimMaxAccumulableDropMatrixResults#server|showClosedZoned"] = ShimMaxAccumulableDropMatrixResults.Flush
+	SetMap["shimMaxAccumulableDropMatrixResults#server|showClosedZoned|sourceCategory"] = ShimMaxAccumulableDropMatrixResults.Flush
 
 	// formula
 	Formula = cache.NewSingular[json.RawMessage]("formula")

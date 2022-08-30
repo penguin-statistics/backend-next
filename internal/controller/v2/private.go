@@ -50,8 +50,6 @@ func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 	isPersonal := ctx.Params("source") == "personal"
 	category := ctx.Params("category", "all")
 
-	fmt.Println("category", category)
-
 	accountId := null.NewInt(0, false)
 	if isPersonal {
 		account, err := c.AccountService.GetAccountFromRequest(ctx)
@@ -62,15 +60,15 @@ func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx.UserContext(), server, true, "", "", accountId)
+	shimResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx.UserContext(), server, true, "", "", accountId, category)
 	if err != nil {
 		return err
 	}
 
 	if !accountId.Valid {
-		key := server + constant.CacheSep + "true"
+		key := server + constant.CacheSep + "true" + constant.CacheSep + category
 		var lastModifiedTime time.Time
-		if err := cache.LastModifiedTime.Get("[shimMaxAccumulableDropMatrixResults#server|showClosedZoned:"+key+"]", &lastModifiedTime); err != nil {
+		if err := cache.LastModifiedTime.Get("[shimMaxAccumulableDropMatrixResults#server|showClosedZoned|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
 			lastModifiedTime = time.Now()
 		}
 		cachectrl.OptIn(ctx, lastModifiedTime)
