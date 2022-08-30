@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -40,12 +41,16 @@ func RegisterPrivate(v2 *svr.V2, c Private) {
 // @Produce  json
 // @Param    server  path      string  true  "Server; default to CN"                  Enums(CN, US, JP, KR)
 // @Param    source  path      string  true  "Global or Personal; default to global"  Enums(global, personal)
+// @Param    category  path      string  true  "Category; default to all"              Enums(all, automated, manual)
 // @Success  200     {object}  modelv2.DropMatrixQueryResult
 // @Failure  500     {object}  pgerr.PenguinError  "An unexpected error occurred"
 // @Router   /PenguinStats/api/v2/_private/result/matrix/{server}/{source} [GET]
 func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	isPersonal := ctx.Params("source") == "personal"
+	category := ctx.Params("category", "all")
+
+	fmt.Println("category", category)
 
 	accountId := null.NewInt(0, false)
 	if isPersonal {
@@ -85,6 +90,9 @@ func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	isPersonal := ctx.Params("source") == "personal"
+	category := ctx.Params("category", "all")
+
+	fmt.Println("category", category)
 
 	accountId := null.NewInt(0, false)
 	if isPersonal {
