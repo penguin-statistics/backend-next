@@ -30,7 +30,7 @@ type IdempotencyConfig struct {
 	// Storage is the storage backend for the idempotency key & its response data.
 	Storage fiber.Storage
 
-	Locker *redsync.Redsync
+	RedSync *redsync.Redsync
 
 	// Next defines a function to skip this middleware when returned true.
 	//
@@ -64,6 +64,7 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 			return c.Next()
 		}
 
+		// Validate idempotency key
 		if err := rekuest.Validate.Var(key, "max=128,alphanum"); err != nil {
 			if l := log.Trace(); l.Enabled() {
 				l.Err(err).Msg("IdempotencyMiddleware: idempotency key is invalid. Returning error.")
@@ -71,6 +72,7 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 			return pgerr.ErrInvalidReq.Msg("invalid idempotency key: idempotency key can only be at most %d characters, consist of only alphanumeric characters", constant.IdempotencyKeyLengthLimit)
 		}
 
+		// First-pass: if the idempotency key is in the storage, get and return the response
 		if exist, err := checkWriteIdempotencyCachedMessage(c, config, key); exist {
 			return err
 		}
@@ -82,7 +84,7 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 		}
 
 		lockKey := "mutex:idempotency-request:" + key
-		mutex := config.Locker.NewMutex(lockKey, redsync.WithExpiry(time.Minute*5), redsync.WithTries(5), redsync.WithRetryDelay(time.Millisecond*250))
+		mutex := config.RedSync.NewMutex(lockKey, redsync.WithExpiry(time.Minute), redsync.WithTries(5), redsync.WithRetryDelay(time.Millisecond*250))
 
 		if err := mutex.Lock(); err != nil {
 			log.Err(err).Str("key", key).

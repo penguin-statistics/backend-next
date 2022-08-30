@@ -44,7 +44,7 @@ func RegisterReport(v2 *svr.V2, c Report) {
 			constant.ShimCompatibilityHeaderKey,
 		},
 		Storage: fiberstore.NewRedis(c.Redis, constant.ReportIdempotencyRedisHashKey),
-		Locker:  c.RedSync,
+		RedSync: c.RedSync,
 	}), c.SingularReport)
 	v2.Post("/report/recall", c.RecallSingularReport)
 	v2.Post("/report/recognition", c.RecognitionReport)
