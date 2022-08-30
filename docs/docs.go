@@ -24,7 +24,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/PenguinStats/api/v2/_private/result/matrix/{server}/{source}": {
+        "/PenguinStats/api/v2/_private/result/matrix/{server}/{source}/{category}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -87,7 +87,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/PenguinStats/api/v2/_private/result/pattern/{server}/{source}": {
+        "/PenguinStats/api/v2/_private/result/pattern/{server}/{source}/{category}": {
             "get": {
                 "produces": [
                     "application/json"
