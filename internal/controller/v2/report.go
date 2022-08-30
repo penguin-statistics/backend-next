@@ -3,7 +3,6 @@ package v2
 import (
 	"encoding/json"
 	"strings"
-	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/go-redsync/redsync/v4"
@@ -63,7 +62,6 @@ func RegisterReport(v2 *svr.V2, c Report) {
 // @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/report [POST]
 func (c *Report) SingularReport(ctx *fiber.Ctx) error {
-	time.Sleep(5 * time.Second)
 	var report types.SingleReportRequest
 	if err := rekuest.ValidBody(ctx, &report); err != nil {
 		return err
