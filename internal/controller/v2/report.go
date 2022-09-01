@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/go-redsync/redsync/v4"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
@@ -26,6 +27,7 @@ type Report struct {
 	fx.In
 
 	Redis         *redis.Client
+	RedSync       *redsync.Redsync
 	Crypto        *crypto.Crypto
 	ReportService *service.Report
 }
@@ -42,6 +44,7 @@ func RegisterReport(v2 *svr.V2, c Report) {
 			constant.ShimCompatibilityHeaderKey,
 		},
 		Storage: fiberstore.NewRedis(c.Redis, constant.ReportIdempotencyRedisHashKey),
+		RedSync: c.RedSync,
 	}), c.SingularReport)
 	v2.Post("/report/recall", c.RecallSingularReport)
 	v2.Post("/report/recognition", c.RecognitionReport)

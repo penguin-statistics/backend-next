@@ -75,6 +75,11 @@ func ErrorHandler(ctx *fiber.Ctx, err error) error {
 		return HandleCustomError(ctx, pgerr.ErrInvalidReq)
 	}
 
+	if e, ok := err.(*pgerr.PenguinError); ok {
+		// Use custom error handler if it's a custom error
+		return HandleCustomError(ctx, e)
+	}
+
 	// must be an unexpected runtime error then
 	log.Error().
 		Stack().

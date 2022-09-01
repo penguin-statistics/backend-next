@@ -23,27 +23,31 @@ func NewRedis(client *redis.Client, hashKey string) *Redis {
 	}
 }
 
+func (r *Redis) key(key string) string {
+	return r.HashKey + ":" + key
+}
+
 // Close implements fiber.Storage
 func (r *Redis) Close() error {
-	return r.Client.Close()
+	panic("fiber.Storage users should not call Close on Redis")
 }
 
 // Delete implements fiber.Storage
 func (r *Redis) Delete(key string) error {
-	return r.Client.HDel(context.Background(), r.HashKey, key).Err()
+	return r.Client.Del(context.Background(), r.key(key)).Err()
 }
 
 // Get implements fiber.Storage
 func (r *Redis) Get(key string) ([]byte, error) {
-	return r.Client.HGet(context.Background(), r.HashKey, key).Bytes()
+	return r.Client.Get(context.Background(), r.key(key)).Bytes()
 }
 
 // Reset implements fiber.Storage
 func (r *Redis) Reset() error {
-	return r.Client.Del(context.Background(), r.HashKey).Err()
+	panic("fiber.Storage users should not call Reset on Redis")
 }
 
 // Set implements fiber.Storage
 func (r *Redis) Set(key string, val []byte, exp time.Duration) error {
-	return r.Client.HSet(context.Background(), r.HashKey, key, val).Err()
+	return r.Client.Set(context.Background(), r.key(key), val, exp).Err()
 }

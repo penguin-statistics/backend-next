@@ -24,7 +24,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/PenguinStats/api/v2/_private/result/matrix/{server}/{source}": {
+        "/PenguinStats/api/v2/_private/result/matrix/{server}/{source}/{category}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -57,6 +57,17 @@ const docTemplate = `{
                         "name": "source",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "enum": [
+                            "all",
+                            "automated",
+                            "manual"
+                        ],
+                        "type": "string",
+                        "description": "Category; default to all",
+                        "name": "category",
+                        "in": "path"
                     }
                 ],
                 "responses": {
@@ -75,7 +86,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/PenguinStats/api/v2/_private/result/pattern/{server}/{source}": {
+        "/PenguinStats/api/v2/_private/result/pattern/{server}/{source}/{category}": {
             "get": {
                 "produces": [
                     "application/json"
@@ -108,6 +119,17 @@ const docTemplate = `{
                         "name": "source",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "enum": [
+                            "all",
+                            "automated",
+                            "manual"
+                        ],
+                        "type": "string",
+                        "description": "Category; default to all",
+                        "name": "category",
+                        "in": "path"
                     }
                 ],
                 "responses": {

@@ -125,9 +125,9 @@ func initializeCaches() {
 	SetMap["itemDropSet#server|stageId|startTime|endTime"] = ItemDropSetByStageIdAndTimeRange.Flush
 
 	// drop_matrix
-	ShimMaxAccumulableDropMatrixResults = cache.NewSet[modelv2.DropMatrixQueryResult]("shimMaxAccumulableDropMatrixResults#server|showClosedZoned")
+	ShimMaxAccumulableDropMatrixResults = cache.NewSet[modelv2.DropMatrixQueryResult]("shimMaxAccumulableDropMatrixResults#server|showClosedZoned|sourceCategory")
 
-	SetMap["shimMaxAccumulableDropMatrixResults#server|showClosedZoned"] = ShimMaxAccumulableDropMatrixResults.Flush
+	SetMap["shimMaxAccumulableDropMatrixResults#server|showClosedZoned|sourceCategory"] = ShimMaxAccumulableDropMatrixResults.Flush
 
 	// formula
 	Formula = cache.NewSingular[json.RawMessage]("formula")
@@ -169,9 +169,9 @@ func initializeCaches() {
 	SingularFlusherMap["shimActivities"] = ShimActivities.Delete
 
 	// pattern_matrix
-	ShimLatestPatternMatrixResults = cache.NewSet[modelv2.PatternMatrixQueryResult]("shimLatestPatternMatrixResults#server")
+	ShimLatestPatternMatrixResults = cache.NewSet[modelv2.PatternMatrixQueryResult]("shimLatestPatternMatrixResults#server|sourceCategory")
 
-	SetMap["shimLatestPatternMatrixResults#server"] = ShimLatestPatternMatrixResults.Flush
+	SetMap["shimLatestPatternMatrixResults#server|sourceCategory"] = ShimLatestPatternMatrixResults.Flush
 
 	// site_stats
 	ShimSiteStats = cache.NewSet[modelv2.SiteStats]("shimSiteStats#server")

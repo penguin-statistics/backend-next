@@ -17,65 +17,27 @@ jobs:
       - name: "Checkout"
         uses: actions/checkout@v3
 
-      - name: "Get Tag Version"
-        id: get_version
-        run: |
-          export TRUNCATED_GITHUB_SHA=$(echo ${{ github.sha }} | cut -c1-7);
-          echo "VERSION=${GITHUB_REF/refs\/tags\//}+${TRUNCATED_GITHUB_SHA}" >> $GITHUB_ENV
-      
-      - name: "Docker: Setup Buildx"
-        uses: docker/setup-buildx-action@v2
-      
-      - name: "Docker: Login to GitHub Container Registry"
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: "Docker: Metadata"
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ghcr.io/penguin-statistics/backend-next
-          tags: |
-            type=semver,pattern=v{{version}}
-            type=ref,event=branch
-            type=ref,event=pr
-          flavor: |
-            latest=auto
+      - name: "Metadata: Git"
+        id: git-meta
+        uses: 'penguin-statistics/actions/git-meta@main'
       
       - name: "Docker: Build and Push Image"
-        uses: docker/build-push-action@v3
+        id: ghcr-docker
+        uses: 'penguin-statistics/actions/ghcr-docker@main'
         with:
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=ghcr.io/penguin-statistics/backend-next:buildcache
-          cache-to: type=registry,ref=ghcr.io/penguin-statistics/backend-next:buildcache,mode=max
-          build-args: |
-            VERSION=${{ env.VERSION }}
+          version: ${{ steps.git-meta.outputs.version }}
+          repository: 'penguin-statistics/backend-next'
 
-      - name: "Sentry: Create Release"
-        uses: getsentry/action-release@v1
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+      - name: "Release: Call Dispatcher"
+        id: release-dispatcher
+        uses: 'penguin-statistics/actions/release-dispatcher@main'
         with:
-          environment: prod
-          version: ${{ env.VERSION }}
-
-      - name: "GitHub: Create Repository Release"
-        uses: "marvinpinto/action-automatic-releases@v1.2.1"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          prerelease: false
-      
-      - name: "ManifestBot: Update Manifest"
-        uses: "penguin-statistics/manifestbot@v9"
-        with:
-          file-path: 'applications/backend/values-prod.yaml'
-          version-path: 'image.tag'
-          version: ${{ env.AUTOMATIC_RELEASES_TAG }}
-          token: ${{ secrets.PAT_FOR_MANIFESTBOT }}
+          version: ${{ steps.git-meta.outputs.version }}
+          use-sentry: true
+          sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          sentry-org: ${{ secrets.SENTRY_ORG }}
+          sentry-project: ${{ secrets.SENTRY_PROJECT }}
+          use-ghrelease: true
+          use-manifestbot: true
+          manifestbot-file-path: 'applications/backend/values-prod.yaml'
+          manifestbot-token: ${{ secrets.PAT_FOR_MANIFESTBOT }}

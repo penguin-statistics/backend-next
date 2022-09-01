@@ -9,6 +9,7 @@ import (
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
 	modelv3 "github.com/penguin-statistics/backend-next/internal/model/v3"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
@@ -93,7 +94,7 @@ func (c Dataset) aggregatePattern(ctx *fiber.Ctx) (*modelv3.PatternMatrixQueryRe
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.UserContext(), server, accountId)
+	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.UserContext(), server, accountId, constant.SourceCategoryAll)
 	if err != nil {
 		return nil, err
 	}

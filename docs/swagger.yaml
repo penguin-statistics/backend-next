@@ -483,7 +483,7 @@ info:
   title: Penguin Statistics API
   version: 3.0.0
 paths:
-  /PenguinStats/api/v2/_private/result/matrix/{server}/{source}:
+  /PenguinStats/api/v2/_private/result/matrix/{server}/{source}/{category}:
     get:
       parameters:
       - description: Server; default to CN
@@ -503,6 +503,14 @@ paths:
         in: path
         name: source
         required: true
+        type: string
+      - description: Category; default to all
+        enum:
+        - all
+        - automated
+        - manual
+        in: path
+        name: category
         type: string
       produces:
       - application/json
@@ -518,7 +526,7 @@ paths:
       summary: Get Drop Matrix
       tags:
       - Private
-  /PenguinStats/api/v2/_private/result/pattern/{server}/{source}:
+  /PenguinStats/api/v2/_private/result/pattern/{server}/{source}/{category}:
     get:
       parameters:
       - description: Server; default to CN
@@ -538,6 +546,14 @@ paths:
         in: path
         name: source
         required: true
+        type: string
+      - description: Category; default to all
+        enum:
+        - all
+        - automated
+        - manual
+        in: path
+        name: category
         type: string
       produces:
       - application/json

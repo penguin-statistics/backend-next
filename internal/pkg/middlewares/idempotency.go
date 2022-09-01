@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-redsync/redsync/v4"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 	"github.com/vmihailenco/msgpack/v5"
@@ -28,6 +29,8 @@ type IdempotencyConfig struct {
 
 	// Storage is the storage backend for the idempotency key & its response data.
 	Storage fiber.Storage
+
+	RedSync *redsync.Redsync
 
 	// Next defines a function to skip this middleware when returned true.
 	//
@@ -61,6 +64,7 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 			return c.Next()
 		}
 
+		// Validate idempotency key
 		if err := rekuest.Validate.Var(key, "max=128,alphanum"); err != nil {
 			if l := log.Trace(); l.Enabled() {
 				l.Err(err).Msg("IdempotencyMiddleware: idempotency key is invalid. Returning error.")
@@ -68,19 +72,40 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 			return pgerr.ErrInvalidReq.Msg("invalid idempotency key: idempotency key can only be at most %d characters, consist of only alphanumeric characters", constant.IdempotencyKeyLengthLimit)
 		}
 
-		// Idempotency key not empty. Check if it is in the storage
-		response, err := config.Storage.Get(key)
-		if err == nil && response != nil {
-			// Idempotency key found in storage. Return the response
-			if l := log.Debug(); l.Enabled() {
-				l.Str("key", key).
-					Msg("IdempotencyMiddleware: idempotency key found in storage. Returning saved response.")
+		// First-pass: if the idempotency key is in the storage, get and return the response
+		if exist, err := checkWriteIdempotencyCachedMessage(c, config, key); exist {
+			return err
+		}
+
+		// Idempotency key not empty and not found in storage. Lock the key
+		if l := log.Debug(); l.Enabled() {
+			l.Str("key", key).
+				Msg("IdempotencyMiddleware: idempotency key not found in storage. Locking key.")
+		}
+
+		lockKey := "mutex:idempotency-request:" + key
+		mutex := config.RedSync.NewMutex(lockKey, redsync.WithExpiry(time.Minute), redsync.WithTries(5), redsync.WithRetryDelay(time.Millisecond*250))
+
+		if err := mutex.Lock(); err != nil {
+			log.Err(err).Str("key", key).
+				Msg("IdempotencyMiddleware: failed to lock idempotency key. Returning error.")
+			return pgerr.ErrInternalError.Msg("failed to lock idempotency key: idempoency key is locked by another request; are you sending the same request concurrently or retrying with little or no backoff?")
+		}
+
+		defer func() {
+			if _, err := mutex.Unlock(); err != nil {
+				log.Err(err).Str("key", key).
+					Msg("IdempotencyMiddleware: failed to unlock idempotency key. Returning error.")
 			}
-			return unmarshalResponseToFiberResponse(c, config, response)
+		}()
+
+		// Lock acquired. Check if the key is still empty. If not, return the response.
+		if exist, err := checkWriteIdempotencyCachedMessage(c, config, key); exist {
+			return err
 		}
 
 		// Execute the request handler
-		err = c.Next()
+		err := c.Next()
 		if err != nil {
 			// If the request handler returned an error, return it and skip idempotency
 			if l := log.Trace(); l.Enabled() {
@@ -164,4 +189,19 @@ func unmarshalResponseToFiberResponse(c *fiber.Ctx, conf *IdempotencyConfig, res
 	}
 
 	return nil
+}
+
+func checkWriteIdempotencyCachedMessage(c *fiber.Ctx, conf *IdempotencyConfig, key string) (bool, error) {
+	// Idempotency key not empty. Check if it is in the storage
+	response, err := conf.Storage.Get(key)
+	if err == nil && response != nil {
+		// Idempotency key found in storage. Return the response
+		if l := log.Debug(); l.Enabled() {
+			l.Str("key", key).
+				Msg("IdempotencyMiddleware: idempotency key found in storage. Returning saved response.")
+		}
+		return true, unmarshalResponseToFiberResponse(c, conf, response)
+	}
+
+	return false, nil
 }

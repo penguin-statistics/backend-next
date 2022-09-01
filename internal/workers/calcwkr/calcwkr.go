@@ -89,7 +89,7 @@ func Start(conf *config.Config, deps WorkerDeps) {
 			trendInterval: conf.WorkerTrendInterval,
 			timeout:       conf.WorkerTimeout,
 			heartbeatURL:  conf.WorkerHeartbeatURL,
-			syncMutex:     deps.RedSync.NewMutex("mutex:calcwkr", redsync.WithExpiry(10*time.Minute)),
+			syncMutex:     deps.RedSync.NewMutex("mutex:calcwkr", redsync.WithExpiry(30*time.Second)),
 			WorkerDeps:    deps,
 		}
 		w.checkConfig()
@@ -176,6 +176,19 @@ func (w *Worker) unlock() {
 	}
 }
 
+func (w *Worker) extend() {
+	// extends the sync mutex to ensure lock is held for enough duration
+	ok, err := w.syncMutex.Extend()
+	if err != nil {
+		log.Error().Str("service", "worker:calculator").Err(err).Msg("failed to extend sync mutex")
+		return
+	}
+	if !ok {
+		log.Error().Str("service", "worker:calculator").Msg("failed to extend sync mutex: not locked. this should not happen as it indicates the mutex is unlocked before the worker finished.")
+		return
+	}
+}
+
 func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx context.Context, server string) error) {
 	logger := log.With().Str("service", "worker:calculator:"+string(typ)).Logger()
 	parentCtx := logger.WithContext(ctx)
@@ -236,23 +249,29 @@ func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 }
 
 func (w *Worker) microtask(ctx context.Context, typ WorkerCalcType, service, server string, f func() error) error {
+	mutexNotifierTicker := time.NewTicker(time.Second * 10)
+	defer func() {
+		mutexNotifierTicker.Stop()
+	}()
+
+	go func() {
+		w.extend()
+		for {
+			select {
+			case <-mutexNotifierTicker.C:
+				w.extend()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
 	log.Ctx(ctx).Info().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Msg("worker microtask started calculating")
 	if err := observeCalcDuration(service, server, f); err != nil {
 		log.Ctx(ctx).Error().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Err(err).Msg("worker microtask failed")
 		return err
 	}
 	log.Ctx(ctx).Info().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Msg("worker microtask finished")
-
-	// extends the sync mutex to ensure lock is held for enough duration
-	ok, err := w.syncMutex.Extend()
-	if err != nil {
-		log.Ctx(ctx).Error().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Err(err).Msg("failed to extend sync mutex")
-		return err
-	}
-	if !ok {
-		log.Ctx(ctx).Error().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Msg("failed to extend sync mutex: not locked. this should not happen as it indicates the mutex is unlocked before the worker finished.")
-		return errors.New("failed to extend sync mutex: not locked")
-	}
 
 	return nil
 }

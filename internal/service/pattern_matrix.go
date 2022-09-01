@@ -47,10 +47,11 @@ func NewPatternMatrix(
 	}
 }
 
-// Cache: shimLatestPatternMatrixResults#server:{server}, 24hrs, records last modified time
-func (s *PatternMatrix) GetShimLatestPatternMatrixResults(ctx context.Context, server string, accountId null.Int) (*modelv2.PatternMatrixQueryResult, error) {
+// Cache: shimLatestPatternMatrixResults#server|sourceCategory:{server}|{sourceCategory}, 24hrs, records last modified time
+func (s *PatternMatrix) GetShimLatestPatternMatrixResults(ctx context.Context, server string, accountId null.Int, sourceCategory string,
+) (*modelv2.PatternMatrixQueryResult, error) {
 	valueFunc := func() (*modelv2.PatternMatrixQueryResult, error) {
-		queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId, constant.SourceCategoryAll)
+		queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId, sourceCategory)
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +68,8 @@ func (s *PatternMatrix) GetShimLatestPatternMatrixResults(ctx context.Context, s
 		if err != nil {
 			return nil, err
 		} else if calculated {
-			cache.LastModifiedTime.Set("[shimLatestPatternMatrixResults#server:"+server+"]", time.Now(), 0)
+			key := server + constant.CacheSep + sourceCategory
+			cache.LastModifiedTime.Set("[shimLatestPatternMatrixResults#server|sourceCategory:"+key+"]", time.Now(), 0)
 		}
 		return &results, nil
 	} else {
