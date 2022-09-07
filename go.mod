@@ -18,8 +18,8 @@ require (
 	github.com/goccy/go-json v0.9.11
 	github.com/gofiber/contrib/fibersentry v0.0.0-20220822164234-32bc232b53bd
 	github.com/gofiber/contrib/otelfiber v0.0.0-20220822164234-32bc232b53bd
-	github.com/gofiber/fiber/v2 v2.36.0
-	github.com/gofiber/helmet/v2 v2.2.15
+	github.com/gofiber/fiber/v2 v2.37.0
+	github.com/gofiber/helmet/v2 v2.2.16
 	github.com/gofiber/swagger v0.1.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/joho/godotenv v1.4.0
