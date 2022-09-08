@@ -48,7 +48,7 @@ func (s *DropInfo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server
 		return nil, err
 	}
 
-	go cache.ItemDropSetByStageIDAndRangeID.Set(key, itemDropSet, time.Minute*5)
+	cache.ItemDropSetByStageIDAndRangeID.Set(key, itemDropSet, time.Minute*5)
 	return itemDropSet, nil
 }
 
@@ -76,7 +76,7 @@ func (s *DropInfo) GetItemDropSetByStageIdAndTimeRange(ctx context.Context, serv
 		Distinct().
 		ToSlice(&itemDropSet)
 
-	go cache.ItemDropSetByStageIdAndTimeRange.Set(key, itemDropSet, time.Minute*5)
+	cache.ItemDropSetByStageIdAndTimeRange.Set(key, itemDropSet, time.Minute*5)
 	return itemDropSet, nil
 }
 

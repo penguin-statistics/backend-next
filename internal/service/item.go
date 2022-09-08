@@ -40,7 +40,7 @@ func (s *Item) GetItems(ctx context.Context) ([]*model.Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	go cache.Items.Set(items, time.Minute*5)
+	cache.Items.Set(items, time.Minute*5)
 	return items, nil
 }
 
@@ -68,7 +68,7 @@ func (s *Item) GetItemByArkId(ctx context.Context, arkItemId string) (*model.Ite
 	if err != nil {
 		return nil, err
 	}
-	go cache.ItemByArkID.Set(arkItemId, *dbItem, time.Minute*5)
+	cache.ItemByArkID.Set(arkItemId, *dbItem, time.Minute*5)
 	return dbItem, nil
 }
 
@@ -109,7 +109,7 @@ func (s *Item) GetShimItemByArkId(ctx context.Context, arkItemId string) (*model
 		return nil, err
 	}
 	s.applyShim(dbItem)
-	go cache.ShimItemByArkID.Set(arkItemId, *dbItem, time.Minute*5)
+	cache.ShimItemByArkID.Set(arkItemId, *dbItem, time.Minute*5)
 	return dbItem, nil
 }
 
