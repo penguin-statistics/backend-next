@@ -35,7 +35,7 @@ require (
 	github.com/swaggo/swag v1.8.5
 	github.com/tidwall/gjson v1.14.3
 	github.com/uptrace/bun v1.1.8
-	github.com/uptrace/bun/dialect/pgdialect v1.1.7
+	github.com/uptrace/bun/dialect/pgdialect v1.1.8
 	github.com/uptrace/bun/driver/pgdriver v1.1.8
 	github.com/uptrace/bun/extra/bundebug v1.1.8
 	github.com/uptrace/bun/extra/bunotel v1.1.8
