@@ -40,7 +40,7 @@ func (s *Item) GetItems(ctx context.Context) ([]*model.Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	go cache.Items.Set(items, time.Hour)
+	go cache.Items.Set(items, time.Minute*5)
 	return items, nil
 }
 
@@ -68,7 +68,7 @@ func (s *Item) GetItemByArkId(ctx context.Context, arkItemId string) (*model.Ite
 	if err != nil {
 		return nil, err
 	}
-	go cache.ItemByArkID.Set(arkItemId, *dbItem, time.Hour)
+	go cache.ItemByArkID.Set(arkItemId, *dbItem, time.Minute*5)
 	return dbItem, nil
 }
 
@@ -91,7 +91,7 @@ func (s *Item) GetShimItems(ctx context.Context) ([]*modelv2.Item, error) {
 	for _, i := range items {
 		s.applyShim(i)
 	}
-	cache.ShimItems.Set(items, time.Hour)
+	cache.ShimItems.Set(items, time.Minute*5)
 	cache.LastModifiedTime.Set("[shimItems]", time.Now(), 0)
 	return items, nil
 }
@@ -109,7 +109,7 @@ func (s *Item) GetShimItemByArkId(ctx context.Context, arkItemId string) (*model
 		return nil, err
 	}
 	s.applyShim(dbItem)
-	go cache.ShimItemByArkID.Set(arkItemId, *dbItem, time.Hour)
+	go cache.ShimItemByArkID.Set(arkItemId, *dbItem, time.Minute*5)
 	return dbItem, nil
 }
 
@@ -126,7 +126,7 @@ func (s *Item) GetItemsMapById(ctx context.Context) (map[int]*model.Item, error)
 			s[item.ItemID] = item
 		}
 		return s, nil
-	}, time.Hour)
+	}, time.Minute*5)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (s *Item) GetItemsMapByArkId(ctx context.Context) (map[string]*model.Item, 
 			s[item.ArkItemID] = item
 		}
 		return s, nil
-	}, time.Hour)
+	}, time.Minute*5)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +170,7 @@ func (s *Item) GetRecruitTagItemsByBilingualName(ctx context.Context) (map[strin
 			})
 		}
 		return m, nil
-	}, time.Hour)
+	}, time.Minute*5)
 	if err != nil {
 		return nil, err
 	}
