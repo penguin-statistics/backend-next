@@ -32,6 +32,6 @@ func (s *DropPatternElement) GetDropPatternElementsByPatternId(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
-	go cache.DropPatternElementsByPatternID.Set(strconv.Itoa(patternId), dbDropPatternElements, 24*time.Hour)
+	cache.DropPatternElementsByPatternID.Set(strconv.Itoa(patternId), dbDropPatternElements, 24*time.Hour)
 	return dbDropPatternElements, nil
 }

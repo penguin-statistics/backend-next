@@ -34,7 +34,7 @@ func (s *FrontendConfig) GetFrontendConfig(ctx context.Context) (json.RawMessage
 	}
 
 	msg := json.RawMessage([]byte(property.Value))
-	go cache.FrontendConfig.Set(msg, time.Hour)
+	cache.FrontendConfig.Set(msg, time.Minute*5)
 
 	return msg, nil
 }

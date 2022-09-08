@@ -16,7 +16,7 @@ jobs:
       - name: "Checkout"
         uses: actions/checkout@v3
 
-      - name: "Docker: Build and Push Image"
+      - name: "Docker: Build Image for Checking"
         id: ghcr-docker
         uses: 'penguin-statistics/actions/ghcr-docker@main'
         with:

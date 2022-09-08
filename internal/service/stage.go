@@ -35,7 +35,7 @@ func (s *Stage) GetStages(ctx context.Context) ([]*model.Stage, error) {
 	}
 
 	stages, err = s.StageRepo.GetStages(ctx)
-	go cache.Stages.Set(stages, time.Hour)
+	cache.Stages.Set(stages, time.Minute*5)
 	return stages, err
 }
 
@@ -63,7 +63,7 @@ func (s *Stage) GetStageByArkId(ctx context.Context, arkStageId string) (*model.
 	if err != nil {
 		return nil, err
 	}
-	go cache.StageByArkID.Set(arkStageId, *dbStage, time.Hour)
+	cache.StageByArkID.Set(arkStageId, *dbStage, time.Minute*5)
 	return dbStage, nil
 }
 
@@ -86,7 +86,7 @@ func (s *Stage) GetShimStages(ctx context.Context, server string) ([]*modelv2.St
 	for _, i := range stages {
 		s.applyShim(i)
 	}
-	cache.ShimStages.Set(server, stages, time.Hour)
+	cache.ShimStages.Set(server, stages, time.Minute*5)
 	cache.LastModifiedTime.Set("[shimStages#server:"+server+"]", time.Now(), 0)
 	return stages, nil
 }
@@ -104,7 +104,7 @@ func (s *Stage) GetShimStageByArkId(ctx context.Context, arkStageId string, serv
 		return nil, err
 	}
 	s.applyShim(dbStage)
-	go cache.ShimStageByArkID.Set(arkStageId, *dbStage, time.Hour)
+	cache.ShimStageByArkID.Set(arkStageId, *dbStage, time.Minute*5)
 	return dbStage, nil
 }
 
@@ -125,7 +125,7 @@ func (s *Stage) GetStagesMapById(ctx context.Context) (map[int]*model.Stage, err
 			s[stage.StageID] = stage
 		}
 		return s, nil
-	}, time.Hour)
+	}, time.Minute*5)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (s *Stage) GetStagesMapByArkId(ctx context.Context) (map[string]*model.Stag
 			s[stage.ArkStageID] = stage
 		}
 		return s, nil
-	}, time.Hour)
+	}, time.Minute*5)
 	if err != nil {
 		return nil, err
 	}

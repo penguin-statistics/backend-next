@@ -34,7 +34,7 @@ func (s *Formula) GetFormula(ctx context.Context) (json.RawMessage, error) {
 	}
 
 	msg := json.RawMessage([]byte(property.Value))
-	go cache.Formula.Set(msg, time.Hour)
+	cache.Formula.Set(msg, time.Minute*5)
 
 	return msg, nil
 }

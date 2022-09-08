@@ -17,9 +17,9 @@ require (
 	github.com/go-redsync/redsync/v4 v4.5.1
 	github.com/goccy/go-json v0.9.11
 	github.com/gofiber/contrib/fibersentry v0.0.0-20220822164234-32bc232b53bd
-	github.com/gofiber/contrib/otelfiber v0.0.0-20220822164234-32bc232b53bd
-	github.com/gofiber/fiber/v2 v2.36.0
-	github.com/gofiber/helmet/v2 v2.2.15
+	github.com/gofiber/contrib/otelfiber v0.0.0-20220907132824-5b95b8215525
+	github.com/gofiber/fiber/v2 v2.37.0
+	github.com/gofiber/helmet/v2 v2.2.16
 	github.com/gofiber/swagger v0.1.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/joho/godotenv v1.4.0
@@ -30,15 +30,15 @@ require (
 	github.com/prometheus/client_golang v1.13.0
 	github.com/rs/xid v1.4.0
 	github.com/rs/zerolog v1.28.0
-	github.com/samber/lo v1.27.0
+	github.com/samber/lo v1.28.0
 	github.com/stretchr/testify v1.8.0
 	github.com/swaggo/swag v1.8.5
 	github.com/tidwall/gjson v1.14.3
-	github.com/uptrace/bun v1.1.7
-	github.com/uptrace/bun/dialect/pgdialect v1.1.7
-	github.com/uptrace/bun/driver/pgdriver v1.1.7
-	github.com/uptrace/bun/extra/bundebug v1.1.7
-	github.com/uptrace/bun/extra/bunotel v1.1.7
+	github.com/uptrace/bun v1.1.8
+	github.com/uptrace/bun/dialect/pgdialect v1.1.8
+	github.com/uptrace/bun/driver/pgdriver v1.1.8
+	github.com/uptrace/bun/extra/bundebug v1.1.8
+	github.com/uptrace/bun/extra/bunotel v1.1.8
 	github.com/vmihailenco/msgpack/v5 v5.3.5
 	github.com/zeebo/xxh3 v1.0.2
 	go.opentelemetry.io/otel v1.9.0
@@ -94,8 +94,8 @@ require (
 	github.com/klauspost/cpuid/v2 v2.0.11 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/mattn/go-colorable v0.1.12 // indirect
-	github.com/mattn/go-isatty v0.0.14 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/nats-io/nats-server/v2 v2.7.3 // indirect
 	github.com/nats-io/nkeys v0.3.0 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
@@ -116,11 +116,11 @@ require (
 	go.uber.org/dig v1.15.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0 // indirect
-	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
+	golang.org/x/crypto v0.0.0-20220826181053-bd7e27e6170d // indirect
 	golang.org/x/net v0.0.0-20220812174116-3211cb980234 // indirect
-	golang.org/x/sys v0.0.0-20220818161305-2296e01440c6 // indirect
+	golang.org/x/sys v0.0.0-20220825204002-c680a09ffe64 // indirect
 	golang.org/x/tools v0.1.12 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/tools v0.1.3 // indirect
-	mellium.im/sasl v0.2.1 // indirect
+	mellium.im/sasl v0.3.0 // indirect
 )
