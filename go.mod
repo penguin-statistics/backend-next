@@ -18,7 +18,7 @@ require (
 	github.com/goccy/go-json v0.9.11
 	github.com/gofiber/contrib/fibersentry v0.0.0-20220822164234-32bc232b53bd
 	github.com/gofiber/contrib/otelfiber v0.0.0-20220907132824-5b95b8215525
-	github.com/gofiber/fiber/v2 v2.37.0
+	github.com/gofiber/fiber/v2 v2.37.1
 	github.com/gofiber/helmet/v2 v2.2.16
 	github.com/gofiber/swagger v0.1.0
 	github.com/jinzhu/copier v0.3.5
@@ -107,7 +107,7 @@ require (
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
 	github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.15 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.39.0
+	github.com/valyala/fasthttp v1.40.0
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/otel/metric v0.31.0 // indirect
