@@ -17,7 +17,7 @@ require (
 	github.com/go-redsync/redsync/v4 v4.5.1
 	github.com/goccy/go-json v0.9.11
 	github.com/gofiber/contrib/fibersentry v0.0.0-20220822164234-32bc232b53bd
-	github.com/gofiber/contrib/otelfiber v0.0.0-20220907132824-5b95b8215525
+	github.com/gofiber/contrib/otelfiber v0.0.0-20220909153624-d49537d075e0
 	github.com/gofiber/fiber/v2 v2.37.1
 	github.com/gofiber/helmet/v2 v2.2.16
 	github.com/gofiber/swagger v0.1.0
