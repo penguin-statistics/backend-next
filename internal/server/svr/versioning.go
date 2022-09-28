@@ -40,7 +40,7 @@ func CreateEndpointGroups(app *fiber.App, conf *config.Config) (*V2, *V3, *Admin
 		c.Set("X-Penguin-Notes", msg)
 
 		accepts := c.Get(fiber.HeaderAccept)
-		if strings.Contains(accepts, "application/vnd.penguin.v3+json") {
+		if !strings.Contains(accepts, "application/vnd.penguin.v3+json") {
 			return pgerr.ErrInvalidReq.Msg(msg + " To use the v3 API, please use the application/vnd.penguin.v3+json Accept header to explicitly opt-in to the alpha version of API.")
 		}
 

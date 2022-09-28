@@ -12,15 +12,15 @@ require (
 	github.com/getsentry/sentry-go v0.13.0
 	github.com/go-playground/locales v0.14.0
 	github.com/go-playground/universal-translator v0.18.0
-	github.com/go-playground/validator/v10 v10.11.0
+	github.com/go-playground/validator/v10 v10.11.1
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/go-redsync/redsync/v4 v4.5.1
+	github.com/go-redsync/redsync/v4 v4.6.0
 	github.com/goccy/go-json v0.9.11
-	github.com/gofiber/contrib/fibersentry v0.0.0-20220822164234-32bc232b53bd
-	github.com/gofiber/contrib/otelfiber v0.0.0-20220907132824-5b95b8215525
-	github.com/gofiber/fiber/v2 v2.37.0
+	github.com/gofiber/contrib/fibersentry v0.0.0-20220911111204-91048590f414
+	github.com/gofiber/contrib/otelfiber v0.0.0-20220926215249-f70c9eb80bdd
+	github.com/gofiber/fiber/v2 v2.38.1
 	github.com/gofiber/helmet/v2 v2.2.16
-	github.com/gofiber/swagger v0.1.0
+	github.com/gofiber/swagger v0.1.2
 	github.com/jinzhu/copier v0.3.5
 	github.com/joho/godotenv v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -30,9 +30,9 @@ require (
 	github.com/prometheus/client_golang v1.13.0
 	github.com/rs/xid v1.4.0
 	github.com/rs/zerolog v1.28.0
-	github.com/samber/lo v1.28.0
+	github.com/samber/lo v1.28.2
 	github.com/stretchr/testify v1.8.0
-	github.com/swaggo/swag v1.8.5
+	github.com/swaggo/swag v1.8.6
 	github.com/tidwall/gjson v1.14.3
 	github.com/uptrace/bun v1.1.8
 	github.com/uptrace/bun/dialect/pgdialect v1.1.8
@@ -41,12 +41,12 @@ require (
 	github.com/uptrace/bun/extra/bunotel v1.1.8
 	github.com/vmihailenco/msgpack/v5 v5.3.5
 	github.com/zeebo/xxh3 v1.0.2
-	go.opentelemetry.io/otel v1.9.0
-	go.opentelemetry.io/otel/exporters/jaeger v1.9.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.9.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.9.0
-	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.9.0
-	go.opentelemetry.io/otel/sdk v1.9.0
+	go.opentelemetry.io/otel v1.10.0
+	go.opentelemetry.io/otel/exporters/jaeger v1.10.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.10.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.10.0
+	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.10.0
+	go.opentelemetry.io/otel/sdk v1.10.0
 	go.uber.org/fx v1.18.1
 	golang.org/x/exp v0.0.0-20220823124025-807a23277127
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
@@ -68,9 +68,9 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/swaggo/files v0.0.0-20220728132757-551d4a08d97a // indirect
-	go.opentelemetry.io/contrib v1.9.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.9.0 // indirect
-	go.opentelemetry.io/proto/otlp v0.18.0 // indirect
+	go.opentelemetry.io/contrib v1.10.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.10.0 // indirect
+	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	google.golang.org/genproto v0.0.0-20211118181313-81c1377c94b1 // indirect
 	google.golang.org/grpc v1.46.2 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
@@ -107,11 +107,11 @@ require (
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
 	github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.15 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.39.0
+	github.com/valyala/fasthttp v1.40.0
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/otel/metric v0.31.0 // indirect
-	go.opentelemetry.io/otel/trace v1.9.0
+	go.opentelemetry.io/otel/trace v1.10.0
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/dig v1.15.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
