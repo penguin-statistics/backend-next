@@ -8,7 +8,7 @@ require (
 	github.com/antonmedv/expr v1.9.0
 	github.com/avast/retry-go/v3 v3.1.1
 	github.com/davecgh/go-spew v1.1.1
-	github.com/dchest/uniuri v0.0.0-20200228104902-7aecb25e1fe5
+	github.com/dchest/uniuri v0.0.0-20220929095258-3027df40b6ce
 	github.com/getsentry/sentry-go v0.13.0
 	github.com/go-playground/locales v0.14.0
 	github.com/go-playground/universal-translator v0.18.0
