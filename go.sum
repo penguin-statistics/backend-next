@@ -234,6 +234,8 @@ github.com/gofiber/swagger v0.1.0 h1:I2XMqcZcPVrYYQc3NMnCussCBI5qPgV1LiOObOVFsUc
 github.com/gofiber/swagger v0.1.0/go.mod h1:X3+7UsNZCL8BW3GzRzTpKxEyX1kRYdy0gwHwGHw2yW0=
 github.com/gofiber/swagger v0.1.2 h1:tfqvFYO+CANlsZ4rgvA5S42Vtd3bd9llxKUagE0So/A=
 github.com/gofiber/swagger v0.1.2/go.mod h1:+WXfWaEzWcZnmJ4wQTzQ+FPwINmost6mHZLydICPsXs=
+github.com/gofiber/swagger v0.1.4 h1:+Z/Xu6J1NYq2yuOm5rET2NDNXY6/bMgvx5fYmBQe9Qs=
+github.com/gofiber/swagger v0.1.4/go.mod h1:cTI29LN749q6KRg0dfHeBszeLwaphfSTSvXD8+0mCw8=
 github.com/gogo/protobuf v1.1.1/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7atdtwQ=
 github.com/golang-jwt/jwt v3.2.2+incompatible/go.mod h1:8pz2t5EyA70fFQQSrl6XZXzqecmYZeUEB8OUGHkxJ+I=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
