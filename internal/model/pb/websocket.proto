@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+import "shared.proto";
+
+option go_package = "github.com/penguin-statistics/backend-next/internal/model/pb";
+
+enum Language {
+  ZH_CN = 0;
+  EN_US = 1;
+  JA_JP = 2;
+  KO_KR = 3;
+  OTHER = 4;
+}
+
+message Skeleton {
+    Header header = 1;
+}
+
+message Header {
+    MessageType type = 1;
+}
+
+enum MessageType {
+    // default value, leave for unknown
+    UNKNOWN = 0;
+    
+    PROBE_NAVIGATED = 1;
+    PROBE_ENTERED_SEARCH_RESULT = 2;
+    PROBE_EXECUTED_ADVANCED_QUERY = 3;
+
+    PROBE_SERVER_ACK = 64;
+
+    // server push messages. start from 1 << 8
+    /// uses MatrixUpdateMessage
+    MATRIX_UPDATE_MESSAGE = 256;
+
+    // request-response pattern messages. start from 1 << 12
+    /// uses MatrixUpdateSubscribeReq
+    MATRIX_UPDATE_SUBSCRIBE_REQ = 4096;
+    /// uses MatrixUpdateSubscribeResp
+    MATRIX_UPDATE_SUBSCRIBE_RESP = 4097;
+}
+
+message MatrixUpdateMessage {
+    message Element {
+        Server server = 1;
+        uint32 stage_id = 2;
+        uint32 item_id = 3;
+        uint64 quantity = 4;
+        uint64 times = 5;
+    }
+
+    Header header = 1;
+    repeated Element segments = 2;
+}
+
+message MatrixUpdateSubscribeReq {
+    Header header = 1;
+    Server server = 2;
+    oneof id {
+        uint32 stage_id = 3;
+        uint32 item_id = 4;
+    }
+}
+
+message MatrixUpdateSubscribeResp {
+    Header header = 1;
+    string error = 2;
+}
+
+

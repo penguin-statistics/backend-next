@@ -25,6 +25,11 @@ func RegisterMeta(meta *svr.Meta, c Meta) {
 		// cache it for a second to mitigate potential DDoS
 		Expiration: time.Second,
 	}), c.Health)
+
+	meta.Get("/ping", func(c *fiber.Ctx) error {
+		// only allow intranet access to prevent abuse
+		return c.SendString("pong")
+	})
 }
 
 func (c *Meta) BinInfo(ctx *fiber.Ctx) error {

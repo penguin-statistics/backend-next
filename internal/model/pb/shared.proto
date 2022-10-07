@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+option go_package = "github.com/penguin-statistics/backend-next/internal/model/pb";
+
+enum Server {
+  CN = 0;
+  US = 1;
+  JP = 2;
+  KR = 3;
+}
