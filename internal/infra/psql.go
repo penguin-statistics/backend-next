@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
@@ -31,6 +32,7 @@ func Postgres(conf *config.Config) (*bun.DB, error) {
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
+		log.Error().Err(err).Msg("infra: postgres: failed to ping database")
 		return nil, err
 	}
 
