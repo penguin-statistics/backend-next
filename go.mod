@@ -8,7 +8,7 @@ require (
 	github.com/antonmedv/expr v1.9.0
 	github.com/avast/retry-go/v3 v3.1.1
 	github.com/davecgh/go-spew v1.1.1
-	github.com/dchest/uniuri v0.0.0-20220929095258-3027df40b6ce
+	github.com/dchest/uniuri v1.2.0
 	github.com/getsentry/sentry-go v0.13.0
 	github.com/go-playground/locales v0.14.0
 	github.com/go-playground/universal-translator v0.18.0
@@ -51,6 +51,8 @@ require (
 	golang.org/x/exp v0.0.0-20220823124025-807a23277127
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
 	golang.org/x/text v0.3.7
+	google.golang.org/grpc v1.46.2
+	google.golang.org/protobuf v1.28.1
 	gopkg.in/guregu/null.v3 v3.5.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
@@ -72,8 +74,6 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.10.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	google.golang.org/genproto v0.0.0-20211118181313-81c1377c94b1 // indirect
-	google.golang.org/grpc v1.46.2 // indirect
-	google.golang.org/protobuf v1.28.1 // indirect
 )
 
 require (
