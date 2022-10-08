@@ -10,7 +10,7 @@ service ConnectedLiveService {
 }
 
 message ReportBatchRequest {
-    repeated Report report = 1;
+    repeated Report reports = 1;
 }
 
 message ReportBatchACK {}
