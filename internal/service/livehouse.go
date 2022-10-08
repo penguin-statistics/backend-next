@@ -68,34 +68,27 @@ func (l *LiveHouse) worker() {
 	}
 }
 
-func (l *LiveHouse) PushReport(report *types.ReportTask) error {
-	var server pb.Server
-	if m, ok := constant.ServerIDMapping[report.Server]; ok {
-		server = pb.Server(m)
+func (l *LiveHouse) PushReport(r *types.ReportTaskSingleReport, stageId uint32, server string) error {
+	var pbserv pb.Server
+	if m, ok := constant.ServerIDMapping[server]; ok {
+		pbserv = pb.Server(m)
 	} else {
 		return errors.New("service/livehouse: invalid server")
 	}
 
-	for _, r := range report.Reports {
-		s, err := l.StageRepo.GetStageByArkId(context.Background(), r.StageID)
-		if err != nil {
-			return errors.Wrap(err, "service/livehouse: failed to get stage")
-		}
-
-		pr := &pb.Report{
-			Server:     server,
-			Generation: atomic.LoadUint64(&l.gen),
-			StageId:    uint32(s.StageID),
-			Drops:      make([]*pb.Drop, 0, len(r.Drops)),
-		}
-		for _, d := range r.Drops {
-			pr.Drops = append(pr.Drops, &pb.Drop{
-				ItemId:   uint32(d.ItemID),
-				Quantity: uint64(d.Quantity),
-			})
-		}
-		l.q.Push(pr)
+	pr := &pb.Report{
+		Server:     pbserv,
+		Generation: atomic.LoadUint64(&l.gen),
+		StageId:    stageId,
+		Drops:      make([]*pb.Drop, 0, len(r.Drops)),
 	}
+	for _, d := range r.Drops {
+		pr.Drops = append(pr.Drops, &pb.Drop{
+			ItemId:   uint32(d.ItemID),
+			Quantity: uint64(d.Quantity),
+		})
+	}
+	l.q.Push(pr)
 
 	return nil
 }

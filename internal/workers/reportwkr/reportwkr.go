@@ -276,15 +276,17 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 		if err := w.Redis.Set(pstCtx, constant.ReportRedisPrefix+reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
 			return errors.Wrap(err, "failed to set report id in redis")
 		}
+
+		if reliability == 0 {
+			if err := w.LiveHouseService.PushReport(report, uint32(stage.StageID), reportTask.Server); err != nil {
+				log.Warn().Err(err).Msg("failed to push report to LiveHouse")
+			}
+		}
 	}
 
 	intendedCommit = true
 	if err := tx.Commit(); err != nil {
 		return errors.Wrap(err, "failed to commit transaction")
-	}
-
-	if err := w.LiveHouseService.PushReport(reportTask); err != nil {
-		log.Warn().Err(err).Msg("failed to push report to LiveHouse")
 	}
 
 	return nil
