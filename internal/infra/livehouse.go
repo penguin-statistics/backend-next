@@ -18,6 +18,8 @@ func LiveHouse(conf *config.Config) (pb.ConnectedLiveServiceClient, error) {
 		}
 
 		return pb.NewConnectedLiveServiceClient(conn), nil
+	} else {
+		log.Warn().Msg("infra: livehouse is disabled")
 	}
 
 	return nil, nil

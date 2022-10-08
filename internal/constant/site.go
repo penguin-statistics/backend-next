@@ -40,6 +40,14 @@ var ServerMap = map[string]struct{}{
 	"KR": {},
 }
 
+// ServerIDMapping should align with protobuf enum Server
+var ServerIDMapping = map[string]uint8{
+	"CN": 0,
+	"US": 1,
+	"JP": 2,
+	"KR": 3,
+}
+
 var LocMap = map[string]*time.Location{
 	"CN": time.FixedZone("UTC+8", +8*60*60),
 	"US": time.FixedZone("UTC-7", -7*60*60),

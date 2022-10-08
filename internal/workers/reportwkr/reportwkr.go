@@ -26,6 +26,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/jetstream"
 	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
 	"github.com/penguin-statistics/backend-next/internal/repo"
+	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
 	"github.com/penguin-statistics/backend-next/internal/util/reportverifs"
 )
@@ -43,6 +44,7 @@ type WorkerDeps struct {
 	DropReportExtraRepo    *repo.DropReportExtra
 	DropPatternElementRepo *repo.DropPatternElement
 	ReportVerifier         *reportverifs.ReportVerifiers
+	LiveHouseService       *service.LiveHouse
 }
 
 type Worker struct {
@@ -277,5 +279,13 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 	}
 
 	intendedCommit = true
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return errors.Wrap(err, "failed to commit transaction")
+	}
+
+	if err := w.LiveHouseService.PushReport(reportTask); err != nil {
+		log.Warn().Err(err).Msg("failed to push report to LiveHouse")
+	}
+
+	return nil
 }
