@@ -43,10 +43,10 @@ func NewLiveHouse(client pb.ConnectedLiveServiceClient, stageRepo *repo.Stage) (
 
 func (l *LiveHouse) checkConfig() error {
 	if l.Client == nil {
-		return errors.New("service/livehouse: client is nil. is livehouse enabled?")
+		return errors.New("service: livehouse: client is nil. is livehouse enabled?")
 	}
 	if l.StageRepo == nil {
-		return errors.New("service/livehouse: stage repo is nil")
+		return errors.New("service: livehouse: stage repo is nil")
 	}
 
 	return nil
