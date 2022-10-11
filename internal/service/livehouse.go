@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
+	"github.com/penguin-statistics/backend-next/internal/config"
 	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/model/pb"
 	"github.com/penguin-statistics/backend-next/internal/model/types"
@@ -16,6 +17,7 @@ import (
 )
 
 type LiveHouse struct {
+	Enabled   bool
 	Client    pb.ConnectedLiveServiceClient
 	StageRepo *repo.Stage
 
@@ -24,19 +26,24 @@ type LiveHouse struct {
 	gen uint64
 }
 
-func NewLiveHouse(client pb.ConnectedLiveServiceClient, stageRepo *repo.Stage) (*LiveHouse, error) {
+func NewLiveHouse(client pb.ConnectedLiveServiceClient, stageRepo *repo.Stage, conf *config.Config) (*LiveHouse, error) {
 	l := &LiveHouse{
+		Enabled:   conf.LiveHouseEnabled,
 		Client:    client,
 		StageRepo: stageRepo,
 		q:         dstructs.NewFlQueue[*pb.Report](),
 		t:         time.NewTicker(time.Second * 5),
 	}
 
-	if err := l.checkConfig(); err != nil {
-		return nil, err
-	}
+	if l.Enabled {
+		if err := l.checkConfig(); err != nil {
+			return nil, err
+		}
 
-	go l.worker()
+		go l.worker()
+	} else {
+		log.Info().Msg("service: livehouse: disabled")
+	}
 
 	return l, nil
 }
@@ -69,11 +76,15 @@ func (l *LiveHouse) worker() {
 }
 
 func (l *LiveHouse) PushReport(r *types.ReportTaskSingleReport, stageId uint32, server string) error {
+	if !l.Enabled {
+		return nil
+	}
+
 	var pbserv pb.Server
 	if m, ok := constant.ServerIDMapping[server]; ok {
 		pbserv = pb.Server(m)
 	} else {
-		return errors.New("service/livehouse: invalid server")
+		return errors.New("service: livehouse: invalid server")
 	}
 
 	pr := &pb.Report{
@@ -94,5 +105,8 @@ func (l *LiveHouse) PushReport(r *types.ReportTaskSingleReport, stageId uint32, 
 }
 
 func (l *LiveHouse) PushMatrix() {
+	if !l.Enabled {
+		return
+	}
 	atomic.AddUint64(&l.gen, 1)
 }
