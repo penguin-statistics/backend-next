@@ -117,9 +117,9 @@ func (s *Report) pipelinePreprocessRecruitmentTags(ctx context.Context, req *typ
 
 func (s *Report) pipelineConvertLegacySuppliesForMaa(ctx context.Context, req *types.SingleReportRequest) error {
 	if time.Now().UnixMilli() <= 1666641600000 && req.FragmentReportCommon.Source == constant.MeoAssistant {
-		for _, drop := range req.Drops {
-			if drop.ItemID == "randomMaterial_5" {
-				drop.ItemID = "randomMaterial_7"
+		for i := range req.Drops {
+			if req.Drops[i].ItemID == "randomMaterial_5" {
+				req.Drops[i].ItemID = "randomMaterial_7"
 				break
 			}
 		}
