@@ -9,6 +9,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/rs/zerolog/log"
 
 	"github.com/penguin-statistics/backend-next/internal/pkg/projectpath"
 )
@@ -135,7 +136,7 @@ func (m *WorkerHeartbeatURLMap) Decode(value string) error {
 func Parse() (*Config, error) {
 	err := godotenv.Load(filepath.Join(projectpath.Root, ".env"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to load .env file: %w", err)
+		log.Warn().Err(err).Msg("failed to load .env file")
 	}
 
 	var config Config
