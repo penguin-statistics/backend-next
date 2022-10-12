@@ -286,6 +286,7 @@ func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchR
 
 	// construct ReportContext
 	reportTask := &types.ReportTask{
+		CreatedAt: time.Now().UnixMicro(),
 		FragmentReportCommon: types.FragmentReportCommon{
 			Server:  req.Server,
 			Source:  req.Source,
