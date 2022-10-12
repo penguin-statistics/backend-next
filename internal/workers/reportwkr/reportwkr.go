@@ -26,6 +26,7 @@ import (
 	"github.com/penguin-statistics/backend-next/internal/pkg/jetstream"
 	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
 	"github.com/penguin-statistics/backend-next/internal/repo"
+	"github.com/penguin-statistics/backend-next/internal/service"
 	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
 	"github.com/penguin-statistics/backend-next/internal/util/reportverifs"
 )
@@ -43,6 +44,7 @@ type WorkerDeps struct {
 	DropReportExtraRepo    *repo.DropReportExtra
 	DropPatternElementRepo *repo.DropPatternElement
 	ReportVerifier         *reportverifs.ReportVerifiers
+	LiveHouseService       *service.LiveHouse
 }
 
 type Worker struct {
@@ -274,8 +276,18 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 		if err := w.Redis.Set(pstCtx, constant.ReportRedisPrefix+reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
 			return errors.Wrap(err, "failed to set report id in redis")
 		}
+
+		if reliability == 0 {
+			if err := w.LiveHouseService.PushReport(report, uint32(stage.StageID), reportTask.Server); err != nil {
+				log.Warn().Err(err).Msg("failed to push report to LiveHouse")
+			}
+		}
 	}
 
 	intendedCommit = true
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return errors.Wrap(err, "failed to commit transaction")
+	}
+
+	return nil
 }

@@ -12,11 +12,13 @@ import (
 func NATS(conf *config.Config) (*nats.Conn, nats.JetStreamContext, error) {
 	nc, err := nats.Connect(conf.NatsURL, nats.PingInterval(time.Second*20))
 	if err != nil {
+		log.Error().Err(err).Msg("infra: nats: failed to connect to NATS")
 		return nil, nil, err
 	}
 
 	js, err := nc.JetStream(nats.PublishAsyncMaxPending(128))
 	if err != nil {
+		log.Error().Err(err).Msg("infra: nats: failed to initialize NATS JetStream")
 		return nil, nil, err
 	}
 
@@ -35,7 +37,7 @@ func NATS(conf *config.Config) (*nats.Conn, nats.JetStreamContext, error) {
 	// MaxAckPending should equal to (worker count * worker channel buffer size)
 
 	if err != nil {
-		log.Warn().Err(err).Msg("failed to create jetstream stream: is it already created?")
+		log.Warn().Err(err).Msg("infra: nats: failed to create jetstream stream: is it already created?")
 	}
 
 	return nc, js, nil
