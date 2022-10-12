@@ -1,7 +1,7 @@
 package wrap
 
 func Flattened[T []any](src []T) T {
-	var res T
+	res := make(T, 0, len(src))
 	for _, v := range src {
 		res = append(res, v...)
 	}
@@ -9,7 +9,7 @@ func Flattened[T []any](src []T) T {
 }
 
 func FlattenedPtrs[T []*any](src []T) T {
-	var res T
+	res := make(T, 0, len(src))
 	for _, v := range src {
 		res = append(res, v...)
 	}
