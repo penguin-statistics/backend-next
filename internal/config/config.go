@@ -3,11 +3,14 @@ package config
 import (
 	"encoding/base64"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
-	_ "github.com/joho/godotenv/autoload"
+	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
+
+	"github.com/penguin-statistics/backend-next/internal/pkg/projectpath"
 )
 
 type Config struct {
@@ -130,8 +133,13 @@ func (m *WorkerHeartbeatURLMap) Decode(value string) error {
 }
 
 func Parse() (*Config, error) {
+	err := godotenv.Load(filepath.Join(projectpath.Root, ".env"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to load .env file: %w", err)
+	}
+
 	var config Config
-	err := envconfig.Process("penguin_v3", &config)
+	err = envconfig.Process("penguin_v3", &config)
 	if err != nil {
 		_ = envconfig.Usage("penguin_v3", &config)
 		return nil, fmt.Errorf("failed to parse configuration: %w. More info on how to configure this backend is located at https://pkg.go.dev/github.com/penguin-statistics/backend-next/internal/config#Config", err)

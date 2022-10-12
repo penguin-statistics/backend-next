@@ -6,7 +6,7 @@ type Tuple[K comparable, V any] struct {
 }
 
 func TuplesFromMap[K comparable, V any](m map[K]V) []Tuple[K, V] {
-	var res []Tuple[K, V]
+	res := make([]Tuple[K, V], 0, len(m))
 	for k, v := range m {
 		res = append(res, Tuple[K, V]{k, v})
 	}
@@ -14,7 +14,7 @@ func TuplesFromMap[K comparable, V any](m map[K]V) []Tuple[K, V] {
 }
 
 func TuplePtrsFromMap[K comparable, V any](m map[K]V) []*Tuple[K, V] {
-	var res []*Tuple[K, V]
+	res := make([]*Tuple[K, V], 0, len(m))
 	for k, v := range m {
 		res = append(res, &Tuple[K, V]{k, v})
 	}

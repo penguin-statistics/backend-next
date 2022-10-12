@@ -13,9 +13,12 @@ type Errors struct {
 
 func (e Errors) Error() any {
 	var sb strings.Builder
-	for _, err := range e.Errs {
+	l := len(e.Errs)
+	for i, err := range e.Errs {
 		sb.WriteString(err.Error())
-		sb.WriteString("; ")
+		if i < l-1 {
+			sb.WriteString(", ")
+		}
 	}
 	return sb.String()
 }
@@ -103,7 +106,7 @@ func FlatMap[T any, D any](src []T, concurrencyLimit int, f func(T) ([]D, error)
 		return nil, err
 	}
 
-	flattened := []D{}
+	flattened := make([]D, 0, len(r))
 	for _, v := range r {
 		flattened = append(flattened, v...)
 	}
