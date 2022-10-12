@@ -74,6 +74,24 @@ func TestPipelineMergeDropsAndMapDropTypes(t *testing.T) {
 				{"REGULAR", 8, 2},
 			},
 		},
+		{
+			args: []types.ArkDrop{
+				{"REGULAR_DROP", "30013", 1},
+				{"NORMAL_DROP", "30013", 1},
+				{"SPECIAL_DROP", "30013", 1},
+				{"SPECIAL_DROP", "30014", 1},
+				{"SPECIAL_DROP", "30014", 1},
+				{"NORMAL_DROP", "30013", 1},
+				{"NORMAL_DROP", "30013", 1},
+				{"NORMAL_DROP", "30012", 4},
+			},
+			expect: []*types.Drop{
+				{"REGULAR", 8, 4},
+				{"SPECIAL", 8, 1},
+				{"SPECIAL", 9, 2},
+				{"REGULAR", 7, 4},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
