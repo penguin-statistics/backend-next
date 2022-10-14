@@ -47,8 +47,9 @@ func Create(conf *config.Config) (*fiber.App, DevOpsApp) {
 
 func CreateServiceApp(conf *config.Config) *fiber.App {
 	app := fiber.New(fiber.Config{
-		AppName:      "Penguin Stats Backend v3",
-		ServerHeader: fmt.Sprintf("Penguin/%s", bininfo.Version),
+		AppName:               "Penguin Stats Backend v3",
+		ServerHeader:          fmt.Sprintf("Penguin/%s", bininfo.Version),
+		DisableStartupMessage: !conf.DevMode,
 		// NOTICE: This will also affect WebSocket. Be aware if this fiber instance service is re-used
 		//         for long connection services.
 		ReadTimeout:  time.Second * 20,
@@ -145,8 +146,9 @@ func CreateServiceApp(conf *config.Config) *fiber.App {
 
 func CreateDevOpsApp(conf *config.Config) *fiber.App {
 	app := fiber.New(fiber.Config{
-		AppName:      "Penguin Stats Backend v3 (DevOps)",
-		ServerHeader: fmt.Sprintf("PenguinDevOps/%s", bininfo.Version),
+		AppName:               "Penguin Stats Backend v3 (DevOps)",
+		ServerHeader:          fmt.Sprintf("PenguinDevOps/%s", bininfo.Version),
+		DisableStartupMessage: !conf.DevMode,
 		// allow possibility for graceful shutdown, otherwise app#Shutdown() will block forever
 		IdleTimeout:             conf.HTTPServerShutdownTimeout,
 		ProxyHeader:             "X-Original-Forwarded-For",

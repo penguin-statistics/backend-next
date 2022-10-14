@@ -48,6 +48,7 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Invoke(logger.Configure),
 		fx.Invoke(infra.SentryInit),
 		fx.Invoke(cache.Initialize),
+		fx.WithLogger(logger.Fx),
 
 		// Controllers (v2)
 		controllerv2.Module(),
