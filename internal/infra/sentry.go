@@ -10,19 +10,19 @@ import (
 
 func getEnvironment(conf *config.Config) string {
 	if conf.DevMode {
-		return "development"
+		return "dev"
 	} else {
-		return "production"
+		return "prod"
 	}
 }
 
 // SentryInit initializes sentry with side effect
 func SentryInit(conf *config.Config) error {
 	if conf.SentryDSN == "" {
-		log.Warn().Msg("Sentry is disabled due to missing DSN.")
+		log.Warn().Str("evt.name", "infra.sentry.init").Msg("Sentry is disabled due to missing DSN.")
 		return nil
 	} else {
-		log.Info().Msg("Initializing Sentry...")
+		log.Info().Str("evt.name", "infra.sentry.init").Msg("Initializing Sentry...")
 	}
 
 	return sentry.Init(sentry.ClientOptions{
@@ -34,7 +34,11 @@ func SentryInit(conf *config.Config) error {
 		Environment:      getEnvironment(conf),
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			if conf.DevMode {
-				log.Trace().Msg("not sending event to Sentry: DEV mode enabled")
+				log.Trace().
+					Str("evt.name", "infra.sentry.event").
+					Interface("event", event).
+					Interface("hint", hint).
+					Msg("Sentry event captured, but not sent due to development mode enabled.")
 				return nil
 			}
 			return event
