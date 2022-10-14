@@ -7,5 +7,10 @@ import (
 )
 
 func IdempotencyKeyFromLocals(ctx *fiber.Ctx) string {
-	return ctx.Locals(constant.IdempotencyKeyLocalsKey).(string)
+	l, ok := ctx.Locals(constant.IdempotencyKeyLocalsKey).(string)
+	if !ok {
+		return ""
+	}
+
+	return l
 }
