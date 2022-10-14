@@ -10,7 +10,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 
 	"github.com/penguin-statistics/backend-next/internal/constant"
@@ -135,7 +134,6 @@ func (s *Report) PipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []
 			if !errors.Is(err, pgerr.ErrNotFound) {
 				return nil, err
 			} else {
-				log.Warn().Msgf("failed to get item by ark id '%s', will ignore it", drop.ItemID)
 				continue
 			}
 		}

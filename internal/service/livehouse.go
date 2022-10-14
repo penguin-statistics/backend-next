@@ -72,7 +72,15 @@ func (l *LiveHouse) worker() {
 			Reports: reports,
 		})
 		if err != nil {
-			log.Error().Err(err).Msg("service: livehouse: failed to report")
+			log.Error().
+				Str("evt.name", "livehouse.report.failed").
+				Err(err).
+				Msg("failed to push report batch")
+		} else {
+			log.Info().
+				Str("evt.name", "livehouse.report.success").
+				Int("count", len(reports)).
+				Msg("successfully reported reports to livehouse")
 		}
 	}
 }
@@ -86,7 +94,7 @@ func (l *LiveHouse) PushReport(r *types.ReportTaskSingleReport, stageId uint32, 
 	if m, ok := constant.ServerIDMapping[server]; ok {
 		pbserv = pb.Server(m)
 	} else {
-		return errors.New("service: livehouse: invalid server")
+		return errors.New("service: livehouse: unknown server")
 	}
 
 	pr := &pb.Report{
