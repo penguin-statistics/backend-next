@@ -59,7 +59,9 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 		key := c.Get(config.KeyHeader)
 		if key == "" {
 			if l := log.Trace(); l.Enabled() {
-				l.Msg("IdempotencyMiddleware: idempotency key is missing. Skipping middleware.")
+				l.
+					Str("evt.name", "http.idempotency.no_key").
+					Msg("idempotency key is missing. Skipping middleware.")
 			}
 			return c.Next()
 		}
@@ -67,7 +69,10 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 		// Validate idempotency key
 		if err := rekuest.Validate.Var(key, "max=128,alphanum"); err != nil {
 			if l := log.Trace(); l.Enabled() {
-				l.Err(err).Msg("IdempotencyMiddleware: idempotency key is invalid. Returning error.")
+				l.
+					Err(err).
+					Str("evt.name", "http.idempotency.invalid_key").
+					Msg("idempotency key is invalid. Returning error.")
 			}
 			return pgerr.ErrInvalidReq.Msg("invalid idempotency key: idempotency key can only be at most %d characters, consist of only alphanumeric characters", constant.IdempotencyKeyLengthLimit)
 		}
@@ -82,23 +87,29 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 
 		// Idempotency key not empty and not found in storage. Lock the key
 		if l := log.Debug(); l.Enabled() {
-			l.Str("key", key).
-				Msg("IdempotencyMiddleware: idempotency key not found in storage. Locking key.")
+			l.
+				Str("evt.name", "http.idempotency.lock").
+				Str("key", key).
+				Msg("idempotency key not found in storage. Locking key.")
 		}
 
 		lockKey := "mutex:idempotency-request:" + key
 		mutex := config.RedSync.NewMutex(lockKey, redsync.WithExpiry(time.Minute), redsync.WithTries(5), redsync.WithRetryDelay(time.Millisecond*250))
 
 		if err := mutex.Lock(); err != nil {
-			log.Err(err).Str("key", key).
-				Msg("IdempotencyMiddleware: failed to lock idempotency key. Returning error.")
+			log.Err(err).
+				Str("evt.name", "http.idempotency.lock.failed").
+				Str("key", key).
+				Msg("failed to lock idempotency key. Returning error.")
 			return pgerr.ErrInternalError.Msg("failed to lock idempotency key: idempoency key is locked by another request; are you sending the same request concurrently or retrying with little or no backoff?")
 		}
 
 		defer func() {
 			if _, err := mutex.Unlock(); err != nil {
-				log.Err(err).Str("key", key).
-					Msg("IdempotencyMiddleware: failed to unlock idempotency key.")
+				log.Err(err).
+					Str("evt.name", "http.idempotency.unlock.failed").
+					Str("key", key).
+					Msg("failed to unlock idempotency key.")
 			}
 		}()
 
@@ -112,7 +123,9 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 		if err != nil {
 			// If the request handler returned an error, return it and skip idempotency
 			if l := log.Trace(); l.Enabled() {
-				l.Msg("IdempotencyMiddleware: request handler returned an error. Skipping saving the idempotency response.")
+				l.
+					Str("evt.name", "http.idempotency.handler.error").
+					Msg("request handler returned an error. Skipping saving the idempotency response.")
 			}
 			return err
 		}
@@ -120,13 +133,19 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 		// Marshal response to bytes
 		responseBytes, err := marshalResponseToBytes(c, config)
 		if err != nil {
-			log.Error().Err(err).Msg("IdempotencyMiddleware: error marshaling response to bytes. Skipping saving the idempotency response.")
+			log.Error().
+				Str("evt.name", "http.idempotency.response.marshal.failed").
+				Err(err).
+				Msg("error marshaling response to bytes. Skipping saving the idempotency response.")
 			return err
 		}
 
 		// Store the response in the storage
 		if err := config.Storage.Set(key, responseBytes, config.Lifetime); err != nil {
-			log.Error().Err(err).Msg("IdempotencyMiddleware: error saving the idempotency response. Skipping saving the idempotency response.")
+			log.Error().
+				Str("evt.name", "http.idempotency.response.save.failed").
+				Err(err).
+				Msg("error saving the idempotency response. Skipping saving the idempotency response.")
 			return err
 		}
 
@@ -134,8 +153,10 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 		c.Set(constant.IdempotencyHeader, "saved")
 
 		if l := log.Debug(); l.Enabled() {
-			l.Str("key", key).
-				Msg("IdempotencyMiddleware: Idempotency Key given and no response was saved. Executed request handler and saved returned response in storage.")
+			l.
+				Str("evt.name", "http.idempotency.saved").
+				Str("key", key).
+				Msg("idempotency response saved")
 		}
 
 		return nil
@@ -200,8 +221,10 @@ func checkWriteIdempotencyCachedMessage(c *fiber.Ctx, conf *IdempotencyConfig, k
 	if err == nil && response != nil {
 		// Idempotency key found in storage. Return the response
 		if l := log.Debug(); l.Enabled() {
-			l.Str("key", key).
-				Msg("IdempotencyMiddleware: idempotency key found in storage. Returning saved response.")
+			l.
+				Str("evt.name", "http.idempotency.hit").
+				Str("key", key).
+				Msg("idempotency key found in storage")
 		}
 		return true, unmarshalResponseToFiberResponse(c, conf, response)
 	}

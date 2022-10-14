@@ -168,7 +168,9 @@ func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
 	span.End()
 
 	log.Info().
+		Str("evt.name", "reportwkr.processed").
 		Str("taskId", reportTask.TaskID).
+		Interface("task", reportTask).
 		Dur("duration", time.Since(start)).
 		Msg("report task processed successfully")
 
@@ -180,7 +182,9 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 		Interface("task", reportTask).
 		Logger()
 
-	L.Info().Msg("now processing new report task")
+	L.Info().
+		Str("evt.name", "reportwkr.received").
+		Msg("received report task: processing")
 
 	verifyCtx, verifySpan := tracer.
 		Start(ctx, "reportwkr.process.Verify",
