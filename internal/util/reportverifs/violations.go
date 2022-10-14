@@ -15,9 +15,11 @@ func (v Violations) Reliability(index int) int {
 func (v Violations) String() string {
 	var buf bytes.Buffer
 
-	for _, violation := range v {
+	for i, violation := range v {
 		buf.WriteString(violation.Message)
-		buf.WriteString("; ")
+		if i != len(v)-1 {
+			buf.WriteString("; ")
+		}
 	}
 
 	return buf.String()

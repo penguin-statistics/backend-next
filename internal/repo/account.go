@@ -29,15 +29,23 @@ func (c *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.
 		account := &model.Account{
 			PenguinID: pgid.New(),
 		}
+
 		_, err := c.db.NewInsert().
 			Model(account).
 			Returning("account_id").
 			Exec(ctx)
 		if err != nil {
-			log.Warn().Err(err).Int("retry", i).Msg("failed to create account. retrying...")
+			log.Warn().
+				Str("evt.name", "account.create.retry").
+				Err(err).
+				Int("retry", i).
+				Msg("failed to create account. retrying...")
 			continue
-		} else if i > 0 {
+		}
+
+		if i > 0 {
 			log.Info().
+				Str("evt.name", "account.create.retry").
 				Int("retry", i).
 				Str("finalizedPenguinID", account.PenguinID).
 				Msg("successfully created account after retry")

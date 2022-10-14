@@ -10,11 +10,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
 	"github.com/penguin-statistics/backend-next/internal/util"
 )
 
 // FromFiberCtx gets the logger in the request's context.
-// This is a shortcut for log.Ctx(r.Context())
+// This is a shortcut for log.Ctx(r.UserContext())
 func FromFiberCtx(r *fiber.Ctx) *zerolog.Logger {
 	return log.Ctx(r.UserContext())
 }
@@ -104,6 +105,21 @@ func RefererHandler(fieldKey string) func(ctx *fiber.Ctx) error {
 	}
 }
 
+// PenguinIDHandler adds the request's penguin id as a field to the context's logger
+func PenguinIDHandler(fieldKey string) func(ctx *fiber.Ctx) error {
+	return func(ctx *fiber.Ctx) error {
+		UpdateContext(ctx, func(c zerolog.Context) zerolog.Context {
+			return c.Str(fieldKey, pgid.Extract(ctx))
+		})
+		return ctx.Next()
+	}
+}
+
+// UpdateContext updates the context of the logger in the request's context.
+func UpdateContext(ctx *fiber.Ctx, f func(c zerolog.Context) zerolog.Context) {
+	FromFiberCtx(ctx).UpdateContext(f)
+}
+
 type idKey struct{}
 
 // IDFromFiberCtx returns the unique id associated to the *fiber.Ctx if any.
@@ -182,30 +198,30 @@ func AccessHandler(f func(ctx *fiber.Ctx, duration time.Duration)) fiber.Handler
 }
 
 // Logger Level Method Helpers
-func TraceFrom(ctx *fiber.Ctx) *zerolog.Event {
-	return FromFiberCtx(ctx).Trace()
+func TraceFrom(ctx *fiber.Ctx, name string) *zerolog.Event {
+	return FromFiberCtx(ctx).Trace().Str("evt.name", name)
 }
 
-func DebugFrom(ctx *fiber.Ctx) *zerolog.Event {
-	return FromFiberCtx(ctx).Debug()
+func DebugFrom(ctx *fiber.Ctx, name string) *zerolog.Event {
+	return FromFiberCtx(ctx).Debug().Str("evt.name", name)
 }
 
-func InfoFrom(ctx *fiber.Ctx) *zerolog.Event {
-	return FromFiberCtx(ctx).Info()
+func InfoFrom(ctx *fiber.Ctx, name string) *zerolog.Event {
+	return FromFiberCtx(ctx).Info().Str("evt.name", name)
 }
 
-func WarnFrom(ctx *fiber.Ctx) *zerolog.Event {
-	return FromFiberCtx(ctx).Warn()
+func WarnFrom(ctx *fiber.Ctx, name string) *zerolog.Event {
+	return FromFiberCtx(ctx).Warn().Str("evt.name", name)
 }
 
-func ErrorFrom(ctx *fiber.Ctx) *zerolog.Event {
-	return FromFiberCtx(ctx).Error()
+func ErrorFrom(ctx *fiber.Ctx, name string) *zerolog.Event {
+	return FromFiberCtx(ctx).Error().Str("evt.name", name)
 }
 
-func FatalFrom(ctx *fiber.Ctx) *zerolog.Event {
-	return FromFiberCtx(ctx).Fatal()
+func FatalFrom(ctx *fiber.Ctx, name string) *zerolog.Event {
+	return FromFiberCtx(ctx).Fatal().Str("evt.name", name)
 }
 
-func PanicFrom(ctx *fiber.Ctx) *zerolog.Event {
-	return FromFiberCtx(ctx).Panic()
+func PanicFrom(ctx *fiber.Ctx, name string) *zerolog.Event {
+	return FromFiberCtx(ctx).Panic().Str("evt.name", name)
 }

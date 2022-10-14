@@ -131,7 +131,9 @@ func CreateServiceApp(conf *config.Config) *fiber.App {
 	fiberprometheus.New(observability.ServiceName).RegisterAt(app, "/metrics")
 
 	if conf.DevMode {
-		log.Info().Msg("Running in DEV mode")
+		log.Info().
+			Str("evt.name", "infra.dev_mode.enabled").
+			Msg("running in DEV mode")
 	}
 
 	if !conf.DevMode {
@@ -172,7 +174,9 @@ func CreateDevOpsApp(conf *config.Config) *fiber.App {
 func tracingProviderOptions(conf *config.Config) []tracesdk.TracerProviderOption {
 	options := []tracesdk.TracerProviderOption{}
 	if !conf.TracingEnabled {
-		log.Info().Msg("Tracing is disabled: no spans will be reported")
+		log.Info().
+			Str("evt.name", "infra.tracing.disabled").
+			Msg("Tracing is disabled: no spans will be reported")
 		return options
 	}
 
@@ -199,9 +203,13 @@ func tracingProviderOptions(conf *config.Config) []tracesdk.TracerProviderOption
 	}
 
 	if len(options) == 0 {
-		log.Warn().Msg("Tracing is enabled via configuration, but no tracing exporters are provided")
+		log.Warn().
+			Str("evt.name", "infra.tracing.exporters").
+			Msg("Tracing is enabled via configuration, but no tracing exporters are provided")
 	} else {
-		log.Info().Msgf("Tracing enabled with exporters: %s", strings.Join(optionsstr, ", "))
+		log.Info().
+			Str("evt.name", "infra.tracing.exporters").
+			Msgf("Tracing enabled with exporters: %s", strings.Join(optionsstr, ", "))
 	}
 
 	return options

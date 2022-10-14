@@ -18,12 +18,6 @@ import (
 var sentryHubKey = "sentry-hub"
 
 func HandleCustomError(ctx *fiber.Ctx, e *pgerr.PenguinError) error {
-	log.Warn().
-		Err(e).
-		Str("method", ctx.Method()).
-		Str("path", ctx.Path()).
-		Msg(e.Message)
-
 	// Provide error code if pgerr.PenguinError type
 	body := fiber.Map{
 		"code":    e.ErrorCode,

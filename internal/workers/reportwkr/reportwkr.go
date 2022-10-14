@@ -279,7 +279,7 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 
 		if reliability == 0 {
 			if err := w.LiveHouseService.PushReport(report, uint32(stage.StageID), reportTask.Server); err != nil {
-				log.Warn().Err(err).Msg("failed to push report to LiveHouse")
+				L.Warn().Err(err).Msg("failed to push report to LiveHouse")
 			}
 		}
 	}

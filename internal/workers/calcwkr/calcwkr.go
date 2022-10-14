@@ -76,10 +76,12 @@ func (t WorkerCalcType) Interval(w *Worker) time.Duration {
 func Start(conf *config.Config, deps WorkerDeps) {
 	if conf.WorkerEnabled {
 		if len(conf.WorkerHeartbeatURL) == 0 {
-			log.Info().
+			log.Warn().
+				Str("evt.name", "worker.calcwkr.heartbeat.disabled").
 				Msg("No heartbeat URL found. The worker will NOT send a heartbeat when it is finished.")
 		} else {
 			log.Info().
+				Str("evt.name", "worker.calcwkr.heartbeat.enabled").
 				Interface("heartbeatURLs", conf.WorkerHeartbeatURL).
 				Msg("The worker will send a heartbeat to those URLs when it is finished")
 		}
@@ -96,7 +98,9 @@ func Start(conf *config.Config, deps WorkerDeps) {
 		w.doMainCalc(conf.MatrixWorkerSourceCategories)
 		w.doTrendCalc(conf.MatrixWorkerSourceCategories)
 	} else {
-		log.Info().Msg("worker is disabled due to configuration")
+		log.Info().
+			Str("evt.name", "worker.calcwkr.disabled").
+			Msg("worker is disabled due to configuration")
 	}
 }
 
@@ -169,10 +173,10 @@ func (w *Worker) lock() error {
 func (w *Worker) unlock() {
 	b, err := w.syncMutex.Unlock()
 	if err != nil {
-		log.Error().Str("service", "worker").Err(err).Msg("unlock sync mutex failed")
+		log.Error().Str("evt.name", "worker").Err(err).Msg("unlock sync mutex failed")
 	}
 	if !b {
-		log.Error().Str("service", "worker").Msg("unlock sync mutex failed: not locked. this should not happen as it indicates the mutex is unlocked before the worker finished.")
+		log.Error().Str("evt.name", "worker").Msg("unlock sync mutex failed: not locked. this should not happen as it indicates the mutex is unlocked before the worker finished.")
 	}
 }
 
@@ -180,17 +184,17 @@ func (w *Worker) extend() {
 	// extends the sync mutex to ensure lock is held for enough duration
 	ok, err := w.syncMutex.Extend()
 	if err != nil {
-		log.Error().Str("service", "worker:calculator").Err(err).Msg("failed to extend sync mutex")
+		log.Error().Str("evt.name", "worker.calcwkr").Err(err).Msg("failed to extend sync mutex")
 		return
 	}
 	if !ok {
-		log.Error().Str("service", "worker:calculator").Msg("failed to extend sync mutex: not locked. this should not happen as it indicates the mutex is unlocked before the worker finished.")
+		log.Error().Str("evt.name", "worker.calcwkr").Msg("failed to extend sync mutex: not locked. this should not happen as it indicates the mutex is unlocked before the worker finished.")
 		return
 	}
 }
 
 func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx context.Context, server string) error) {
-	logger := log.With().Str("service", "worker:calculator:"+string(typ)).Logger()
+	logger := log.With().Str("evt.name", "worker.calcwkr."+string(typ)).Logger()
 	parentCtx := logger.WithContext(ctx)
 
 	go func() {
@@ -266,12 +270,12 @@ func (w *Worker) microtask(ctx context.Context, typ WorkerCalcType, service, ser
 		}
 	}()
 
-	log.Ctx(ctx).Info().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Msg("worker microtask started calculating")
+	log.Ctx(ctx).Info().Str("evt.name", "worker.calcwkr."+string(typ)+"."+service).Str("server", server).Msg("worker microtask started calculating")
 	if err := observeCalcDuration(service, server, f); err != nil {
-		log.Ctx(ctx).Error().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Err(err).Msg("worker microtask failed")
+		log.Ctx(ctx).Error().Str("evt.name", "worker.calcwkr."+string(typ)+"."+service).Str("server", server).Err(err).Msg("worker microtask failed")
 		return err
 	}
-	log.Ctx(ctx).Info().Str("service", "worker:calculator:"+string(typ)+":"+service).Str("server", server).Msg("worker microtask finished")
+	log.Ctx(ctx).Info().Str("evt.name", "worker.calcwkr."+string(typ)+"."+service).Str("server", server).Msg("worker microtask finished")
 
 	return nil
 }
@@ -300,10 +304,12 @@ func (w *Worker) heartbeat(typ WorkerCalcType) {
 	if err != nil {
 		log.Error().
 			Err(err).
+			Str("evt.name", "worker.calcwkr.heartbeat.failed").
 			Str("url", url).
-			Msg("worker succeeded notification eventually failed")
+			Msg("worker succeeded notification eventually failed after retry attempts")
 	} else {
 		log.Info().
+			Str("evt.name", "worker.calcwkr.heartbeat.success").
 			Str("url", url).
 			Msg("worker succeeded notification succeeded")
 	}

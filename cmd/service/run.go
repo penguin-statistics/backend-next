@@ -31,7 +31,9 @@ func run(serviceApp *fiber.App, devOpsApp httpserver.DevOpsApp, conf *config.Con
 			}()
 
 			if conf.DevOpsAddress == "" {
-				log.Info().Msg("DevOps server is disabled")
+				log.Info().
+					Str("evt.name", "infra.devops.disabled").
+					Msg("DevOps server is disabled")
 			} else {
 				devOpsLn, err := net.Listen("tcp", conf.DevOpsAddress)
 				if err != nil {

@@ -72,6 +72,9 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 			return pgerr.ErrInvalidReq.Msg("invalid idempotency key: idempotency key can only be at most %d characters, consist of only alphanumeric characters", constant.IdempotencyKeyLengthLimit)
 		}
 
+		// Save idempotency key to context
+		c.Locals(constant.IdempotencyKeyLocalsKey, key)
+
 		// First-pass: if the idempotency key is in the storage, get and return the response
 		if exist, err := checkWriteIdempotencyCachedMessage(c, config, key); exist {
 			return err
@@ -95,7 +98,7 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 		defer func() {
 			if _, err := mutex.Unlock(); err != nil {
 				log.Err(err).Str("key", key).
-					Msg("IdempotencyMiddleware: failed to unlock idempotency key. Returning error.")
+					Msg("IdempotencyMiddleware: failed to unlock idempotency key.")
 			}
 		}()
 
