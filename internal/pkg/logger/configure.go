@@ -15,6 +15,7 @@ import (
 
 func Configure(conf *config.Config) {
 	zerolog.TimeFieldFormat = time.RFC3339Nano
+	zerolog.DurationFieldUnit = time.Nanosecond
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 
 	_ = os.Mkdir("logs", os.ModePerm)
