@@ -193,6 +193,7 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 	violations := w.ReportVerifier.Verify(verifyCtx, reportTask)
 	if len(violations) > 0 {
 		L.Warn().
+			Str("evt.name", "reportwkr.violations").
 			Stringer("violations", violations).
 			Msg("report task verification failed on some or all reports")
 	}
