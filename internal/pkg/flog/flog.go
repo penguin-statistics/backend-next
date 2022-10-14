@@ -14,7 +14,7 @@ import (
 )
 
 // FromFiberCtx gets the logger in the request's context.
-// This is a shortcut for log.Ctx(r.Context())
+// This is a shortcut for log.Ctx(r.UserContext())
 func FromFiberCtx(r *fiber.Ctx) *zerolog.Logger {
 	return log.Ctx(r.UserContext())
 }
@@ -24,7 +24,7 @@ func NewHandlerMiddleware(log zerolog.Logger) func(*fiber.Ctx) error {
 	return func(ctx *fiber.Ctx) error {
 		// Create a copy of the logger (including internal context slice)
 		// to prevent data race when using UpdateContext.
-		l := log.With().Logger()
+		l := log
 		// ctx.SetUserContext(context.WithValue(ctx.UserContext(), idKey{}, l))
 		injectedCtx := l.WithContext(ctx.UserContext())
 		ctx.SetUserContext(injectedCtx)
