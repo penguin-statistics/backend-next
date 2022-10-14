@@ -169,7 +169,7 @@ func (s *Report) PipelineAggregateGachaboxDrops(ctx context.Context, singleRepor
 	return nil
 }
 
-func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.ReportTask) (taskId string, err error) {
+func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.ReportTask, idempotency string) (taskId string, err error) {
 	taskId = s.PipelineTaskId(ctx)
 	task.TaskID = taskId
 
@@ -178,7 +178,12 @@ func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.Re
 		return "", err
 	}
 
-	pub, err := s.NatsJS.PublishAsync(subject, reportTaskJSON)
+	natsOpts := make([]nats.PubOpt, 0, 1)
+	if idempotency != "" {
+		natsOpts = append(natsOpts, nats.MsgId(idempotency))
+	}
+
+	pub, err := s.NatsJS.PublishAsync(subject, reportTaskJSON, natsOpts...)
 	if err != nil {
 		return "", err
 	}
@@ -247,7 +252,7 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 		IP:        util.ExtractIP(ctx),
 	}
 
-	return s.commitReportTask(ctx, "REPORT.SINGLE", reportTask)
+	return s.commitReportTask(ctx, "REPORT.SINGLE", reportTask, util.IdempotencyKeyFromLocals(ctx))
 }
 
 func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchReportRequest) (taskId string, err error) {
@@ -296,7 +301,7 @@ func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchR
 		IP:        util.ExtractIP(ctx),
 	}
 
-	return s.commitReportTask(ctx, "REPORT.BATCH", reportTask)
+	return s.commitReportTask(ctx, "REPORT.BATCH", reportTask, util.IdempotencyKeyFromLocals(ctx))
 }
 
 func (s *Report) RecallSingularReport(ctx context.Context, req *types.SingleReportRecallRequest) error {
