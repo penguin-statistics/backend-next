@@ -90,6 +90,10 @@ func (c *Report) RecallSingularReport(ctx *fiber.Ctx) error {
 		return err
 	}
 
+	flog.InfoFrom(ctx, "report.singular.recall.request").
+		Str("reportHash", req.ReportHash).
+		Msg("Recalling report")
+
 	err := c.ReportService.RecallSingularReport(ctx.UserContext(), &req)
 	if err != nil {
 		return err
@@ -114,7 +118,7 @@ func (c *Report) RecognitionReport(ctx *fiber.Ctx) error {
 	segments := strings.SplitN(encrypted, ":", 2)
 
 	if err := rekuest.Validate.Var(segments, "len=2"); err != nil {
-		flog.WarnFrom(ctx).
+		flog.WarnFrom(ctx, "report.recognition.request.invalid.segments").
 			Err(err).
 			Msg("failed to decrypt recognition request")
 		return pgerr.ErrInvalidReq
@@ -125,7 +129,7 @@ func (c *Report) RecognitionReport(ctx *fiber.Ctx) error {
 
 	decrypted, err := c.Crypto.Decrypt(privateKey, body)
 	if err != nil {
-		flog.WarnFrom(ctx).
+		flog.WarnFrom(ctx, "report.recognition.request.invalid.decryption").
 			Err(err).
 			Msg("failed to decrypt recognition request")
 		return pgerr.ErrInvalidReq
@@ -133,7 +137,7 @@ func (c *Report) RecognitionReport(ctx *fiber.Ctx) error {
 
 	var request types.BatchReportRequest
 	if err = json.Unmarshal(decrypted, &request); err != nil {
-		flog.WarnFrom(ctx).
+		flog.WarnFrom(ctx, "report.recognition.request.invalid.json").
 			Err(err).
 			Msg("failed to unmarshal recognition request")
 		return pgerr.ErrInvalidReq
