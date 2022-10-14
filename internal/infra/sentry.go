@@ -27,7 +27,7 @@ func SentryInit(conf *config.Config) error {
 
 	return sentry.Init(sentry.ClientOptions{
 		Dsn:              conf.SentryDSN,
-		Release:          "backend-next@" + bininfo.Version,
+		Release:          bininfo.Version,
 		Debug:            conf.DevMode,
 		AttachStacktrace: true,
 		TracesSampleRate: 0.01,
