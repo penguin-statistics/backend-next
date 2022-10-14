@@ -15,7 +15,6 @@ require (
 	github.com/go-playground/validator/v10 v10.11.1
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-redsync/redsync/v4 v4.6.0
-	github.com/goccy/go-json v0.9.11
 	github.com/gofiber/contrib/fibersentry v0.0.0-20221012214519-a585aaf976b3
 	github.com/gofiber/contrib/otelfiber v0.0.0-20221012214519-a585aaf976b3
 	github.com/gofiber/fiber/v2 v2.38.1
