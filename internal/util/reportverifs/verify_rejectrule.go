@@ -78,6 +78,7 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 		result, err := expr.Eval(rejectRule.Expr, reportContext)
 		if err != nil {
 			log.Error().
+				Str("evt.name", "verifier.reject_rule.expr_eval_error").
 				Interface("context", reportContext).
 				Int("ruleId", rejectRule.RuleID).
 				Err(err).
@@ -89,10 +90,12 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 
 		if shouldReject {
 			log.Warn().
+				Str("evt.name", "verifier.reject_rule.rejected").
 				Interface("context", reportContext).
-				Int("ruleId", rejectRule.RuleID).
-				Bool("shouldReject", shouldReject).
-				Msgf("reject rule %d matched (rejecting using reliability value %d)", rejectRule.RuleID, rejectRule.WithReliability)
+				Int("reject_rule.rule_id", rejectRule.RuleID).
+				Int("reject_rule.with_reliability", rejectRule.WithReliability).
+				Bool("verifier.evaluation.should_reject", shouldReject).
+				Msg("reject rule matched, rejecting using specified reliability value")
 
 			return &Rejection{
 				Reliability: rejectRule.WithReliability,
