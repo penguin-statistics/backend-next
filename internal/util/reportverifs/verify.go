@@ -43,6 +43,10 @@ func (verifiers ReportVerifiers) Verify(ctx context.Context, reportTask *types.R
 			rejection := pipe.Verify(ctx, report, reportTask)
 			span.End()
 
+			observability.ReportVerifyDuration.
+				WithLabelValues(name).
+				Observe(time.Since(start).Seconds())
+
 			if rejection != nil {
 				violations[reportIndex] = &Violation{
 					Name:      name,
@@ -51,10 +55,6 @@ func (verifiers ReportVerifiers) Verify(ctx context.Context, reportTask *types.R
 
 				break
 			}
-
-			observability.ReportVerifyDuration.
-				WithLabelValues(name).
-				Observe(time.Since(start).Seconds())
 		}
 	}
 
