@@ -15,6 +15,7 @@ require (
 	github.com/go-playground/validator/v10 v10.11.1
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-redsync/redsync/v4 v4.6.0
+	github.com/goccy/go-json v0.9.11
 	github.com/gofiber/contrib/fibersentry v0.0.0-20221014214022-052aa9ddca30
 	github.com/gofiber/contrib/otelfiber v0.0.0-20221014214022-052aa9ddca30
 	github.com/gofiber/fiber/v2 v2.38.1
@@ -59,7 +60,6 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
-	github.com/goccy/go-json v0.9.11 // indirect
 	github.com/gofiber/adaptor/v2 v2.1.25 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
