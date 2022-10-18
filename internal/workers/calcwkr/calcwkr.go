@@ -91,7 +91,7 @@ func Start(conf *config.Config, deps WorkerDeps) {
 			trendInterval: conf.WorkerTrendInterval,
 			timeout:       conf.WorkerTimeout,
 			heartbeatURL:  conf.WorkerHeartbeatURL,
-			syncMutex:     deps.RedSync.NewMutex("mutex:calcwkr", redsync.WithExpiry(30*time.Second)),
+			syncMutex:     deps.RedSync.NewMutex("mutex:calcwkr", redsync.WithExpiry(30*time.Second), redsync.WithTries(2)),
 			WorkerDeps:    deps,
 		}
 		w.checkConfig()
