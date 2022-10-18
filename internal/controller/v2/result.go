@@ -67,7 +67,6 @@ func RegisterResult(v2 *svr.V2, c Result) {
 		Next: func(c *fiber.Ctx) bool {
 			// only cache requests with itemFilter and stageFilter query params
 			if c.Query("itemFilter") != "" || c.Query("stageFilter") != "" {
-				time.Sleep(time.Second) // simulate a slow request
 				return false
 			}
 			return true
