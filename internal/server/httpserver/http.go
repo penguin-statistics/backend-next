@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ansrivas/fiberprometheus/v2"
+	"github.com/goccy/go-json"
 	"github.com/gofiber/contrib/fibersentry"
 	"github.com/gofiber/contrib/otelfiber"
 	"github.com/gofiber/fiber/v2"
@@ -59,6 +60,9 @@ func CreateServiceApp(conf *config.Config) *fiber.App {
 		ProxyHeader:             "X-Original-Forwarded-For",
 		EnableTrustedProxyCheck: true,
 		TrustedProxies:          conf.TrustedProxies,
+
+		JSONEncoder: json.Marshal,
+		JSONDecoder: json.Unmarshal,
 
 		ErrorHandler: ErrorHandler,
 		Immutable:    true,
