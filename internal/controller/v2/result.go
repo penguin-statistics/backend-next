@@ -72,7 +72,7 @@ func RegisterResult(v2 *svr.V2, c Result) {
 			}
 			return true
 		},
-		CacheHeader:  "X-Penguin-Cache",
+		CacheHeader:  constant.CacheHeader,
 		CacheControl: true,
 		Expiration:   time.Minute * 5,
 		KeyGenerator: func(c *fiber.Ctx) string {
