@@ -1,7 +1,7 @@
 package model
 
 import (
-	"encoding/json"
+	"github.com/goccy/go-json"
 
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"

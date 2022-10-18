@@ -10,7 +10,16 @@ import (
 )
 
 func NATS(conf *config.Config) (*nats.Conn, nats.JetStreamContext, error) {
-	nc, err := nats.Connect(conf.NatsURL, nats.PingInterval(time.Second*20))
+	errorHandler := func(conn *nats.Conn, sub *nats.Subscription, err error) {
+		log.Error().
+			Str("evt.name", "nats.error").
+			Err(err).
+			Str("conn.url", conn.ConnectedUrlRedacted()).
+			Str("sub.subject", sub.Subject).
+			Msg("nats error")
+	}
+
+	nc, err := nats.Connect(conf.NatsURL, nats.PingInterval(time.Second*20), nats.ErrorHandler(errorHandler))
 	if err != nil {
 		log.Error().Err(err).Msg("infra: nats: failed to connect to NATS")
 		return nil, nil, err

@@ -20,6 +20,11 @@ var (
 		Help:    "Duration of report consumption in seconds",
 		Buckets: prometheus.ExponentialBuckets(0.01, 2, 10),
 	}, []string{})
+	ReportConsumeMessagingLatency = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    prometheus.BuildFQName(ServiceName, "report", "consume_messaging_latency_seconds"),
+		Help:    "Messaging latency of report consumption in seconds",
+		Buckets: prometheus.ExponentialBuckets(0.01, 2, 10),
+	}, []string{})
 	ReportReliability = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: prometheus.BuildFQName(ServiceName, "report", "reliability"),
 		Help: "Reliability distribution of report consumption",

@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cache"
 	"go.uber.org/fx"
 
+	"github.com/penguin-statistics/backend-next/internal/constant"
 	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
 	"github.com/penguin-statistics/backend-next/internal/server/svr"
 	"github.com/penguin-statistics/backend-next/internal/service"
@@ -23,7 +24,8 @@ func RegisterMeta(meta *svr.Meta, c Meta) {
 
 	meta.Get("/health", cache.New(cache.Config{
 		// cache it for a second to mitigate potential DDoS
-		Expiration: time.Second,
+		Expiration:  time.Second,
+		CacheHeader: constant.CacheHeader,
 	}), c.Health)
 
 	meta.Get("/ping", func(c *fiber.Ctx) error {

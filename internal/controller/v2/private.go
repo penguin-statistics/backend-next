@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	fibercache "github.com/gofiber/fiber/v2/middleware/cache"
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
@@ -30,9 +31,17 @@ type Private struct {
 }
 
 func RegisterPrivate(v2 *svr.V2, c Private) {
-	v2.Get("/_private/result/matrix/:server/:source/:category?", middlewares.ValidateServerAsParam, middlewares.ValidateCategoryAsParam, c.GetDropMatrix)
-	v2.Get("/_private/result/pattern/:server/:source/:category?", middlewares.ValidateServerAsParam, middlewares.ValidateCategoryAsParam, c.GetPatternMatrix)
-	v2.Get("/_private/result/trend/:server", middlewares.ValidateServerAsParam, c.GetTrends)
+	result := v2.Group("/_private/result", fibercache.New(fibercache.Config{
+		Next: func(c *fiber.Ctx) bool {
+			return c.Params("source") == "personal"
+		},
+		CacheHeader:          constant.CacheHeader,
+		StoreResponseHeaders: true,
+		Expiration:           time.Minute * 5,
+	}))
+	result.Get("/matrix/:server/:source/:category?", middlewares.ValidateServerAsParam, middlewares.ValidateCategoryAsParam, c.GetDropMatrix)
+	result.Get("/pattern/:server/:source/:category?", middlewares.ValidateServerAsParam, middlewares.ValidateCategoryAsParam, c.GetPatternMatrix)
+	result.Get("/trend/:server", middlewares.ValidateServerAsParam, c.GetTrends)
 }
 
 // @Summary  Get Drop Matrix

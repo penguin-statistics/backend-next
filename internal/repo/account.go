@@ -96,6 +96,7 @@ func (c *Account) IsAccountExistWithId(ctx context.Context, accountId int) bool 
 
 	err := c.db.NewSelect().
 		Model(&account).
+		Column("account_id").
 		Where("account_id = ?", accountId).
 		Scan(ctx, &account)
 	if err != nil {

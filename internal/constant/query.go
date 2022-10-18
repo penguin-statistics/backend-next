@@ -2,7 +2,7 @@ package constant
 
 const (
 	MaxIntervalNum     = 360
-	DefaultIntervalNum = 60
+	DefaultIntervalNum = 30
 
 	StdDevDigits = 4
 

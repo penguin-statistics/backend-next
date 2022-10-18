@@ -16,11 +16,11 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-redsync/redsync/v4 v4.6.0
 	github.com/goccy/go-json v0.9.11
-	github.com/gofiber/contrib/fibersentry v0.0.0-20221012214519-a585aaf976b3
-	github.com/gofiber/contrib/otelfiber v0.0.0-20221012214519-a585aaf976b3
+	github.com/gofiber/contrib/fibersentry v0.0.0-20221014214022-052aa9ddca30
+	github.com/gofiber/contrib/otelfiber v0.0.0-20221014214022-052aa9ddca30
 	github.com/gofiber/fiber/v2 v2.38.1
 	github.com/gofiber/helmet/v2 v2.2.17
-	github.com/gofiber/swagger v0.1.4
+	github.com/gofiber/swagger v0.1.6
 	github.com/jinzhu/copier v0.3.5
 	github.com/joho/godotenv v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -30,9 +30,9 @@ require (
 	github.com/prometheus/client_golang v1.13.0
 	github.com/rs/xid v1.4.0
 	github.com/rs/zerolog v1.28.0
-	github.com/samber/lo v1.32.0
+	github.com/samber/lo v1.33.0
 	github.com/stretchr/testify v1.8.0
-	github.com/swaggo/swag v1.8.6
+	github.com/swaggo/swag v1.8.7
 	github.com/tidwall/gjson v1.14.3
 	github.com/uptrace/bun v1.1.8
 	github.com/uptrace/bun/dialect/pgdialect v1.1.8
@@ -50,8 +50,8 @@ require (
 	go.uber.org/fx v1.18.1
 	golang.org/x/exp v0.0.0-20220823124025-807a23277127
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
-	golang.org/x/text v0.3.8
-	google.golang.org/grpc v1.50.0
+	golang.org/x/text v0.4.0
+	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/guregu/null.v3 v3.5.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0

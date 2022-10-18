@@ -8,4 +8,6 @@ const (
 
 	IdempotencyKeyLengthLimit = 128
 	IdempotencyKeyLocalsKey   = "idempotencyKey"
+
+	CacheHeader = "X-Penguin-Cache"
 )

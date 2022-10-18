@@ -2,10 +2,11 @@ package reportwkr
 
 import (
 	"context"
-	"encoding/json"
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/nats-io/nats.go"
@@ -186,6 +187,13 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 		Str("evt.name", "reportwkr.received").
 		Msg("received report task: processing")
 
+	// reportTask.CreatedAt is in microseconds
+	taskCreatedAt := time.UnixMicro(reportTask.CreatedAt)
+
+	observability.ReportConsumeMessagingLatency.
+		WithLabelValues().
+		Observe(time.Since(taskCreatedAt).Seconds())
+
 	verifyCtx, verifySpan := tracer.
 		Start(ctx, "reportwkr.process.Verify",
 			trace.WithSpanKind(trace.SpanKindInternal))
@@ -204,9 +212,6 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 		Start(ctx, "reportwkr.process.Persistence",
 			trace.WithSpanKind(trace.SpanKindInternal))
 	defer pstSpan.End()
-
-	// reportTask.CreatedAt is in microseconds
-	taskCreatedAt := time.UnixMicro(reportTask.CreatedAt)
 
 	tx, err := w.DB.BeginTx(pstCtx, nil)
 	if err != nil {
