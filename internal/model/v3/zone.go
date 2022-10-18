@@ -1,7 +1,7 @@
 package v3
 
 import (
-	"encoding/json"
+	"github.com/goccy/go-json"
 
 	"gopkg.in/guregu/null.v3"
 )

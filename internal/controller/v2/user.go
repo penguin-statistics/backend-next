@@ -1,7 +1,7 @@
 package v2
 
 import (
-	"encoding/json"
+	"github.com/goccy/go-json"
 
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"

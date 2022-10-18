@@ -2,8 +2,9 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/dchest/uniuri"
 	"github.com/go-redis/redis/v8"

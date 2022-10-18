@@ -2,10 +2,11 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/tidwall/gjson"

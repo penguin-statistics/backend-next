@@ -2,9 +2,10 @@ package cache
 
 import (
 	"context"
-	"encoding/json"
 	"sync"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"gopkg.in/guregu/null.v3"
 

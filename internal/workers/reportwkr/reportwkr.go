@@ -2,10 +2,11 @@ package reportwkr
 
 import (
 	"context"
-	"encoding/json"
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/nats-io/nats.go"

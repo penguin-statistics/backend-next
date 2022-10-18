@@ -1,7 +1,7 @@
 package v2
 
 import (
-	"encoding/json"
+	"github.com/goccy/go-json"
 
 	"github.com/uptrace/bun"
 
@@ -22,7 +22,7 @@ type DropInfo struct {
 	Bounds     json.RawMessage `json:"bounds" swaggertype:"object"`
 	Extras     json.RawMessage `json:"-" swaggertype:"object"`
 
-	Item      *Item             `bun:"rel:belongs-to,join:item_id=item_id" json:"-"`
-	Stage     *Stage            `bun:"rel:belongs-to,join:stage_id=stage_id" json:"-"`
+	Item      *Item            `bun:"rel:belongs-to,join:item_id=item_id" json:"-"`
+	Stage     *Stage           `bun:"rel:belongs-to,join:stage_id=stage_id" json:"-"`
 	TimeRange *model.TimeRange `bun:"rel:belongs-to,join:range_id=range_id" json:"-"`
 }

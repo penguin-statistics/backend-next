@@ -59,6 +59,7 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
+	github.com/goccy/go-json v0.9.11 // indirect
 	github.com/gofiber/adaptor/v2 v2.1.25 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect

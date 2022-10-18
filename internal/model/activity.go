@@ -1,8 +1,9 @@
 package model
 
 import (
-	"encoding/json"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/uptrace/bun"
 )
