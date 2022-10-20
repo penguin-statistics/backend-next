@@ -3,18 +3,11 @@ package infra
 import (
 	"github.com/getsentry/sentry-go"
 	"github.com/rs/zerolog/log"
+	"github.com/samber/lo"
 
 	"github.com/penguin-statistics/backend-next/internal/config"
 	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
 )
-
-func getEnvironment(conf *config.Config) string {
-	if conf.DevMode {
-		return "dev"
-	} else {
-		return "prod"
-	}
-}
 
 // SentryInit initializes sentry with side effect
 func SentryInit(conf *config.Config) error {
@@ -35,7 +28,7 @@ func SentryInit(conf *config.Config) error {
 		Debug:            conf.DevMode,
 		AttachStacktrace: true,
 		TracesSampleRate: 0.01,
-		Environment:      getEnvironment(conf),
+		Environment:      lo.Ternary(conf.DevMode, "dev", "prod"),
 		BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
 			if conf.DevMode {
 				log.Trace().
