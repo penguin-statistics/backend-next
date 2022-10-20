@@ -205,6 +205,8 @@ github.com/gofiber/contrib/fibersentry v0.0.0-20221014214022-052aa9ddca30 h1:ZYO
 github.com/gofiber/contrib/fibersentry v0.0.0-20221014214022-052aa9ddca30/go.mod h1:2XkEVu6c1/sbx15/G5dc/KkELLXH4i2advA6zKqqyIg=
 github.com/gofiber/contrib/otelfiber v0.0.0-20221014214022-052aa9ddca30 h1:4RVCEK/ukry9Gojc0Dg2DygBjIBSto7E9uq+/wJhU0s=
 github.com/gofiber/contrib/otelfiber v0.0.0-20221014214022-052aa9ddca30/go.mod h1:K81WVVcm1/D1Y5LN6Rk3DvwjI6DeRiEkhewPPPN7bU8=
+github.com/gofiber/contrib/otelfiber v0.0.0-20221020220652-4b53fd7edccb h1:6Sb9tIvtSlTGC96IeQZ+wZYpI07q1fwIkxRsqlTd00M=
+github.com/gofiber/contrib/otelfiber v0.0.0-20221020220652-4b53fd7edccb/go.mod h1:efDpe+Q/VhLbr6KcRtsK/2TtPdu2YOY/cECHWvsKJwI=
 github.com/gofiber/fiber/v2 v2.24.0/go.mod h1:MR1usVH3JHYRyQwMe2eZXRSZHRX38fkV+A7CPB+DlDQ=
 github.com/gofiber/fiber/v2 v2.36.0/go.mod h1:tgCr+lierLwLoVHHO/jn3Niannv34WRkQETU8wiL9fQ=
 github.com/gofiber/fiber/v2 v2.38.1 h1:GEQ/Yt3Wsf2a30iTqtLXlBYJZso0JXPovt/tmj5H9jU=
@@ -599,6 +601,8 @@ go.opencensus.io v0.22.3/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
 go.opencensus.io v0.22.4/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
 go.opentelemetry.io/contrib v1.11.0 h1:7wXYf1FO4V3E171XdkSoc24S/xiP2nJnbr9Z1ec1vv0=
 go.opentelemetry.io/contrib v1.11.0/go.mod h1:O3SXx534x0bWzGJlxXiUXpV7Ao7Iweib+s/urIXELrs=
+go.opentelemetry.io/contrib v1.11.1 h1:K1o2vsylRPQK0KoQNC2Xf8Dcmkwb5KfATz77qLt+u/M=
+go.opentelemetry.io/contrib v1.11.1/go.mod h1:O3SXx534x0bWzGJlxXiUXpV7Ao7Iweib+s/urIXELrs=
 go.opentelemetry.io/contrib/propagators/b3 v1.11.0 h1:LAzUx5os6NwhtEv166/k3m6TWHabuN2jJYoMFws6t1M=
 go.opentelemetry.io/contrib/propagators/b3 v1.11.0/go.mod h1:mD7gBpRoRgGxheDunJ5SnNQNlo13EhfnLtqhs3rsDV0=
 go.opentelemetry.io/otel v1.0.0-RC3/go.mod h1:Ka5j3ua8tZs4Rkq4Ex3hwgBgOchyPVq5S6P2lz//nKQ=
