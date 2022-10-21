@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	fibercache "github.com/gofiber/fiber/v2/middleware/cache"
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
@@ -31,14 +30,7 @@ type Private struct {
 }
 
 func RegisterPrivate(v2 *svr.V2, c Private) {
-	result := v2.Group("/_private/result", fibercache.New(fibercache.Config{
-		Next: func(c *fiber.Ctx) bool {
-			return c.Params("source") == "personal"
-		},
-		CacheHeader:          constant.CacheHeader,
-		StoreResponseHeaders: true,
-		Expiration:           time.Minute * 5,
-	}))
+	result := v2.Group("/_private/result")
 	result.Get("/matrix/:server/:source/:category?", middlewares.ValidateServerAsParam, middlewares.ValidateCategoryAsParam, c.GetDropMatrix)
 	result.Get("/pattern/:server/:source/:category?", middlewares.ValidateServerAsParam, middlewares.ValidateCategoryAsParam, c.GetPatternMatrix)
 	result.Get("/trend/:server", middlewares.ValidateServerAsParam, c.GetTrends)
