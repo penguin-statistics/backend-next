@@ -3,7 +3,7 @@ package util
 import (
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/penguin-statistics/backend-next/internal/constant"
+	"exusiai.dev/backend-next/internal/constant"
 )
 
 func IdempotencyKeyFromLocals(ctx *fiber.Ctx) string {

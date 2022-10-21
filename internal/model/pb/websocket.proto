@@ -2,7 +2,7 @@ syntax = "proto3";
 
 import "shared.proto";
 
-option go_package = "github.com/penguin-statistics/backend-next/internal/model/pb";
+option go_package = "exusiai.dev/backend-next/internal/model/pb";
 
 enum Language {
   ZH_CN = 0;

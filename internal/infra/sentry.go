@@ -5,8 +5,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
+	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/pkg/bininfo"
 )
 
 // SentryInit initializes sentry with side effect

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/penguin-statistics/backend-next/cmd/service"
+	"exusiai.dev/backend-next/cmd/service"
 )
 
 // @title        Penguin Statistics API

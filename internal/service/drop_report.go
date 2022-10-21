@@ -6,8 +6,8 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/repo"
 )
 
 type DropReport struct {

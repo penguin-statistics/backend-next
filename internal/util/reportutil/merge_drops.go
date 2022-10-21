@@ -5,7 +5,7 @@ import (
 
 	"github.com/ahmetb/go-linq/v3"
 
-	"github.com/penguin-statistics/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/model/types"
 )
 
 // MergeDropsByDropTypeAndItemID merges drops with same (DropType, ItemID) pair into one drop, summing up their Quantity values.

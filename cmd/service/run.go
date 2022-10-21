@@ -11,9 +11,9 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/pkg/async"
-	"github.com/penguin-statistics/backend-next/internal/server/httpserver"
+	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/pkg/async"
+	"exusiai.dev/backend-next/internal/server/httpserver"
 )
 
 func run(serviceApp *fiber.App, devOpsApp httpserver.DevOpsApp, conf *config.Config, lc fx.Lifecycle) {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
 )
 
 func Accepts(mimes ...string) func(ctx *fiber.Ctx) error {

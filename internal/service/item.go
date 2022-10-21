@@ -11,12 +11,12 @@ import (
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/tidwall/gjson"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/model/cache"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
-	"github.com/penguin-statistics/backend-next/internal/repo"
-	"github.com/penguin-statistics/backend-next/internal/util"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model/cache"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/util"
 )
 
 type Item struct {

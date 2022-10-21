@@ -3,7 +3,7 @@ package calcwkr
 import (
 	"time"
 
-	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
+	"exusiai.dev/backend-next/internal/pkg/observability"
 )
 
 func observeCalcDuration(service string, server string, f func() error) error {

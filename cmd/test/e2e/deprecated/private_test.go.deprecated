@@ -10,8 +10,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/penguin-statistics/backend-next/internal/constant"
-	"github.com/penguin-statistics/backend-next/internal/pkg/testentry"
+	"exusiai.dev/backend-next/internal/constant"
+	"exusiai.dev/backend-next/internal/pkg/testentry"
 )
 
 func TestV2Result(t *testing.T) {

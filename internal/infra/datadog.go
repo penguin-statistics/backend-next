@@ -8,8 +8,8 @@ import (
 	"go.uber.org/fx"
 	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
+	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/pkg/bininfo"
 )
 
 func Datadog(conf *config.Config, lc fx.Lifecycle) {

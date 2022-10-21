@@ -10,9 +10,9 @@ import (
 	"github.com/rs/zerolog/log"
 	"golang.org/x/mod/semver"
 
-	"github.com/penguin-statistics/backend-next/internal/constant"
-	"github.com/penguin-statistics/backend-next/internal/model/types"
-	"github.com/penguin-statistics/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/constant"
+	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/repo"
 )
 
 var ErrExprMatched = errors.New("reject expr matched")

@@ -4,7 +4,7 @@ import (
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/model/types"
 )
 
 type DropReportExtra struct {

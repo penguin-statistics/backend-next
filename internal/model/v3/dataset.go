@@ -1,7 +1,7 @@
 package v3
 
 import (
-	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 )
 
 type AggregatedItemStats struct {

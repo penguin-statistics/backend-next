@@ -5,7 +5,7 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model"
 )
 
 type Admin struct {

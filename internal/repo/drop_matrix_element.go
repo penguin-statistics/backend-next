@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model"
 )
 
 type DropMatrixElement struct {

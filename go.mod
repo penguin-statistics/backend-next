@@ -1,4 +1,4 @@
-module github.com/penguin-statistics/backend-next
+module exusiai.dev/backend-next
 
 go 1.19
 

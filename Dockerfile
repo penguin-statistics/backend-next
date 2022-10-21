@@ -20,7 +20,7 @@ RUN go mod download
 COPY . .
 
 # inject versioning information & build the binary
-RUN export BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ"); go build -o backend -ldflags "-X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.Version=$VERSION -X github.com/penguin-statistics/backend-next/internal/pkg/bininfo.BuildTime=$BUILD_TIME" .
+RUN export BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ"); go build -o backend -ldflags "-X exusiai.dev/backend-next/internal/pkg/bininfo.Version=$VERSION -X exusiai.dev/backend-next/internal/pkg/bininfo.BuildTime=$BUILD_TIME" .
 
 # runner
 FROM base AS runner

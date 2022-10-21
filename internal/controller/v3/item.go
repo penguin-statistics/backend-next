@@ -6,10 +6,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
-	"github.com/penguin-statistics/backend-next/internal/server/svr"
-	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/util"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/server/svr"
+	"exusiai.dev/backend-next/internal/service"
+	"exusiai.dev/backend-next/internal/util"
 )
 
 type ItemController struct {

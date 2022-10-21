@@ -6,8 +6,8 @@ import (
 	"github.com/jinzhu/copier"
 	"github.com/samber/lo"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
-	modelv3 "github.com/penguin-statistics/backend-next/internal/model/v3"
+	"exusiai.dev/backend-next/internal/model"
+	modelv3 "exusiai.dev/backend-next/internal/model/v3"
 )
 
 type Init struct {

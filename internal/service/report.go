@@ -13,14 +13,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/constant"
-	"github.com/penguin-statistics/backend-next/internal/model/types"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
-	"github.com/penguin-statistics/backend-next/internal/repo"
-	"github.com/penguin-statistics/backend-next/internal/util"
-	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
-	"github.com/penguin-statistics/backend-next/internal/util/reportverifs"
+	"exusiai.dev/backend-next/internal/constant"
+	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/pkg/pgid"
+	"exusiai.dev/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/util"
+	"exusiai.dev/backend-next/internal/util/reportutil"
+	"exusiai.dev/backend-next/internal/util/reportverifs"
 )
 
 var (

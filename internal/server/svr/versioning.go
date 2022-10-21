@@ -7,9 +7,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/constant"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/constant"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
 )
 
 type V2 struct {
@@ -36,7 +36,7 @@ func CreateEndpointGroups(app *fiber.App, conf *config.Config) (*V2, *V3, *Admin
 	})
 
 	v3 := app.Group("/api/v3alpha", func(c *fiber.Ctx) error {
-		msg := "The v3 API is in alpha and may change in the future. Please report any issues and/or suggestions to https://github.com/penguin-statistics/backend-next/issues."
+		msg := "The v3 API is in alpha and may change in the future. Please report any issues and/or suggestions to https://exusiai.dev/backend-next/issues."
 		c.Set("X-Penguin-Notes", msg)
 
 		accepts := c.Get(fiber.HeaderAccept)

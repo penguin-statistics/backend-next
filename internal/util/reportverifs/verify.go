@@ -6,8 +6,8 @@ import (
 
 	"go.opentelemetry.io/otel"
 
-	"github.com/penguin-statistics/backend-next/internal/model/types"
-	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
+	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/observability"
 )
 
 var tracer = otel.Tracer("reportverifs")

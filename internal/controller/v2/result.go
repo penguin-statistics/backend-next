@@ -12,17 +12,17 @@ import (
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/constant"
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/model/cache"
-	"github.com/penguin-statistics/backend-next/internal/model/types"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
-	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
-	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
-	"github.com/penguin-statistics/backend-next/internal/server/svr"
-	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/util/rekuest"
+	"exusiai.dev/backend-next/internal/constant"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model/cache"
+	"exusiai.dev/backend-next/internal/model/types"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+	"exusiai.dev/backend-next/internal/pkg/cachectrl"
+	"exusiai.dev/backend-next/internal/pkg/middlewares"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/server/svr"
+	"exusiai.dev/backend-next/internal/service"
+	"exusiai.dev/backend-next/internal/util/rekuest"
 )
 
 // ErrIntervalLengthTooSmall is returned when the interval length is invalid

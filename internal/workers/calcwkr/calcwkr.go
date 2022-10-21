@@ -11,9 +11,9 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/constant"
-	"github.com/penguin-statistics/backend-next/internal/service"
+	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/constant"
+	"exusiai.dev/backend-next/internal/service"
 )
 
 type WorkerDeps struct {

@@ -3,7 +3,7 @@ package util
 import (
 	"github.com/ahmetb/go-linq/v3"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model"
 )
 
 func GetDropMatrixElementsMap(elements []*model.DropMatrixElement) map[int]map[int]map[int]*model.DropMatrixElement {

@@ -6,9 +6,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/penguin-statistics/backend-next/internal/constant"
-	v2 "github.com/penguin-statistics/backend-next/internal/model/v2"
-	"github.com/penguin-statistics/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/constant"
+	v2 "exusiai.dev/backend-next/internal/model/v2"
+	"exusiai.dev/backend-next/internal/repo"
 )
 
 type Analytics struct {

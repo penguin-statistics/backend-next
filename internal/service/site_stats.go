@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/penguin-statistics/backend-next/internal/model/cache"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
-	"github.com/penguin-statistics/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/model/cache"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+	"exusiai.dev/backend-next/internal/repo"
 )
 
 type SiteStats struct {
