@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ansrivas/fiberprometheus/v2"
@@ -35,6 +36,8 @@ import (
 	"exusiai.dev/backend-next/internal/pkg/observability"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 )
+
+var prometheusRegisterOnce sync.Once
 
 type DevOpsApp struct {
 	*fiber.App
@@ -133,7 +136,9 @@ func CreateServiceApp(conf *config.Config) *fiber.App {
 
 	app.Use(otelfiber.Middleware("pgbackend"))
 
-	fiberprometheus.New(observability.ServiceName).RegisterAt(app, "/metrics")
+	prometheusRegisterOnce.Do(func() {
+		fiberprometheus.New(observability.ServiceName).RegisterAt(app, "/metrics")
+	})
 
 	if conf.DevMode {
 		log.Info().
