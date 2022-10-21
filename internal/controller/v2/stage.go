@@ -6,12 +6,12 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/model/cache"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
-	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
-	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
-	"github.com/penguin-statistics/backend-next/internal/server/svr"
-	"github.com/penguin-statistics/backend-next/internal/service"
+	"exusiai.dev/backend-next/internal/model/cache"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+	"exusiai.dev/backend-next/internal/pkg/cachectrl"
+	"exusiai.dev/backend-next/internal/pkg/middlewares"
+	"exusiai.dev/backend-next/internal/server/svr"
+	"exusiai.dev/backend-next/internal/service"
 )
 
 var _ modelv2.Stage

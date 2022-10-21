@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/model/cache"
-	"github.com/penguin-statistics/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model/cache"
+	"exusiai.dev/backend-next/internal/repo"
 )
 
 type Notice struct {

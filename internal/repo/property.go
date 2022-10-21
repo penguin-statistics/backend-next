@@ -7,8 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
 )
 
 type Property struct {
@@ -23,6 +23,7 @@ func (c *Property) GetProperties(ctx context.Context) ([]*model.Property, error)
 	var properties []*model.Property
 	err := c.db.NewSelect().
 		Model(&properties).
+		Order("property_id ASC").
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {

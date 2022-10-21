@@ -9,10 +9,10 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
-	"github.com/penguin-statistics/backend-next/internal/pkg/cache"
-	"github.com/penguin-statistics/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/model"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+	"exusiai.dev/backend-next/internal/pkg/cache"
+	"exusiai.dev/backend-next/internal/repo"
 )
 
 type Flusher func() error

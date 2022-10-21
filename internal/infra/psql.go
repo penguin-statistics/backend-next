@@ -12,7 +12,7 @@ import (
 	"github.com/uptrace/bun/extra/bundebug"
 	"github.com/uptrace/bun/extra/bunotel"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/config"
 )
 
 func Postgres(conf *config.Config) (*bun.DB, error) {

@@ -7,9 +7,9 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/penguin-statistics/backend-next/internal/model/types"
-	"github.com/penguin-statistics/backend-next/internal/pkg/testentry"
-	"github.com/penguin-statistics/backend-next/internal/service"
+	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/testentry"
+	"exusiai.dev/backend-next/internal/service"
 )
 
 func TestPipelineMergeDropsAndMapDropTypes(t *testing.T) {

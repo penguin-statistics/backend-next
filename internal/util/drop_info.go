@@ -3,7 +3,7 @@ package util
 import (
 	"github.com/ahmetb/go-linq/v3"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model"
 )
 
 func GetStageIdItemIdMapFromDropInfos(dropInfos []*model.DropInfo) map[int][]int {

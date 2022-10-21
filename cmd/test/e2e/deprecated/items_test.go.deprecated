@@ -8,8 +8,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/penguin-statistics/backend-next/cmd/test/comparator"
-	"github.com/penguin-statistics/backend-next/internal/pkg/testentry"
+	"exusiai.dev/backend-next/cmd/test/comparator"
+	"exusiai.dev/backend-next/internal/pkg/testentry"
 )
 
 func TestV2Items(t *testing.T) {

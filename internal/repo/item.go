@@ -7,10 +7,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/constant"
-	"github.com/penguin-statistics/backend-next/internal/model"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/model"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/gommon/constant"
 )
 
 type Item struct {
@@ -25,6 +25,7 @@ func (c *Item) GetItems(ctx context.Context) ([]*model.Item, error) {
 	var items []*model.Item
 	err := c.DB.NewSelect().
 		Model(&items).
+		Order("item_id ASC").
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -73,6 +74,7 @@ func (c *Item) GetShimItems(ctx context.Context) ([]*modelv2.Item, error) {
 
 	err := c.DB.NewSelect().
 		Model(&items).
+		Order("item_id ASC").
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -121,6 +123,7 @@ func (c *Item) GetRecruitTagItems(ctx context.Context) ([]*model.Item, error) {
 	err := c.DB.NewSelect().
 		Model(&items).
 		Where("type = ?", constant.RecruitItemType).
+		Order("item_id ASC").
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {

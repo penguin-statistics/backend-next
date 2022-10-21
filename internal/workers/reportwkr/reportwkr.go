@@ -20,16 +20,16 @@ import (
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/constant"
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/model/types"
-	"github.com/penguin-statistics/backend-next/internal/pkg/jetstream"
-	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
-	"github.com/penguin-statistics/backend-next/internal/repo"
-	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/util/reportutil"
-	"github.com/penguin-statistics/backend-next/internal/util/reportverifs"
+	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/jetstream"
+	"exusiai.dev/backend-next/internal/pkg/observability"
+	"exusiai.dev/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/service"
+	"exusiai.dev/backend-next/internal/util/reportutil"
+	"exusiai.dev/backend-next/internal/util/reportverifs"
+	"exusiai.dev/gommon/constant"
 )
 
 var tracer = otel.Tracer("reportwkr")

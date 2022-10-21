@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/appentry"
+	"exusiai.dev/backend-next/internal/appentry"
 )
 
 func Populate(t zerolog.TestingLog, targets ...any) {

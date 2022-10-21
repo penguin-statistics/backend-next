@@ -14,16 +14,16 @@ import (
 	"github.com/zeebo/xxh3"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/constant"
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/model/cache"
-	"github.com/penguin-statistics/backend-next/internal/model/gamedata"
-	"github.com/penguin-statistics/backend-next/internal/model/types"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
-	"github.com/penguin-statistics/backend-next/internal/repo"
-	"github.com/penguin-statistics/backend-next/internal/server/svr"
-	"github.com/penguin-statistics/backend-next/internal/service"
-	"github.com/penguin-statistics/backend-next/internal/util/rekuest"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model/cache"
+	"exusiai.dev/backend-next/internal/model/gamedata"
+	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/server/svr"
+	"exusiai.dev/backend-next/internal/service"
+	"exusiai.dev/backend-next/internal/util/rekuest"
+	"exusiai.dev/gommon/constant"
 )
 
 type AdminController struct {
@@ -244,7 +244,7 @@ func (c *AdminController) PurgeCache(ctx *fiber.Ctx) error {
 		lo.Map(request.Pairs, func(pair types.PurgeCachePair, _ int) error {
 			err := cache.Delete(pair.Name, pair.Key)
 			if err != nil {
-				return errors.Wrapf(err, "cache [%s:%s]", pair.Name, pair.Key)
+				return errors.Wrapf(err, "cache [%s:%s]", pair.Name, pair.Key.String)
 			}
 			return nil
 		}),

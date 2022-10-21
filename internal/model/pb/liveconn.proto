@@ -2,7 +2,7 @@ syntax = "proto3";
 
 import "shared.proto";
 
-option go_package = "github.com/penguin-statistics/backend-next/internal/model/pb";
+option go_package = "exusiai.dev/backend-next/internal/model/pb";
 
 service ConnectedLiveService {
     rpc PushReportBatch(ReportBatchRequest) returns (ReportBatchACK) {}

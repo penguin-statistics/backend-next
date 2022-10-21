@@ -3,7 +3,7 @@ package service
 import (
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/appentry"
+	"exusiai.dev/backend-next/internal/appentry"
 )
 
 func Bootstrap() {

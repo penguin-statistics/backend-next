@@ -7,8 +7,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
 )
 
 const (
@@ -44,6 +44,7 @@ func (s *RejectRule) GetAllActiveRejectRules(ctx context.Context) ([]*model.Reje
 	err := s.DB.NewSelect().
 		Model(&rejectRule).
 		Where("status = ?", RejectRuleActiveStatus).
+		Order("rule_id ASC").
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {

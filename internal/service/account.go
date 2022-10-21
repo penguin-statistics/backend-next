@@ -6,12 +6,12 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/model/cache"
-	"github.com/penguin-statistics/backend-next/internal/pkg/flog"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
-	"github.com/penguin-statistics/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model/cache"
+	"exusiai.dev/backend-next/internal/pkg/flog"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/pkg/pgid"
+	"exusiai.dev/backend-next/internal/repo"
 )
 
 type Account struct {

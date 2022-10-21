@@ -4,8 +4,8 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/swagger"
 
-	"github.com/penguin-statistics/backend-next/docs"
-	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
+	"exusiai.dev/backend-next/docs"
+	"exusiai.dev/backend-next/internal/pkg/bininfo"
 )
 
 func RegisterSwagger(app *fiber.App) {

@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/config"
 )
 
 type Crypto struct {

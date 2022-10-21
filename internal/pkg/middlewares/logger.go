@@ -6,7 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 
-	"github.com/penguin-statistics/backend-next/internal/pkg/flog"
+	"exusiai.dev/backend-next/internal/pkg/flog"
 )
 
 func Logger(app *fiber.App) {

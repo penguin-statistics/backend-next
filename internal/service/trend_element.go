@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/repo"
 )
 
 type TrendElement struct {

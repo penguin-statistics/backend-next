@@ -3,7 +3,7 @@ package gameday
 import (
 	"time"
 
-	"github.com/penguin-statistics/backend-next/internal/constant"
+	"exusiai.dev/gommon/constant"
 )
 
 func StartTime(server string, t time.Time) time.Time {

@@ -5,8 +5,8 @@ import (
 
 	"github.com/oschwald/geoip2-golang"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/pkg/geoip"
+	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/pkg/geoip"
 )
 
 func GeoIPDatabase(conf *config.Config) (*geoip2.Reader, error) {

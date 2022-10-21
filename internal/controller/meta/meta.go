@@ -7,10 +7,10 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cache"
 	"go.uber.org/fx"
 
-	"github.com/penguin-statistics/backend-next/internal/constant"
-	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
-	"github.com/penguin-statistics/backend-next/internal/server/svr"
-	"github.com/penguin-statistics/backend-next/internal/service"
+	"exusiai.dev/backend-next/internal/pkg/bininfo"
+	"exusiai.dev/backend-next/internal/server/svr"
+	"exusiai.dev/backend-next/internal/service"
+	"exusiai.dev/gommon/constant"
 )
 
 type Meta struct {

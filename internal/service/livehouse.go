@@ -8,12 +8,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/constant"
-	"github.com/penguin-statistics/backend-next/internal/model/pb"
-	"github.com/penguin-statistics/backend-next/internal/model/types"
-	"github.com/penguin-statistics/backend-next/internal/pkg/dstructs"
-	"github.com/penguin-statistics/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/model/pb"
+	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/dstructs"
+	"exusiai.dev/backend-next/internal/repo"
+	"exusiai.dev/gommon/constant"
 )
 
 type LiveHouse struct {

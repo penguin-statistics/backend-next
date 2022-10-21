@@ -5,8 +5,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/model/pb"
+	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/model/pb"
 )
 
 func LiveHouse(conf *config.Config) (pb.ConnectedLiveServiceClient, error) {

@@ -6,11 +6,11 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
-	"github.com/penguin-statistics/backend-next/internal/pkg/cachectrl"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
-	"github.com/penguin-statistics/backend-next/internal/server/svr"
-	"github.com/penguin-statistics/backend-next/internal/service"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+	"exusiai.dev/backend-next/internal/pkg/cachectrl"
+	"exusiai.dev/backend-next/internal/pkg/pgid"
+	"exusiai.dev/backend-next/internal/server/svr"
+	"exusiai.dev/backend-next/internal/service"
 )
 
 type Account struct {

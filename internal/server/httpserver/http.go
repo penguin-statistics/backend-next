@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ansrivas/fiberprometheus/v2"
@@ -29,12 +30,14 @@ import (
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
-	"github.com/penguin-statistics/backend-next/internal/pkg/bininfo"
-	"github.com/penguin-statistics/backend-next/internal/pkg/middlewares"
-	"github.com/penguin-statistics/backend-next/internal/pkg/observability"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/pkg/bininfo"
+	"exusiai.dev/backend-next/internal/pkg/middlewares"
+	"exusiai.dev/backend-next/internal/pkg/observability"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
 )
+
+var prometheusRegisterOnce sync.Once
 
 type DevOpsApp struct {
 	*fiber.App
@@ -133,7 +136,9 @@ func CreateServiceApp(conf *config.Config) *fiber.App {
 
 	app.Use(otelfiber.Middleware("pgbackend"))
 
-	fiberprometheus.New(observability.ServiceName).RegisterAt(app, "/metrics")
+	prometheusRegisterOnce.Do(func() {
+		fiberprometheus.New(observability.ServiceName).RegisterAt(app, "/metrics")
+	})
 
 	if conf.DevMode {
 		log.Info().

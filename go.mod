@@ -1,4 +1,4 @@
-module github.com/penguin-statistics/backend-next
+module exusiai.dev/backend-next
 
 go 1.19
 
@@ -59,6 +59,7 @@ require (
 )
 
 require (
+	exusiai.dev/gommon v0.0.4 // indirect
 	github.com/DataDog/datadog-go/v5 v5.0.2 // indirect
 	github.com/DataDog/gostackparse v0.5.0 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect

@@ -6,10 +6,10 @@ import (
 
 	"github.com/tidwall/gjson"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/model/cache"
-	modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
-	"github.com/penguin-statistics/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model/cache"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+	"exusiai.dev/backend-next/internal/repo"
 )
 
 type Zone struct {

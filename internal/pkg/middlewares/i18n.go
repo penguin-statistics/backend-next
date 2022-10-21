@@ -7,7 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/text/language"
 
-	"github.com/penguin-statistics/backend-next/internal/util/i18n"
+	"exusiai.dev/backend-next/internal/util/i18n"
 )
 
 func InjectI18n() func(c *fiber.Ctx) error {

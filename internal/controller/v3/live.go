@@ -3,7 +3,7 @@ package v3
 import (
 	"github.com/gofiber/fiber/v2"
 
-	"github.com/penguin-statistics/backend-next/internal/server/svr"
+	"exusiai.dev/backend-next/internal/server/svr"
 )
 
 type LiveController struct{}

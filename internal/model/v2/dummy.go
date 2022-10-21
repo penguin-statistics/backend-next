@@ -8,7 +8,7 @@ package v2
 //
 // The intended way to use this is:
 //
-//     import modelv2 "github.com/penguin-statistics/backend-next/internal/model/v2"
-//     // then, reference the Dummy type to make Go compiler happy as we want to keep our import alias intact
-//     var _ modelv2.Dummy
+//	import modelv2 "exusiai.dev/backend-next/internal/model/v2"
+//	// then, reference the Dummy type to make Go compiler happy as we want to keep our import alias intact
+//	var _ modelv2.Dummy
 type Dummy struct{}

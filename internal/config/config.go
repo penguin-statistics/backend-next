@@ -11,7 +11,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 	"github.com/rs/zerolog/log"
 
-	"github.com/penguin-statistics/backend-next/internal/pkg/projectpath"
+	"exusiai.dev/backend-next/internal/pkg/projectpath"
 )
 
 type Config struct {
@@ -149,7 +149,7 @@ func Parse() (*Config, error) {
 	err = envconfig.Process("penguin_v3", &config)
 	if err != nil {
 		_ = envconfig.Usage("penguin_v3", &config)
-		return nil, fmt.Errorf("failed to parse configuration: %w. More info on how to configure this backend is located at https://pkg.go.dev/github.com/penguin-statistics/backend-next/internal/config#Config", err)
+		return nil, fmt.Errorf("failed to parse configuration: %w. More info on how to configure this backend is located at https://pkg.go.dev/exusiai.dev/backend-next/internal/config#Config", err)
 	}
 
 	return &config, nil

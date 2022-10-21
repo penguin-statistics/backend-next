@@ -7,7 +7,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/rs/zerolog/log"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/config"
 )
 
 func Redis(conf *config.Config) (*redis.Client, error) {

@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog/pkgerrors"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"github.com/penguin-statistics/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/config"
 )
 
 func Configure(conf *config.Config) {

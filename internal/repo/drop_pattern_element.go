@@ -7,9 +7,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/model/types"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
 )
 
 type DropPatternElement struct {

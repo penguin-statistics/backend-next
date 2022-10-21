@@ -12,8 +12,8 @@ import (
 	"github.com/uptrace/bun"
 	"github.com/vmihailenco/msgpack/v5"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/pkg/testentry"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/pkg/testentry"
 )
 
 func BenchmarkJsonOrGobOrMsgpackEncoding(b *testing.B) {

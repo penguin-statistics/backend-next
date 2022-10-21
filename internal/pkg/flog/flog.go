@@ -10,8 +10,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgid"
-	"github.com/penguin-statistics/backend-next/internal/util"
+	"exusiai.dev/backend-next/internal/pkg/pgid"
+	"exusiai.dev/backend-next/internal/util"
 )
 
 // FromFiberCtx gets the logger in the request's context.

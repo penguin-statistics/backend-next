@@ -12,9 +12,9 @@ import (
 	"github.com/uptrace/bun"
 	"github.com/zeebo/xxh3"
 
-	"github.com/penguin-statistics/backend-next/internal/model"
-	"github.com/penguin-statistics/backend-next/internal/model/types"
-	"github.com/penguin-statistics/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
 )
 
 type DropPattern struct {

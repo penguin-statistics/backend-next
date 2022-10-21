@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/penguin-statistics/backend-next/internal/pkg/testentry"
-	"github.com/penguin-statistics/backend-next/internal/service"
+	"exusiai.dev/backend-next/internal/pkg/testentry"
+	"exusiai.dev/backend-next/internal/service"
 )
 
 func TestAccounts(t *testing.T) {

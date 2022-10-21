@@ -1,3 +1,0 @@
-package constant
-
-const CacheSep = "|"

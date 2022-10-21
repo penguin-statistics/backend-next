@@ -1,7 +1,7 @@
 package gamedata
 
 import (
-	"github.com/penguin-statistics/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model"
 )
 
 type RenderedObjects struct {
