@@ -17,7 +17,7 @@ require (
 	github.com/go-redsync/redsync/v4 v4.6.0
 	github.com/goccy/go-json v0.9.11
 	github.com/gofiber/contrib/fibersentry v0.0.0-20221014214022-052aa9ddca30
-	github.com/gofiber/contrib/otelfiber v0.0.0-20221014214022-052aa9ddca30
+	github.com/gofiber/contrib/otelfiber v0.0.0-20221020220652-4b53fd7edccb
 	github.com/gofiber/fiber/v2 v2.38.1
 	github.com/gofiber/helmet/v2 v2.2.17
 	github.com/gofiber/swagger v0.1.6
@@ -53,15 +53,21 @@ require (
 	golang.org/x/text v0.4.0
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
+	gopkg.in/DataDog/dd-trace-go.v1 v1.43.0
 	gopkg.in/guregu/null.v3 v3.5.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
 require (
+	github.com/DataDog/datadog-go/v5 v5.0.2 // indirect
+	github.com/DataDog/gostackparse v0.5.0 // indirect
+	github.com/Microsoft/go-winio v0.5.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/gofiber/adaptor/v2 v2.1.25 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/google/pprof v0.0.0-20210423192551-a2663126120b // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -70,7 +76,7 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/swaggo/files v0.0.0-20220728132757-551d4a08d97a // indirect
-	go.opentelemetry.io/contrib v1.11.0 // indirect
+	go.opentelemetry.io/contrib v1.11.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.11.1 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	google.golang.org/genproto v0.0.0-20211118181313-81c1377c94b1 // indirect

@@ -76,6 +76,12 @@ type Config struct {
 	// LiveHouseGRPCAddress is the address of the LiveHouse gRPC server.
 	LiveHouseGRPCAddress string `split_words:"true" default:"localhost:9015"`
 
+	// DatadogProfilerEnabled to indicate whether to enable Datadog profiler.
+	DatadogProfilerEnabled bool `split_words:"true" default:"false"`
+
+	// DatadogProfilerAgentAddress is the address of the Datadog profiler agent.
+	DatadogProfilerAgentAddress string `split_words:"true" default:"localhost:8126"`
+
 	// RecognitionEncryptionPrivateKey is the private key used to decrypt the recognition data.
 	// Normal contributors should not need to change this: when left empty, recognition report is simply disabled.
 	RecognitionEncryptionPrivateKey []byte `split_words:"true"`

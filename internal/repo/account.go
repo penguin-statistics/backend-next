@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -28,6 +29,7 @@ func (c *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.
 	for i := 0; i < AccountMaxRetries; i++ {
 		account := &model.Account{
 			PenguinID: pgid.New(),
+			CreatedAt: time.Now(),
 		}
 
 		_, err := c.db.NewInsert().

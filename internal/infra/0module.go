@@ -10,5 +10,5 @@ func Module() fx.Option {
 		Postgres,
 		LiveHouse,
 		GeoIPDatabase,
-	))
+	), fx.Invoke(Datadog))
 }
