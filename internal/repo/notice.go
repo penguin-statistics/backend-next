@@ -22,6 +22,7 @@ func (c *Notice) GetNotices(ctx context.Context) ([]*model.Notice, error) {
 	var notice []*model.Notice
 	err := c.DB.NewSelect().
 		Model(&notice).
+		Order("notice_id ASC").
 		Scan(ctx)
 
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {

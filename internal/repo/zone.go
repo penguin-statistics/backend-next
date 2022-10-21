@@ -24,6 +24,7 @@ func (c *Zone) GetZones(ctx context.Context) ([]*model.Zone, error) {
 	var zones []*model.Zone
 	err := c.db.NewSelect().
 		Model(&zones).
+		Order("zone_id ASC").
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -78,6 +79,7 @@ func (c *Zone) GetShimZones(ctx context.Context) ([]*modelv2.Zone, error) {
 			// see https://github.com/go-pg/pg/issues/1315
 			return q.Column("ark_stage_id", "zone_id")
 		}).
+		Order("zone_id ASC").
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {

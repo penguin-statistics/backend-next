@@ -44,6 +44,7 @@ func (s *RejectRule) GetAllActiveRejectRules(ctx context.Context) ([]*model.Reje
 	err := s.DB.NewSelect().
 		Model(&rejectRule).
 		Where("status = ?", RejectRuleActiveStatus).
+		Order("rule_id ASC").
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {

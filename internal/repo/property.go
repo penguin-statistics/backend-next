@@ -23,6 +23,7 @@ func (c *Property) GetProperties(ctx context.Context) ([]*model.Property, error)
 	var properties []*model.Property
 	err := c.db.NewSelect().
 		Model(&properties).
+		Order("property_id ASC").
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {

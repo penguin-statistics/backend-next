@@ -25,6 +25,7 @@ func (c *Item) GetItems(ctx context.Context) ([]*model.Item, error) {
 	var items []*model.Item
 	err := c.DB.NewSelect().
 		Model(&items).
+		Order("item_id ASC").
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -73,6 +74,7 @@ func (c *Item) GetShimItems(ctx context.Context) ([]*modelv2.Item, error) {
 
 	err := c.DB.NewSelect().
 		Model(&items).
+		Order("item_id ASC").
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {
@@ -121,6 +123,7 @@ func (c *Item) GetRecruitTagItems(ctx context.Context) ([]*model.Item, error) {
 	err := c.DB.NewSelect().
 		Model(&items).
 		Where("type = ?", constant.RecruitItemType).
+		Order("item_id ASC").
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {

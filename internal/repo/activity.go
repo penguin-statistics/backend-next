@@ -22,6 +22,7 @@ func (c *Activity) GetActivities(ctx context.Context) ([]*model.Activity, error)
 	var activities []*model.Activity
 	err := c.DB.NewSelect().
 		Model(&activities).
+		Order("activity_id ASC").
 		Scan(ctx)
 
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
