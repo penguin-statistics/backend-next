@@ -27,6 +27,7 @@ func Fx() fxevent.Logger {
 }
 
 func (l fxLogger) Write(p []byte) (n int, err error) {
+	// from https://github.com/rs/zerolog/blob/a9a8199d2dd3578d37e459618515f34b5e917f8d/log.go#L435-L441
 	n = len(p)
 	if n > 0 && p[n-1] == '\n' {
 		// Trim CR added by stdlog.
