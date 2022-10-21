@@ -244,7 +244,7 @@ func (c *AdminController) PurgeCache(ctx *fiber.Ctx) error {
 		lo.Map(request.Pairs, func(pair types.PurgeCachePair, _ int) error {
 			err := cache.Delete(pair.Name, pair.Key)
 			if err != nil {
-				return errors.Wrapf(err, "cache [%s:%s]", pair.Name, pair.Key)
+				return errors.Wrapf(err, "cache [%s:%s]", pair.Name, pair.Key.String)
 			}
 			return nil
 		}),
