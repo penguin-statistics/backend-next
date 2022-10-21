@@ -6,9 +6,9 @@ import (
 
 	"github.com/goccy/go-json"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/repo"
+	"exusiai.dev/gommon/constant"
 )
 
 type FrontendConfig struct {

@@ -9,9 +9,9 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/vmihailenco/msgpack/v5"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/util/rekuest"
+	"exusiai.dev/gommon/constant"
 )
 
 type IdempotencyConfig struct {

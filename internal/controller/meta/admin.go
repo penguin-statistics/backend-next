@@ -14,7 +14,6 @@ import (
 	"github.com/zeebo/xxh3"
 	"go.uber.org/fx"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/model/gamedata"
@@ -24,6 +23,7 @@ import (
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
 	"exusiai.dev/backend-next/internal/util/rekuest"
+	"exusiai.dev/gommon/constant"
 )
 
 type AdminController struct {

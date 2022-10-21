@@ -9,11 +9,11 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"exusiai.dev/backend-next/internal/config"
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/model/pb"
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/pkg/dstructs"
 	"exusiai.dev/backend-next/internal/repo"
+	"exusiai.dev/gommon/constant"
 )
 
 type LiveHouse struct {

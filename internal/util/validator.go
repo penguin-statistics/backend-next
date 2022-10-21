@@ -8,7 +8,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/guregu/null.v3"
 
-	"exusiai.dev/backend-next/internal/constant"
+	"exusiai.dev/gommon/constant"
 )
 
 var (

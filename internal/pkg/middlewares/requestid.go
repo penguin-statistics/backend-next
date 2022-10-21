@@ -3,8 +3,8 @@ package middlewares
 import (
 	"github.com/gofiber/fiber/v2"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/pkg/flog"
+	"exusiai.dev/gommon/constant"
 )
 
 func RequestID() fiber.Handler {

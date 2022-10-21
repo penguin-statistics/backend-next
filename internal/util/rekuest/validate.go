@@ -12,10 +12,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/util"
 	"exusiai.dev/backend-next/internal/util/i18n"
+	"exusiai.dev/gommon/constant"
 )
 
 var Validate = util.NewValidator()

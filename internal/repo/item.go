@@ -7,10 +7,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/model"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/gommon/constant"
 )
 
 type Item struct {

@@ -6,11 +6,11 @@ import (
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/uptrace/bun"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/model/gamedata"
 	"exusiai.dev/backend-next/internal/repo"
+	"exusiai.dev/gommon/constant"
 )
 
 type Admin struct {

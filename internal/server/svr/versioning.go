@@ -8,8 +8,8 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"exusiai.dev/backend-next/internal/config"
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/gommon/constant"
 )
 
 type V2 struct {

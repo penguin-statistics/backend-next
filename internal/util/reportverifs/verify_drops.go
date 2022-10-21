@@ -9,10 +9,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/repo"
+	"exusiai.dev/gommon/constant"
 )
 
 var (

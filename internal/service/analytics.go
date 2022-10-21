@@ -6,9 +6,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"exusiai.dev/backend-next/internal/constant"
 	v2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/repo"
+	"exusiai.dev/gommon/constant"
 )
 
 type Analytics struct {

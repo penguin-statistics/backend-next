@@ -10,9 +10,9 @@ import (
 	"github.com/rs/zerolog/log"
 	"golang.org/x/mod/semver"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/repo"
+	"exusiai.dev/gommon/constant"
 )
 
 var ErrExprMatched = errors.New("reject expr matched")

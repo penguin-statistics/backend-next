@@ -10,7 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 
-	"exusiai.dev/backend-next/internal/constant"
+	"exusiai.dev/gommon/constant"
 	"exusiai.dev/backend-next/internal/pkg/testentry"
 )
 

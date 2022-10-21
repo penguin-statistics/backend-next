@@ -3,8 +3,8 @@ package middlewares
 import (
 	"github.com/gofiber/fiber/v2"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/util/rekuest"
+	"exusiai.dev/gommon/constant"
 )
 
 func ValidateServerAsParam(c *fiber.Ctx) error {

@@ -13,7 +13,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/pkg/pgid"
@@ -21,6 +20,7 @@ import (
 	"exusiai.dev/backend-next/internal/util"
 	"exusiai.dev/backend-next/internal/util/reportutil"
 	"exusiai.dev/backend-next/internal/util/reportverifs"
+	"exusiai.dev/gommon/constant"
 )
 
 var (

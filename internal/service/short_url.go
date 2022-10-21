@@ -6,8 +6,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/util"
+	"exusiai.dev/gommon/constant"
 )
 
 type ShortURL struct {

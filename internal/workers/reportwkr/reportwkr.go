@@ -21,7 +21,6 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/config"
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/pkg/jetstream"
@@ -30,6 +29,7 @@ import (
 	"exusiai.dev/backend-next/internal/service"
 	"exusiai.dev/backend-next/internal/util/reportutil"
 	"exusiai.dev/backend-next/internal/util/reportverifs"
+	"exusiai.dev/gommon/constant"
 )
 
 var tracer = otel.Tracer("reportwkr")

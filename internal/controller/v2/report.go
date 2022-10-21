@@ -11,7 +11,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/model/types"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/crypto"
@@ -22,6 +21,7 @@ import (
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
 	"exusiai.dev/backend-next/internal/util/rekuest"
+	"exusiai.dev/gommon/constant"
 )
 
 type Report struct {

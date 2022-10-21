@@ -11,12 +11,12 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/async"
 	"exusiai.dev/backend-next/internal/util"
+	"exusiai.dev/gommon/constant"
 )
 
 /*

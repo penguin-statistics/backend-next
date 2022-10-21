@@ -10,11 +10,11 @@ import (
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/model"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/gameday"
 	"exusiai.dev/backend-next/internal/pkg/pgqry"
+	"exusiai.dev/gommon/constant"
 )
 
 type DropReport struct {

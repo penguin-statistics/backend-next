@@ -8,7 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 
-	"exusiai.dev/backend-next/internal/constant"
+	"exusiai.dev/gommon/constant"
 )
 
 func EnrichSentry() func(ctx *fiber.Ctx) error {

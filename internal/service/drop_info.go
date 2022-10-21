@@ -8,10 +8,10 @@ import (
 	"github.com/ahmetb/go-linq/v3"
 	"gopkg.in/guregu/null.v3"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/repo"
+	"exusiai.dev/gommon/constant"
 )
 
 type DropInfo struct {

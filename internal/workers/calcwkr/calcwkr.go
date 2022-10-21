@@ -12,8 +12,8 @@ import (
 	"go.uber.org/fx"
 
 	"exusiai.dev/backend-next/internal/config"
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/service"
+	"exusiai.dev/gommon/constant"
 )
 
 type WorkerDeps struct {

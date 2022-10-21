@@ -7,13 +7,13 @@ import (
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
-	"exusiai.dev/backend-next/internal/constant"
 	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/cachectrl"
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
+	"exusiai.dev/gommon/constant"
 )
 
 var _ modelv2.Dummy
