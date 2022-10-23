@@ -3,6 +3,7 @@ module exusiai.dev/backend-next
 go 1.19
 
 require (
+	exusiai.dev/gommon v0.0.4
 	github.com/ahmetb/go-linq/v3 v3.2.0
 	github.com/ansrivas/fiberprometheus/v2 v2.4.1
 	github.com/antonmedv/expr v1.9.0
@@ -18,7 +19,7 @@ require (
 	github.com/goccy/go-json v0.9.11
 	github.com/gofiber/contrib/fibersentry v0.0.0-20221020220652-4b53fd7edccb
 	github.com/gofiber/contrib/otelfiber v0.0.0-20221020220652-4b53fd7edccb
-	github.com/gofiber/fiber/v2 v2.38.1
+	github.com/gofiber/fiber/v2 v2.39.0
 	github.com/gofiber/helmet/v2 v2.2.17
 	github.com/gofiber/swagger v0.1.6
 	github.com/jinzhu/copier v0.3.5
@@ -59,7 +60,6 @@ require (
 )
 
 require (
-	exusiai.dev/gommon v0.0.4 // indirect
 	github.com/DataDog/datadog-go/v5 v5.0.2 // indirect
 	github.com/DataDog/gostackparse v0.5.0 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
@@ -72,10 +72,12 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
+	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/swaggo/files v0.0.0-20220728132757-551d4a08d97a // indirect
 	go.opentelemetry.io/contrib v1.11.1 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.11.1 // indirect
