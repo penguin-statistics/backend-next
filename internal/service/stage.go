@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/tidwall/gjson"
 	"gopkg.in/guregu/null.v3"
@@ -13,7 +14,6 @@ import (
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/repo"
-	"exusiai.dev/gommon/constant"
 )
 
 type Stage struct {
@@ -88,6 +88,18 @@ func (s *Stage) GetShimStages(ctx context.Context, server string) ([]*modelv2.St
 	}
 	cache.ShimStages.Set(server, stages, time.Minute*5)
 	cache.LastModifiedTime.Set("[shimStages#server:"+server+"]", time.Now(), 0)
+	return stages, nil
+}
+
+// Not Cached
+func (s *Stage) GetShimStagesForFakeTime(ctx context.Context, server string, t time.Time) ([]*modelv2.Stage, error) {
+	stages, err := s.StageRepo.GetShimStagesForFakeTime(ctx, server, t)
+	if err != nil {
+		return nil, err
+	}
+	for _, i := range stages {
+		s.applyShim(i)
+	}
 	return stages, nil
 }
 

@@ -6,7 +6,9 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gofiber/fiber/v2"
 	"github.com/pkg/errors"
@@ -23,7 +25,6 @@ import (
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
 	"exusiai.dev/backend-next/internal/util/rekuest"
-	"exusiai.dev/gommon/constant"
 )
 
 type AdminController struct {
@@ -33,6 +34,7 @@ type AdminController struct {
 	PatternElementRepo   *repo.DropPatternElement
 	AdminService         *service.Admin
 	ItemService          *service.Item
+	StageService         *service.Stage
 	DropMatrixService    *service.DropMatrix
 	PatternMatrixService *service.PatternMatrix
 	TrendService         *service.Trend
@@ -46,6 +48,7 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Post("/purge", c.PurgeCache)
 
 	admin.Get("/cli/gamedata/seed", c.GetCliGameDataSeed)
+	admin.Get("/internal/time-faked/stages", c.GetFakeTimeStages)
 	admin.Get("/_temp/pattern/merging", c.FindPatterns)
 	admin.Get("/_temp/pattern/disambiguation", c.DisambiguatePatterns)
 
@@ -219,6 +222,35 @@ func (c AdminController) GetCliGameDataSeed(ctx *fiber.Ctx) error {
 	return ctx.JSON(CliGameDataSeedResponse{
 		Items: items,
 	})
+}
+
+func (c AdminController) GetFakeTimeStages(ctx *fiber.Ctx) error {
+	server := ctx.Query("server", "CN")
+	fakeTimeStr := ctx.Query("fakeTime")
+
+	if err := rekuest.ValidServer(ctx, server); err != nil {
+		return err
+	}
+
+	if fakeTimeStr == "" {
+		return pgerr.ErrInvalidReq.Msg("fakeTime is required")
+	} else if len(fakeTimeStr) > 32 {
+		return pgerr.ErrInvalidReq.Msg("fakeTime is too long")
+	} else if fakeTimeStr == "now" {
+		fakeTimeStr = time.Now().Format(time.RFC3339)
+	}
+
+	fakeTime, err := time.Parse(time.RFC3339, fakeTimeStr)
+	if err != nil {
+		return pgerr.ErrInvalidReq.Msg("fakeTime is invalid: " + err.Error())
+	}
+
+	stages, err := c.StageService.GetShimStagesForFakeTime(ctx.UserContext(), server, fakeTime)
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(stages)
 }
 
 func (c *AdminController) SaveRenderedObjects(ctx *fiber.Ctx) error {
