@@ -9,7 +9,6 @@ import (
 	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/cachectrl"
-	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
 )
@@ -23,8 +22,8 @@ type Zone struct {
 }
 
 func RegisterZone(v2 *svr.V2, c Zone) {
-	v2.Get("/zones", middlewares.ValidateServerAsQuery, c.GetZones)
-	v2.Get("/zones/:zoneId", middlewares.ValidateServerAsQuery, c.GetZoneByArkId)
+	v2.Get("/zones", c.GetZones)
+	v2.Get("/zones/:zoneId", c.GetZoneByArkId)
 }
 
 // @Summary  Get All Zones

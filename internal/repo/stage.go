@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
@@ -13,7 +14,6 @@ import (
 	"exusiai.dev/backend-next/internal/model"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
-	"exusiai.dev/gommon/constant"
 )
 
 type Stage struct {
@@ -72,11 +72,9 @@ func (c *Stage) GetStageByArkId(ctx context.Context, arkStageId string) (*model.
 	return &stage, nil
 }
 
-func (c *Stage) GetShimStages(ctx context.Context, server string) ([]*modelv2.Stage, error) {
-	var stages []*modelv2.Stage
-
-	err := c.db.NewSelect().
-		Model(&stages).
+func (c *Stage) shimStageQuery(ctx context.Context, server string, stages *[]*modelv2.Stage, t time.Time) error {
+	return c.db.NewSelect().
+		Model(stages).
 		Relation("Zone", func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.Column("ark_zone_id")
 		}).
@@ -89,12 +87,32 @@ func (c *Stage) GetShimStages(ctx context.Context, server string) ([]*modelv2.St
 					return sq.Column("ark_stage_id")
 				}).
 				Relation("TimeRange", func(sq *bun.SelectQuery) *bun.SelectQuery {
-					return sq.Where("start_time <= ? AND end_time > ?", time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339))
+					return sq.Where("start_time <= ? AND end_time > ?", t.Format(time.RFC3339), t.Format(time.RFC3339))
 				}).
 				Where("drop_info.server = ?", server)
 		}).
 		Order("stage_id ASC").
 		Scan(ctx)
+}
+
+func (c *Stage) GetShimStages(ctx context.Context, server string) ([]*modelv2.Stage, error) {
+	var stages []*modelv2.Stage
+
+	err := c.shimStageQuery(ctx, server, &stages, time.Now())
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, pgerr.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return stages, nil
+}
+
+func (c *Stage) GetShimStagesForFakeTime(ctx context.Context, server string, fakeTime time.Time) ([]*modelv2.Stage, error) {
+	var stages []*modelv2.Stage
+
+	err := c.shimStageQuery(ctx, server, &stages, fakeTime)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, pgerr.ErrNotFound
