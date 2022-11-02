@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/gofiber/fiber/v2"
 	cachemiddleware "github.com/gofiber/fiber/v2/middleware/cache"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
@@ -17,12 +18,12 @@ import (
 	"exusiai.dev/backend-next/internal/model/types"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/cachectrl"
+	"exusiai.dev/backend-next/internal/pkg/flog"
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
 	"exusiai.dev/backend-next/internal/util/rekuest"
-	"exusiai.dev/gommon/constant"
 )
 
 // ErrIntervalLengthTooSmall is returned when the interval length is invalid
@@ -99,7 +100,7 @@ func RegisterResult(v2 *svr.V2, c Result) {
 // @Produce   json
 // @Param     server             query     string                         true   "Server; default to CN"  Enums(CN, US, JP, KR)
 // @Param     is_personal        query     bool                           false  "Whether to query for personal drop matrix or not. If `is_personal` equals to `true`, a valid PenguinID would be required to be provided (PenguinIDAuth)"
-// @Param     show_closed_zones  query     bool                           false  "Whether to show closed stages or not"
+// @Param     show_closed_zone   query     bool                           false  "Whether to show closed stages or not"
 // @Param     stageFilter        query     []string                       false  "Comma separated list of stage IDs to filter"  collectionFormat(csv)
 // @Param     itemFilter         query     []string                       false  "Comma separated list of item IDs to filter"   collectionFormat(csv)
 // @Success   200                {object}  modelv2.DropMatrixQueryResult  "Drop Matrix response"
@@ -116,9 +117,14 @@ func (c *Result) GetDropMatrix(ctx *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	showClosedZones, err := strconv.ParseBool(ctx.Query("show_closed_zones", "false"))
+	showClosedZones, err := strconv.ParseBool(ctx.Query("show_closed_zone", "false"))
 	if err != nil {
 		return err
+	}
+	if showClosedZones {
+		flog.
+			DebugFrom(ctx, "query.result.matrix.show_closed_zone").
+			Msg("show_closed_zone is used")
 	}
 	stageFilterStr := ctx.Query("stageFilter")
 	itemFilterStr := ctx.Query("itemFilter")
