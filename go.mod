@@ -25,7 +25,7 @@ require (
 	github.com/jinzhu/copier v0.3.5
 	github.com/joho/godotenv v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/nats-io/nats.go v1.18.0
+	github.com/nats-io/nats.go v1.19.1
 	github.com/oschwald/geoip2-golang v1.8.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.13.1
