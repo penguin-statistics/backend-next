@@ -10,7 +10,7 @@ require (
 	github.com/avast/retry-go/v3 v3.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/uniuri v1.2.0
-	github.com/getsentry/sentry-go v0.14.0
+	github.com/getsentry/sentry-go v0.15.0
 	github.com/go-playground/locales v0.14.0
 	github.com/go-playground/universal-translator v0.18.0
 	github.com/go-playground/validator/v10 v10.11.1
