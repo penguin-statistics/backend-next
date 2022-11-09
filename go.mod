@@ -50,7 +50,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.11.1
 	go.uber.org/fx v1.18.1
 	golang.org/x/exp v0.0.0-20220823124025-807a23277127
-	golang.org/x/mod v0.6.0
+	golang.org/x/mod v0.7.0
 	golang.org/x/text v0.4.0
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
