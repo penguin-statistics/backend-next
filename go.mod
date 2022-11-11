@@ -20,7 +20,7 @@ require (
 	github.com/gofiber/contrib/fibersentry v0.0.0-20221107214250-45e1617922cb
 	github.com/gofiber/contrib/otelfiber v0.0.0-20221024221520-cac581acacd3
 	github.com/gofiber/fiber/v2 v2.39.0
-	github.com/gofiber/helmet/v2 v2.2.18
+	github.com/gofiber/helmet/v2 v2.2.21
 	github.com/gofiber/swagger v0.1.7
 	github.com/jinzhu/copier v0.3.5
 	github.com/joho/godotenv v1.4.0
