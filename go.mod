@@ -50,7 +50,7 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.11.1
 	go.opentelemetry.io/otel/sdk v1.11.1
 	go.uber.org/fx v1.18.1
-	golang.org/x/exp v0.0.0-20220823124025-807a23277127
+	golang.org/x/exp v0.0.0-20221114191408-850992195362
 	golang.org/x/mod v0.7.0
 	golang.org/x/text v0.4.0
 	google.golang.org/grpc v1.50.1
@@ -129,7 +129,7 @@ require (
 	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/net v0.1.0 // indirect
 	golang.org/x/sys v0.1.0 // indirect
-	golang.org/x/tools v0.1.12 // indirect
+	golang.org/x/tools v0.2.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	honnef.co/go/tools v0.1.3 // indirect
 	mellium.im/sasl v0.3.0 // indirect
