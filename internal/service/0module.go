@@ -13,6 +13,7 @@ func Module() fx.Option {
 		NewGeoIP,
 		NewTrend,
 		NewAdmin,
+		NewUpyun,
 		NewHealth,
 		NewNotice,
 		NewReport,

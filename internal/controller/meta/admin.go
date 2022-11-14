@@ -30,16 +30,18 @@ import (
 type AdminController struct {
 	fx.In
 
-	PatternRepo          *repo.DropPattern
-	PatternElementRepo   *repo.DropPatternElement
-	AdminService         *service.Admin
-	ItemService          *service.Item
-	StageService         *service.Stage
-	DropMatrixService    *service.DropMatrix
-	PatternMatrixService *service.PatternMatrix
-	TrendService         *service.Trend
-	SiteStatsService     *service.SiteStats
-	AnalyticsService     *service.Analytics
+	PatternRepo           *repo.DropPattern
+	PatternElementRepo    *repo.DropPatternElement
+	RecognitionDefectRepo *repo.RecognitionDefect
+	AdminService          *service.Admin
+	ItemService           *service.Item
+	StageService          *service.Stage
+	DropMatrixService     *service.DropMatrix
+	PatternMatrixService  *service.PatternMatrix
+	TrendService          *service.Trend
+	SiteStatsService      *service.SiteStats
+	AnalyticsService      *service.Analytics
+	UpyunService          *service.Upyun
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
@@ -58,6 +60,8 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
 	admin.Get("/refresh/trend/:server", c.RefreshAllTrendElements)
 	admin.Get("/refresh/sitestats/:server", c.RefreshAllSiteStats)
+
+	admin.Get("/recognition/defects", c.GetRecognitionDefects)
 }
 
 type CliGameDataSeedResponse struct {
@@ -321,4 +325,23 @@ func (c *AdminController) RefreshAllSiteStats(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	_, err := c.SiteStatsService.RefreshShimSiteStats(ctx.UserContext(), server)
 	return err
+}
+
+func (c *AdminController) GetRecognitionDefects(ctx *fiber.Ctx) error {
+	defects, err := c.RecognitionDefectRepo.GetDefectReports(ctx.UserContext(), 100, 0)
+	if err != nil {
+		return err
+	}
+
+	for i, defect := range defects {
+		if defect.ImageURI != "" {
+			u, err := c.UpyunService.ImageURIToSignedURL(defect.ImageURI)
+			if err != nil {
+				return err
+			}
+
+			defects[i].ImageURI = u
+		}
+	}
+	return ctx.JSON(defects)
 }

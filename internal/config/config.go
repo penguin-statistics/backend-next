@@ -82,6 +82,24 @@ type Config struct {
 	// DatadogProfilerAgentAddress is the address of the Datadog profiler agent.
 	DatadogProfilerAgentAddress string `split_words:"true" default:"localhost:8126"`
 
+	// UpyunOperatorName is the operator name of the Upyun account.
+	UpyunOperatorName string `split_words:"true"`
+
+	// UpyunOperatorPassword is the operator password of the Upyun account.
+	UpyunOperatorPassword string `split_words:"true"`
+
+	// UpyunUserContentBucket is the bucket name of user content.
+	UpyunUserContentBucket string `split_words:"true"`
+
+	// UpyunUserContentDomain is the domain name of user content.
+	UpyunUserContentDomain string `split_words:"true"`
+
+	// UpyunNotifyURLPrefix is the notify URL
+	UpyunNotifyURLPrefix string `split_words:"true"`
+
+	// UpyunUserContentSignatureSecret is the signature secret of the Upyun account.
+	UpyunUserContentSignatureSecret string `split_words:"true"`
+
 	// RecognitionEncryptionPrivateKey is the private key used to decrypt the recognition data.
 	// Normal contributors should not need to change this: when left empty, recognition report is simply disabled.
 	RecognitionEncryptionPrivateKey []byte `split_words:"true"`
