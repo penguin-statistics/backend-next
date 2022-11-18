@@ -328,7 +328,17 @@ func (c *AdminController) RefreshAllSiteStats(ctx *fiber.Ctx) error {
 }
 
 func (c *AdminController) GetRecognitionDefects(ctx *fiber.Ctx) error {
-	defects, err := c.RecognitionDefectRepo.GetDefectReports(ctx.UserContext(), 100, 0)
+	type getRecognitionDefectsRequest struct {
+		Limit int    `query:"limit"`
+		Skip  int    `query:"skip"`
+		After string `query:"after"`
+	}
+	var request getRecognitionDefectsRequest
+	if err := rekuest.ValidQuery(ctx, &request); err != nil {
+		return err
+	}
+
+	defects, err := c.RecognitionDefectRepo.GetDefectReports(ctx.UserContext(), request.Limit, request.Skip, request.After)
 	if err != nil {
 		return err
 	}
