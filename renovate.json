@@ -8,5 +8,11 @@
   "prConcurrentLimit": 5,
   "ignoreDeps": [
     "golang.org/x/exp"
+  ],
+  "packageRules": [
+    {
+      "matchPackagePatterns": "github.com/gofiber/contrib/.*",
+      "automerge": true
+    }
   ]
 }
