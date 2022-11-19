@@ -215,6 +215,8 @@ github.com/gofiber/contrib/otelfiber v0.0.0-20221114104857-ba3ad6a63a65 h1:XsKtz
 github.com/gofiber/contrib/otelfiber v0.0.0-20221114104857-ba3ad6a63a65/go.mod h1:JJ5vISYSXewqahfCrEMYjEkaGprXd2wz1fPfvKW7pyo=
 github.com/gofiber/contrib/otelfiber v0.0.0-20221117080656-ed8389df1920 h1:K9hu8d34v7AIBF4MMo3x0IQagai6LDn27xyuinARpJo=
 github.com/gofiber/contrib/otelfiber v0.0.0-20221117080656-ed8389df1920/go.mod h1:JJ5vISYSXewqahfCrEMYjEkaGprXd2wz1fPfvKW7pyo=
+github.com/gofiber/contrib/otelfiber v0.0.0-20221119010831-b113a981ee26 h1:FOj0A8O6QMfU27GEi7Es4CjxJ21Myu6lgM8VTNoWOSI=
+github.com/gofiber/contrib/otelfiber v0.0.0-20221119010831-b113a981ee26/go.mod h1:JJ5vISYSXewqahfCrEMYjEkaGprXd2wz1fPfvKW7pyo=
 github.com/gofiber/fiber/v2 v2.24.0/go.mod h1:MR1usVH3JHYRyQwMe2eZXRSZHRX38fkV+A7CPB+DlDQ=
 github.com/gofiber/fiber/v2 v2.36.0/go.mod h1:tgCr+lierLwLoVHHO/jn3Niannv34WRkQETU8wiL9fQ=
 github.com/gofiber/fiber/v2 v2.39.0 h1:uhWpYQ6EHN8J7FOPYbI2hrdBD/KNZBC5CjbuOd4QUt4=
