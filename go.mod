@@ -35,7 +35,7 @@ require (
 	github.com/samber/lo v1.35.0
 	github.com/stretchr/testify v1.8.1
 	github.com/swaggo/swag v1.8.7
-	github.com/tidwall/gjson v1.14.3
+	github.com/tidwall/gjson v1.14.4
 	github.com/uptrace/bun v1.1.8
 	github.com/uptrace/bun/dialect/pgdialect v1.1.8
 	github.com/uptrace/bun/driver/pgdriver v1.1.8
