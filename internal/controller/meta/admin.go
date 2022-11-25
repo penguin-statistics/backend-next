@@ -49,6 +49,9 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Post("/save", c.SaveRenderedObjects)
 	admin.Post("/purge", c.PurgeCache)
 
+	admin.Post("/rejections/reject-rules/reevaluation/preview", c.RejectRulesReevaluationPreview)
+	admin.Post("/rejections/reject-rules/reevaluation/apply", c.RejectRulesReevaluationApply)
+
 	admin.Get("/cli/gamedata/seed", c.GetCliGameDataSeed)
 	admin.Get("/internal/time-faked/stages", c.GetFakeTimeStages)
 	admin.Get("/_temp/pattern/merging", c.FindPatterns)
@@ -354,4 +357,12 @@ func (c *AdminController) GetRecognitionDefects(ctx *fiber.Ctx) error {
 		}
 	}
 	return ctx.JSON(defects)
+}
+
+func (c *AdminController) RejectRulesReevaluationPreview(ctx *fiber.Ctx) error {
+	return ctx.SendStatus(http.StatusNotImplemented)
+}
+
+func (c *AdminController) RejectRulesReevaluationApply(ctx *fiber.Ctx) error {
+	return ctx.SendStatus(http.StatusNotImplemented)
 }
