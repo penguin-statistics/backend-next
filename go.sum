@@ -600,6 +600,8 @@ github.com/uptrace/bun/driver/pgdriver v1.1.9 h1:Dy9g/EpgOG15RP3mDAuJd/hnfXAUdBs
 github.com/uptrace/bun/driver/pgdriver v1.1.9/go.mod h1:YnPHzR4fT24PXrBTcadclXfdtkR9dYouqk2HwOiKf2g=
 github.com/uptrace/bun/extra/bundebug v1.1.8 h1:RrZNOYYFb690k14nCN0t/hokfpsgoppT55/Xk/ijvBA=
 github.com/uptrace/bun/extra/bundebug v1.1.8/go.mod h1:AXl9cPt1j3Yyu+a681xTlDyWoIBL1iSjTjr2SAU5oUY=
+github.com/uptrace/bun/extra/bundebug v1.1.9 h1:rs7H4MxYrcPk9QlaJRY7XlEQxRHCVhki2X/UC8+VJvo=
+github.com/uptrace/bun/extra/bundebug v1.1.9/go.mod h1:ohdrG1K6GGU3x6gTIQ2izqZ1RWP0T8StdSq93lBDi68=
 github.com/uptrace/bun/extra/bunotel v1.1.8 h1:Sg7XcLLI+KTalKg36aRpOJovYF9UUVuN5coBuIUCag8=
 github.com/uptrace/bun/extra/bunotel v1.1.8/go.mod h1:1chzcC5wkd7FP+/SRUbmmqF0DL1ed+NgdHlGE+GIkPs=
 github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.15 h1:s6BZwhj/2oZ9GSkfcTH8YRHjxj3MGo1j2Pg83Pc1xjw=
