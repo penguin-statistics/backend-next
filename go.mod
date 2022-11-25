@@ -38,7 +38,7 @@ require (
 	github.com/tidwall/gjson v1.14.4
 	github.com/uptrace/bun v1.1.9
 	github.com/uptrace/bun/dialect/pgdialect v1.1.9
-	github.com/uptrace/bun/driver/pgdriver v1.1.8
+	github.com/uptrace/bun/driver/pgdriver v1.1.9
 	github.com/uptrace/bun/extra/bundebug v1.1.8
 	github.com/uptrace/bun/extra/bunotel v1.1.8
 	github.com/vmihailenco/msgpack/v5 v5.3.5
@@ -126,8 +126,8 @@ require (
 	go.uber.org/dig v1.15.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.16.0 // indirect
-	golang.org/x/crypto v0.1.0 // indirect
-	golang.org/x/net v0.1.0 // indirect
+	golang.org/x/crypto v0.3.0 // indirect
+	golang.org/x/net v0.2.0 // indirect
 	golang.org/x/sys v0.2.0 // indirect
 	golang.org/x/tools v0.1.12 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
