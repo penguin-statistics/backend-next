@@ -5,13 +5,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
-
 	"exusiai.dev/gommon/constant"
+	"github.com/gofiber/fiber/v2"
 )
 
 func Extract(ctx *fiber.Ctx) string {
-	penguinId := strings.TrimSpace(strings.TrimPrefix(ctx.Get(fiber.HeaderAuthorization), constant.PenguinIDAuthorizationRealm))
+	authorization := ctx.Get(fiber.HeaderAuthorization)
+	if authorization != "" || !strings.HasPrefix(authorization, constant.PenguinIDAuthorizationRealm) {
+		return ""
+	}
+	penguinId := strings.TrimSpace(strings.TrimPrefix(authorization, constant.PenguinIDAuthorizationRealm))
 
 	if penguinId == "" {
 		penguinId = ctx.Cookies(constant.PenguinIDCookieKey)

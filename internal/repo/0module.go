@@ -22,6 +22,7 @@ func Module() fx.Option {
 		NewTrendElement,
 		NewDropReportExtra,
 		NewDropMatrixElement,
+		NewRecognitionDefect,
 		NewDropPatternElement,
 		NewPatternMatrixElement,
 	))

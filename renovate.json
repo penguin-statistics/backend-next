@@ -2,6 +2,17 @@
   "extends": [
     "config:base"
   ],
-  "baseBranches": ["dev"],
-  "prConcurrentLimit": 5
+  "baseBranches": [
+    "dev"
+  ],
+  "prConcurrentLimit": 5,
+  "ignoreDeps": [
+    "golang.org/x/exp"
+  ],
+  "packageRules": [
+    {
+      "matchPackagePatterns": "github.com/gofiber/contrib/.*",
+      "automerge": true
+    }
+  ]
 }

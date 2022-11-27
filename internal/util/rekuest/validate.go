@@ -3,6 +3,7 @@ package rekuest
 import (
 	"strings"
 
+	"exusiai.dev/gommon/constant"
 	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 	enTranslations "github.com/go-playground/validator/v10/translations/en"
@@ -15,7 +16,6 @@ import (
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/util"
 	"exusiai.dev/backend-next/internal/util/i18n"
-	"exusiai.dev/gommon/constant"
 )
 
 var Validate = util.NewValidator()
@@ -135,6 +135,22 @@ func validateStruct(ctx *fiber.Ctx, s any) []*ErrorResponse {
 // always be a pointer.
 func ValidBody(ctx *fiber.Ctx, dest any) error {
 	if err := ctx.BodyParser(dest); err != nil {
+		return pgerr.ErrInvalidReq.Msg("invalid request: %s", err)
+	}
+
+	if err := validateStruct(ctx, dest); err != nil {
+		return pgerr.NewInvalidViolations(err)
+	}
+
+	return nil
+}
+
+// ValidQuery will get the query from *fiber.Ctx using fiber#QueryParser(),
+// and validate it using the validator singleton. If the validation passed it will write the unmarshalled query
+// to dest and return a nil, otherwise it will return an error. Notice that dest shall
+// always be a pointer.
+func ValidQuery(ctx *fiber.Ctx, dest any) error {
+	if err := ctx.QueryParser(dest); err != nil {
 		return pgerr.ErrInvalidReq.Msg("invalid request: %s", err)
 	}
 

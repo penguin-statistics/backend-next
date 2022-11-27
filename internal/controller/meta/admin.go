@@ -30,22 +30,27 @@ import (
 type AdminController struct {
 	fx.In
 
-	PatternRepo          *repo.DropPattern
-	PatternElementRepo   *repo.DropPatternElement
-	AdminService         *service.Admin
-	ItemService          *service.Item
-	StageService         *service.Stage
-	DropMatrixService    *service.DropMatrix
-	PatternMatrixService *service.PatternMatrix
-	TrendService         *service.Trend
-	SiteStatsService     *service.SiteStats
-	AnalyticsService     *service.Analytics
+	PatternRepo           *repo.DropPattern
+	PatternElementRepo    *repo.DropPatternElement
+	RecognitionDefectRepo *repo.RecognitionDefect
+	AdminService          *service.Admin
+	ItemService           *service.Item
+	StageService          *service.Stage
+	DropMatrixService     *service.DropMatrix
+	PatternMatrixService  *service.PatternMatrix
+	TrendService          *service.Trend
+	SiteStatsService      *service.SiteStats
+	AnalyticsService      *service.Analytics
+	UpyunService          *service.Upyun
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Get("/bonjour", c.Bonjour)
 	admin.Post("/save", c.SaveRenderedObjects)
 	admin.Post("/purge", c.PurgeCache)
+
+	admin.Post("/rejections/reject-rules/reevaluation/preview", c.RejectRulesReevaluationPreview)
+	admin.Post("/rejections/reject-rules/reevaluation/apply", c.RejectRulesReevaluationApply)
 
 	admin.Get("/cli/gamedata/seed", c.GetCliGameDataSeed)
 	admin.Get("/internal/time-faked/stages", c.GetFakeTimeStages)
@@ -58,6 +63,8 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
 	admin.Get("/refresh/trend/:server", c.RefreshAllTrendElements)
 	admin.Get("/refresh/sitestats/:server", c.RefreshAllSiteStats)
+
+	admin.Get("/recognition/defects", c.GetRecognitionDefects)
 }
 
 type CliGameDataSeedResponse struct {
@@ -321,4 +328,41 @@ func (c *AdminController) RefreshAllSiteStats(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	_, err := c.SiteStatsService.RefreshShimSiteStats(ctx.UserContext(), server)
 	return err
+}
+
+func (c *AdminController) GetRecognitionDefects(ctx *fiber.Ctx) error {
+	type getRecognitionDefectsRequest struct {
+		Limit int    `query:"limit"`
+		Skip  int    `query:"skip"`
+		After string `query:"after"`
+	}
+	var request getRecognitionDefectsRequest
+	if err := rekuest.ValidQuery(ctx, &request); err != nil {
+		return err
+	}
+
+	defects, err := c.RecognitionDefectRepo.GetDefectReports(ctx.UserContext(), request.Limit, request.Skip, request.After)
+	if err != nil {
+		return err
+	}
+
+	for i, defect := range defects {
+		if defect.ImageURI != "" {
+			u, err := c.UpyunService.ImageURIToSignedURL(defect.ImageURI)
+			if err != nil {
+				return err
+			}
+
+			defects[i].ImageURI = u
+		}
+	}
+	return ctx.JSON(defects)
+}
+
+func (c *AdminController) RejectRulesReevaluationPreview(ctx *fiber.Ctx) error {
+	return ctx.SendStatus(http.StatusNotImplemented)
+}
+
+func (c *AdminController) RejectRulesReevaluationApply(ctx *fiber.Ctx) error {
+	return ctx.SendStatus(http.StatusNotImplemented)
 }
