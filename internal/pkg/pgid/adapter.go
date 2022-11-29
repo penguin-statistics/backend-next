@@ -11,7 +11,7 @@ import (
 
 func Extract(ctx *fiber.Ctx) string {
 	authorization := ctx.Get(fiber.HeaderAuthorization)
-	if authorization != "" || !strings.HasPrefix(authorization, constant.PenguinIDAuthorizationRealm) {
+	if authorization != "" && !strings.HasPrefix(authorization, constant.PenguinIDAuthorizationRealm) {
 		return ""
 	}
 	penguinId := strings.TrimSpace(strings.TrimPrefix(authorization, constant.PenguinIDAuthorizationRealm))
