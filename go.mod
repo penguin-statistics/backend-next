@@ -32,7 +32,7 @@ require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rs/xid v1.4.0
 	github.com/rs/zerolog v1.28.0
-	github.com/samber/lo v1.35.0
+	github.com/samber/lo v1.36.0
 	github.com/stretchr/testify v1.8.1
 	github.com/swaggo/swag v1.8.8
 	github.com/tidwall/gjson v1.14.4
@@ -117,7 +117,7 @@ require (
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
 	github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.17 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.42.0
+	github.com/valyala/fasthttp v1.43.0
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/otel/metric v0.33.0 // indirect
