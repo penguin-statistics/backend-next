@@ -1,4 +1,5 @@
 {
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:base"
   ],
@@ -11,8 +12,11 @@
   ],
   "packageRules": [
     {
-      "matchPackagePatterns": "github.com/gofiber/contrib/.*",
+      "matchPackagePatterns": [
+        "github.com/gofiber/contrib/.*"
+      ],
       "automerge": true
     }
-  ]
+  ],
+  "platformAutomerge": true
 }
