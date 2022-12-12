@@ -18,7 +18,7 @@ require (
 	github.com/go-redsync/redsync/v4 v4.7.1
 	github.com/goccy/go-json v0.10.0
 	github.com/gofiber/contrib/fibersentry v0.0.0-20221208211326-11f2d8d1ddc7
-	github.com/gofiber/contrib/otelfiber v0.0.0-20221212095313-e00e43092a0f
+	github.com/gofiber/contrib/otelfiber v0.0.0-20221212211437-4ae694962ec2
 	github.com/gofiber/fiber/v2 v2.40.1
 	github.com/gofiber/helmet/v2 v2.2.22
 	github.com/gofiber/swagger v0.1.8
@@ -122,7 +122,7 @@ require (
 	github.com/valyala/fasthttp v1.43.0
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
-	go.opentelemetry.io/otel/metric v0.33.0 // indirect
+	go.opentelemetry.io/otel/metric v0.34.0 // indirect
 	go.opentelemetry.io/otel/trace v1.11.2
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/dig v1.15.0 // indirect
