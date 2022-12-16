@@ -195,7 +195,7 @@ func (c *Upyun) ImageURIToSignedURL(uri, style string) (path string, err error) 
 	u.Host = c.cdnDomain
 	u.Scheme = "https"
 
-	etime := time.Now().UTC().Add(time.Minute * 10).Unix()
+	etime := time.Now().UTC().Add(time.Hour * 24).Unix()
 	token := c.calculateSignature(u.Path, etime)
 
 	u.RawQuery = url.Values{
