@@ -48,18 +48,14 @@ func (s *RecognitionDefect) FinalizeDefectReport(ctx context.Context, defectId, 
 	return nil
 }
 
-func (s *RecognitionDefect) GetDefectReports(ctx context.Context, limit int, skip int, after string) ([]*model.RecognitionDefect, error) {
+func (s *RecognitionDefect) GetDefectReports(ctx context.Context, limit int, page int) ([]*model.RecognitionDefect, error) {
 	var defectReports []*model.RecognitionDefect
 
 	query := s.DB.NewSelect().
 		Model(&defectReports).
 		Order("created_at DESC").
 		Limit(limit).
-		Offset(skip)
-
-	if after != "" {
-		query = query.Where("defect_id < ?", after)
-	}
+		Offset(page * limit)
 
 	err := query.Scan(ctx)
 	if err != nil {

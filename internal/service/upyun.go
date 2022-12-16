@@ -174,7 +174,7 @@ func (c *Upyun) MarshalImageURI(path string) string {
 	return u.String()
 }
 
-func (c *Upyun) ImageURIToSignedURL(uri string) (path string, err error) {
+func (c *Upyun) ImageURIToSignedURL(uri, style string) (path string, err error) {
 	u, err := url.Parse(uri)
 	if err != nil {
 		return "", err
@@ -186,6 +186,10 @@ func (c *Upyun) ImageURIToSignedURL(uri string) (path string, err error) {
 
 	if u.Host != c.ugcBucket {
 		return "", errors.Errorf("invalid host")
+	}
+
+	if style != "" {
+		u.Path += "!" + style
 	}
 
 	u.Host = c.cdnDomain
