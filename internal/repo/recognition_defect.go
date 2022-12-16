@@ -64,3 +64,17 @@ func (s *RecognitionDefect) GetDefectReports(ctx context.Context, limit int, pag
 
 	return defectReports, nil
 }
+
+func (s *RecognitionDefect) GetDefectReport(ctx context.Context, defectId string) (*model.RecognitionDefect, error) {
+	var defectReport model.RecognitionDefect
+
+	err := s.DB.NewSelect().
+		Model(&defectReport).
+		Where("defect_id = ?", defectId).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &defectReport, nil
+}
