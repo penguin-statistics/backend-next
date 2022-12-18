@@ -137,6 +137,8 @@ github.com/gdamore/tcell v1.3.0/go.mod h1:Hjvr+Ofd+gLglo7RYKxxnzCBmev3BzsS67MebK
 github.com/getsentry/sentry-go v0.12.0/go.mod h1:NSap0JBYWzHND8oMbyi0+XZhUalc1TBdRL1M71JZW2c=
 github.com/getsentry/sentry-go v0.15.0 h1:CP9bmA7pralrVUedYZsmIHWpq/pBtXTSew7xvVpfLaA=
 github.com/getsentry/sentry-go v0.15.0/go.mod h1:RZPJKSw+adu8PBNygiri/A98FqVr2HtRckJk9XVxJ9I=
+github.com/getsentry/sentry-go v0.16.0 h1:owk+S+5XcgJLlGR/3+3s6N4d+uKwqYvh/eS0AIMjPWo=
+github.com/getsentry/sentry-go v0.16.0/go.mod h1:ZXCloQLj0pG7mja5NK6NPf2V4A88YJ4pNlc2mOHwh6Y=
 github.com/ghodss/yaml v1.0.0/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=
 github.com/gin-contrib/sse v0.0.0-20190301062529-5545eab6dad3/go.mod h1:VJ0WA2NBN22VlZ2dKZQPAPnyWw5XTlK1KymzLKsr59s=
 github.com/gin-gonic/gin v1.4.0/go.mod h1:OW2EZn3DO8Ln9oIKOvM++LBO+5UPHJJDH72/q/3rZdM=
@@ -204,6 +206,8 @@ github.com/gofiber/adaptor/v2 v2.1.25 h1:K2Ef2a7mUsCfL/oJdzbjyMXchGYuUUwIVXrYVm+
 github.com/gofiber/adaptor/v2 v2.1.25/go.mod h1:gOxtwMVqUStB5goAYtKd+hSvGupdd+aRIafZHPLNaUk=
 github.com/gofiber/contrib/fibersentry v0.0.0-20221208211326-11f2d8d1ddc7 h1:HxWXcuD8l4lxSzH+5/69pyI0k2Dtcq81vPyYMKEZFmk=
 github.com/gofiber/contrib/fibersentry v0.0.0-20221208211326-11f2d8d1ddc7/go.mod h1:Er5LtaWsQuKiNYEnFFwd7tJHgTseKNci3ssTMxZ1z+M=
+github.com/gofiber/contrib/fibersentry v0.0.0-20221215212655-b9cfd37ac3c5 h1:F1lITLnS5xCZXo+5b7lcqG/prdAhhOz6Nd+5eCtqPaA=
+github.com/gofiber/contrib/fibersentry v0.0.0-20221215212655-b9cfd37ac3c5/go.mod h1:AdnGkItVsZMMFx6DZ2mPtTB8BDBQZcxJJLTI/j9oI5o=
 github.com/gofiber/contrib/otelfiber v0.0.0-20221212211437-4ae694962ec2 h1:wh+Iu9/XzoKGYL6NmrUCyCYVQ/VxKj1CREBs9OsW/FQ=
 github.com/gofiber/contrib/otelfiber v0.0.0-20221212211437-4ae694962ec2/go.mod h1:DDW538ekELmM/iy6x8egOQ9B+aZzY0LAEoc6C6q0wbI=
 github.com/gofiber/contrib/otelfiber v0.0.0-20221215212655-b9cfd37ac3c5 h1:7TQk1Zy1B3LT8f+tR6RZH2eeENyy21+36eIw4OmGLJE=
