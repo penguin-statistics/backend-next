@@ -10,14 +10,14 @@ require (
 	github.com/avast/retry-go/v3 v3.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/uniuri v1.2.0
-	github.com/getsentry/sentry-go v0.15.0
+	github.com/getsentry/sentry-go v0.16.0
 	github.com/go-playground/locales v0.14.0
 	github.com/go-playground/universal-translator v0.18.0
 	github.com/go-playground/validator/v10 v10.11.1
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-redsync/redsync/v4 v4.7.1
 	github.com/goccy/go-json v0.10.0
-	github.com/gofiber/contrib/fibersentry v0.0.0-20221208211326-11f2d8d1ddc7
+	github.com/gofiber/contrib/fibersentry v0.0.0-20221215212655-b9cfd37ac3c5
 	github.com/gofiber/contrib/otelfiber v0.0.0-20221215212655-b9cfd37ac3c5
 	github.com/gofiber/fiber/v2 v2.40.1
 	github.com/gofiber/helmet/v2 v2.2.22
