@@ -55,7 +55,7 @@ require (
 	golang.org/x/text v0.5.0
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
-	gopkg.in/DataDog/dd-trace-go.v1 v1.44.1
+	gopkg.in/DataDog/dd-trace-go.v1 v1.45.1
 	gopkg.in/guregu/null.v3 v3.5.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
