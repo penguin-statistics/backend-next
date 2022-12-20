@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -16,7 +17,6 @@ import (
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/async"
 	"exusiai.dev/backend-next/internal/util"
-	"exusiai.dev/gommon/constant"
 )
 
 /*
@@ -151,6 +151,12 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 	}
 
 	elements, err := async.FlatMap(allTimeRanges, constant.WorkerParallelism, func(timeRange *model.TimeRange) ([]*model.DropMatrixElement, error) {
+		if server == "CN" {
+			log.Info().
+				Str("evt.name", "worker.debug").
+				Str("timeRange", strconv.Itoa(timeRange.RangeID)).
+				Msg("start to run RefreshAllDropMatrixElements for a single timeRange")
+		}
 		timeRanges := []*model.TimeRange{timeRange}
 		currentBatch := make([]*model.DropMatrixElement, 0)
 		for _, sourceCategory := range sourceCategories {
@@ -159,6 +165,14 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 				return nil, err
 			}
 			currentBatch = append(currentBatch, results...)
+
+			if server == "CN" {
+				log.Info().
+					Str("evt.name", "worker.debug").
+					Str("timeRange", strconv.Itoa(timeRange.RangeID)).
+					Str("sourceCategory", sourceCategory).
+					Msg("finish running RefreshAllDropMatrixElements for a single timeRange with one sourceCategory")
+			}
 		}
 		return currentBatch, nil
 	})

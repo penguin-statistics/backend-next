@@ -10,15 +10,15 @@ require (
 	github.com/avast/retry-go/v3 v3.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/uniuri v1.2.0
-	github.com/getsentry/sentry-go v0.15.0
+	github.com/getsentry/sentry-go v0.16.0
 	github.com/go-playground/locales v0.14.0
 	github.com/go-playground/universal-translator v0.18.0
 	github.com/go-playground/validator/v10 v10.11.1
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-redsync/redsync/v4 v4.7.1
 	github.com/goccy/go-json v0.10.0
-	github.com/gofiber/contrib/fibersentry v0.0.0-20221208211326-11f2d8d1ddc7
-	github.com/gofiber/contrib/otelfiber v0.0.0-20221212211437-4ae694962ec2
+	github.com/gofiber/contrib/fibersentry v0.0.0-20221215212655-b9cfd37ac3c5
+	github.com/gofiber/contrib/otelfiber v0.0.0-20221215212655-b9cfd37ac3c5
 	github.com/gofiber/fiber/v2 v2.40.1
 	github.com/gofiber/helmet/v2 v2.2.22
 	github.com/gofiber/swagger v0.1.8
@@ -34,7 +34,7 @@ require (
 	github.com/rs/zerolog v1.28.0
 	github.com/samber/lo v1.37.0
 	github.com/stretchr/testify v1.8.1
-	github.com/swaggo/swag v1.8.8
+	github.com/swaggo/swag v1.8.9
 	github.com/tidwall/gjson v1.14.4
 	github.com/uptrace/bun v1.1.9
 	github.com/uptrace/bun/dialect/pgdialect v1.1.9
@@ -55,7 +55,7 @@ require (
 	golang.org/x/text v0.5.0
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
-	gopkg.in/DataDog/dd-trace-go.v1 v1.44.1
+	gopkg.in/DataDog/dd-trace-go.v1 v1.45.1
 	gopkg.in/guregu/null.v3 v3.5.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
