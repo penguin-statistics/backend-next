@@ -8,6 +8,7 @@ require (
 	github.com/ansrivas/fiberprometheus/v2 v2.4.1
 	github.com/antonmedv/expr v1.9.0
 	github.com/avast/retry-go/v3 v3.1.1
+	github.com/avast/retry-go/v4 v4.3.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/uniuri v1.2.0
 	github.com/getsentry/sentry-go v0.16.0
