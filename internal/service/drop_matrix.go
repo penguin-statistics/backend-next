@@ -171,6 +171,7 @@ func (s *DropMatrix) RefreshAllDropMatrixElements(ctx context.Context, server st
 					Str("evt.name", "worker.debug").
 					Str("timeRange", strconv.Itoa(timeRange.RangeID)).
 					Str("sourceCategory", sourceCategory).
+					Str("resultSize", strconv.Itoa(len(results))).
 					Msg("finish running RefreshAllDropMatrixElements for a single timeRange with one sourceCategory")
 			}
 		}
@@ -280,6 +281,15 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 		}
 		oneBatch := s.combineQuantityAndTimesResults(quantityResults, timesResults, quantityUniqCountResults, timeRange)
 		combinedResults = append(combinedResults, oneBatch...)
+
+		if server == "CN" && !accountId.Valid {
+			log.Info().
+				Str("evt.name", "worker.debug.inner").
+				Str("timeRange", strconv.Itoa(timeRange.RangeID)).
+				Str("sourceCategory", sourceCategory).
+				Str("resultSize", strconv.Itoa(len(combinedResults))).
+				Msg("finish calculating combinedResults for a single timeRange with one sourceCategory in calcDropMatrixForTimeRanges()")
+		}
 	}
 
 	// save stage times for later use
