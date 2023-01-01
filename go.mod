@@ -8,6 +8,7 @@ require (
 	github.com/ansrivas/fiberprometheus/v2 v2.4.1
 	github.com/antonmedv/expr v1.9.0
 	github.com/avast/retry-go/v3 v3.1.1
+	github.com/avast/retry-go/v4 v4.3.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/uniuri v1.2.0
 	github.com/getsentry/sentry-go v0.16.0
@@ -17,15 +18,15 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-redsync/redsync/v4 v4.7.1
 	github.com/goccy/go-json v0.10.0
-	github.com/gofiber/contrib/fibersentry v0.0.0-20221215212655-b9cfd37ac3c5
-	github.com/gofiber/contrib/otelfiber v0.0.0-20221215212655-b9cfd37ac3c5
+	github.com/gofiber/contrib/fibersentry v0.0.0-20221221212612-92599266f187
+	github.com/gofiber/contrib/otelfiber v0.0.0-20221221212612-92599266f187
 	github.com/gofiber/fiber/v2 v2.40.1
 	github.com/gofiber/helmet/v2 v2.2.22
 	github.com/gofiber/swagger v0.1.8
 	github.com/jinzhu/copier v0.3.5
 	github.com/joho/godotenv v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/nats-io/nats.go v1.20.0
+	github.com/nats-io/nats.go v1.22.0
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/oschwald/geoip2-golang v1.8.0
 	github.com/pkg/errors v0.9.1
@@ -57,6 +58,7 @@ require (
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/DataDog/dd-trace-go.v1 v1.45.1
 	gopkg.in/guregu/null.v3 v3.5.0
+	gopkg.in/guregu/null.v4 v4.0.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 

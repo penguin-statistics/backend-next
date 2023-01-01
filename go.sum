@@ -72,6 +72,7 @@ github.com/antonmedv/expr v1.9.0/go.mod h1:5qsM3oLGDND7sDmQGDXHkYfkjYMUX14qsgqmH
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/avast/retry-go/v3 v3.1.1 h1:49Scxf4v8PmiQ/nY0aY3p0hDueqSmc7++cBbtiDGu2g=
 github.com/avast/retry-go/v3 v3.1.1/go.mod h1:6cXRK369RpzFL3UQGqIUp9Q7GDrams+KsYWrfNA1/nQ=
+github.com/avast/retry-go/v4 v4.3.1/go.mod h1:rg6XFaiuFYII0Xu3RDbZQkxCofFwruZKW8oEF1jpWiU=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
 github.com/benbjohnson/clock v1.3.0 h1:ip6w0uFQkncKQ979AypyG0ER7mqUSBdKLOgAle/AT8A=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
@@ -208,10 +209,14 @@ github.com/gofiber/contrib/fibersentry v0.0.0-20221208211326-11f2d8d1ddc7 h1:HxW
 github.com/gofiber/contrib/fibersentry v0.0.0-20221208211326-11f2d8d1ddc7/go.mod h1:Er5LtaWsQuKiNYEnFFwd7tJHgTseKNci3ssTMxZ1z+M=
 github.com/gofiber/contrib/fibersentry v0.0.0-20221215212655-b9cfd37ac3c5 h1:F1lITLnS5xCZXo+5b7lcqG/prdAhhOz6Nd+5eCtqPaA=
 github.com/gofiber/contrib/fibersentry v0.0.0-20221215212655-b9cfd37ac3c5/go.mod h1:AdnGkItVsZMMFx6DZ2mPtTB8BDBQZcxJJLTI/j9oI5o=
+github.com/gofiber/contrib/fibersentry v0.0.0-20221221212612-92599266f187 h1:G5qChdDQfphiitFtRkh5s7JtEm5wQjiw7f5EhuMGy84=
+github.com/gofiber/contrib/fibersentry v0.0.0-20221221212612-92599266f187/go.mod h1:AdnGkItVsZMMFx6DZ2mPtTB8BDBQZcxJJLTI/j9oI5o=
 github.com/gofiber/contrib/otelfiber v0.0.0-20221212211437-4ae694962ec2 h1:wh+Iu9/XzoKGYL6NmrUCyCYVQ/VxKj1CREBs9OsW/FQ=
 github.com/gofiber/contrib/otelfiber v0.0.0-20221212211437-4ae694962ec2/go.mod h1:DDW538ekELmM/iy6x8egOQ9B+aZzY0LAEoc6C6q0wbI=
 github.com/gofiber/contrib/otelfiber v0.0.0-20221215212655-b9cfd37ac3c5 h1:7TQk1Zy1B3LT8f+tR6RZH2eeENyy21+36eIw4OmGLJE=
 github.com/gofiber/contrib/otelfiber v0.0.0-20221215212655-b9cfd37ac3c5/go.mod h1:3ztTBoTkiNQUGPCSlRsL0Ood/XaKmBlX7pMKrparG+U=
+github.com/gofiber/contrib/otelfiber v0.0.0-20221221212612-92599266f187 h1:Hs25pZzxJ0l4KSd8NHrSbPkhkCnO+bf0wk61eeP60aE=
+github.com/gofiber/contrib/otelfiber v0.0.0-20221221212612-92599266f187/go.mod h1:3ztTBoTkiNQUGPCSlRsL0Ood/XaKmBlX7pMKrparG+U=
 github.com/gofiber/fiber/v2 v2.36.0/go.mod h1:tgCr+lierLwLoVHHO/jn3Niannv34WRkQETU8wiL9fQ=
 github.com/gofiber/fiber/v2 v2.40.0/go.mod h1:Gko04sLksnHbzLSRBFWPFdzM9Ws9pRxvvIaohJK1dsk=
 github.com/gofiber/fiber/v2 v2.40.1 h1:pc7n9VVpGIqNsvg9IPLQhyFEMJL8gCs1kneH5D1pIl4=
@@ -417,6 +422,8 @@ github.com/nats-io/nats-server/v2 v2.7.3/go.mod h1:eJUrA5gm0ch6sJTEv85xmXIgQWsB0
 github.com/nats-io/nats.go v1.9.1/go.mod h1:ZjDU1L/7fJ09jvUSRVBR2e7+RnLiiIQyqyzEE/Zbp4w=
 github.com/nats-io/nats.go v1.20.0 h1:T8JJnQfVSdh1CzGiwAOv5hEobYCBho/0EupGznYw0oM=
 github.com/nats-io/nats.go v1.20.0/go.mod h1:tLqubohF7t4z3du1QDPYJIQQyhb4wl6DhjxEajSI7UA=
+github.com/nats-io/nats.go v1.22.0 h1:3dxyVf+S449DbMriqQV27HgSbXklxT9SUKbDKIxhrV0=
+github.com/nats-io/nats.go v1.22.0/go.mod h1:tLqubohF7t4z3du1QDPYJIQQyhb4wl6DhjxEajSI7UA=
 github.com/nats-io/nkeys v0.1.0/go.mod h1:xpnFELMwJABBLVhffcfd1MZx6VsNRFpEugbxziKVo7w=
 github.com/nats-io/nkeys v0.3.0 h1:cgM5tL53EvYRU+2YLXIK0G2mJtK12Ft9oeooSZMA2G8=
 github.com/nats-io/nkeys v0.3.0/go.mod h1:gvUNGjVcM2IPr5rCsRsC6Wb3Hr2CQAm08dsxtV6A5y4=
@@ -1029,6 +1036,7 @@ gopkg.in/go-playground/assert.v1 v1.2.1/go.mod h1:9RXL0bg/zibRAgZUYszZSwO/z8Y/a8
 gopkg.in/go-playground/validator.v8 v8.18.2/go.mod h1:RX2a/7Ha8BgOhfk7j780h4/u/RRjR0eouCJSH80/M2Y=
 gopkg.in/guregu/null.v3 v3.5.0 h1:xTcasT8ETfMcUHn0zTvIYtQud/9Mx5dJqD554SZct0o=
 gopkg.in/guregu/null.v3 v3.5.0/go.mod h1:E4tX2Qe3h7QdL+uZ3a0vqvYwKQsRSQKM5V4YltdgH9Y=
+gopkg.in/guregu/null.v4 v4.0.0/go.mod h1:YoQhUrADuG3i9WqesrCmpNRwm1ypAgSHYqoOcTu/JrI=
 gopkg.in/ini.v1 v1.51.1/go.mod h1:pNLf8WUiyNEtQjuu5G5vTm06TEv9tsIgeAvK8hOrP4k=
 gopkg.in/mgo.v2 v2.0.0-20180705113604-9856a29383ce/go.mod h1:yeKp02qBN3iKW1OzL3MGk2IdtZzaj7SFntXj72NppTA=
 gopkg.in/natefinch/lumberjack.v2 v2.0.0 h1:1Lc07Kr7qY4U2YPouBjpCLxpiyxIVoxqXgkXLknAOE8=
