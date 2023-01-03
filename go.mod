@@ -20,7 +20,7 @@ require (
 	github.com/goccy/go-json v0.10.0
 	github.com/gofiber/contrib/fibersentry v0.0.0-20221221212612-92599266f187
 	github.com/gofiber/contrib/otelfiber v0.0.0-20221221212612-92599266f187
-	github.com/gofiber/fiber/v2 v2.40.1
+	github.com/gofiber/fiber/v2 v2.41.0
 	github.com/gofiber/helmet/v2 v2.2.22
 	github.com/gofiber/swagger v0.1.8
 	github.com/jinzhu/copier v0.3.5
@@ -109,7 +109,7 @@ require (
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.16 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/nats-io/nats-server/v2 v2.7.3 // indirect
 	github.com/nats-io/nkeys v0.3.0 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
