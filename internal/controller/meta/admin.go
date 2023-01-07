@@ -44,6 +44,7 @@ type AdminController struct {
 	AnalyticsService      *service.Analytics
 	UpyunService          *service.Upyun
 	SnapshotService       *service.Snapshot
+	DropReportService     *service.DropReport
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
@@ -427,7 +428,28 @@ func (c *AdminController) GetRecognitionDefect(ctx *fiber.Ctx) error {
 }
 
 func (c *AdminController) RejectRulesReevaluationPreview(ctx *fiber.Ctx) error {
-	return ctx.SendStatus(http.StatusNotImplemented)
+	var request types.RejectRulesReevaluationPreviewRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	evalContexts, err := c.AdminService.GetRejectRulesReportContext(ctx.UserContext(), request)
+	if err != nil {
+		return err
+	}
+
+	evaluation, err := c.AdminService.EvaluateRejectRules(ctx.UserContext(), evalContexts, request.RuleID)
+	if err != nil {
+		return err
+	}
+
+	type rejectRulesReevaluationPreviewResponse struct {
+		Summary service.RejectRulesReevaluationEvaluationResultSetSummary `json:"summary"`
+	}
+
+	return ctx.JSON(&rejectRulesReevaluationPreviewResponse{
+		Summary: evaluation.Summary(),
+	})
 }
 
 func (c *AdminController) RejectRulesReevaluationApply(ctx *fiber.Ctx) error {
