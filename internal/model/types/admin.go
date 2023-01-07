@@ -1,6 +1,8 @@
 package types
 
 import (
+	"time"
+
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -34,4 +36,12 @@ type PurgeCacheRequest struct {
 type PurgeCachePair struct {
 	Name string      `json:"name"`
 	Key  null.String `json:"key" swaggertype:"string"`
+}
+
+type RejectRulesReevaluationPreviewRequest struct {
+	RuleID          int `json:"ruleId"`
+	ReevaluateRange struct {
+		From time.Time `json:"from"`
+		To   time.Time `json:"to"`
+	} `json:"reevaluateRange"`
 }

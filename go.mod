@@ -8,7 +8,6 @@ require (
 	github.com/ansrivas/fiberprometheus/v2 v2.5.0
 	github.com/antonmedv/expr v1.12.0
 	github.com/avast/retry-go/v3 v3.1.1
-	github.com/avast/retry-go/v4 v4.3.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/uniuri v1.2.0
 	github.com/felixge/fgprof v0.9.3
@@ -61,7 +60,6 @@ require (
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/DataDog/dd-trace-go.v1 v1.47.0
 	gopkg.in/guregu/null.v3 v3.5.0
-	gopkg.in/guregu/null.v4 v4.0.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
@@ -143,6 +141,5 @@ require (
 	golang.org/x/sys v0.4.0 // indirect
 	golang.org/x/tools v0.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	honnef.co/go/tools v0.1.3 // indirect
 	mellium.im/sasl v0.3.1 // indirect
 )
