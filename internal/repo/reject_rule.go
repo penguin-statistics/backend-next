@@ -27,7 +27,7 @@ func (s *RejectRule) GetRejectRule(ctx context.Context, id int) (*model.RejectRu
 	var rejectRule model.RejectRule
 	err := s.DB.NewSelect().
 		Model(&rejectRule).
-		Where("id = ?", id).
+		Where("rule_id = ?", id).
 		Scan(ctx)
 
 	if errors.Is(err, sql.ErrNoRows) {
