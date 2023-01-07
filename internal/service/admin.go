@@ -251,9 +251,41 @@ type RejectRulesReevaluationEvaluationResultSetSummarySampledEvaluations struct 
 
 type RejectRulesReevaluationEvaluationResultSetSummary struct {
 	TotalCount         int                                                                   `json:"totalCount"`
+	ChangeSetCount     int                                                                   `json:"changeSetCount"`
 	ReliabilityChanges []RejectRulesReevaluationEvaluationResultSetSummaryReliabilityChanges `json:"reliabilityChanges"`
 
 	SampledEvaluations RejectRulesReevaluationEvaluationResultSetSummarySampledEvaluations `json:"sampledEvaluations"`
+}
+
+type RejectRulesReevaluationEvaluationResultSetDiff struct {
+	ReportID        int `json:"reportId"`
+	FromReliability int `json:"fromReliability"`
+	ToReliability   int `json:"toReliability"`
+}
+
+type RejectRulesReevaluationEvaluationResultSetChangeSet []*RejectRulesReevaluationEvaluationResultSetDiff
+
+func (s RejectRulesReevaluationEvaluationResultSet) ChangeSet() RejectRulesReevaluationEvaluationResultSetChangeSet {
+	changeSet := make(RejectRulesReevaluationEvaluationResultSetChangeSet, 0, len(s))
+	for i, result := range s {
+		originalReliability := result.OriginalReport.Reliability
+		toReliability := originalReliability
+		if result.EvaluationShouldRejectToReliability != nil {
+			toReliability = *result.EvaluationShouldRejectToReliability
+		}
+
+		if originalReliability == toReliability {
+			continue
+		}
+
+		changeSet[i] = &RejectRulesReevaluationEvaluationResultSetDiff{
+			ReportID:        result.OriginalReport.ReportID,
+			FromReliability: originalReliability,
+			ToReliability:   toReliability,
+		}
+	}
+
+	return changeSet
 }
 
 func (s RejectRulesReevaluationEvaluationResultSet) Summary() RejectRulesReevaluationEvaluationResultSetSummary {
@@ -270,20 +302,16 @@ func (s RejectRulesReevaluationEvaluationResultSet) Summary() RejectRulesReevalu
 		},
 	}
 
+	changeset := s.ChangeSet()
+
 	// ReliabilityChanges count (into a temp map)
 	reliabilityChanges := map[int]map[int]int{}
-	for _, result := range s {
-		originalReliability := result.OriginalReport.Reliability
-		toReliability := originalReliability
-		if result.EvaluationShouldRejectToReliability != nil {
-			toReliability = *result.EvaluationShouldRejectToReliability
+	for _, change := range changeset {
+		if reliabilityChanges[change.FromReliability] == nil {
+			reliabilityChanges[change.FromReliability] = map[int]int{}
 		}
 
-		if _, ok := reliabilityChanges[originalReliability]; !ok {
-			reliabilityChanges[originalReliability] = map[int]int{}
-		}
-
-		reliabilityChanges[originalReliability][toReliability]++
+		reliabilityChanges[change.FromReliability][change.ToReliability]++
 	}
 
 	// ReliabilityChanges count (into summary format)
@@ -305,6 +333,10 @@ func (s RejectRulesReevaluationEvaluationResultSet) Summary() RejectRulesReevalu
 
 	// SampledEvaluations
 	for _, result := range s {
+		if len(summary.SampledEvaluations.ShouldReject) >= 10 && len(summary.SampledEvaluations.ShouldPass) >= 10 {
+			break // early break
+		}
+
 		if result.EvaluationShouldRejectToReliability != nil {
 			if len(summary.SampledEvaluations.ShouldReject) >= 10 {
 				continue
@@ -317,6 +349,8 @@ func (s RejectRulesReevaluationEvaluationResultSet) Summary() RejectRulesReevalu
 			summary.SampledEvaluations.ShouldPass = append(summary.SampledEvaluations.ShouldPass, result)
 		}
 	}
+
+	summary.ChangeSetCount = len(changeset)
 
 	return summary
 }
