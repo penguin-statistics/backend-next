@@ -15,6 +15,7 @@ func Module() fx.Option {
 		NewActivity,
 		NewDropInfo,
 		NewProperty,
+		NewSnapshot,
 		NewTimeRange,
 		NewDropReport,
 		NewRejectRule,

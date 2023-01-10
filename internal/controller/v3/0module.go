@@ -12,5 +12,6 @@ func Module() fx.Option {
 		RegisterZone,
 		RegisterDataset,
 		RegisterInit,
+		RegisterIncremental,
 	))
 }

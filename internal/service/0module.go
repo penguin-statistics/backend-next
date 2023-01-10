@@ -22,6 +22,7 @@ func Module() fx.Option {
 		NewActivity,
 		NewDropInfo,
 		NewShortURL,
+		NewSnapshot,
 		NewAnalytics,
 		NewLiveHouse,
 		NewSiteStats,

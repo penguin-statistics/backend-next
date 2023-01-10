@@ -43,6 +43,7 @@ type AdminController struct {
 	SiteStatsService      *service.SiteStats
 	AnalyticsService      *service.Analytics
 	UpyunService          *service.Upyun
+	SnapshotService       *service.Snapshot
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
@@ -67,6 +68,8 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 
 	admin.Get("/recognition/defects", c.GetRecognitionDefects)
 	admin.Get("/recognition/defects/:defectId", c.GetRecognitionDefect)
+
+	admin.Post("/snapshots", c.CreateSnapshot)
 }
 
 type CliGameDataSeedResponse struct {
@@ -429,4 +432,22 @@ func (c *AdminController) RejectRulesReevaluationPreview(ctx *fiber.Ctx) error {
 
 func (c *AdminController) RejectRulesReevaluationApply(ctx *fiber.Ctx) error {
 	return ctx.SendStatus(http.StatusNotImplemented)
+}
+
+func (c *AdminController) CreateSnapshot(ctx *fiber.Ctx) error {
+	type createSnapshotRequest struct {
+		Key     string `json:"key"`
+		Content string `json:"content"`
+	}
+	var request createSnapshotRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	snapshot, err := c.SnapshotService.SaveSnapshot(ctx.UserContext(), request.Key, request.Content)
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(snapshot)
 }
