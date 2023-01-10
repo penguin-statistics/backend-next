@@ -15,8 +15,10 @@ import (
 )
 
 var (
-	ErrSnapshotNotFound    = errors.New("snapshot not found")
-	ErrSnapshotNonNullable = errors.New("snapshot content cannot be empty")
+	ErrSnapshotNotFound            = errors.New("snapshot not found")
+	ErrSnapshotNonNullable         = errors.New("snapshot content cannot be empty")
+	ErrSnapshotFromVersionNotFound = pgerr.ErrInvalidReq.Msg("snapshot matching `from` version not found")
+	ErrSnapshotToVersionNotFound   = pgerr.ErrInvalidReq.Msg("snapshot matching `to` version not found")
 )
 
 type Snapshot struct {
@@ -58,9 +60,9 @@ func (s *Snapshot) GetDiffBetweenVersions(ctx context.Context, key, fromVersion,
 	}
 
 	if !fromContent.Valid {
-		return nil, pgerr.ErrInvalidReq.Msg("snapshot matching `from` version not found")
+		return nil, ErrSnapshotFromVersionNotFound
 	} else if !toContent.Valid {
-		return nil, pgerr.ErrInvalidReq.Msg("snapshot matching `to` version not found")
+		return nil, ErrSnapshotToVersionNotFound
 	}
 
 	fromBytes := []byte(fromContent.String)
