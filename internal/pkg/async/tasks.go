@@ -8,13 +8,22 @@ import (
 )
 
 type Errors struct {
-	Errs []error
+	E []error
 }
 
-func (e Errors) Error() any {
+var _ error = (*Errors)(nil)
+
+func (e Errors) Wrapped() error {
+	if len(e.E) == 0 {
+		return nil
+	}
+	return e
+}
+
+func (e Errors) Error() string {
 	var sb strings.Builder
-	l := len(e.Errs)
-	for i, err := range e.Errs {
+	l := len(e.E)
+	for i, err := range e.E {
 		sb.WriteString(err.Error())
 		if i < l-1 {
 			sb.WriteString(", ")
@@ -61,14 +70,14 @@ func Map[T any, D any](src []T, concurrencyLimit int, f func(T) (D, error)) ([]D
 	}()
 
 	// error fan-in
-	errors := Errors{}
+	errs := Errors{}
 	go func() {
 		for {
 			err, ok := <-errCh
 			if !ok {
 				return
 			}
-			errors.Errs = append(errors.Errs, err)
+			errs.E = append(errs.E, err)
 			wg.Done()
 		}
 	}()
@@ -97,7 +106,7 @@ func Map[T any, D any](src []T, concurrencyLimit int, f func(T) (D, error)) ([]D
 	close(resCh)
 	close(errCh)
 
-	return results, nil
+	return results, errs.Wrapped()
 }
 
 func FlatMap[T any, D any](src []T, concurrencyLimit int, f func(T) ([]D, error)) ([]D, error) {

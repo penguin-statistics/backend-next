@@ -7,16 +7,16 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func OptIn(ctx *fiber.Ctx, t time.Time) {
+func OptIn(ctx *fiber.Ctx, lastModifiedAt time.Time) {
 	offset := time.Minute * 10
-	OptInCustom(ctx, t, offset)
+	OptInCustom(ctx, lastModifiedAt, offset)
 }
 
-func OptInCustom(ctx *fiber.Ctx, t time.Time, offset time.Duration) {
+func OptInCustom(ctx *fiber.Ctx, lastModifiedAt time.Time, offset time.Duration) {
 	ctx.Set("Cache-Control", "public, max-age="+strconv.Itoa(int(offset.Seconds())))
-	ctx.Set("Expires", t.Add(offset).Format(time.RFC1123))
+	ctx.Set("Expires", lastModifiedAt.Add(offset).Format(time.RFC1123))
 
-	ctx.Response().Header.SetLastModified(t)
+	ctx.Response().Header.SetLastModified(lastModifiedAt)
 }
 
 func OptOut(ctx *fiber.Ctx) {
