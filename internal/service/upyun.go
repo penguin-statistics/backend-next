@@ -16,7 +16,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/pkg/errors"
 
-	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/model/types"
 )
 
@@ -33,7 +33,7 @@ type Upyun struct {
 	signatureSecret  string
 }
 
-func NewUpyun(conf *config.Config) *Upyun {
+func NewUpyun(conf *appconfig.Config) *Upyun {
 	return &Upyun{
 		operatorUsername: conf.UpyunOperatorName,
 		operatorPassword: conf.UpyunOperatorPassword,

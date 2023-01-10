@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 )
 
 type Crypto struct {
@@ -29,7 +29,7 @@ func intSliceToByteSlice(iv []int) []byte {
 	return b
 }
 
-func NewCrypto(conf *config.Config) *Crypto {
+func NewCrypto(conf *appconfig.Config) *Crypto {
 	pk := []byte("-----BEGIN RSA PRIVATE KEY-----\n")
 	pk = append(pk, conf.RecognitionEncryptionPrivateKey...)
 	pk = append(pk, []byte("\n-----END RSA PRIVATE KEY-----")...)

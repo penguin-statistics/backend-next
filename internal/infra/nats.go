@@ -6,10 +6,10 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/rs/zerolog/log"
 
-	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 )
 
-func NATS(conf *config.Config) (*nats.Conn, nats.JetStreamContext, error) {
+func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
 	errorHandler := func(conn *nats.Conn, sub *nats.Subscription, err error) {
 		log.Error().
 			Str("evt.name", "nats.error").

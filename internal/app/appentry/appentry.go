@@ -5,7 +5,7 @@ import (
 
 	"go.uber.org/fx"
 
-	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 	controllermeta "exusiai.dev/backend-next/internal/controller/meta"
 	controllerv2 "exusiai.dev/backend-next/internal/controller/v2"
 	controllerv3 "exusiai.dev/backend-next/internal/controller/v3"

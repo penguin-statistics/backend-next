@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
-	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/model/pb"
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/pkg/dstructs"
@@ -26,7 +26,7 @@ type LiveHouse struct {
 	gen uint64
 }
 
-func NewLiveHouse(client pb.ConnectedLiveServiceClient, stageRepo *repo.Stage, conf *config.Config) (*LiveHouse, error) {
+func NewLiveHouse(client pb.ConnectedLiveServiceClient, stageRepo *repo.Stage, conf *appconfig.Config) (*LiveHouse, error) {
 	l := &LiveHouse{
 		Enabled:   conf.LiveHouseEnabled,
 		Client:    client,

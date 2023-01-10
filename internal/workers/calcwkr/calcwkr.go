@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 
-	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/service"
 	"exusiai.dev/gommon/constant"
 )
@@ -73,7 +73,7 @@ func (t WorkerCalcType) Interval(w *Worker) time.Duration {
 	}
 }
 
-func Start(conf *config.Config, deps WorkerDeps) {
+func Start(conf *appconfig.Config, deps WorkerDeps) {
 	if conf.WorkerEnabled {
 		if len(conf.WorkerHeartbeatURL) == 0 {
 			log.Warn().

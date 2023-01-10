@@ -1,4 +1,4 @@
-package config
+package appconfig
 
 import (
 	"encoding/base64"

@@ -20,7 +20,7 @@ import (
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
-	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/pkg/jetstream"
@@ -55,7 +55,7 @@ type Worker struct {
 	WorkerDeps
 }
 
-func Start(conf *config.Config, deps WorkerDeps) {
+func Start(conf *appconfig.Config, deps WorkerDeps) {
 	ch := make(chan error)
 	// handle & dump errors from workers
 	go func() {
@@ -72,7 +72,7 @@ func Start(conf *config.Config, deps WorkerDeps) {
 		WorkerDeps: deps,
 	}
 	// spawn workers
-	// maybe we should specify the number of worker in config.Config ?
+	// maybe we should specify the number of worker in appconfig.Config ?
 	for i := 0; i < runtime.NumCPU(); i++ {
 		go func() {
 			err := reportWorkers.Consumer(context.Background(), ch)

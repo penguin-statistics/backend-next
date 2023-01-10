@@ -8,7 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 
-	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 )
 
@@ -28,7 +28,7 @@ type Meta struct {
 	fiber.Router
 }
 
-func CreateEndpointGroups(app *fiber.App, conf *config.Config) (*V2, *V3, *Admin, *Meta) {
+func CreateEndpointGroups(app *fiber.App, conf *appconfig.Config) (*V2, *V3, *Admin, *Meta) {
 	v2 := app.Group("/PenguinStats/api/v2", func(c *fiber.Ctx) error {
 		// add compatibility versioning header for v2 shims
 		c.Set(constant.ShimCompatibilityHeaderKey, constant.ShimCompatibilityHeaderValue)

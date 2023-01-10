@@ -5,11 +5,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/model/pb"
 )
 
-func LiveHouse(conf *config.Config) (pb.ConnectedLiveServiceClient, error) {
+func LiveHouse(conf *appconfig.Config) (pb.ConnectedLiveServiceClient, error) {
 	if conf.LiveHouseEnabled {
 		conn, err := grpc.Dial(conf.LiveHouseGRPCAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
