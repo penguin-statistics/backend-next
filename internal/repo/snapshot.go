@@ -42,7 +42,7 @@ func (s *Snapshot) GetLatestSnapshotByKey(ctx context.Context, key string) (*mod
 
 func (s *Snapshot) GetSnapshotsByVersions(ctx context.Context, key string, versions []string) ([]*model.Snapshot, error) {
 	return s.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.Where("key = ? AND version IN (?)", key, bun.In(versions))
+		return q.Where("key = ?", key).Where("version IN (?)", bun.In(versions))
 	})
 }
 
