@@ -1,4 +1,4 @@
-package service
+package server
 
 import (
 	"context"
@@ -11,10 +11,16 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 
+	"exusiai.dev/backend-next/internal/app"
 	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/app/appcontext"
 	"exusiai.dev/backend-next/internal/pkg/async"
 	"exusiai.dev/backend-next/internal/server/httpserver"
 )
+
+func Run() {
+	app.New(appcontext.Declare(appcontext.EnvServer), fx.Invoke(run)).Run()
+}
 
 func run(serviceApp *fiber.App, devOpsApp httpserver.DevOpsApp, conf *appconfig.Config, lc fx.Lifecycle) {
 	lc.Append(fx.Hook{

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"exusiai.dev/backend-next/cmd/service"
+	"exusiai.dev/backend-next/cmd/app"
 )
 
 // @title        Penguin Statistics API
@@ -24,5 +24,5 @@ import (
 // @name                        Authorization
 
 func main() {
-	service.Bootstrap()
+	app.Run()
 }

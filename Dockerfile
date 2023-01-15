@@ -31,4 +31,4 @@ COPY --from=builder /app/backend /app/backend
 EXPOSE 8080
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD [ "/app/backend" ]
+CMD [ "/app/backend", "start" ]

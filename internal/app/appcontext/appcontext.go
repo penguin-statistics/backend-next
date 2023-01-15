@@ -2,7 +2,6 @@ package appcontext
 
 const (
 	EnvServer Env = iota
-	EnvWorker
 	EnvCLI
 )
 
