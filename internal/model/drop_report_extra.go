@@ -12,8 +12,6 @@ type DropReportExtra struct {
 
 	ReportID int                          `bun:",pk,autoincrement" json:"id"`
 	IP       string                       `json:"ip"`
-	Source   string                       `json:"source" bun:"source_name"`
-	Version  string                       `json:"version"`
 	Metadata *types.ReportRequestMetadata `json:"metadata"`
 	MD5      null.String                  `json:"md5" swaggertype:"string"`
 }
