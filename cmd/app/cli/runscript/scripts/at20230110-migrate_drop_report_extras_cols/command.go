@@ -14,8 +14,8 @@ type CommandDeps struct {
 
 func Command(depsFn func() CommandDeps) *cli.Command {
 	return &cli.Command{
-		Name:  "migrate_drop_report_extras_cols",
-		Usage: "migrate (source_name, version) columns from `drop_report_extras` table to `drop_reports` table",
+		Name:        "migrate_drop_report_extras_cols",
+		Description: "migrate (source_name, version) columns from `drop_report_extras` table to `drop_reports` table",
 		Action: func(ctx *cli.Context) error {
 			return run(depsFn())
 		},
