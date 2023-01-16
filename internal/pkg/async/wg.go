@@ -3,6 +3,8 @@ package async
 import (
 	"sync"
 	"sync/atomic"
+
+	"github.com/rs/zerolog/log"
 )
 
 // WaitAll waits for all the given errables to finish, and returns
@@ -17,6 +19,7 @@ func WaitAll(chans ...<-chan error) error {
 			defer wg.Done()
 			if err, open := <-ch; open {
 				if err != nil {
+					log.Error().Err(err).Msg("error occurred in async task")
 					lastErr.Store(err)
 				}
 			} else {

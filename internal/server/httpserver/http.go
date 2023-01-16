@@ -30,7 +30,7 @@ import (
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 
-	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/pkg/bininfo"
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/pkg/observability"
@@ -43,13 +43,13 @@ type DevOpsApp struct {
 	*fiber.App
 }
 
-func Create(conf *config.Config) (*fiber.App, DevOpsApp) {
+func Create(conf *appconfig.Config) (*fiber.App, DevOpsApp) {
 	return CreateServiceApp(conf), DevOpsApp{
 		App: CreateDevOpsApp(conf),
 	}
 }
 
-func CreateServiceApp(conf *config.Config) *fiber.App {
+func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:               "Penguin Stats Backend v3",
 		ServerHeader:          fmt.Sprintf("Penguin/%s", bininfo.Version),
@@ -153,7 +153,7 @@ func CreateServiceApp(conf *config.Config) *fiber.App {
 	return app
 }
 
-func CreateDevOpsApp(conf *config.Config) *fiber.App {
+func CreateDevOpsApp(conf *appconfig.Config) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:               "Penguin Stats Backend v3 (DevOps)",
 		ServerHeader:          fmt.Sprintf("PenguinDevOps/%s", bininfo.Version),
@@ -182,7 +182,7 @@ func CreateDevOpsApp(conf *config.Config) *fiber.App {
 	return app
 }
 
-func tracingProviderOptions(conf *config.Config) []tracesdk.TracerProviderOption {
+func tracingProviderOptions(conf *appconfig.Config) []tracesdk.TracerProviderOption {
 	options := []tracesdk.TracerProviderOption{}
 	if !conf.TracingEnabled {
 		log.Info().

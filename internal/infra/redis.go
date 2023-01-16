@@ -7,10 +7,10 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/rs/zerolog/log"
 
-	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 )
 
-func Redis(conf *config.Config) (*redis.Client, error) {
+func Redis(conf *appconfig.Config) (*redis.Client, error) {
 	u, err := redis.ParseURL(conf.RedisURL)
 	if err != nil {
 		log.Error().Err(err).Msg("infra: redis: failed to parse redis url")

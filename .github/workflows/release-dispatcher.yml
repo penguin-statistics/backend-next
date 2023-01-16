@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: 'main'
+          ref: "main"
 
       # git tag the release, then push it
       # The tag name is the string after `Release`, trimmed of whitespace

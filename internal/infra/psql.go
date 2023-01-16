@@ -12,10 +12,10 @@ import (
 	"github.com/uptrace/bun/extra/bundebug"
 	"github.com/uptrace/bun/extra/bunotel"
 
-	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 )
 
-func Postgres(conf *config.Config) (*bun.DB, error) {
+func Postgres(conf *appconfig.Config) (*bun.DB, error) {
 	// Open a Postgres database.
 	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(conf.PostgresDSN), pgdriver.WithApplicationName("penguin-backend")))
 

@@ -5,12 +5,12 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
 
-	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/pkg/bininfo"
 )
 
 // SentryInit initializes sentry with side effect
-func SentryInit(conf *config.Config) error {
+func SentryInit(conf *appconfig.Config) error {
 	if conf.SentryDSN == "" {
 		log.Warn().
 			Str("evt.name", "infra.sentry.init").

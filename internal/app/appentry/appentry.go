@@ -5,10 +5,8 @@ import (
 
 	"go.uber.org/fx"
 
-	"exusiai.dev/backend-next/internal/config"
-	controllermeta "exusiai.dev/backend-next/internal/controller/meta"
-	controllerv2 "exusiai.dev/backend-next/internal/controller/v2"
-	controllerv3 "exusiai.dev/backend-next/internal/controller/v3"
+	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/controller"
 	"exusiai.dev/backend-next/internal/infra"
 	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/pkg/crypto"
@@ -22,10 +20,10 @@ import (
 	"exusiai.dev/backend-next/internal/workers/reportwkr"
 )
 
-func ProvideOptions(includeSwagger bool) []fx.Option {
+func ProvideOptions() []fx.Option {
 	opts := []fx.Option{
 		// Misc
-		fx.Provide(config.Parse),
+		fx.Provide(appconfig.Parse),
 		fx.Provide(httpserver.Create),
 		fx.Provide(svr.CreateEndpointGroups),
 		fx.Provide(crypto.NewCrypto),
@@ -50,14 +48,8 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		fx.Invoke(cache.Initialize),
 		fx.WithLogger(logger.Fx),
 
-		// Controllers (v2)
-		controllerv2.Module(),
-
-		// Controllers (v3)
-		controllerv3.Module(),
-
-		// Controllers (meta)
-		controllermeta.Module(),
+		// Controllers
+		controller.Module(controller.OptIncludeSwagger),
 
 		// Workers
 		fx.Invoke(calcwkr.Start),
@@ -69,10 +61,6 @@ func ProvideOptions(includeSwagger bool) []fx.Option {
 		// in which fiber has its own IdleTimeout for controlling the shutdown timeout.
 		// It acts as a countermeasure in case the fiber app is not properly shutting down.
 		fx.StopTimeout(5 * time.Minute),
-	}
-
-	if includeSwagger {
-		opts = append(opts, fx.Invoke(controllermeta.RegisterSwagger))
 	}
 
 	return opts

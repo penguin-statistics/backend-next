@@ -8,11 +8,11 @@ import (
 	"go.uber.org/fx"
 	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
 
-	"exusiai.dev/backend-next/internal/config"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/pkg/bininfo"
 )
 
-func Datadog(conf *config.Config, lc fx.Lifecycle) {
+func Datadog(conf *appconfig.Config, lc fx.Lifecycle) {
 	if conf.DevMode {
 		log.Info().
 			Str("evt.name", "infra.datadog.disabled").

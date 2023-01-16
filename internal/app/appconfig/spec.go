@@ -1,20 +1,12 @@
-package config
+package appconfig
 
 import (
-	"encoding/base64"
-	"fmt"
-	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/joho/godotenv"
-	"github.com/kelseyhightower/envconfig"
-	"github.com/rs/zerolog/log"
-
-	"exusiai.dev/backend-next/internal/pkg/projectpath"
+	"exusiai.dev/backend-next/internal/app/appcontext"
 )
 
-type Config struct {
+type ConfigSpec struct {
 	// ServiceAddress is the listen address would listen on for serving normal service requests.
 	ServiceAddress string `required:"true" split_words:"true" default:"localhost:9010"`
 
@@ -139,36 +131,10 @@ type Config struct {
 	MatrixWorkerSourceCategories []string `required:"true" split_words:"true" default:"all"`
 }
 
-type WorkerHeartbeatURLMap map[string]string
+type Config struct {
+	// ConfigSpec is the configuration specification injected to the config.
+	ConfigSpec
 
-func (m *WorkerHeartbeatURLMap) Decode(value string) error {
-	*m = WorkerHeartbeatURLMap{}
-	for _, pair := range strings.Split(value, ",") {
-		kv := strings.Split(pair, ":")
-		if len(kv) != 2 {
-			return fmt.Errorf("invalid heartbeat URL map: expect a `:` separated key pair for each element, but got: %s", value)
-		}
-		val, err := base64.StdEncoding.DecodeString(strings.TrimSpace(kv[1]))
-		if err != nil {
-			return fmt.Errorf("invalid value in worker heartbeat URL map: base64 decoding failed: %s (%w)", val, err)
-		}
-		(*m)[kv[0]] = string(val)
-	}
-	return nil
-}
-
-func Parse() (*Config, error) {
-	err := godotenv.Load(filepath.Join(projectpath.Root, ".env"))
-	if err != nil {
-		log.Warn().Err(err).Msg("failed to load .env file")
-	}
-
-	var config Config
-	err = envconfig.Process("penguin_v3", &config)
-	if err != nil {
-		_ = envconfig.Usage("penguin_v3", &config)
-		return nil, fmt.Errorf("failed to parse configuration: %w. More info on how to configure this backend is located at https://pkg.go.dev/exusiai.dev/backend-next/internal/config#Config", err)
-	}
-
-	return &config, nil
+	// AppContext is the application context
+	AppContext appcontext.Ctx
 }

@@ -19,18 +19,18 @@ jobs:
 
       - name: "Metadata: Git"
         id: git-meta
-        uses: 'penguin-statistics/actions/git-meta@main'
-      
+        uses: "penguin-statistics/actions/git-meta@main"
+
       - name: "Docker: Build and Push Image"
         id: ghcr-docker
-        uses: 'penguin-statistics/actions/ghcr-docker@main'
+        uses: "penguin-statistics/actions/ghcr-docker@main"
         with:
           version: ${{ steps.git-meta.outputs.version }}
-          repository: 'penguin-statistics/backend-next'
+          repository: "penguin-statistics/backend-next"
 
       - name: "Release: Call Dispatcher"
         id: release-dispatcher
-        uses: 'penguin-statistics/actions/release-dispatcher@main'
+        uses: "penguin-statistics/actions/release-dispatcher@main"
         with:
           version: ${{ steps.git-meta.outputs.version }}
           use-sentry: true
@@ -39,5 +39,5 @@ jobs:
           sentry-project: ${{ secrets.SENTRY_PROJECT }}
           use-ghrelease: true
           use-manifestbot: true
-          manifestbot-file-path: 'applications/backend/values-prod.yaml'
+          manifestbot-file-path: "applications/backend/values-prod.yaml"
           manifestbot-token: ${{ secrets.PAT_FOR_MANIFESTBOT }}

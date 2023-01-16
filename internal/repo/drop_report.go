@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
@@ -14,7 +15,6 @@ import (
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/gameday"
 	"exusiai.dev/backend-next/internal/pkg/pgqry"
-	"exusiai.dev/gommon/constant"
 )
 
 type DropReport struct {
@@ -53,7 +53,7 @@ func (s *DropReport) CalcTotalQuantityForDropMatrix(
 
 	subq1 := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
-		Column("dr.report_id", "dr.stage_id", "dpe.item_id", "dpe.quantity").
+		Column("dr.stage_id", "dr.source_name", "dpe.item_id", "dpe.quantity").
 		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id")
 	s.handleAccountAndReliability(subq1, accountId)
 	s.handleCreatedAtWithTimeRange(subq1, timeRange)
@@ -63,8 +63,7 @@ func (s *DropReport) CalcTotalQuantityForDropMatrix(
 	mainq := s.DB.NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("stage_id", "item_id").
-		ColumnExpr("SUM(quantity) AS total_quantity").
-		Join("LEFT JOIN (?) AS b ON b.report_id = a.report_id", s.genSubQueryForSourceName())
+		ColumnExpr("SUM(quantity) AS total_quantity")
 	s.handleSourceName(mainq, sourceCategory)
 
 	if err := mainq.
@@ -85,7 +84,7 @@ func (s *DropReport) CalcTotalQuantityForPatternMatrix(
 
 	subq1 := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
-		Column("dr.report_id", "dr.stage_id", "dr.pattern_id")
+		Column("dr.source_name", "dr.stage_id", "dr.pattern_id")
 	s.handleAccountAndReliability(subq1, accountId)
 	s.handleCreatedAtWithTimeRange(subq1, timeRange)
 	s.handleServer(subq1, server)
@@ -95,8 +94,7 @@ func (s *DropReport) CalcTotalQuantityForPatternMatrix(
 	mainq := s.DB.NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("stage_id", "pattern_id").
-		ColumnExpr("COUNT(*) AS total_quantity").
-		Join("LEFT JOIN (?) AS b ON b.report_id = a.report_id", s.genSubQueryForSourceName())
+		ColumnExpr("COUNT(*) AS total_quantity")
 	s.handleSourceName(mainq, sourceCategory)
 
 	if err := mainq.
@@ -117,7 +115,7 @@ func (s *DropReport) CalcTotalTimes(
 
 	subq1 := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
-		Column("dr.report_id", "dr.stage_id", "dr.times")
+		Column("dr.source_name", "dr.stage_id", "dr.times")
 	s.handleAccountAndReliability(subq1, accountId)
 	if excludeNonOneTimes {
 		s.handleTimes(subq1, 1)
@@ -129,8 +127,7 @@ func (s *DropReport) CalcTotalTimes(
 	mainq := s.DB.NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("stage_id").
-		ColumnExpr("SUM(times) AS total_times").
-		Join("LEFT JOIN (?) AS b ON b.report_id = a.report_id", s.genSubQueryForSourceName())
+		ColumnExpr("SUM(times) AS total_times")
 	s.handleSourceName(mainq, sourceCategory)
 
 	if err := mainq.
@@ -151,7 +148,7 @@ func (s *DropReport) CalcQuantityUniqCount(
 
 	subq1 := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
-		Column("dr.report_id", "dr.stage_id", "dpe.item_id", "dpe.quantity").
+		Column("dr.source_name", "dr.stage_id", "dpe.item_id", "dpe.quantity").
 		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id")
 	s.handleAccountAndReliability(subq1, accountId)
 	s.handleCreatedAtWithTimeRange(subq1, timeRange)
@@ -161,8 +158,7 @@ func (s *DropReport) CalcQuantityUniqCount(
 	mainq := s.DB.NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("stage_id", "item_id", "quantity").
-		ColumnExpr("COUNT(*) AS count").
-		Join("LEFT JOIN (?) AS b ON b.report_id = a.report_id", s.genSubQueryForSourceName())
+		ColumnExpr("COUNT(*) AS count")
 	s.handleSourceName(mainq, sourceCategory)
 
 	if err := mainq.
@@ -187,7 +183,7 @@ func (s *DropReport) CalcTotalQuantityForTrend(
 	subq1 := s.DB.NewSelect().
 		With("intervals", s.genSubQueryForTrendSegments(gameDayStart, intervalLength, intervalNum)).
 		TableExpr("drop_reports AS dr").
-		Column("dr.report_id", "sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id", "dpe.item_id", "dpe.quantity").
+		Column("dr.source_name", "sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id", "dpe.item_id", "dpe.quantity").
 		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id").
 		Join("RIGHT JOIN intervals AS sub").
 		JoinOn("dr.created_at >= sub.interval_start AND dr.created_at < sub.interval_end")
@@ -199,8 +195,7 @@ func (s *DropReport) CalcTotalQuantityForTrend(
 	mainq := s.DB.NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("group_id", "interval_start", "interval_end", "stage_id", "item_id").
-		ColumnExpr("SUM(quantity) AS total_quantity").
-		Join("LEFT JOIN (?) AS b ON b.report_id = a.report_id", s.genSubQueryForSourceName())
+		ColumnExpr("SUM(quantity) AS total_quantity")
 	s.handleSourceName(mainq, sourceCategory)
 
 	if err := mainq.
@@ -225,7 +220,7 @@ func (s *DropReport) CalcTotalTimesForTrend(
 	subq1 := s.DB.NewSelect().
 		With("intervals", s.genSubQueryForTrendSegments(gameDayStart, intervalLength, intervalNum)).
 		TableExpr("drop_reports AS dr").
-		Column("dr.report_id", "sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id", "dr.times").
+		Column("dr.source_name", "sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id", "dr.times").
 		Join("RIGHT JOIN intervals AS sub").
 		JoinOn("dr.created_at >= sub.interval_start AND dr.created_at < sub.interval_end")
 	s.handleAccountAndReliability(subq1, accountId)
@@ -236,8 +231,7 @@ func (s *DropReport) CalcTotalTimesForTrend(
 	mainq := s.DB.NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("group_id", "interval_start", "interval_end", "stage_id").
-		ColumnExpr("SUM(times) AS total_times").
-		Join("LEFT JOIN (?) AS b ON b.report_id = a.report_id", s.genSubQueryForSourceName())
+		ColumnExpr("SUM(times) AS total_times")
 	s.handleSourceName(mainq, sourceCategory)
 
 	if err := mainq.
@@ -309,14 +303,11 @@ func (s *DropReport) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, 
 
 func (s *DropReport) CalcRecentUniqueUserCountBySource(ctx context.Context, duration time.Duration) ([]*modelv2.UniqueUserCountBySource, error) {
 	results := make([]*modelv2.UniqueUserCountBySource, 0)
-
 	subq := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
-		Column("dre.source_name", "dr.account_id").
-		Join("LEFT JOIN drop_report_extras AS dre").
-		JoinOn("dr.report_id = dre.report_id")
+		Column("dr.source_name", "dr.account_id")
 	s.handleCreatedAtWithTime(subq, time.Now().Add(-duration), time.Now())
-	subq = subq.Group("dre.source_name", "dr.account_id")
+	subq = subq.Group("dr.source_name", "dr.account_id")
 
 	mainq := s.DB.NewSelect().
 		TableExpr("(?) AS a", subq).
@@ -416,10 +407,4 @@ func (s *DropReport) genSubQueryForTrendSegments(gameDayStart time.Time, interva
 			int(intervalLength.Hours()),
 			int(intervalLength.Hours()),
 		)
-}
-
-func (s *DropReport) genSubQueryForSourceName() *bun.SelectQuery {
-	return s.DB.NewSelect().
-		TableExpr("drop_report_extras AS dre").
-		Column("dre.report_id", "dre.source_name")
 }
