@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/goccy/go-json"
-
+	"exusiai.dev/gommon/constant"
 	"github.com/go-redis/redis/v8"
+	"github.com/goccy/go-json"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -29,7 +29,6 @@ import (
 	"exusiai.dev/backend-next/internal/service"
 	"exusiai.dev/backend-next/internal/util/reportutil"
 	"exusiai.dev/backend-next/internal/util/reportverifs"
-	"exusiai.dev/gommon/constant"
 )
 
 var tracer = otel.Tracer("reportwkr")
@@ -257,6 +256,8 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 			Reliability: reliability,
 			Server:      reportTask.Server,
 			AccountID:   reportTask.AccountID,
+			SourceName:  reportTask.Source,
+			Version:     reportTask.Version,
 		}
 		if err = w.DropReportRepo.CreateDropReport(pstCtx, tx, dropReport); err != nil {
 			return errors.Wrap(err, "failed to create drop report")
@@ -275,8 +276,6 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 		if err = w.DropReportExtraRepo.CreateDropReportExtra(pstCtx, tx, &model.DropReportExtra{
 			ReportID: dropReport.ReportID,
 			IP:       reportTask.IP,
-			Source:   reportTask.Source,
-			Version:  reportTask.Version,
 			Metadata: report.Metadata,
 			MD5:      null.NewString(md5, md5 != ""),
 		}); err != nil {
