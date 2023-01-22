@@ -236,6 +236,8 @@ github.com/gofiber/fiber/v2 v2.41.0 h1:YhNoUS/OTjEz+/WLYuQ01xI7RXgKEFnGBKMagAu5f
 github.com/gofiber/fiber/v2 v2.41.0/go.mod h1:RdebcCuCRFp4W6hr3968/XxwJVg0K+jr9/Ae0PFzZ0Q=
 github.com/gofiber/helmet/v2 v2.2.22 h1:kACyVKnu3RpBmr0IomxwxwFzTLJuWllRCA5DQEminxQ=
 github.com/gofiber/helmet/v2 v2.2.22/go.mod h1:8eDCsQ6XV+Ye41c+vQKyPQdG6NW9iQhlgdnwRIvp01M=
+github.com/gofiber/helmet/v2 v2.2.23 h1:hEastMbezQwbqJgSIFvgtx/lmb51bqi6T6GW/SBhiwo=
+github.com/gofiber/helmet/v2 v2.2.23/go.mod h1:wqmrFiOYWkoOXtsf4OOdNVUABkjCvwJi9AU8xa/7SAA=
 github.com/gofiber/swagger v0.1.8 h1:Ut8gecn/nf62HGexuxaju30pVLF7UL1HZXHTq9EA7QI=
 github.com/gofiber/swagger v0.1.8/go.mod h1:9LPuXJldC8uGFtpxb3JQqhSjhyP1p5id+0GvRU8eUUw=
 github.com/gogo/protobuf v1.1.1/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7atdtwQ=
