@@ -197,7 +197,7 @@ func (s *Admin) GetRejectRulesReportContext(ctx context.Context, req types.Rejec
 					CreatedAt: createdAt,
 					FragmentReportCommon: types.FragmentReportCommon{
 						Server:  dropReport.Server,
-						Source:  dropReport.Source,
+						Source:  dropReport.SourceName,
 						Version: dropReport.Version,
 					},
 					AccountID: dropReport.AccountID,
