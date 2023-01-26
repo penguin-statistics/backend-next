@@ -603,8 +603,12 @@ github.com/ugorji/go/codec v0.0.0-20181204163529-d75b2dcb6bc8/go.mod h1:VFNgLljT
 github.com/ugorji/go/codec v1.1.7/go.mod h1:Ax+UKWsSmolVDwsd+7N3ZtXu+yMGCf907BLYF3GoBXY=
 github.com/uptrace/bun v1.1.9 h1:6zs+YJcgw8oj67c+YmI8edQokDFeyR4BE/ykNWjGYYs=
 github.com/uptrace/bun v1.1.9/go.mod h1:fpYRCGyruLCyP7dNjMfqulYn4VBP/fH0enc0j0yW/Cs=
+github.com/uptrace/bun v1.1.10 h1:wx80lg32mWlOV1gNvmPTbR9znt6A2fYvvURzU5dzSPE=
+github.com/uptrace/bun v1.1.10/go.mod h1:pOWJSVU+W0jp3+cbn/TtHdcG/h+QxagECw4EYdKiaSw=
 github.com/uptrace/bun/dialect/pgdialect v1.1.9 h1:V23SU89WfjqtePLFPRXVXCwmSyYb0XKeg8Z6BMXgyHg=
 github.com/uptrace/bun/dialect/pgdialect v1.1.9/go.mod h1:+ux7PjC4NYsNMdGE9b2ERxCi2jJai8Z8zniXFExq0Ns=
+github.com/uptrace/bun/dialect/pgdialect v1.1.10 h1:H25ieb5OJV5ywvKvswF++wMTnePRaGRiSNkYCRXrQxc=
+github.com/uptrace/bun/dialect/pgdialect v1.1.10/go.mod h1:leDSw/IC70/GYPIU3zC8fkOZpJaJ28f51OMT1VnZiY8=
 github.com/uptrace/bun/driver/pgdriver v1.1.9 h1:Dy9g/EpgOG15RP3mDAuJd/hnfXAUdBsfxpg9On27M+Y=
 github.com/uptrace/bun/driver/pgdriver v1.1.9/go.mod h1:YnPHzR4fT24PXrBTcadclXfdtkR9dYouqk2HwOiKf2g=
 github.com/uptrace/bun/extra/bundebug v1.1.9 h1:rs7H4MxYrcPk9QlaJRY7XlEQxRHCVhki2X/UC8+VJvo=
@@ -902,6 +906,8 @@ golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.3.0 h1:w8ZOecv6NaNa/zC8944JTU3vz4u6Lagfk4RPQxv92NQ=
 golang.org/x/sys v0.3.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.org/x/sys v0.4.0 h1:Zr2JFtRQNX3BCZ8YtxRE9hNJYC8J6I1MVbMg6owUp18=
+golang.org/x/sys v0.4.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/term v0.0.0-20210927222741-03fcf44c2211/go.mod h1:jbD1KX2456YbFQfuXm/mYQcufACuNUgVhRMnK/tPxf8=
 golang.org/x/text v0.0.0-20170915032832-14c0d48ead0c/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
