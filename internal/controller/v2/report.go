@@ -47,9 +47,9 @@ func RegisterReport(v2 *svr.V2, c Report) {
 		},
 		Storage: fiberstore.NewRedis(c.Redis, constant.ReportIdempotencyRedisHashKey),
 		RedSync: c.RedSync,
-	}), c.MiddlewareGetOrCreateAccount, c.SingularReport)
+	}), middlewares.InjectValidBody[types.SingularReportRequest](), c.MiddlewareGetOrCreateAccount, c.SingularReport)
 	v2.Post("/report/recall", c.RecallSingularReport)
-	v2.Post("/report/recognition", c.MiddlewareGetOrCreateAccount, c.RecognitionReport)
+	v2.Post("/report/recognition", middlewares.InjectValidBody[types.SingularReportRecallRequest](), c.MiddlewareGetOrCreateAccount, c.RecognitionReport)
 }
 
 func (c *Report) MiddlewareGetOrCreateAccount(ctx *fiber.Ctx) error {
@@ -83,12 +83,9 @@ func (c *Report) MiddlewareGetOrCreateAccount(ctx *fiber.Ctx) error {
 // @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/report [POST]
 func (c *Report) SingularReport(ctx *fiber.Ctx) error {
-	var report types.SingularReportRequest
-	if err := rekuest.ValidBody(ctx, &report); err != nil {
-		return err
-	}
+	req := ctx.Locals("body").(types.SingularReportRequest)
 
-	taskId, err := c.ReportService.PreprocessAndQueueSingularReport(ctx, &report)
+	taskId, err := c.ReportService.PreprocessAndQueueSingularReport(ctx, &req)
 	if err != nil {
 		return err
 	}
@@ -106,10 +103,7 @@ func (c *Report) SingularReport(ctx *fiber.Ctx) error {
 // @Failure      500     {object}  pgerr.PenguinError  "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/report/recall [POST]
 func (c *Report) RecallSingularReport(ctx *fiber.Ctx) error {
-	var req types.SingularReportRecallRequest
-	if err := rekuest.ValidBody(ctx, &req); err != nil {
-		return err
-	}
+	req := ctx.Locals("body").(types.SingularReportRecallRequest)
 
 	flog.InfoFrom(ctx, "report.singular.recall.request").
 		Str("reportHash", req.ReportHash).
