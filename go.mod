@@ -43,7 +43,7 @@ require (
 	github.com/uptrace/bun/dialect/pgdialect v1.1.10
 	github.com/uptrace/bun/driver/pgdriver v1.1.10
 	github.com/uptrace/bun/extra/bundebug v1.1.10
-	github.com/uptrace/bun/extra/bunotel v1.1.9
+	github.com/uptrace/bun/extra/bunotel v1.1.10
 	github.com/urfave/cli/v2 v2.23.7
 	github.com/vmihailenco/msgpack/v5 v5.3.5
 	github.com/zeebo/xxh3 v1.0.2
@@ -127,7 +127,7 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
-	github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.17 // indirect
+	github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.18 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.44.0
 	github.com/valyala/tcplisten v1.0.0 // indirect
