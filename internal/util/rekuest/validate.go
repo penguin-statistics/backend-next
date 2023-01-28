@@ -116,7 +116,7 @@ func validateVar(ctx *fiber.Ctx, s any, tag string) []*ErrorResponse {
 	return nil
 }
 
-func validateStruct(ctx *fiber.Ctx, s any) []*ErrorResponse {
+func ValidateStruct(ctx *fiber.Ctx, s any) []*ErrorResponse {
 	tr := TranslatorFromCtx(ctx)
 	err := Validate.Struct(s)
 	if err != nil {
@@ -138,7 +138,7 @@ func ValidBody(ctx *fiber.Ctx, dest any) error {
 		return pgerr.ErrInvalidReq.Msg("invalid request: %s", err)
 	}
 
-	if err := validateStruct(ctx, dest); err != nil {
+	if err := ValidateStruct(ctx, dest); err != nil {
 		return pgerr.NewInvalidViolations(err)
 	}
 
@@ -154,7 +154,7 @@ func ValidQuery(ctx *fiber.Ctx, dest any) error {
 		return pgerr.ErrInvalidReq.Msg("invalid request: %s", err)
 	}
 
-	if err := validateStruct(ctx, dest); err != nil {
+	if err := ValidateStruct(ctx, dest); err != nil {
 		return pgerr.NewInvalidViolations(err)
 	}
 
@@ -162,7 +162,7 @@ func ValidQuery(ctx *fiber.Ctx, dest any) error {
 }
 
 func ValidStruct(ctx *fiber.Ctx, dest any) error {
-	if err := validateStruct(ctx, dest); err != nil {
+	if err := ValidateStruct(ctx, dest); err != nil {
 		return pgerr.NewInvalidViolations(err)
 	}
 
