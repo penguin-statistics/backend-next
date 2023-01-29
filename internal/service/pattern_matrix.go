@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
 	"gopkg.in/guregu/null.v3"
@@ -14,7 +15,6 @@ import (
 	"exusiai.dev/backend-next/internal/pkg/async"
 	"exusiai.dev/backend-next/internal/pkg/wrap"
 	"exusiai.dev/backend-next/internal/util"
-	"exusiai.dev/gommon/constant"
 )
 
 type PatternMatrix struct {
@@ -191,12 +191,25 @@ func (s *PatternMatrix) calcPatternMatrixForTimeRanges(
 	}
 
 	stageIds := util.GetStageIdsFromDropInfos(dropInfos)
+	stageItemFilter := make(map[int][]int, 0)
+	for _, stageId := range stageIds {
+		stageItemFilter[stageId] = make([]int, 0)
+	}
 	for _, timeRange := range timeRanges {
-		quantityResults, err := s.DropReportService.CalcTotalQuantityForPatternMatrix(ctx, server, timeRange, stageIds, accountId, sourceCategory)
+		queryCtx := &model.DropReportQueryContext{
+			Server:             server,
+			StartTime:          timeRange.StartTime,
+			EndTime:            timeRange.EndTime,
+			AccountID:          accountId,
+			StageItemFilter:    &stageItemFilter,
+			SourceCategory:     sourceCategory,
+			ExcludeNonOneTimes: true,
+		}
+		quantityResults, err := s.DropReportService.CalcTotalQuantityForPatternMatrix(ctx, queryCtx)
 		if err != nil {
 			return nil, err
 		}
-		timesResults, err := s.DropReportService.CalcTotalTimesForPatternMatrix(ctx, server, timeRange, stageIds, accountId, sourceCategory)
+		timesResults, err := s.DropReportService.CalcTotalTimesForPatternMatrix(ctx, queryCtx)
 		if err != nil {
 			return nil, err
 		}

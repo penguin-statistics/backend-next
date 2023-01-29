@@ -53,27 +53,27 @@ func (s *DropReport) UpdateDropReportReliability(ctx context.Context, tx bun.Tx,
 }
 
 func (s *DropReport) CalcTotalQuantityForDropMatrix(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int, sourceCategory string,
+	ctx context.Context, queryCtx *model.DropReportQueryContext,
 ) ([]*model.TotalQuantityResultForDropMatrix, error) {
 	results := make([]*model.TotalQuantityResultForDropMatrix, 0)
-	if len(stageIdItemIdMap) == 0 {
-		return results, nil
-	}
 
 	subq1 := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
 		Column("dr.stage_id", "dr.source_name", "dpe.item_id", "dpe.quantity").
 		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id")
-	s.handleAccountAndReliability(subq1, accountId)
-	s.handleCreatedAtWithTimeRange(subq1, timeRange)
-	s.handleServer(subq1, server)
-	s.handleStagesAndItems(subq1, stageIdItemIdMap)
+	s.handleAccountAndReliability(subq1, queryCtx.AccountID)
+	if queryCtx.ExcludeNonOneTimes {
+		s.handleTimes(subq1, 1)
+	}
+	s.handleCreatedAtWithTime(subq1, queryCtx.StartTime, queryCtx.EndTime)
+	s.handleServer(subq1, queryCtx.Server)
+	s.handleStagesAndItems(subq1, *queryCtx.StageItemFilter)
 
 	mainq := s.DB.NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("stage_id", "item_id").
 		ColumnExpr("SUM(quantity) AS total_quantity")
-	s.handleSourceName(mainq, sourceCategory)
+	s.handleSourceName(mainq, queryCtx.SourceCategory)
 
 	if err := mainq.
 		Group("stage_id", "item_id").
@@ -84,27 +84,27 @@ func (s *DropReport) CalcTotalQuantityForDropMatrix(
 }
 
 func (s *DropReport) CalcTotalQuantityForPatternMatrix(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int, sourceCategory string,
+	ctx context.Context, queryCtx *model.DropReportQueryContext,
 ) ([]*model.TotalQuantityResultForPatternMatrix, error) {
 	results := make([]*model.TotalQuantityResultForPatternMatrix, 0)
-	if len(stageIds) == 0 {
-		return results, nil
-	}
 
 	subq1 := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
 		Column("dr.source_name", "dr.stage_id", "dr.pattern_id")
-	s.handleAccountAndReliability(subq1, accountId)
-	s.handleCreatedAtWithTimeRange(subq1, timeRange)
-	s.handleServer(subq1, server)
-	s.handleStages(subq1, stageIds)
+	s.handleAccountAndReliability(subq1, queryCtx.AccountID)
+	if queryCtx.ExcludeNonOneTimes {
+		s.handleTimes(subq1, 1)
+	}
+	s.handleCreatedAtWithTime(subq1, queryCtx.StartTime, queryCtx.EndTime)
+	s.handleServer(subq1, queryCtx.Server)
+	s.handleStages(subq1, queryCtx.GetStageIds())
 	s.handleTimes(subq1, 1)
 
 	mainq := s.DB.NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("stage_id", "pattern_id").
 		ColumnExpr("COUNT(*) AS total_quantity")
-	s.handleSourceName(mainq, sourceCategory)
+	s.handleSourceName(mainq, queryCtx.SourceCategory)
 
 	if err := mainq.
 		Group("stage_id", "pattern_id").
@@ -115,29 +115,29 @@ func (s *DropReport) CalcTotalQuantityForPatternMatrix(
 }
 
 func (s *DropReport) CalcTotalTimes(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int, excludeNonOneTimes bool, sourceCategory string,
+	ctx context.Context, queryCtx *model.DropReportQueryContext,
 ) ([]*model.TotalTimesResult, error) {
 	results := make([]*model.TotalTimesResult, 0)
-	if len(stageIds) == 0 {
-		return results, nil
-	}
 
 	subq1 := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
 		Column("dr.source_name", "dr.stage_id", "dr.times")
-	s.handleAccountAndReliability(subq1, accountId)
-	if excludeNonOneTimes {
+	s.handleAccountAndReliability(subq1, queryCtx.AccountID)
+	if queryCtx.ExcludeNonOneTimes {
 		s.handleTimes(subq1, 1)
 	}
-	s.handleCreatedAtWithTimeRange(subq1, timeRange)
-	s.handleServer(subq1, server)
-	s.handleStages(subq1, stageIds)
+	s.handleCreatedAtWithTime(subq1, queryCtx.StartTime, queryCtx.EndTime)
+	s.handleServer(subq1, queryCtx.Server)
+	stageIds := queryCtx.GetStageIds()
+	if len(stageIds) > 0 {
+		s.handleStages(subq1, stageIds)
+	}
 
 	mainq := s.DB.NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("stage_id").
 		ColumnExpr("SUM(times) AS total_times")
-	s.handleSourceName(mainq, sourceCategory)
+	s.handleSourceName(mainq, queryCtx.SourceCategory)
 
 	if err := mainq.
 		Group("stage_id").
@@ -148,27 +148,27 @@ func (s *DropReport) CalcTotalTimes(
 }
 
 func (s *DropReport) CalcQuantityUniqCount(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int, sourceCategory string,
+	ctx context.Context, queryCtx *model.DropReportQueryContext,
 ) ([]*model.QuantityUniqCountResultForDropMatrix, error) {
 	results := make([]*model.QuantityUniqCountResultForDropMatrix, 0)
-	if len(stageIdItemIdMap) == 0 {
-		return results, nil
-	}
 
 	subq1 := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
 		Column("dr.source_name", "dr.stage_id", "dpe.item_id", "dpe.quantity").
 		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id")
-	s.handleAccountAndReliability(subq1, accountId)
-	s.handleCreatedAtWithTimeRange(subq1, timeRange)
-	s.handleServer(subq1, server)
-	s.handleStagesAndItems(subq1, stageIdItemIdMap)
+	s.handleAccountAndReliability(subq1, queryCtx.AccountID)
+	if queryCtx.ExcludeNonOneTimes {
+		s.handleTimes(subq1, 1)
+	}
+	s.handleCreatedAtWithTime(subq1, queryCtx.StartTime, queryCtx.EndTime)
+	s.handleServer(subq1, queryCtx.Server)
+	s.handleStagesAndItems(subq1, *queryCtx.StageItemFilter)
 
 	mainq := s.DB.NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("stage_id", "item_id", "quantity").
 		ColumnExpr("COUNT(*) AS count")
-	s.handleSourceName(mainq, sourceCategory)
+	s.handleSourceName(mainq, queryCtx.SourceCategory)
 
 	if err := mainq.
 		Group("stage_id", "item_id", "quantity").
@@ -197,7 +197,7 @@ func (s *DropReport) CalcTotalQuantityForTrend(
 		Join("RIGHT JOIN intervals AS sub").
 		JoinOn("dr.created_at >= sub.interval_start AND dr.created_at < sub.interval_end")
 	s.handleAccountAndReliability(subq1, accountId)
-	s.handleCreatedAtWithTime(subq1, gameDayStart, lastDayEnd)
+	s.handleCreatedAtWithTime(subq1, &gameDayStart, &lastDayEnd)
 	s.handleServer(subq1, server)
 	s.handleStagesAndItems(subq1, stageIdItemIdMap)
 
@@ -233,7 +233,7 @@ func (s *DropReport) CalcTotalTimesForTrend(
 		Join("RIGHT JOIN intervals AS sub").
 		JoinOn("dr.created_at >= sub.interval_start AND dr.created_at < sub.interval_end")
 	s.handleAccountAndReliability(subq1, accountId)
-	s.handleCreatedAtWithTime(subq1, gameDayStart, lastDayEnd)
+	s.handleCreatedAtWithTime(subq1, &gameDayStart, &lastDayEnd)
 	s.handleServer(subq1, server)
 	s.handleStages(subq1, stageIds)
 
@@ -315,7 +315,9 @@ func (s *DropReport) CalcRecentUniqueUserCountBySource(ctx context.Context, dura
 	subq := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
 		Column("dr.source_name", "dr.account_id")
-	s.handleCreatedAtWithTime(subq, time.Now().Add(-duration), time.Now())
+	start := time.Now().Add(-duration)
+	end := time.Now()
+	s.handleCreatedAtWithTime(subq, &start, &end)
 	subq = subq.Group("dr.source_name", "dr.account_id")
 
 	mainq := s.DB.NewSelect().
@@ -335,19 +337,21 @@ func (s *DropReport) handleStagesAndItems(query *bun.SelectQuery, stageIdItemIdM
 	stageConditions := make([]string, 0)
 	for stageId, itemIds := range stageIdItemIdMap {
 		var stageB strings.Builder
-		fmt.Fprintf(&stageB, "dr.stage_id = %d AND dpe.item_id", stageId)
+		fmt.Fprintf(&stageB, "dr.stage_id = %d", stageId)
 		if len(itemIds) == 1 {
-			fmt.Fprintf(&stageB, " = %d", itemIds[0])
-		} else {
+			fmt.Fprintf(&stageB, " AND dpe.item_id = %d", itemIds[0])
+		} else if len(itemIds) > 1 {
 			var itemIdsStr []string
 			for _, itemId := range itemIds {
 				itemIdsStr = append(itemIdsStr, strconv.Itoa(itemId))
 			}
-			fmt.Fprintf(&stageB, " IN (%s)", strings.Join(itemIdsStr, ","))
+			fmt.Fprintf(&stageB, " AND dpe.item_id IN (%s)", strings.Join(itemIdsStr, ","))
 		}
 		stageConditions = append(stageConditions, stageB.String())
 	}
-	query.Where(strings.Join(stageConditions, " OR "))
+	if len(stageConditions) > 0 {
+		query.Where(strings.Join(stageConditions, " OR "))
+	}
 }
 
 func (s *DropReport) handleStages(query *bun.SelectQuery, stageIds []int) {
@@ -382,9 +386,13 @@ func (s *DropReport) handleCreatedAtWithTimeRange(query *bun.SelectQuery, timeRa
 	}
 }
 
-func (s *DropReport) handleCreatedAtWithTime(query *bun.SelectQuery, start time.Time, end time.Time) {
-	query = query.Where("dr.created_at >= to_timestamp(?)", start.Unix())
-	query = query.Where("dr.created_at < to_timestamp(?)", end.Unix())
+func (s *DropReport) handleCreatedAtWithTime(query *bun.SelectQuery, start *time.Time, end *time.Time) {
+	if start != nil {
+		query = query.Where("dr.created_at >= to_timestamp(?)", start.Unix())
+	}
+	if end != nil {
+		query = query.Where("dr.created_at < to_timestamp(?)", end.Unix())
+	}
 }
 
 func (s *DropReport) handleServer(query *bun.SelectQuery, server string) {
