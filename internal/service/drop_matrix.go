@@ -266,16 +266,25 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 
 	var combinedResults []*model.CombinedResultForDropMatrix
 	for _, timeRange := range timeRanges {
-		stageIdItemIdMap := util.GetStageIdItemIdMapFromDropInfos(dropInfos)
-		quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, stageIdItemIdMap, accountId, sourceCategory)
+		stageItemFilter := util.GetStageIdItemIdMapFromDropInfos(dropInfos)
+		queryCtx := &model.DropReportQueryContext{
+			Server:             server,
+			StartTime:          timeRange.StartTime,
+			EndTime:            timeRange.EndTime,
+			AccountID:          accountId,
+			StageItemFilter:    &stageItemFilter,
+			SourceCategory:     sourceCategory,
+			ExcludeNonOneTimes: true,
+		}
+		quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, queryCtx)
 		if err != nil {
 			return nil, err
 		}
-		timesResults, err := s.DropReportService.CalcTotalTimesForDropMatrix(ctx, server, timeRange, util.GetStageIdsFromDropInfos(dropInfos), accountId, sourceCategory)
+		timesResults, err := s.DropReportService.CalcTotalTimesForDropMatrix(ctx, queryCtx)
 		if err != nil {
 			return nil, err
 		}
-		quantityUniqCountResults, err := s.DropReportService.CalcQuantityUniqCount(ctx, server, timeRange, stageIdItemIdMap, accountId, sourceCategory)
+		quantityUniqCountResults, err := s.DropReportService.CalcQuantityUniqCount(ctx, queryCtx)
 		if err != nil {
 			return nil, err
 		}
