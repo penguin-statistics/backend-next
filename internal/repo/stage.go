@@ -14,62 +14,35 @@ import (
 	"exusiai.dev/backend-next/internal/model"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
 type Stage struct {
+	sel selector.S[model.Stage]
+
 	db *bun.DB
 }
 
 func NewStage(db *bun.DB) *Stage {
-	return &Stage{db: db}
+	return &Stage{db: db, sel: selector.New[model.Stage](db)}
 }
 
 func (c *Stage) GetStages(ctx context.Context) ([]*model.Stage, error) {
-	var stages []*model.Stage
-	err := c.db.NewSelect().
-		Model(&stages).
-		Order("stage_id ASC").
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return stages, nil
+	return c.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Order("stage_id ASC")
+	})
 }
 
 func (c *Stage) GetStageById(ctx context.Context, stageId int) (*model.Stage, error) {
-	var stage model.Stage
-	err := c.db.NewSelect().
-		Model(&stage).
-		Where("stage_id = ?", stageId).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return &stage, nil
+	return c.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("stage_id = ?", stageId)
+	})
 }
 
 func (c *Stage) GetStageByArkId(ctx context.Context, arkStageId string) (*model.Stage, error) {
-	var stage model.Stage
-	err := c.db.NewSelect().
-		Model(&stage).
-		Where("ark_stage_id = ?", arkStageId).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return &stage, nil
+	return c.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("ark_stage_id = ?", arkStageId)
+	})
 }
 
 func (c *Stage) shimStageQuery(ctx context.Context, server string, stages *[]*modelv2.Stage, t time.Time) error {
@@ -160,16 +133,11 @@ func (c *Stage) GetShimStageByArkId(ctx context.Context, arkStageId string, serv
 }
 
 func (c *Stage) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId string) (null.String, error) {
-	var stage model.Stage
-	err := c.db.NewSelect().
-		Model(&stage).
-		Column("st.extra_process_type").
-		Where("st.ark_stage_id = ?", arkStageId).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return null.NewString("", false), pgerr.ErrNotFound
-	} else if err != nil {
+	stage, err := c.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Column("st.extra_process_type").
+			Where("ark_stage_id = ?", arkStageId)
+	})
+	if err != nil {
 		return null.NewString("", false), err
 	}
 
@@ -177,33 +145,13 @@ func (c *Stage) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId 
 }
 
 func (c *Stage) SearchStageByCode(ctx context.Context, code string) (*model.Stage, error) {
-	var stage model.Stage
-	err := c.db.NewSelect().
-		Model(&stage).
-		Where("\"code\"::TEXT ILIKE ?", "%"+code+"%").
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return &stage, nil
+	return c.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("\"code\"::TEXT ILIKE ?", "%"+code+"%")
+	})
 }
 
 func (c *Stage) GetGachaBoxStages(ctx context.Context) ([]*model.Stage, error) {
-	var stages []*model.Stage
-	err := c.db.NewSelect().
-		Model(&stages).
-		Where("extra_process_type = ?", constant.ExtraProcessTypeGachaBox).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return stages, nil
+	return c.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("extra_process_type = ?", constant.ExtraProcessTypeGachaBox)
+	})
 }
