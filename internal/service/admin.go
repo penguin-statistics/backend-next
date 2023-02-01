@@ -157,7 +157,7 @@ func (s *Admin) GetRejectRulesReportContext(ctx context.Context, req types.Rejec
 
 	var dropReports []dropReportJoinedResult
 
-	err := s.DropReportService.DropReportRepo.DB.NewSelect().
+	err := s.DB.NewSelect().
 		Model(&dropReports).
 		ColumnExpr("dr.*").
 		ColumnExpr("dre.*").
