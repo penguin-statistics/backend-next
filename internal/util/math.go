@@ -12,14 +12,6 @@ type StatsBundle struct {
 	StdDev float64
 }
 
-func NewStatsBundle(n int, avg float64, stdDev float64) *StatsBundle {
-	return &StatsBundle{
-		N:      n,
-		Avg:    avg,
-		StdDev: stdDev,
-	}
-}
-
 func CalcStdDevFromQuantityBuckets(quantityBuckets map[int]int, times int, isUnbiased bool) float64 {
 	sum := 0
 	squareSum := 0
