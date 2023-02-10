@@ -14,62 +14,34 @@ import (
 
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/types"
-	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
 type DropPattern struct {
-	DB *bun.DB
+	db  *bun.DB
+	sel selector.S[model.DropPattern]
 }
 
 func NewDropPattern(db *bun.DB) *DropPattern {
-	return &DropPattern{DB: db}
+	return &DropPattern{db: db, sel: selector.New[model.DropPattern](db)}
 }
 
 func (s *DropPattern) GetDropPatterns(ctx context.Context) ([]*model.DropPattern, error) {
-	dropPatterns := make([]*model.DropPattern, 0)
-	err := s.DB.NewSelect().
-		Model(&dropPatterns).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return dropPatterns, nil
+	return s.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q
+	})
 }
 
 func (s *DropPattern) GetDropPatternById(ctx context.Context, id int) (*model.DropPattern, error) {
-	var dropPattern model.DropPattern
-	err := s.DB.NewSelect().
-		Model(&dropPattern).
-		Where("id = ?", id).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return &dropPattern, nil
+	return s.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("id = ?", id)
+	})
 }
 
 func (s *DropPattern) GetDropPatternByHash(ctx context.Context, hash string) (*model.DropPattern, error) {
-	var dropPattern model.DropPattern
-	err := s.DB.NewSelect().
-		Model(&dropPattern).
-		Where("hash = ?", hash).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return &dropPattern, nil
+	return s.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("hash = ?", hash)
+	})
 }
 
 func (s *DropPattern) GetOrCreateDropPatternFromDrops(ctx context.Context, tx bun.Tx, drops []*types.Drop) (*model.DropPattern, bool, error) {
