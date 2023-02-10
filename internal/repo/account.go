@@ -27,7 +27,7 @@ func NewAccount(db *bun.DB) *Account {
 	}
 }
 
-func (c *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.Account, error) {
+func (r *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.Account, error) {
 	// retry if account already exists
 	for i := 0; i < AccountMaxRetries; i++ {
 		account := &model.Account{
@@ -35,7 +35,7 @@ func (c *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.
 			CreatedAt: time.Now(),
 		}
 
-		_, err := c.db.NewInsert().
+		_, err := r.db.NewInsert().
 			Model(account).
 			Returning("account_id").
 			Exec(ctx)
@@ -61,20 +61,20 @@ func (c *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.
 	return nil, pgerr.ErrInternalError.Msg("failed to create account")
 }
 
-func (c *Account) GetAccountById(ctx context.Context, accountId string) (*model.Account, error) {
-	return c.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Account) GetAccountById(ctx context.Context, accountId string) (*model.Account, error) {
+	return r.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("account_id = ?", accountId)
 	})
 }
 
-func (c *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (*model.Account, error) {
-	return c.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (*model.Account, error) {
+	return r.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("penguin_id = ?", penguinId)
 	})
 }
 
-func (c *Account) IsAccountExistWithId(ctx context.Context, accountId int) bool {
-	account, err := c.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Account) IsAccountExistWithId(ctx context.Context, accountId int) bool {
+	account, err := r.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Column("account_id").Where("account_id = ?", accountId)
 	})
 	if err != nil {

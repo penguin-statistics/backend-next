@@ -20,8 +20,8 @@ func NewDropMatrixElement(db *bun.DB) *DropMatrixElement {
 	return &DropMatrixElement{db: db, sel: selector.New[model.DropMatrixElement](db)}
 }
 
-func (s *DropMatrixElement) BatchSaveElements(ctx context.Context, elements []*model.DropMatrixElement, server string) error {
-	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+func (r *DropMatrixElement) BatchSaveElements(ctx context.Context, elements []*model.DropMatrixElement, server string) error {
+	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		_, err := tx.NewDelete().Model((*model.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
 		if err != nil {
 			return err
@@ -35,14 +35,14 @@ func (s *DropMatrixElement) BatchSaveElements(ctx context.Context, elements []*m
 	return nil
 }
 
-func (s *DropMatrixElement) DeleteByServer(ctx context.Context, server string) error {
-	_, err := s.db.NewDelete().Model((*model.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
+func (r *DropMatrixElement) DeleteByServer(ctx context.Context, server string) error {
+	_, err := r.db.NewDelete().Model((*model.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
 	return err
 }
 
-func (s *DropMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.DropMatrixElement, error) {
+func (r *DropMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.DropMatrixElement, error) {
 	var elements []*model.DropMatrixElement
-	err := s.db.NewSelect().Model(&elements).Where("server = ?", server).Where("source_category = ?", sourceCategory).Scan(ctx)
+	err := r.db.NewSelect().Model(&elements).Where("server = ?", server).Where("source_category = ?", sourceCategory).Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	} else if err != nil {
