@@ -16,9 +16,8 @@ import (
 const AccountMaxRetries = 100
 
 type Account struct {
+	db  *bun.DB
 	sel selector.S[model.Account]
-
-	db *bun.DB
 }
 
 func NewAccount(db *bun.DB) *Account {

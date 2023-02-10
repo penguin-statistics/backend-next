@@ -10,8 +10,7 @@ import (
 )
 
 type Activity struct {
-	db *bun.DB
-
+	db  *bun.DB
 	sel selector.S[model.Activity]
 }
 
