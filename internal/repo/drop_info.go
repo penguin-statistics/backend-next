@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
@@ -17,64 +18,34 @@ import (
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/pkg/pgqry"
-	"exusiai.dev/gommon/constant"
+	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
 type DropInfo struct {
-	DB *bun.DB
+	db  *bun.DB
+	sel selector.S[model.DropInfo]
 }
 
 func NewDropInfo(db *bun.DB) *DropInfo {
-	return &DropInfo{DB: db}
+	return &DropInfo{db: db, sel: selector.New[model.DropInfo](db)}
 }
 
 func (s *DropInfo) GetDropInfo(ctx context.Context, id int) (*model.DropInfo, error) {
-	var dropInfo model.DropInfo
-	err := s.DB.NewSelect().
-		Model(&dropInfo).
-		Where("id = ?", id).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return &dropInfo, nil
+	return s.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("id = ?", id)
+	})
 }
 
 func (s *DropInfo) GetDropInfosByServerAndStageId(ctx context.Context, server string, stageId int) ([]*model.DropInfo, error) {
-	var dropInfo []*model.DropInfo
-	err := s.DB.NewSelect().
-		Model(&dropInfo).
-		Where("stage_id = ?", stageId).
-		Where("server = ?", server).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return dropInfo, nil
+	return s.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("stage_id = ?", stageId).Where("server = ?", server)
+	})
 }
 
 func (s *DropInfo) GetDropInfosByServer(ctx context.Context, server string) ([]*model.DropInfo, error) {
-	var dropInfo []*model.DropInfo
-	err := s.DB.NewSelect().
-		Model(&dropInfo).
-		Where("server = ?", server).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return dropInfo, nil
+	return s.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("server = ?", server)
+	})
 }
 
 type DropInfoQuery struct {
@@ -86,7 +57,7 @@ type DropInfoQuery struct {
 func (s *DropInfo) GetForCurrentTimeRange(ctx context.Context, query *DropInfoQuery) ([]*model.DropInfo, error) {
 	var dropInfo []*model.DropInfo
 	err := pgqry.New(
-		s.DB.NewSelect().
+		s.db.NewSelect().
 			Model(&dropInfo).
 			Where("di.server = ?", query.Server).
 			Where("st.ark_stage_id = ?", query.ArkStageId),
@@ -108,7 +79,7 @@ func (s *DropInfo) GetForCurrentTimeRange(ctx context.Context, query *DropInfoQu
 
 func (s *DropInfo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server string, stageId int, rangeId int) ([]int, error) {
 	var results []int
-	err := s.DB.NewSelect().
+	err := s.db.NewSelect().
 		Column("di.item_id").
 		Model((*model.DropInfo)(nil)).
 		Where("di.server = ?", server).
@@ -186,7 +157,7 @@ func (s *DropInfo) GetDropInfosWithFilters(ctx context.Context, server string, t
 			}
 		}
 	}
-	if err := s.DB.NewSelect().TableExpr("drop_infos as di").Column("di.stage_id", "di.item_id", "di.accumulable").
+	if err := s.db.NewSelect().TableExpr("drop_infos as di").Column("di.stage_id", "di.item_id", "di.accumulable").
 		Where(whereBuilder.String(), server, constant.DropTypeRecognitionOnly, bun.In(stageIdFilter), bun.In(itemIdFilter)).
 		Join("JOIN time_ranges AS tr ON tr.range_id = di.range_id").
 		Scan(ctx, &results); err != nil {

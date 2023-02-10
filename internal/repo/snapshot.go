@@ -10,8 +10,7 @@ import (
 )
 
 type Snapshot struct {
-	db *bun.DB
-
+	db  *bun.DB
 	sel selector.S[model.Snapshot]
 }
 
