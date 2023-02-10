@@ -6,14 +6,16 @@ import (
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
 type TimeRange struct {
-	db *bun.DB
+	db  *bun.DB
+	sel selector.S[model.TimeRange]
 }
 
 func NewTimeRange(db *bun.DB) *TimeRange {
-	return &TimeRange{db: db}
+	return &TimeRange{db: db, sel: selector.New[model.TimeRange](db)}
 }
 
 func (r *TimeRange) GetTimeRangesByServer(ctx context.Context, server string) ([]*model.TimeRange, error) {

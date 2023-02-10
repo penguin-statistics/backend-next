@@ -8,14 +8,16 @@ import (
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
 type TrendElement struct {
-	db *bun.DB
+	db  *bun.DB
+	sel selector.S[model.TrendElement]
 }
 
 func NewTrendElement(db *bun.DB) *TrendElement {
-	return &TrendElement{db: db}
+	return &TrendElement{db: db, sel: selector.New[model.TrendElement](db)}
 }
 
 func (r *TrendElement) BatchSaveElements(ctx context.Context, elements []*model.TrendElement, server string) error {
