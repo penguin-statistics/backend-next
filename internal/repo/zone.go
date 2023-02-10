@@ -10,62 +10,39 @@ import (
 	"exusiai.dev/backend-next/internal/model"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
 type Zone struct {
-	db *bun.DB
+	db    *bun.DB
+	v2sel selector.S[modelv2.Zone]
+	v3sel selector.S[model.Zone]
 }
 
 func NewZone(db *bun.DB) *Zone {
-	return &Zone{db: db}
+	return &Zone{
+		db:    db,
+		v2sel: selector.New[modelv2.Zone](db),
+		v3sel: selector.New[model.Zone](db),
+	}
 }
 
 func (c *Zone) GetZones(ctx context.Context) ([]*model.Zone, error) {
-	var zones []*model.Zone
-	err := c.db.NewSelect().
-		Model(&zones).
-		Order("zone_id ASC").
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return zones, nil
+	return c.v3sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Order("zone_id ASC")
+	})
 }
 
 func (c *Zone) GetZoneById(ctx context.Context, id int) (*model.Zone, error) {
-	var zone model.Zone
-	err := c.db.NewSelect().
-		Model(&zone).
-		Where("zone_id = ?", id).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return &zone, nil
+	return c.v3sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("zone_id = ?", id)
+	})
 }
 
 func (c *Zone) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model.Zone, error) {
-	var zone model.Zone
-	err := c.db.NewSelect().
-		Model(&zone).
-		Where("ark_zone_id = ?", arkZoneId).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return &zone, nil
+	return c.v3sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("ark_zone_id = ?", arkZoneId)
+	})
 }
 
 func (c *Zone) GetShimZones(ctx context.Context) ([]*modelv2.Zone, error) {
