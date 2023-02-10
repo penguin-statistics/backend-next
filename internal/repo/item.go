@@ -25,44 +25,44 @@ func NewItem(db *bun.DB) *Item {
 	}
 }
 
-func (c *Item) GetItems(ctx context.Context) ([]*model.Item, error) {
-	return c.v3sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Item) GetItems(ctx context.Context) ([]*model.Item, error) {
+	return r.v3sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Order("item_id ASC")
 	})
 }
 
-func (c *Item) GetItemById(ctx context.Context, itemId int) (*model.Item, error) {
-	return c.v3sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Item) GetItemById(ctx context.Context, itemId int) (*model.Item, error) {
+	return r.v3sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("item_id = ?", itemId)
 	})
 }
 
-func (c *Item) GetItemByArkId(ctx context.Context, arkItemId string) (*model.Item, error) {
-	return c.v3sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Item) GetItemByArkId(ctx context.Context, arkItemId string) (*model.Item, error) {
+	return r.v3sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("ark_item_id = ?", arkItemId)
 	})
 }
 
-func (c *Item) GetShimItems(ctx context.Context) ([]*modelv2.Item, error) {
-	return c.v2sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Item) GetShimItems(ctx context.Context) ([]*modelv2.Item, error) {
+	return r.v2sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Order("item_id ASC")
 	})
 }
 
-func (c *Item) GetShimItemByArkId(ctx context.Context, itemId string) (*modelv2.Item, error) {
-	return c.v2sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Item) GetShimItemByArkId(ctx context.Context, itemId string) (*modelv2.Item, error) {
+	return r.v2sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("ark_item_id = ?", itemId)
 	})
 }
 
-func (c *Item) SearchItemByName(ctx context.Context, name string) (*model.Item, error) {
-	return c.v3sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Item) SearchItemByName(ctx context.Context, name string) (*model.Item, error) {
+	return r.v3sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("\"name\"::TEXT ILIKE ?", "%"+name+"%")
 	})
 }
 
-func (c *Item) GetRecruitTagItems(ctx context.Context) ([]*model.Item, error) {
-	return c.v3sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Item) GetRecruitTagItems(ctx context.Context) ([]*model.Item, error) {
+	return r.v3sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("type = ?", constant.RecruitItemType).Order("item_id ASC")
 	})
 }
