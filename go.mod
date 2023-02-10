@@ -7,7 +7,7 @@ require (
 	github.com/ahmetb/go-linq/v3 v3.2.0
 	github.com/ansrivas/fiberprometheus/v2 v2.5.0
 	github.com/antonmedv/expr v1.12.0
-	github.com/avast/retry-go/v3 v3.1.1
+	github.com/avast/retry-go/v4 v4.3.3
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/uniuri v1.2.0
 	github.com/felixge/fgprof v0.9.3
@@ -67,7 +67,6 @@ require (
 	github.com/DataDog/datadog-go/v5 v5.0.2 // indirect
 	github.com/DataDog/gostackparse v0.5.0 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
-	github.com/avast/retry-go/v4 v4.3.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
@@ -93,7 +92,7 @@ require (
 	go.opentelemetry.io/contrib v1.12.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.12.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
-	google.golang.org/genproto v0.0.0-20211118181313-81c1377c94b1 // indirect
+	google.golang.org/genproto v0.0.0-20221118155620-16455021b5e6 // indirect
 )
 
 require (
