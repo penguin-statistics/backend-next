@@ -30,20 +30,20 @@ func NewDropInfo(db *bun.DB) *DropInfo {
 	return &DropInfo{db: db, sel: selector.New[model.DropInfo](db)}
 }
 
-func (s *DropInfo) GetDropInfo(ctx context.Context, id int) (*model.DropInfo, error) {
-	return s.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *DropInfo) GetDropInfo(ctx context.Context, id int) (*model.DropInfo, error) {
+	return r.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("id = ?", id)
 	})
 }
 
-func (s *DropInfo) GetDropInfosByServerAndStageId(ctx context.Context, server string, stageId int) ([]*model.DropInfo, error) {
-	return s.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *DropInfo) GetDropInfosByServerAndStageId(ctx context.Context, server string, stageId int) ([]*model.DropInfo, error) {
+	return r.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("stage_id = ?", stageId).Where("server = ?", server)
 	})
 }
 
-func (s *DropInfo) GetDropInfosByServer(ctx context.Context, server string) ([]*model.DropInfo, error) {
-	return s.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *DropInfo) GetDropInfosByServer(ctx context.Context, server string) ([]*model.DropInfo, error) {
+	return r.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("server = ?", server)
 	})
 }
@@ -54,10 +54,10 @@ type DropInfoQuery struct {
 }
 
 // GetDropInfoByArkId returns a drop info by its ark id.
-func (s *DropInfo) GetForCurrentTimeRange(ctx context.Context, query *DropInfoQuery) ([]*model.DropInfo, error) {
+func (r *DropInfo) GetForCurrentTimeRange(ctx context.Context, query *DropInfoQuery) ([]*model.DropInfo, error) {
 	var dropInfo []*model.DropInfo
 	err := pgqry.New(
-		s.db.NewSelect().
+		r.db.NewSelect().
 			Model(&dropInfo).
 			Where("di.server = ?", query.Server).
 			Where("st.ark_stage_id = ?", query.ArkStageId),
@@ -77,9 +77,9 @@ func (s *DropInfo) GetForCurrentTimeRange(ctx context.Context, query *DropInfoQu
 	return dropInfo, nil
 }
 
-func (s *DropInfo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server string, stageId int, rangeId int) ([]int, error) {
+func (r *DropInfo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server string, stageId int, rangeId int) ([]int, error) {
 	var results []int
-	err := s.db.NewSelect().
+	err := r.db.NewSelect().
 		Column("di.item_id").
 		Model((*model.DropInfo)(nil)).
 		Where("di.server = ?", server).
@@ -95,12 +95,12 @@ func (s *DropInfo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server
 	}
 
 	results = lo.Uniq(results)
-	results = sort.IntSlice(results)
+	sort.Ints(results)
 	return results, nil
 }
 
-func (s *DropInfo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) (itemDropInfos, typeDropInfos []*model.DropInfo, err error) {
-	allDropInfos, err := s.GetForCurrentTimeRange(ctx, query)
+func (r *DropInfo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) (itemDropInfos, typeDropInfos []*model.DropInfo, err error) {
+	allDropInfos, err := r.GetForCurrentTimeRange(ctx, query)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -117,7 +117,7 @@ func (s *DropInfo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, quer
 	return itemDropInfos, typeDropInfos, nil
 }
 
-func (s *DropInfo) GetDropInfosWithFilters(ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*model.DropInfo, error) {
+func (r *DropInfo) GetDropInfosWithFilters(ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*model.DropInfo, error) {
 	results := make([]*model.DropInfo, 0)
 	var whereBuilder strings.Builder
 	fmt.Fprintf(&whereBuilder, "di.server = ? AND di.drop_type != ? AND di.item_id IS NOT NULL")
@@ -157,7 +157,7 @@ func (s *DropInfo) GetDropInfosWithFilters(ctx context.Context, server string, t
 			}
 		}
 	}
-	if err := s.db.NewSelect().TableExpr("drop_infos as di").Column("di.stage_id", "di.item_id", "di.accumulable").
+	if err := r.db.NewSelect().TableExpr("drop_infos as di").Column("di.stage_id", "di.item_id", "di.accumulable").
 		Where(whereBuilder.String(), server, constant.DropTypeRecognitionOnly, bun.In(stageIdFilter), bun.In(itemIdFilter)).
 		Join("JOIN time_ranges AS tr ON tr.range_id = di.range_id").
 		Scan(ctx, &results); err != nil {

@@ -18,8 +18,8 @@ func NewActivity(db *bun.DB) *Activity {
 	return &Activity{db: db, sel: selector.New[model.Activity](db)}
 }
 
-func (c *Activity) GetActivities(ctx context.Context) ([]*model.Activity, error) {
-	return c.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Activity) GetActivities(ctx context.Context) ([]*model.Activity, error) {
+	return r.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Order("activity_id ASC")
 	})
 }
