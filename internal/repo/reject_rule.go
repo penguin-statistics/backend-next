@@ -16,16 +16,16 @@ const (
 )
 
 type RejectRule struct {
-	DB *bun.DB
+	db *bun.DB
 }
 
 func NewRejectRule(db *bun.DB) *RejectRule {
-	return &RejectRule{DB: db}
+	return &RejectRule{db: db}
 }
 
 func (r *RejectRule) GetRejectRule(ctx context.Context, id int) (*model.RejectRule, error) {
 	var rejectRule model.RejectRule
-	err := r.DB.NewSelect().
+	err := r.db.NewSelect().
 		Model(&rejectRule).
 		Where("rule_id = ?", id).
 		Scan(ctx)
@@ -41,7 +41,7 @@ func (r *RejectRule) GetRejectRule(ctx context.Context, id int) (*model.RejectRu
 
 func (r *RejectRule) GetAllActiveRejectRules(ctx context.Context) ([]*model.RejectRule, error) {
 	var rejectRule []*model.RejectRule
-	err := r.DB.NewSelect().
+	err := r.db.NewSelect().
 		Model(&rejectRule).
 		Where("status = ?", RejectRuleActiveStatus).
 		Order("rule_id ASC").
