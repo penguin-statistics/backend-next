@@ -5,7 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/avast/retry-go/v3"
+	"exusiai.dev/gommon/constant"
+	"github.com/avast/retry-go/v4"
 	"github.com/go-redsync/redsync/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -13,7 +14,6 @@ import (
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/service"
-	"exusiai.dev/gommon/constant"
 )
 
 type WorkerDeps struct {
