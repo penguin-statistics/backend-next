@@ -16,9 +16,9 @@ func NewTimeRange(db *bun.DB) *TimeRange {
 	return &TimeRange{db: db}
 }
 
-func (c *TimeRange) GetTimeRangesByServer(ctx context.Context, server string) ([]*model.TimeRange, error) {
+func (r *TimeRange) GetTimeRangesByServer(ctx context.Context, server string) ([]*model.TimeRange, error) {
 	var timeRanges []*model.TimeRange
-	if err := c.db.NewSelect().
+	if err := r.db.NewSelect().
 		Model(&timeRanges).
 		Where("tr.server = ?", server).
 		Scan(ctx); err != nil {
@@ -27,9 +27,9 @@ func (c *TimeRange) GetTimeRangesByServer(ctx context.Context, server string) ([
 	return timeRanges, nil
 }
 
-func (c *TimeRange) GetTimeRangeById(ctx context.Context, rangeId int) (*model.TimeRange, error) {
+func (r *TimeRange) GetTimeRangeById(ctx context.Context, rangeId int) (*model.TimeRange, error) {
 	var timeRange model.TimeRange
-	if err := c.db.NewSelect().
+	if err := r.db.NewSelect().
 		Model(&timeRange).
 		Where("tr.range_id = ?", rangeId).
 		Scan(ctx); err != nil {
