@@ -21,32 +21,32 @@ func NewSnapshot(db *bun.DB) *Snapshot {
 	}
 }
 
-func (s *Snapshot) GetSnapshotById(ctx context.Context, id int) (*model.Snapshot, error) {
-	return s.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Snapshot) GetSnapshotById(ctx context.Context, id int) (*model.Snapshot, error) {
+	return r.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("id = ?", id)
 	})
 }
 
-func (s *Snapshot) GetSnapshotsByIds(ctx context.Context, ids []int) ([]*model.Snapshot, error) {
-	return s.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Snapshot) GetSnapshotsByIds(ctx context.Context, ids []int) ([]*model.Snapshot, error) {
+	return r.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("id IN (?)", ids)
 	})
 }
 
-func (s *Snapshot) GetLatestSnapshotByKey(ctx context.Context, key string) (*model.Snapshot, error) {
-	return s.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Snapshot) GetLatestSnapshotByKey(ctx context.Context, key string) (*model.Snapshot, error) {
+	return r.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("key = ?", key).OrderExpr("snapshot_id DESC").Limit(1)
 	})
 }
 
-func (s *Snapshot) GetSnapshotsByVersions(ctx context.Context, key string, versions []string) ([]*model.Snapshot, error) {
-	return s.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Snapshot) GetSnapshotsByVersions(ctx context.Context, key string, versions []string) ([]*model.Snapshot, error) {
+	return r.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("key = ?", key).Where("version IN (?)", bun.In(versions))
 	})
 }
 
-func (s *Snapshot) SaveSnapshot(ctx context.Context, snapshot *model.Snapshot) (*model.Snapshot, error) {
-	_, err := s.db.NewInsert().
+func (r *Snapshot) SaveSnapshot(ctx context.Context, snapshot *model.Snapshot) (*model.Snapshot, error) {
+	_, err := r.db.NewInsert().
 		Model(snapshot).
 		Exec(ctx)
 	if err != nil {
