@@ -10,14 +10,14 @@ import (
 )
 
 type Snapshot struct {
-	sel selector.S[model.Snapshot]
+	db *bun.DB
 
-	DB *bun.DB
+	sel selector.S[model.Snapshot]
 }
 
 func NewSnapshot(db *bun.DB) *Snapshot {
 	return &Snapshot{
-		DB:  db,
+		db:  db,
 		sel: selector.New[model.Snapshot](db),
 	}
 }
@@ -47,7 +47,7 @@ func (s *Snapshot) GetSnapshotsByVersions(ctx context.Context, key string, versi
 }
 
 func (s *Snapshot) SaveSnapshot(ctx context.Context, snapshot *model.Snapshot) (*model.Snapshot, error) {
-	_, err := s.DB.NewInsert().
+	_, err := s.db.NewInsert().
 		Model(snapshot).
 		Exec(ctx)
 	if err != nil {
