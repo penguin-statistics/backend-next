@@ -2,26 +2,30 @@ package repo
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/pkg/pgid"
+	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
 const AccountMaxRetries = 100
 
 type Account struct {
+	sel selector.S[model.Account]
+
 	db *bun.DB
 }
 
 func NewAccount(db *bun.DB) *Account {
-	return &Account{db: db}
+	return &Account{
+		db:  db,
+		sel: selector.New[model.Account](db),
+	}
 }
 
 func (c *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.Account, error) {
@@ -59,51 +63,24 @@ func (c *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.
 }
 
 func (c *Account) GetAccountById(ctx context.Context, accountId string) (*model.Account, error) {
-	var account model.Account
-
-	err := c.db.NewSelect().
-		Model(&account).
-		Column("account_id").
-		Where("account_id = ?", accountId).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return &account, nil
+	return c.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("account_id = ?", accountId)
+	})
 }
 
 func (c *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (*model.Account, error) {
-	var account model.Account
-
-	err := c.db.NewSelect().
-		Model(&account).
-		Where("penguin_id = ?", penguinId).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return &account, nil
+	return c.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("penguin_id = ?", penguinId)
+	})
 }
 
 func (c *Account) IsAccountExistWithId(ctx context.Context, accountId int) bool {
-	var account model.Account
-
-	err := c.db.NewSelect().
-		Model(&account).
-		Column("account_id").
-		Where("account_id = ?", accountId).
-		Scan(ctx, &account)
+	account, err := c.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Column("account_id").Where("account_id = ?", accountId)
+	})
 	if err != nil {
 		return false
 	}
 
-	return account.AccountID > 0
+	return account != nil
 }
