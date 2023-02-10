@@ -2,9 +2,7 @@ package repo
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model"
