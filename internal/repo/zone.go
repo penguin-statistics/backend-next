@@ -27,14 +27,14 @@ func NewZone(db *bun.DB) *Zone {
 	}
 }
 
-func (c *Zone) GetZones(ctx context.Context) ([]*model.Zone, error) {
-	return c.v3sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Zone) GetZones(ctx context.Context) ([]*model.Zone, error) {
+	return r.v3sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Order("zone_id ASC")
 	})
 }
 
-func (c *Zone) GetZoneById(ctx context.Context, id int) (*model.Zone, error) {
-	return c.v3sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+func (r *Zone) GetZoneById(ctx context.Context, id int) (*model.Zone, error) {
+	return r.v3sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("zone_id = ?", id)
 	})
 }
@@ -45,10 +45,10 @@ func (c *Zone) GetZoneByArkId(ctx context.Context, arkZoneId string) (*model.Zon
 	})
 }
 
-func (c *Zone) GetShimZones(ctx context.Context) ([]*modelv2.Zone, error) {
+func (r *Zone) GetShimZones(ctx context.Context) ([]*modelv2.Zone, error) {
 	var zones []*modelv2.Zone
 
-	err := c.db.NewSelect().
+	err := r.db.NewSelect().
 		Model(&zones).
 		// `Stages` shall match the model's `Stages` field name, rather for any else references
 		Relation("Stages", func(q *bun.SelectQuery) *bun.SelectQuery {
@@ -68,9 +68,9 @@ func (c *Zone) GetShimZones(ctx context.Context) ([]*modelv2.Zone, error) {
 	return zones, nil
 }
 
-func (c *Zone) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*modelv2.Zone, error) {
+func (r *Zone) GetShimZoneByArkId(ctx context.Context, arkZoneId string) (*modelv2.Zone, error) {
 	var zone modelv2.Zone
-	err := c.db.NewSelect().
+	err := r.db.NewSelect().
 		Model(&zone).
 		Relation("Stages", func(q *bun.SelectQuery) *bun.SelectQuery {
 			// zone_id is for go-pg/pg's internal joining for has-many relationship. removing it will cause an error

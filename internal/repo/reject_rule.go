@@ -23,9 +23,9 @@ func NewRejectRule(db *bun.DB) *RejectRule {
 	return &RejectRule{DB: db}
 }
 
-func (s *RejectRule) GetRejectRule(ctx context.Context, id int) (*model.RejectRule, error) {
+func (r *RejectRule) GetRejectRule(ctx context.Context, id int) (*model.RejectRule, error) {
 	var rejectRule model.RejectRule
-	err := s.DB.NewSelect().
+	err := r.DB.NewSelect().
 		Model(&rejectRule).
 		Where("rule_id = ?", id).
 		Scan(ctx)
@@ -39,9 +39,9 @@ func (s *RejectRule) GetRejectRule(ctx context.Context, id int) (*model.RejectRu
 	return &rejectRule, nil
 }
 
-func (s *RejectRule) GetAllActiveRejectRules(ctx context.Context) ([]*model.RejectRule, error) {
+func (r *RejectRule) GetAllActiveRejectRules(ctx context.Context) ([]*model.RejectRule, error) {
 	var rejectRule []*model.RejectRule
-	err := s.DB.NewSelect().
+	err := r.DB.NewSelect().
 		Model(&rejectRule).
 		Where("status = ?", RejectRuleActiveStatus).
 		Order("rule_id ASC").
