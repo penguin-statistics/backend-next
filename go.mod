@@ -8,6 +8,7 @@ require (
 	github.com/ansrivas/fiberprometheus/v2 v2.5.0
 	github.com/antonmedv/expr v1.12.0
 	github.com/avast/retry-go/v3 v3.1.1
+	github.com/avast/retry-go/v4 v4.3.3
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/uniuri v1.2.0
 	github.com/felixge/fgprof v0.9.3
@@ -19,7 +20,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-redsync/redsync/v4 v4.7.1
 	github.com/goccy/go-json v0.10.0
-	github.com/gofiber/contrib/fibersentry v0.0.0-20230131211242-a28f9d6afd49
+	github.com/gofiber/contrib/fibersentry v0.0.0-20230209220352-3aae4df40ccc
 	github.com/gofiber/contrib/otelfiber v0.0.0-20221221212612-92599266f187
 	github.com/gofiber/fiber/v2 v2.41.0
 	github.com/gofiber/helmet/v2 v2.2.23
@@ -67,7 +68,6 @@ require (
 	github.com/DataDog/datadog-go/v5 v5.0.2 // indirect
 	github.com/DataDog/gostackparse v0.5.0 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
-	github.com/avast/retry-go/v4 v4.3.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
