@@ -20,7 +20,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-redsync/redsync/v4 v4.7.1
 	github.com/goccy/go-json v0.10.0
-	github.com/gofiber/contrib/fibersentry v0.0.0-20230209220352-3aae4df40ccc
+	github.com/gofiber/contrib/fibersentry v0.0.0-20230214221137-36b97d3ad36f
 	github.com/gofiber/contrib/otelfiber v0.0.0-20221221212612-92599266f187
 	github.com/gofiber/fiber/v2 v2.41.0
 	github.com/gofiber/helmet/v2 v2.2.23
