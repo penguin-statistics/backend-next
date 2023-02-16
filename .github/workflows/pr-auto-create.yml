@@ -33,7 +33,7 @@ jobs:
             })
             const nextRelease = lastRelease.replace(/(\d+)$/, (match, p1) => Number(p1) + 1)
             const prTitle = `Release ${nextRelease}`
-            const pr = await github.pulls.create({
+            const pr = await github.rest.pulls.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: prTitle,
