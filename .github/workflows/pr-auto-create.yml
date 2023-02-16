@@ -7,7 +7,7 @@ on:
       - dev
 
 concurrency:
-  group: tagger-${{ github.ref }}
+  group: pr-creator-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
