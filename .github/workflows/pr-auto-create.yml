@@ -38,7 +38,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: prTitle,
-              body: `*This PR is automatically created by actions defined in this repository. To see the run log of this action, please click [here](/${{ github.repository }}/actions/runs/${{ github.run_id }})*`,
+              body: `> *This PR is automatically created by actions defined in this repository. To see the run log of this action, please click [here](/${{ github.repository }}/actions/runs/${{ github.run_id }})*`,
               head: context.ref,
               base: 'main',
               draft: true
