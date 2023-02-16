@@ -26,6 +26,7 @@ jobs:
         # ignore errors if PR already exists
         continue-on-error: true
         with:
+          github-token: ${{ secrets.PAT_FOR_RELEASE_TAGGER }}
           script: |
             const { data: { tag_name: lastRelease } } = await github.rest.repos.getLatestRelease({
               owner: context.repo.owner,
@@ -37,6 +38,8 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: prTitle,
+              body: `*This PR is automatically created by actions defined in this repository. To see the run log of this action, please click [here](/${{ github.repository }}/actions/runs/${{ github.run_id }})*`,
               head: context.ref,
-              base: 'main'
+              base: 'main',
+              draft: true
             })
