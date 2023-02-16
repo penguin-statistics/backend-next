@@ -85,9 +85,9 @@ func Start(conf *appconfig.Config, deps WorkerDeps) {
 }
 
 func (w *Worker) Consumer(ctx context.Context, ch chan error) error {
-	msgChan := make(chan *nats.Msg, 16)
+	msgChan := make(chan *nats.Msg, 512*4)
 
-	_, err := w.NatsJS.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.AckWait(time.Second*10), nats.MaxAckPending(128))
+	_, err := w.NatsJS.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.AckWait(time.Second*10), nats.MaxAckPending(512))
 	if err != nil {
 		log.Err(err).Msg("failed to subscribe to REPORT.*")
 		return err
