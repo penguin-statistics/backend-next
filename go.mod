@@ -7,7 +7,6 @@ require (
 	github.com/ahmetb/go-linq/v3 v3.2.0
 	github.com/ansrivas/fiberprometheus/v2 v2.5.0
 	github.com/antonmedv/expr v1.12.0
-	github.com/avast/retry-go/v3 v3.1.1
 	github.com/avast/retry-go/v4 v4.3.3
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/uniuri v1.2.0
@@ -40,8 +39,8 @@ require (
 	github.com/swaggo/swag v1.8.10
 	github.com/tidwall/gjson v1.14.4
 	github.com/uptrace/bun v1.1.11
-	github.com/uptrace/bun/dialect/pgdialect v1.1.10
-	github.com/uptrace/bun/driver/pgdriver v1.1.10
+	github.com/uptrace/bun/dialect/pgdialect v1.1.11
+	github.com/uptrace/bun/driver/pgdriver v1.1.11
 	github.com/uptrace/bun/extra/bundebug v1.1.10
 	github.com/uptrace/bun/extra/bunotel v1.1.10
 	github.com/urfave/cli/v2 v2.24.3
