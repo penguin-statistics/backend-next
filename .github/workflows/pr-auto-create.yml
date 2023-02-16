@@ -27,7 +27,7 @@ jobs:
         continue-on-error: true
         with:
           script: |
-            const { data: { tag_name: lastRelease } } = await github.repos.getLatestRelease({
+            const { data: { tag_name: lastRelease } } = await github.rest.repos.getLatestRelease({
               owner: context.repo.owner,
               repo: context.repo.repo
             })
