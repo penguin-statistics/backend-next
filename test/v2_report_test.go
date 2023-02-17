@@ -73,7 +73,7 @@ func TestAPIV2Reports(t *testing.T) {
 
 	t.Run("invalid account", func(t *testing.T) {
 		h, j := report(ReportValidBody, &http.Header{
-			"Authorization": []string{"PenguinID 3838483274123"},
+			"Authorization": []string{"PenguinID 1145141919810"},
 		})
 		assert.Equal(t, http.StatusOK, h.StatusCode)
 		assert.Equal(t, len(j.Get("reportHash").String()), ReportHashLen)
