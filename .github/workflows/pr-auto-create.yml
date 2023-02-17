@@ -1,0 +1,45 @@
+name: Auto Create Release PR
+
+on:
+  # trigger on push to dev branch
+  push:
+    branches:
+      - dev
+
+concurrency:
+  group: pr-creator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-creator:
+    name: Create PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: "dev"
+
+      # create a PR from dev to main, with title in form: Release <semver>
+      # where, <semver> is the next version number to be released, based on the last release in git tag
+      - name: Create PR
+        uses: actions/github-script@v6
+        # ignore errors if PR already exists
+        continue-on-error: true
+        with:
+          github-token: ${{ secrets.PAT_FOR_RELEASE_TAGGER }}
+          script: |
+            const { data: { tag_name: lastRelease } } = await github.rest.repos.getLatestRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            })
+            const nextRelease = lastRelease.replace(/(\d+)$/, (match, p1) => Number(p1) + 1)
+            const prTitle = `Release ${nextRelease}`
+            const pr = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: prTitle,
+              body: `> *This PR is automatically created by actions defined in this repository. To see the run log of this action, please click [here](/${{ github.repository }}/actions/runs/${{ github.run_id }})*`,
+              head: context.ref,
+              base: 'main',
+              draft: true
+            })

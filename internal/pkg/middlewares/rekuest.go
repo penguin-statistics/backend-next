@@ -10,7 +10,7 @@ import (
 func InjectValidBody[T any]() func(*fiber.Ctx) error {
 	return func(ctx *fiber.Ctx) error {
 		var dest T
-		if err := ctx.BodyParser(dest); err != nil {
+		if err := ctx.BodyParser(&dest); err != nil {
 			return pgerr.ErrInvalidReq.Msg("invalid request: %s", err)
 		}
 
