@@ -10,4 +10,6 @@ const (
 	// ReportHashLen is the length of the report hash.
 	// Used by POST /PenguinStats/api/v2/report
 	ReportHashLen = len("cfmsmv1i32o8ob8jp7g0-1wE2I9dvMFXXzBMp")
+
+	ReportValidBody = `{"server":"CN","source":"MeoAssistant","stageId":"wk_kc_5","drops":[{"dropType":"NORMAL_DROP","itemId":"2002","quantity":1},{"dropType":"NORMAL_DROP","itemId":"2003","quantity":1},{"dropType":"NORMAL_DROP","itemId":"2004","quantity":3}],"version":"v3.0.4"}`
 )
