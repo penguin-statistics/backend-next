@@ -12,7 +12,7 @@ require (
 	github.com/dchest/uniuri v1.2.0
 	github.com/felixge/fgprof v0.9.3
 	github.com/gabstv/go-bsdiff v1.0.5
-	github.com/getsentry/sentry-go v0.17.0
+	github.com/getsentry/sentry-go v0.18.0
 	github.com/go-playground/locales v0.14.1
 	github.com/go-playground/universal-translator v0.18.1
 	github.com/go-playground/validator/v10 v10.11.2
@@ -88,6 +88,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/swaggo/files v0.0.0-20220728132757-551d4a08d97a // indirect
+	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.opentelemetry.io/contrib v1.12.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.12.0 // indirect

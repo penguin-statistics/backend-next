@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/dchest/uniuri"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ func TestAPIV2Reports(t *testing.T) {
 	t.Parallel()
 
 	// helpers
-	reportCustom := func(req *http.Request) (*http.Response, *gjson.Result) {
+	jsonReqCustom := func(req *http.Request) (*http.Response, *gjson.Result) {
 		t.Helper()
 
 		resp := request(t, req)
@@ -30,15 +31,25 @@ func TestAPIV2Reports(t *testing.T) {
 		return resp, &body
 	}
 
-	report := func(body string, headers *http.Header) (*http.Response, *gjson.Result) {
+	jsonReq := func(path, body string, headers *http.Header) (*http.Response, *gjson.Result) {
 		t.Helper()
 
-		req := httptest.NewRequest(http.MethodPost, "/PenguinStats/api/v2/report", bytes.NewBufferString(body))
+		req := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(body))
 		if headers != nil {
 			req.Header = *headers
 		}
 		req.Header.Set("Content-Type", "application/json")
-		return reportCustom(req)
+		return jsonReqCustom(req)
+	}
+
+	report := func(body string, headers *http.Header) (*http.Response, *gjson.Result) {
+		t.Helper()
+		return jsonReq("/PenguinStats/api/v2/report", body, headers)
+	}
+
+	recall := func(body string, headers *http.Header) (*http.Response, *gjson.Result) {
+		t.Helper()
+		return jsonReq("/PenguinStats/api/v2/report/recall", body, headers)
 	}
 
 	// tests
@@ -125,6 +136,23 @@ func TestAPIV2Reports(t *testing.T) {
 			assert.Equal(t, http.StatusOK, h.StatusCode)
 			assert.Equal(t, ReportHashLen, len(j.Get("reportHash").String()))
 			assert.Equal(t, "hit", h.Header.Get("X-Penguin-Idempotency"), "idempotency key should be hit on duplicate request")
+		})
+	})
+
+	t.Run("recall", func(t *testing.T) {
+		t.Run("basic", func(t *testing.T) {
+			var reportHash string
+			{
+				h, j := report(ReportValidBody, nil)
+				assert.Equal(t, http.StatusOK, h.StatusCode)
+				assert.Equal(t, len(j.Get("reportHash").String()), ReportHashLen)
+				reportHash = j.Get("reportHash").String()
+			}
+			time.Sleep(time.Second * 2) // FIXME: wait for the report to be consumed
+			{
+				h, j := recall(`{"reportHash":"`+reportHash+`"}`, nil)
+				assert.Equal(t, http.StatusOK, h.StatusCode, j.String())
+			}
 		})
 	})
 }

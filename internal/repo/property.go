@@ -50,3 +50,29 @@ func (c *Property) GetPropertyByKey(ctx context.Context, key string) (*model.Pro
 
 	return &property, nil
 }
+
+func (c *Property) UpdatePropertyByKey(ctx context.Context, key string, value string) (*model.Property, error) {
+	var property model.Property
+	err := c.db.NewSelect().
+		Model(&property).
+		Where("key = ?", key).
+		Scan(ctx)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, pgerr.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	property.Value = value
+	_, err = c.db.NewUpdate().
+		Model(&property).
+		Where("key = ?", key).
+		Exec(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &property, nil
+}
