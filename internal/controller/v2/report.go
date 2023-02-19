@@ -48,8 +48,8 @@ func RegisterReport(v2 *svr.V2, c Report) {
 		Storage: fiberstore.NewRedis(c.Redis, constant.ReportIdempotencyRedisHashKey),
 		RedSync: c.RedSync,
 	}), middlewares.InjectValidBody[types.SingularReportRequest](), c.MiddlewareGetOrCreateAccount, c.SingularReport)
-	v2.Post("/report/recall", c.RecallSingularReport)
-	v2.Post("/report/recognition", middlewares.InjectValidBody[types.SingularReportRecallRequest](), c.MiddlewareGetOrCreateAccount, c.RecognitionReport)
+	v2.Post("/report/recall", middlewares.InjectValidBody[types.SingularReportRecallRequest](), c.RecallSingularReport)
+	v2.Post("/report/recognition", c.MiddlewareGetOrCreateAccount, c.RecognitionReport)
 }
 
 func (c *Report) MiddlewareGetOrCreateAccount(ctx *fiber.Ctx) error {
