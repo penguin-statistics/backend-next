@@ -302,13 +302,20 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 		itemIds = append(itemIds, item.ItemID)
 	}
 
+	// handle sourceCategory, default to all
+	// FIXME: when front end finishes adding this attribute, it won't be necessary to set default value here
+	sourceCategory := query.SourceCategory
+	if sourceCategory == "" {
+		sourceCategory = constant.SourceCategoryAll
+	}
+
 	// if there is no interval, then do drop matrix query, otherwise do trend query
 	if !query.Interval.Valid {
 		timeRange := &model.TimeRange{
 			StartTime: &startTime,
 			EndTime:   &endTime,
 		}
-		return c.DropMatrixService.GetShimCustomizedDropMatrixResults(ctx.UserContext(), query.Server, timeRange, []int{stage.StageID}, itemIds, accountId, constant.SourceCategoryAll)
+		return c.DropMatrixService.GetShimCustomizedDropMatrixResults(ctx.UserContext(), query.Server, timeRange, []int{stage.StageID}, itemIds, accountId, sourceCategory)
 	} else {
 		// interval originally is in milliseconds, so we need to convert it to nanoseconds
 		intervalLength := time.Duration(query.Interval.Int64 * 1e6).Round(time.Hour)
@@ -320,7 +327,7 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 			return nil, pgerr.ErrInvalidReq.Msg("too many sections: interval number is %d sections, which is larger than %d sections", intervalNum, constant.MaxIntervalNum)
 		}
 
-		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx.UserContext(), query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, accountId)
+		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx.UserContext(), query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, accountId, sourceCategory)
 		if err != nil {
 			return nil, err
 		}
