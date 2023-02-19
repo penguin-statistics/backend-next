@@ -303,7 +303,6 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 	}
 
 	// handle sourceCategory, default to all
-	// FIXME: when front end finishes adding this attribute, it won't be necessary to set default value here
 	sourceCategory := query.SourceCategory
 	if sourceCategory == "" {
 		sourceCategory = constant.SourceCategoryAll

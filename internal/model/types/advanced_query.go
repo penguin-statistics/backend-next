@@ -6,7 +6,6 @@ type AdvancedQueryRequest struct {
 	Queries []*AdvancedQuery `json:"queries" validate:"required,max=5,min=1,dive"`
 }
 
-// FIXME: when front end finishes adding attribute, add "required" in validate tag for SourceCategory
 type AdvancedQuery struct {
 	Server         string    `json:"server" validate:"required,arkserver" required:"true"`
 	StageID        string    `json:"stageId" validate:"required" required:"true"`

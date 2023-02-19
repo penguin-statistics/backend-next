@@ -52,7 +52,6 @@ func arkServer(fl validator.FieldLevel) bool {
 
 func sourceCategory(fl validator.FieldLevel) bool {
 	val := fl.Field().String()
-	// FIXME: when front end finishes adding this attribute, remove ""
 	return val == "" || val == constant.SourceCategoryAll || val == constant.SourceCategoryAutomated || val == constant.SourceCategoryManual
 }
 
