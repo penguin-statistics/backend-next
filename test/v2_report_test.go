@@ -43,34 +43,65 @@ func TestAPIV2Reports(t *testing.T) {
 
 	// tests
 	t.Run("valid body", func(t *testing.T) {
-		h, j := report(`{"server":"CN","source":"MeoAssistant","stageId":"wk_kc_5","drops":[{"dropType":"NORMAL_DROP","itemId":"2002","quantity":1},{"dropType":"NORMAL_DROP","itemId":"2003","quantity":1},{"dropType":"NORMAL_DROP","itemId":"2004","quantity":3}],"version":"v3.0.4"}`, nil)
-		assert.Equal(t, http.StatusOK, h.StatusCode, "status code should be 200 but got unexpected value. body: %s", j.String())
+		t.Run("basic", func(t *testing.T) {
+			h, j := report(ReportValidBody, nil)
+			assert.Equal(t, http.StatusOK, h.StatusCode)
+			assert.Equal(t, len(j.Get("reportHash").String()), ReportHashLen)
+			assert.NotEmpty(t, h.Header.Get("X-Penguin-Set-PenguinID"))
+			// TODO: check DB for the report correctness
+		})
+	})
+
+	t.Run("valid account", func(t *testing.T) {
+		var accountId string
+		{
+			h, j := report(ReportValidBody, nil)
+			assert.Equal(t, http.StatusOK, h.StatusCode)
+			assert.Equal(t, len(j.Get("reportHash").String()), ReportHashLen)
+			accountId = h.Header.Get("X-Penguin-Set-PenguinID")
+			assert.NotEmpty(t, accountId)
+		}
+		{
+			h, j := report(ReportValidBody, &http.Header{
+				"Authorization": []string{"PenguinID " + accountId},
+			})
+			assert.Equal(t, http.StatusOK, h.StatusCode)
+			assert.Equal(t, len(j.Get("reportHash").String()), ReportHashLen)
+			assert.Empty(t, h.Header.Get("X-Penguin-Set-PenguinID"), "should not create account when a valid one is provided")
+		}
+	})
+
+	t.Run("invalid account", func(t *testing.T) {
+		h, j := report(ReportValidBody, &http.Header{
+			"Authorization": []string{"PenguinID 1145141919810"},
+		})
+		assert.Equal(t, http.StatusOK, h.StatusCode)
 		assert.Equal(t, len(j.Get("reportHash").String()), ReportHashLen)
-		// TODO: check DB for the report correctness
+		assert.NotEmpty(t, h.Header.Get("X-Penguin-Set-PenguinID"), "should create account when an invalid is provided")
 	})
 
 	t.Run("invalid body", func(t *testing.T) {
 		t.Run("invalid json", func(t *testing.T) {
 			h, j := report(`{"server":"CN","source":"MeoAssistant","stageId":"wk_kc_5","drops":[{"dropType":"NORMAL_DROP","itemId":"2002","quantity":1},{"dropType":"NORMAL_DROP","itemId":"2003","quantity":1},{"dropType":"NORMAL_DROP","itemId":"2004","quantity":3}],"version":"v3.0.4"`, nil)
-			assert.Equal(t, http.StatusBadRequest, h.StatusCode, "should return 400, got %d", h.StatusCode, "body: %s", j.String())
+			assert.Equal(t, http.StatusBadRequest, h.StatusCode)
 			assert.NotEmpty(t, j.Get("message").String(), "error message should not be empty")
 		})
 
 		t.Run("invalid server", func(t *testing.T) {
 			h, j := report(`{"server":"UK","source":"MeoAssistant","stageId":"wk_kc_5","drops":[{"dropType":"NORMAL_DROP","itemId":"2002","quantity":1},{"dropType":"NORMAL_DROP","itemId":"2003","quantity":1},{"dropType":"NORMAL_DROP","itemId":"2004","quantity":3}],"version":"v3.0.4"}`, nil)
-			assert.Equal(t, http.StatusBadRequest, h.StatusCode, "should return 400, got %d", h.StatusCode, "body: %s", j.String())
+			assert.Equal(t, http.StatusBadRequest, h.StatusCode)
 			assert.NotEmpty(t, j.Get("message").String(), "error message should not be empty")
 		})
 
 		t.Run("invalid dropType", func(t *testing.T) {
 			h, j := report(`{"server":"CN","source":"MeoAssistant","stageId":"wk_kc_5","drops":[{"dropType":"SOMEELSE_DROP","itemId":"2002","quantity":1},{"dropType":"NORMAL_DROP","itemId":"2003","quantity":1},{"dropType":"NORMAL_DROP","itemId":"2004","quantity":3}],"version":"v3.0.4"}`, nil)
-			assert.Equal(t, http.StatusBadRequest, h.StatusCode, "should return 400, got %d", h.StatusCode, "body: %s", j.String())
+			assert.Equal(t, http.StatusBadRequest, h.StatusCode)
 			assert.NotEmpty(t, j.Get("message").String(), "error message should not be empty")
 		})
 
 		t.Run("missing required", func(t *testing.T) {
-			h, j := report(`{"server":"CN","source":"MeoAssistant","drops":[{"dropType":"SOMEELSE_DROP","itemId":"2002","quantity":1},{"dropType":"NORMAL_DROP","itemId":"2003","quantity":1},{"dropType":"NORMAL_DROP","itemId":"2004","quantity":3}],"version":"v3.0.4"}`, nil)
-			assert.Equal(t, http.StatusBadRequest, h.StatusCode, "should return 400, got %d", h.StatusCode, "body: %s", j.String())
+			h, j := report(`{"server":"CN","source":"MeoAssistant","drops":[],"version":"v3.0.4"}`, nil)
+			assert.Equal(t, http.StatusBadRequest, h.StatusCode)
 			assert.NotEmpty(t, j.Get("message").String(), "error message should not be empty")
 		})
 	})
@@ -79,10 +110,10 @@ func TestAPIV2Reports(t *testing.T) {
 		idempotencyKey := "backendtest" + uniuri.NewLen(32)
 
 		t.Run("initial request", func(t *testing.T) {
-			h, j := report(`{"server":"CN","source":"MeoAssistant","stageId":"wk_kc_5","drops":[{"dropType":"NORMAL_DROP","itemId":"2002","quantity":1},{"dropType":"NORMAL_DROP","itemId":"2003","quantity":1},{"dropType":"NORMAL_DROP","itemId":"2004","quantity":3}],"version":"v3.0.4"}`, &http.Header{
+			h, j := report(ReportValidBody, &http.Header{
 				"X-Penguin-Idempotency-Key": []string{idempotencyKey},
 			})
-			assert.Equal(t, http.StatusOK, h.StatusCode, "status code should be 200 but got unexpected value. body: %s", j.String())
+			assert.Equal(t, http.StatusOK, h.StatusCode)
 			assert.Equal(t, ReportHashLen, len(j.Get("reportHash").String()))
 			assert.Equal(t, "saved", h.Header.Get("X-Penguin-Idempotency"), "idempotency key should be saved on initial request")
 		})
@@ -91,7 +122,7 @@ func TestAPIV2Reports(t *testing.T) {
 			h, j := report(`very+invalid_body`, &http.Header{
 				"X-Penguin-Idempotency-Key": []string{idempotencyKey},
 			})
-			assert.Equal(t, http.StatusOK, h.StatusCode, "status code should be 200 but got unexpected value. body: %s", j.String())
+			assert.Equal(t, http.StatusOK, h.StatusCode)
 			assert.Equal(t, ReportHashLen, len(j.Get("reportHash").String()))
 			assert.Equal(t, "hit", h.Header.Get("X-Penguin-Idempotency"), "idempotency key should be hit on duplicate request")
 		})

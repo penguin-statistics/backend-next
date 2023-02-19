@@ -7,11 +7,12 @@ type AdvancedQueryRequest struct {
 }
 
 type AdvancedQuery struct {
-	Server     string    `json:"server" validate:"required,arkserver" required:"true"`
-	StageID    string    `json:"stageId" validate:"required" required:"true"`
-	ItemIDs    []string  `json:"itemIds"`
-	IsPersonal null.Bool `json:"isPersonal" swaggertype:"boolean"`
-	StartTime  null.Int  `json:"start" swaggertype:"integer"`
-	EndTime    null.Int  `json:"end" swaggertype:"integer"`
-	Interval   null.Int  `json:"interval" swaggertype:"integer"`
+	Server         string    `json:"server" validate:"required,arkserver" required:"true"`
+	StageID        string    `json:"stageId" validate:"required" required:"true"`
+	ItemIDs        []string  `json:"itemIds"`
+	IsPersonal     null.Bool `json:"isPersonal" swaggertype:"boolean"`
+	SourceCategory string    `json:"sourceCategory" validate:"sourcecategory"`
+	StartTime      null.Int  `json:"start" swaggertype:"integer"`
+	EndTime        null.Int  `json:"end" swaggertype:"integer"`
+	Interval       null.Int  `json:"interval" swaggertype:"integer"`
 }
