@@ -21,8 +21,8 @@ require (
 	github.com/goccy/go-json v0.10.0
 	github.com/gofiber/contrib/fibersentry v0.0.0-20230214221137-36b97d3ad36f
 	github.com/gofiber/contrib/otelfiber v0.0.0-20221221212612-92599266f187
-	github.com/gofiber/fiber/v2 v2.41.0
-	github.com/gofiber/helmet/v2 v2.2.23
+	github.com/gofiber/fiber/v2 v2.42.0
+	github.com/gofiber/helmet/v2 v2.2.24
 	github.com/gofiber/swagger v0.1.8
 	github.com/jinzhu/copier v0.3.5
 	github.com/joho/godotenv v1.4.0
@@ -38,6 +38,7 @@ require (
 	github.com/stretchr/testify v1.8.1
 	github.com/swaggo/swag v1.8.10
 	github.com/tidwall/gjson v1.14.4
+	github.com/tidwall/sjson v1.2.5
 	github.com/uptrace/bun v1.1.11
 	github.com/uptrace/bun/dialect/pgdialect v1.1.11
 	github.com/uptrace/bun/driver/pgdriver v1.1.11
@@ -80,15 +81,18 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
+	github.com/philhofer/fwd v1.1.1 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/richardartoul/molecule v1.0.1-0.20221107223329-32cfee06a052 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/savsgio/dictpool v0.0.0-20221023140959-7bf2e61cea94 // indirect
+	github.com/savsgio/gotils v0.0.0-20220530130905-52f3993e8d6d // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/swaggo/files v0.0.0-20220728132757-551d4a08d97a // indirect
-	github.com/tidwall/sjson v1.2.5 // indirect
+	github.com/tinylib/msgp v1.1.6 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.opentelemetry.io/contrib v1.12.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.12.0 // indirect
