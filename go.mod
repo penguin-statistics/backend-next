@@ -23,7 +23,7 @@ require (
 	github.com/gofiber/contrib/otelfiber v0.0.0-20221221212612-92599266f187
 	github.com/gofiber/fiber/v2 v2.42.0
 	github.com/gofiber/helmet/v2 v2.2.24
-	github.com/gofiber/swagger v0.1.8
+	github.com/gofiber/swagger v0.1.9
 	github.com/jinzhu/copier v0.3.5
 	github.com/joho/godotenv v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
