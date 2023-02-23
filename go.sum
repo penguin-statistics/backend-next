@@ -199,6 +199,8 @@ github.com/gofiber/helmet/v2 v2.2.24 h1:5Qo5kjKmC8yJFp8sB22k7fUkW3kjyp5eB38jYVly
 github.com/gofiber/helmet/v2 v2.2.24/go.mod h1:ADBSCgEBgnswL846Gwr06CLlT+ZpTsXpKi4P4o/pPVk=
 github.com/gofiber/swagger v0.1.8 h1:Ut8gecn/nf62HGexuxaju30pVLF7UL1HZXHTq9EA7QI=
 github.com/gofiber/swagger v0.1.8/go.mod h1:9LPuXJldC8uGFtpxb3JQqhSjhyP1p5id+0GvRU8eUUw=
+github.com/gofiber/swagger v0.1.9 h1:JcUVtxa9cOQdQ0DdLwTA0u2QyM5d2/D/3fUZqBGpYR4=
+github.com/gofiber/swagger v0.1.9/go.mod h1:IBHyqGmqbfOwbZmt2X5it5m6PfgtB05VjMN3zfRmY1Y=
 github.com/gogo/protobuf v1.1.1/go.mod h1:r8qH/GZQm5c6nD/R0oafs1akxWv10x8SbQlK7atdtwQ=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
 github.com/golang/glog v1.0.0 h1:nfP3RFugxnNRyKgeWd4oI1nYvXpxrx8ck8ZrcizshdQ=
