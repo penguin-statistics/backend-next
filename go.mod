@@ -56,7 +56,7 @@ require (
 	go.uber.org/fx v1.19.1
 	golang.org/x/exp v0.0.0-20220823124025-807a23277127
 	golang.org/x/mod v0.7.0
-	golang.org/x/text v0.6.0
+	golang.org/x/text v0.7.0
 	google.golang.org/grpc v1.52.3
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/DataDog/dd-trace-go.v1 v1.47.0
