@@ -25,7 +25,7 @@ require (
 	github.com/gofiber/helmet/v2 v2.2.24
 	github.com/gofiber/swagger v0.1.9
 	github.com/jinzhu/copier v0.3.5
-	github.com/joho/godotenv v1.4.0
+	github.com/joho/godotenv v1.5.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/nats-io/nats.go v1.23.0
 	github.com/oklog/ulid/v2 v2.1.0
