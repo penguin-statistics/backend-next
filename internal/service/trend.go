@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -15,7 +16,6 @@ import (
 	"exusiai.dev/backend-next/internal/pkg/async"
 	"exusiai.dev/backend-next/internal/pkg/gameday"
 	"exusiai.dev/backend-next/internal/util"
-	"exusiai.dev/gommon/constant"
 )
 
 type Trend struct {
@@ -76,9 +76,9 @@ func (s *Trend) GetShimSavedTrendResults(ctx context.Context, server string) (*m
 }
 
 func (s *Trend) GetShimCustomizedTrendResults(
-	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, itemIds []int, accountId null.Int,
+	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, itemIds []int, accountId null.Int, sourceCategory string,
 ) (*modelv2.TrendQueryResult, error) {
-	trendQueryResult, err := s.QueryTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, itemIds, accountId, constant.SourceCategoryAll)
+	trendQueryResult, err := s.QueryTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, itemIds, accountId, sourceCategory)
 	if err != nil {
 		return nil, err
 	}

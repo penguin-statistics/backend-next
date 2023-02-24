@@ -104,7 +104,7 @@ func (c *Upyun) VerifyImageUploadCallback(ctx *fiber.Ctx) (path string, err erro
 	body := ctx.Body()
 	v, err := url.ParseQuery(string(body))
 	if err != nil {
-		return "", errors.Errorf("failed to parse body: %w", err)
+		return "", errors.Wrap(err, "failed to parse body")
 	}
 
 	if v.Get("code") != "200" {
@@ -114,7 +114,7 @@ func (c *Upyun) VerifyImageUploadCallback(ctx *fiber.Ctx) (path string, err erro
 	timeStr := v.Get("time")
 	timeInt, err := strconv.Atoi(timeStr)
 	if err != nil {
-		return "", errors.Errorf("failed to parse time: %w", err)
+		return "", errors.Wrap(err, "failed to parse time")
 	}
 	timeT := time.Unix(int64(timeInt), 0)
 	if timeT.Before(time.Now().Add(-time.Minute * 10)) {

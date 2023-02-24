@@ -5,8 +5,9 @@ on:
   pull_request:
     branches:
       - "**"
+
 concurrency:
-  group: ${{ github.ref }}
+  group: check-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

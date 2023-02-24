@@ -16,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
+	"github.com/tidwall/sjson"
 	"github.com/uptrace/bun"
 	"github.com/zeebo/xxh3"
 	"go.uber.org/fx"
@@ -49,6 +50,7 @@ type AdminController struct {
 	SnapshotService       *service.Snapshot
 	DropReportService     *service.DropReport
 	DropReportRepo        *repo.DropReport
+	PropertyRepo          *repo.Property
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
@@ -73,6 +75,7 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 
 	admin.Get("/recognition/defects", c.GetRecognitionDefects)
 	admin.Get("/recognition/defects/:defectId", c.GetRecognitionDefect)
+	admin.Post("/recognition/items-resources/updated", c.RecognitionItemsResourcesUpdated)
 
 	admin.Post("/snapshots", c.CreateSnapshot)
 }
@@ -536,4 +539,33 @@ func (c *AdminController) CreateSnapshot(ctx *fiber.Ctx) error {
 	}
 
 	return ctx.JSON(snapshot)
+}
+
+func (c *AdminController) RecognitionItemsResourcesUpdated(ctx *fiber.Ctx) error {
+	type createRecognitionAssetRequest struct {
+		Server string `json:"server" validate:"required,arkserver"`
+		Prefix string `json:"prefix" validate:"required"`
+	}
+	var request createRecognitionAssetRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	property, err := c.PropertyRepo.GetPropertyByKey(ctx.UserContext(), "frontend_config")
+	if err != nil {
+		return err
+	}
+
+	s, err := sjson.Set(property.Value, "recognition.items-resources.prefix."+request.Server, request.Prefix)
+	if err != nil {
+		return err
+	}
+	// j.Get("recognition").Get("items-resources").Get("prefix").Get(request.Server).
+
+	asset, err := c.PropertyRepo.UpdatePropertyByKey(ctx.UserContext(), "frontend_config", s)
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(asset)
 }
