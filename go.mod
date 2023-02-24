@@ -44,7 +44,7 @@ require (
 	github.com/uptrace/bun/driver/pgdriver v1.1.11
 	github.com/uptrace/bun/extra/bundebug v1.1.10
 	github.com/uptrace/bun/extra/bunotel v1.1.10
-	github.com/urfave/cli/v2 v2.24.3
+	github.com/urfave/cli/v2 v2.24.4
 	github.com/vmihailenco/msgpack/v5 v5.3.5
 	github.com/zeebo/xxh3 v1.0.2
 	go.opentelemetry.io/otel v1.13.0
