@@ -109,6 +109,9 @@ type ConfigSpec struct {
 	// WorkerTrendInterval describes the interval in-between different batches
 	WorkerTrendInterval time.Duration `required:"true" split_words:"true" default:"6h"`
 
+	// WorkerTrendEnabled describes whether to enable the trend worker
+	WorkerTrendEnabled bool `required:"true" split_words:"true" default:"true"`
+
 	// WorkerSeparation describes the separation time in-between different microtasks
 	WorkerSeparation time.Duration `required:"true" split_words:"true" default:"3s"`
 
