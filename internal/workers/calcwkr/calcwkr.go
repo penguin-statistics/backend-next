@@ -96,7 +96,13 @@ func Start(conf *appconfig.Config, deps WorkerDeps) {
 		}
 		w.checkConfig()
 		w.doMainCalc(conf.MatrixWorkerSourceCategories)
-		w.doTrendCalc(conf.MatrixWorkerSourceCategories)
+		if conf.WorkerTrendEnabled {
+			w.doTrendCalc(conf.MatrixWorkerSourceCategories)
+		} else {
+			log.Info().
+				Str("evt.name", "worker.calcwkr.trend.disabled").
+				Msg("worker trend is disabled due to configuration")
+		}
 	} else {
 		log.Info().
 			Str("evt.name", "worker.calcwkr.disabled").
