@@ -115,6 +115,12 @@ func TestAPIV2Reports(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, h.StatusCode)
 			assert.NotEmpty(t, j.Get("message").String(), "error message should not be empty")
 		})
+
+		t.Run("negative quantity", func(t *testing.T) {
+			h, j := report(`{"server":"CN","source":"MeoAssistant","stageId":"wk_kc_5","drops":[{"dropType":"NORMAL_DROP","itemId":"2003","quantity":-1}],"version":"v3.0.4"}`, nil)
+			assert.Equal(t, http.StatusBadRequest, h.StatusCode)
+			assert.NotEmpty(t, j.Get("message").String(), "error message should not be empty")
+		})
 	})
 
 	t.Run("idempotency", func(t *testing.T) {
