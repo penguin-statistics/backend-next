@@ -200,6 +200,7 @@ func (s *Stage) applyShim(stage *modelv2.Stage) {
 		}).
 		ToSlice(&stage.DropInfos)
 	stage.RecognitionOnly = recognitionOnlyArkItemIds
+	stage.IsGacha = stage.ExtraProcessType.String == constant.ExtraProcessTypeGachaBox
 
 	for _, i := range stage.DropInfos {
 		if i.Item != nil {
