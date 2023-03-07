@@ -24,7 +24,7 @@ type Stage struct {
 	Code             string          `bun:"-" json:"code" example:"1-7"`
 	CodeI18n         json.RawMessage `bun:"code" json:"code_i18n" swaggertype:"object"`
 	ExtraProcessType null.String     `json:"-" example:"false"`
-	IsGacha          bool            `json:"isGacha" example:"false"`
+	IsGacha          bool            `bun:"-" json:"isGacha,omitempty" example:"false"`
 	Sanity           null.Int        `json:"apCost" swaggertype:"integer" example:"6"`
 	Existence        json.RawMessage `json:"existence" swaggertype:"object"`
 	MinClearTime     null.Int        `json:"minClearTime" swaggertype:"integer" extension:"x-nullable" example:"118000"`
