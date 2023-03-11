@@ -35,7 +35,7 @@ require (
 	github.com/rs/xid v1.4.0
 	github.com/rs/zerolog v1.29.0
 	github.com/samber/lo v1.37.0
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	github.com/swaggo/swag v1.8.10
 	github.com/tidwall/gjson v1.14.4
 	github.com/tidwall/sjson v1.2.5
