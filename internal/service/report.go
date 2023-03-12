@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/goccy/go-json"
-
+	"exusiai.dev/gommon/constant"
 	"github.com/dchest/uniuri"
 	"github.com/go-redis/redis/v8"
+	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
@@ -20,11 +20,11 @@ import (
 	"exusiai.dev/backend-next/internal/util"
 	"exusiai.dev/backend-next/internal/util/reportutil"
 	"exusiai.dev/backend-next/internal/util/reportverifs"
-	"exusiai.dev/gommon/constant"
 )
 
 var (
 	ErrReportNotFound = pgerr.ErrInvalidReq.Msg("report not existed or has already been recalled")
+	ErrAccountMissing = pgerr.ErrInvalidReq.Msg("account missing")
 	ErrNatsTimeout    = errors.New("timeout waiting for NATS response")
 )
 
@@ -79,7 +79,7 @@ func (s *Report) PipelineAccount(ctx *fiber.Ctx) (accountId int, err error) {
 	return accountId, nil
 }
 
-func (s *Report) PipelinePreprocessRecruitmentTags(ctx context.Context, req *types.SingleReportRequest) error {
+func (s *Report) PipelinePreprocessRecruitmentTags(ctx context.Context, req *types.SingularReportRequest) error {
 	if req.StageID == constant.RecruitStageID {
 		recruitTagMap, err := s.ItemService.GetRecruitTagItemsByBilingualName(ctx)
 		if err != nil {
@@ -115,7 +115,7 @@ func (s *Report) PipelinePreprocessRecruitmentTags(ctx context.Context, req *typ
 	return nil
 }
 
-func (s *Report) PipelineConvertLegacySuppliesForMaa(ctx context.Context, req *types.SingleReportRequest) error {
+func (s *Report) PipelineConvertLegacySuppliesForMaa(ctx context.Context, req *types.SingularReportRequest) error {
 	if time.Now().UnixMilli() <= 1666641600000 && req.FragmentReportCommon.Source == constant.MeoAssistant {
 		for i := range req.Drops {
 			if req.Drops[i].ItemID == "randomMaterial_5" {
@@ -168,21 +168,16 @@ func (s *Report) PipelineAggregateGachaboxDrops(ctx context.Context, singleRepor
 	return nil
 }
 
-func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.ReportTask, idempotency string) (taskId string, err error) {
+func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.ReportTask) (taskId string, err error) {
 	taskId = s.PipelineTaskId(ctx)
 	task.TaskID = taskId
 
-	reportTaskJSON, err := json.Marshal(task)
+	reportTaskJsonBytes, err := json.Marshal(task)
 	if err != nil {
 		return "", err
 	}
 
-	natsOpts := make([]nats.PubOpt, 0, 1)
-	if idempotency != "" {
-		natsOpts = append(natsOpts, nats.MsgId(idempotency))
-	}
-
-	pub, err := s.NatsJS.PublishAsync(subject, reportTaskJSON, natsOpts...)
+	pub, err := s.NatsJS.PublishAsync(subject, reportTaskJsonBytes)
 	if err != nil {
 		return "", err
 	}
@@ -200,11 +195,10 @@ func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.Re
 }
 
 // returns taskID and error, if any
-func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingleReportRequest) (taskId string, err error) {
-	// if account is not found, create new account
-	accountId, err := s.PipelineAccount(ctx)
-	if err != nil {
-		return "", err
+func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.SingularReportRequest) (taskId string, err error) {
+	accountId, ok := ctx.Locals(constant.LocalsAccountIDKey).(int)
+	if !ok {
+		return "", ErrAccountMissing
 	}
 
 	err = s.PipelinePreprocessRecruitmentTags(ctx.UserContext(), req)
@@ -251,14 +245,13 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 		IP:        util.ExtractIP(ctx),
 	}
 
-	return s.commitReportTask(ctx, "REPORT.SINGLE", reportTask, util.IdempotencyKeyFromLocals(ctx))
+	return s.commitReportTask(ctx, "REPORT.SINGLE", reportTask)
 }
 
 func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchReportRequest) (taskId string, err error) {
-	// if account is not found, create new account
-	accountId, err := s.PipelineAccount(ctx)
-	if err != nil {
-		return "", err
+	accountId, ok := ctx.Locals(constant.LocalsAccountIDKey).(int)
+	if !ok {
+		return "", ErrAccountMissing
 	}
 
 	reports := make([]*types.ReportTaskSingleReport, len(req.BatchDrops))
@@ -300,10 +293,10 @@ func (s *Report) PreprocessAndQueueBatchReport(ctx *fiber.Ctx, req *types.BatchR
 		IP:        util.ExtractIP(ctx),
 	}
 
-	return s.commitReportTask(ctx, "REPORT.BATCH", reportTask, util.IdempotencyKeyFromLocals(ctx))
+	return s.commitReportTask(ctx, "REPORT.BATCH", reportTask)
 }
 
-func (s *Report) RecallSingularReport(ctx context.Context, req *types.SingleReportRecallRequest) error {
+func (s *Report) RecallSingularReport(ctx context.Context, req *types.SingularReportRecallRequest) error {
 	var reportId int
 	r := s.Redis.Get(ctx, constant.ReportRedisPrefix+req.ReportHash)
 

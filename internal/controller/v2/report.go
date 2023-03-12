@@ -3,10 +3,10 @@ package v2
 import (
 	"strings"
 
-	"github.com/goccy/go-json"
-
+	"exusiai.dev/gommon/constant"
 	"github.com/go-redis/redis/v8"
 	"github.com/go-redsync/redsync/v4"
+	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
@@ -18,19 +18,20 @@ import (
 	"exusiai.dev/backend-next/internal/pkg/flog"
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/pkg/pgid"
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
 	"exusiai.dev/backend-next/internal/util/rekuest"
-	"exusiai.dev/gommon/constant"
 )
 
 type Report struct {
 	fx.In
 
-	Redis         *redis.Client
-	RedSync       *redsync.Redsync
-	Crypto        *crypto.Crypto
-	ReportService *service.Report
+	Redis          *redis.Client
+	RedSync        *redsync.Redsync
+	Crypto         *crypto.Crypto
+	ReportService  *service.Report
+	AccountService *service.Account
 }
 
 func RegisterReport(v2 *svr.V2, c Report) {
@@ -46,9 +47,28 @@ func RegisterReport(v2 *svr.V2, c Report) {
 		},
 		Storage: fiberstore.NewRedis(c.Redis, constant.ReportIdempotencyRedisHashKey),
 		RedSync: c.RedSync,
-	}), c.SingularReport)
-	v2.Post("/report/recall", c.RecallSingularReport)
-	v2.Post("/report/recognition", c.RecognitionReport)
+	}), middlewares.InjectValidBody[types.SingularReportRequest](), c.MiddlewareGetOrCreateAccount, c.SingularReport)
+	v2.Post("/report/recall", middlewares.InjectValidBody[types.SingularReportRecallRequest](), c.RecallSingularReport)
+	v2.Post("/report/recognition", c.MiddlewareGetOrCreateAccount, c.RecognitionReport)
+}
+
+func (c *Report) MiddlewareGetOrCreateAccount(ctx *fiber.Ctx) error {
+	var accountId int
+
+	account, err := c.AccountService.GetAccountFromRequest(ctx)
+	if err != nil {
+		createdAccount, err := c.AccountService.CreateAccountWithRandomPenguinId(ctx.UserContext())
+		if err != nil {
+			return err
+		}
+		accountId = createdAccount.AccountID
+		pgid.Inject(ctx, createdAccount.PenguinID)
+	} else {
+		accountId = account.AccountID
+	}
+
+	ctx.Locals(constant.LocalsAccountIDKey, accountId)
+	return ctx.Next()
 }
 
 // @Summary      Submit a Drop Report
@@ -63,12 +83,9 @@ func RegisterReport(v2 *svr.V2, c Report) {
 // @Security     PenguinIDAuth
 // @Router       /PenguinStats/api/v2/report [POST]
 func (c *Report) SingularReport(ctx *fiber.Ctx) error {
-	var report types.SingleReportRequest
-	if err := rekuest.ValidBody(ctx, &report); err != nil {
-		return err
-	}
+	req := ctx.Locals("body").(types.SingularReportRequest)
 
-	taskId, err := c.ReportService.PreprocessAndQueueSingularReport(ctx, &report)
+	taskId, err := c.ReportService.PreprocessAndQueueSingularReport(ctx, &req)
 	if err != nil {
 		return err
 	}
@@ -86,10 +103,7 @@ func (c *Report) SingularReport(ctx *fiber.Ctx) error {
 // @Failure      500     {object}  pgerr.PenguinError  "An unexpected error occurred"
 // @Router       /PenguinStats/api/v2/report/recall [POST]
 func (c *Report) RecallSingularReport(ctx *fiber.Ctx) error {
-	var req types.SingleReportRecallRequest
-	if err := rekuest.ValidBody(ctx, &req); err != nil {
-		return err
-	}
+	req := ctx.Locals("body").(types.SingularReportRecallRequest)
 
 	flog.InfoFrom(ctx, "report.singular.recall.request").
 		Str("reportHash", req.ReportHash).

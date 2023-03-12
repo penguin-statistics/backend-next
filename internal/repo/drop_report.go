@@ -43,6 +43,15 @@ func (s *DropReport) DeleteDropReport(ctx context.Context, reportId int) error {
 	return err
 }
 
+func (s *DropReport) UpdateDropReportReliability(ctx context.Context, tx bun.Tx, reportId int, reliability int) error {
+	_, err := tx.NewUpdate().
+		Model((*model.DropReport)(nil)).
+		Set("reliability = ?", reliability).
+		Where("report_id = ?", reportId).
+		Exec(ctx)
+	return err
+}
+
 func (s *DropReport) CalcTotalQuantityForDropMatrix(
 	ctx context.Context, queryCtx *model.DropReportQueryContext,
 ) ([]*model.TotalQuantityResultForDropMatrix, error) {

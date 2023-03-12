@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/antonmedv/expr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -12,7 +13,6 @@ import (
 
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/repo"
-	"exusiai.dev/gommon/constant"
 )
 
 var ErrExprMatched = errors.New("reject expr matched")

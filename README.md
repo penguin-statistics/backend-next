@@ -31,3 +31,9 @@ This project has mainly being maintained by the following contributors (in alpha
 - [GalvinGao](https://github.com/GalvinGao)
 
 > The full list of active contributors of the _Penguin Statistics_ project can be found at the [Team Members page](https://penguin-stats.io/about/members) of the website.
+
+## Contributors
+
+This project is made possible by the following contributors. Contributions are always welcome!
+
+[![Contributors](https://contrib.rocks/image?repo=penguin-statistics/backend-next)](https://github.com/penguin-statistics/backend-next/graphs/contributors)

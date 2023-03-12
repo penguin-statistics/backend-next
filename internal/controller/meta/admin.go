@@ -1,6 +1,7 @@
 package meta
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,7 +14,10 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gofiber/fiber/v2"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
+	"github.com/tidwall/sjson"
+	"github.com/uptrace/bun"
 	"github.com/zeebo/xxh3"
 	"go.uber.org/fx"
 
@@ -44,6 +48,9 @@ type AdminController struct {
 	AnalyticsService      *service.Analytics
 	UpyunService          *service.Upyun
 	SnapshotService       *service.Snapshot
+	DropReportService     *service.DropReport
+	DropReportRepo        *repo.DropReport
+	PropertyRepo          *repo.Property
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
@@ -68,6 +75,7 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 
 	admin.Get("/recognition/defects", c.GetRecognitionDefects)
 	admin.Get("/recognition/defects/:defectId", c.GetRecognitionDefect)
+	admin.Post("/recognition/items-resources/updated", c.RecognitionItemsResourcesUpdated)
 
 	admin.Post("/snapshots", c.CreateSnapshot)
 }
@@ -427,11 +435,92 @@ func (c *AdminController) GetRecognitionDefect(ctx *fiber.Ctx) error {
 }
 
 func (c *AdminController) RejectRulesReevaluationPreview(ctx *fiber.Ctx) error {
-	return ctx.SendStatus(http.StatusNotImplemented)
+	var request types.RejectRulesReevaluationPreviewRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	evalContexts, err := c.AdminService.GetRejectRulesReportContext(ctx.UserContext(), request)
+	if err != nil {
+		return err
+	}
+
+	evaluation, err := c.AdminService.EvaluateRejectRules(ctx.UserContext(), evalContexts, request.RuleID)
+	if err != nil {
+		return err
+	}
+
+	type rejectRulesReevaluationPreviewResponse struct {
+		Summary service.RejectRulesReevaluationEvaluationResultSetSummary `json:"summary"`
+	}
+
+	return ctx.JSON(&rejectRulesReevaluationPreviewResponse{
+		Summary: evaluation.Summary(),
+	})
 }
 
 func (c *AdminController) RejectRulesReevaluationApply(ctx *fiber.Ctx) error {
-	return ctx.SendStatus(http.StatusNotImplemented)
+	var request types.RejectRulesReevaluationPreviewRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	evalContexts, err := c.AdminService.GetRejectRulesReportContext(ctx.UserContext(), request)
+	if err != nil {
+		return err
+	}
+
+	evaluation, err := c.AdminService.EvaluateRejectRules(ctx.UserContext(), evalContexts, request.RuleID)
+	if err != nil {
+		return err
+	}
+
+	changeSet := evaluation.ChangeSet()
+
+	err = c.DropReportRepo.DB.RunInTx(ctx.UserContext(), nil, func(ictx context.Context, tx bun.Tx) error {
+		for _, change := range changeSet {
+			log.Debug().
+				Str("evt.name", "admin.reject_rules.reevaluation.apply").
+				Int("report_id", change.ReportID).
+				Int("to_reliability", change.ToReliability).
+				Msg("applying reliability modification to report")
+
+			if err := c.DropReportRepo.UpdateDropReportReliability(ictx, tx, change.ReportID, change.ToReliability); err != nil {
+				log.Error().
+					Err(err).
+					Str("evt.name", "admin.reject_rules.reevaluation.apply").
+					Int("report_id", change.ReportID).
+					Int("to_reliability", change.ToReliability).
+					Msg("failed to apply reliability modification to report")
+
+				return err
+			}
+
+			log.Debug().
+				Str("evt.name", "admin.reject_rules.reevaluation.apply").
+				Int("report_id", change.ReportID).
+				Int("to_reliability", change.ToReliability).
+				Msg("reliability modification applied to report")
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return pgerr.ErrInternalError.Msg(
+			fmt.Sprintf("failed to apply reevaluation: %s; all changes have been rolled back", err.Error()),
+		)
+	}
+
+	type rejectRulesReevaluationApplyResponse struct {
+		Summary   service.RejectRulesReevaluationEvaluationResultSetSummary   `json:"summary"`
+		ChangeSet service.RejectRulesReevaluationEvaluationResultSetChangeSet `json:"changeset"`
+	}
+
+	return ctx.JSON(&rejectRulesReevaluationApplyResponse{
+		Summary:   evaluation.Summary(),
+		ChangeSet: changeSet,
+	})
 }
 
 func (c *AdminController) CreateSnapshot(ctx *fiber.Ctx) error {
@@ -450,4 +539,33 @@ func (c *AdminController) CreateSnapshot(ctx *fiber.Ctx) error {
 	}
 
 	return ctx.JSON(snapshot)
+}
+
+func (c *AdminController) RecognitionItemsResourcesUpdated(ctx *fiber.Ctx) error {
+	type createRecognitionAssetRequest struct {
+		Server string `json:"server" validate:"required,arkserver"`
+		Prefix string `json:"prefix" validate:"required"`
+	}
+	var request createRecognitionAssetRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	property, err := c.PropertyRepo.GetPropertyByKey(ctx.UserContext(), "frontend_config")
+	if err != nil {
+		return err
+	}
+
+	s, err := sjson.Set(property.Value, "recognition.items-resources.prefix."+request.Server, request.Prefix)
+	if err != nil {
+		return err
+	}
+	// j.Get("recognition").Get("items-resources").Get("prefix").Get(request.Server).
+
+	asset, err := c.PropertyRepo.UpdatePropertyByKey(ctx.UserContext(), "frontend_config", s)
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(asset)
 }

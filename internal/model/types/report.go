@@ -1,36 +1,16 @@
 package types
 
+// common report request structs
 type ArkDrop struct {
 	DropType string `json:"dropType" validate:"required,oneof=REGULAR_DROP NORMAL_DROP SPECIAL_DROP EXTRA_DROP FURNITURE"`
 	ItemID   string `json:"itemId" validate:"required" example:"30013"`
-	Quantity int    `json:"quantity" validate:"required,lte=1000"`
+	Quantity int    `json:"quantity" validate:"required,gte=0,lte=1000"`
 }
 
 type Drop struct {
 	DropType string `json:"dropType"`
 	ItemID   int    `json:"itemId"`
 	Quantity int    `json:"quantity"`
-}
-
-type SingleReportRequest struct {
-	FragmentStageID
-	FragmentReportCommon
-
-	Drops     []ArkDrop `json:"drops" validate:"dive"`
-	PenguinID string    `json:"-"`
-
-	Metadata *ReportRequestMetadata `json:"metadata" validate:"omitempty,dive"`
-}
-
-type SingleReportRecallRequest struct {
-	ReportHash string `json:"reportHash" validate:"required,printascii" example:"cahbuch1eqliv7dopen0-5ejlUrfzNMXNHY6Q"`
-}
-
-type BatchReportDrop struct {
-	FragmentStageID
-
-	Drops    []ArkDrop             `json:"drops" validate:"dive"`
-	Metadata ReportRequestMetadata `json:"metadata" validate:"dive"`
 }
 
 type ReportRequestMetadata struct {
@@ -43,13 +23,34 @@ type ReportRequestMetadata struct {
 	RecognizerAssetsVersion string `json:"recognizerAssetsVersion,omitempty" validate:"omitempty,lte=32,semverprefixed" swaggertype:"string"`
 }
 
+type SingularReportRequest struct {
+	FragmentStageID
+	FragmentReportCommon
+
+	Drops []ArkDrop `json:"drops" validate:"dive"`
+
+	Metadata *ReportRequestMetadata `json:"metadata" validate:"omitempty,dive"`
+}
+
+type BatchDrop struct {
+	FragmentStageID
+
+	Drops    []ArkDrop             `json:"drops" validate:"dive"`
+	Metadata ReportRequestMetadata `json:"metadata" validate:"dive"`
+}
+
 type BatchReportRequest struct {
 	FragmentReportCommon
 
-	BatchDrops []BatchReportDrop `json:"batchDrops" validate:"dive"`
+	BatchDrops []BatchDrop `json:"batchDrops" validate:"dive"`
 }
 
 type BatchReportError struct {
 	Index  int    `json:"index"`
 	Reason string `json:"reason,omitempty"`
+}
+
+// report recall
+type SingularReportRecallRequest struct {
+	ReportHash string `json:"reportHash" validate:"required,printascii" example:"cahbuch1eqliv7dopen0-5ejlUrfzNMXNHY6Q"`
 }

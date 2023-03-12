@@ -9,7 +9,7 @@ on:
       - main
 
 concurrency:
-  group: tagger-${{ github.ref }}
+  group: dispatcher-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/go-redsync/redsync/v4"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
@@ -11,7 +12,6 @@ import (
 
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/util/rekuest"
-	"exusiai.dev/gommon/constant"
 )
 
 type IdempotencyConfig struct {

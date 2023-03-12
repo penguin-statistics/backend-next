@@ -17,14 +17,6 @@ func IsASCII(s string) bool {
 	return true
 }
 
-func IsValidId(s string) bool {
-	if len(s) > 32 {
-		return false
-	}
-
-	return validIdRegex.MatchString(s)
-}
-
 func IsInt(s string) bool {
 	_, err := strconv.ParseInt(s, 10, 64)
 	return err == nil
