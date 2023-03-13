@@ -19,22 +19,15 @@ func NewDropMatrixElement(db *bun.DB) *DropMatrixElement {
 }
 
 func (s *DropMatrixElement) BatchSaveElements(ctx context.Context, elements []*model.DropMatrixElement, server string) error {
-	err := s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		_, err := tx.NewDelete().Model((*model.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
-		if err != nil {
-			return err
-		}
-		_, err = tx.NewInsert().Model(&elements).Exec(ctx)
-		return err
-	})
+	_, err := s.db.NewInsert().Model(&elements).Exec(ctx)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *DropMatrixElement) DeleteByServer(ctx context.Context, server string) error {
-	_, err := s.db.NewDelete().Model((*model.DropMatrixElement)(nil)).Where("server = ?", server).Exec(ctx)
+func (s *DropMatrixElement) DeleteByServerAndDayNum(ctx context.Context, server string, dayNum int) error {
+	_, err := s.db.NewDelete().Model((*model.DropMatrixElement)(nil)).Where("server = ?", server).Where("day_num = ?", dayNum).Exec(ctx)
 	return err
 }
 
