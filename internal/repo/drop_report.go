@@ -407,7 +407,7 @@ func (s *DropReport) handleSourceName(query *bun.SelectQuery, sourceCategory str
 	if sourceCategory == constant.SourceCategoryManual {
 		query = query.Where("source_name IN (?)", bun.In(constant.ManualSources))
 	} else if sourceCategory == constant.SourceCategoryAutomated {
-		query = query.Where("source_name NOT IN (?)", bun.In(constant.ManualSources))
+		query = query.Where("source_name NOT IN (?)", bun.In(constant.ManualSources)).WhereOr("source_name IS NULL")
 	}
 }
 

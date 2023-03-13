@@ -21,8 +21,8 @@ func (s *DropMatrixElement) BatchSaveElements(ctx context.Context, elements []*m
 	return s.DropMatrixElementRepo.BatchSaveElements(ctx, elements, server)
 }
 
-func (s *DropMatrixElement) DeleteByServer(ctx context.Context, server string) error {
-	return s.DropMatrixElementRepo.DeleteByServer(ctx, server)
+func (s *DropMatrixElement) DeleteByServerAndDayNum(ctx context.Context, server string, dayNum int) error {
+	return s.DropMatrixElementRepo.DeleteByServerAndDayNum(ctx, server, dayNum)
 }
 
 func (s *DropMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.DropMatrixElement, error) {

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
@@ -17,7 +18,6 @@ import (
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/pkg/pgqry"
-	"exusiai.dev/gommon/constant"
 )
 
 type DropInfo struct {
