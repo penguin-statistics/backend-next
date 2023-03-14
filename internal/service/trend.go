@@ -22,7 +22,6 @@ type Trend struct {
 	DropInfoService             *DropInfo
 	PatternMatrixElementService *PatternMatrixElement
 	DropPatternElementService   *DropPatternElement
-	TrendElementService         *TrendElement
 	StageService                *Stage
 	ItemService                 *Item
 }
@@ -33,7 +32,6 @@ func NewTrend(
 	dropInfoService *DropInfo,
 	patternMatrixElementService *PatternMatrixElement,
 	dropPatternElementService *DropPatternElement,
-	trendElementService *TrendElement,
 	stageService *Stage,
 	itemService *Item,
 ) *Trend {
@@ -43,7 +41,6 @@ func NewTrend(
 		DropInfoService:             dropInfoService,
 		PatternMatrixElementService: patternMatrixElementService,
 		DropPatternElementService:   dropPatternElementService,
-		TrendElementService:         trendElementService,
 		StageService:                stageService,
 		ItemService:                 itemService,
 	}
