@@ -18,11 +18,11 @@ import (
 
 type WorkerDeps struct {
 	fx.In
-	DropMatrixGlobalService *service.DropMatrixGlobal
-	PatternMatrixService    *service.PatternMatrix
-	TrendService            *service.Trend
-	SiteStatsService        *service.SiteStats
-	RedSync                 *redsync.Redsync
+	DropMatrixService    *service.DropMatrix
+	PatternMatrixService *service.PatternMatrix
+	TrendService         *service.Trend
+	SiteStatsService     *service.SiteStats
+	RedSync              *redsync.Redsync
 }
 
 type Worker struct {
@@ -131,7 +131,7 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 
 		// DropMatrixService
 		if err = w.microtask(ctx, WorkerCalcTypeStatsCalc, "dropMatrix", server, func() error {
-			return w.DropMatrixGlobalService.RunCalcDropMatrixJob(ctx, server)
+			return w.DropMatrixService.RunCalcDropMatrixJob(ctx, server)
 		}); err != nil {
 			return err
 		}

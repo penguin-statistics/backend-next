@@ -120,11 +120,6 @@ func (c *Result) GetDropMatrix(ctx *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	// if showClosedZones {
-	// 	flog.
-	// 		DebugFrom(ctx, "query.result.matrix.show_closed_zones").
-	// 		Msg("show_closed_zone is used")
-	// }
 	stageFilterStr := ctx.Query("stageFilter")
 	itemFilterStr := ctx.Query("itemFilter")
 
@@ -138,7 +133,7 @@ func (c *Result) GetDropMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimQueryResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx.UserContext(), server, showClosedZones, stageFilterStr, itemFilterStr, accountId, constant.SourceCategoryAll)
+	shimQueryResult, err := c.DropMatrixService.GetShimDropMatrix(ctx.UserContext(), server, showClosedZones, stageFilterStr, itemFilterStr, accountId, constant.SourceCategoryAll)
 	if err != nil {
 		return err
 	}
@@ -147,7 +142,7 @@ func (c *Result) GetDropMatrix(ctx *fiber.Ctx) error {
 	if useCache {
 		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones) + constant.CacheSep + constant.SourceCategoryAll
 		var lastModifiedTime time.Time
-		if err := cache.LastModifiedTime.Get("[shimMaxAccumulableDropMatrixResults#server|showClosedZoned|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
+		if err := cache.LastModifiedTime.Get("[shimGlobalDropMatrix#server|showClosedZoned|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
 			lastModifiedTime = time.Now()
 		}
 		cachectrl.OptIn(ctx, lastModifiedTime)

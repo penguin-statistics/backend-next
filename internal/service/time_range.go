@@ -162,6 +162,7 @@ func (s *TimeRange) GetMaxAccumulableTimeRangesByServer(ctx context.Context, ser
 	return maxAccumulableTimeRanges, nil
 }
 
+// This function will combine time ranges together if they are adjacent
 func (s *TimeRange) GetAllMaxAccumulableTimeRangesByServer(ctx context.Context, server string) (map[int]map[int][]*model.TimeRange, error) {
 	var maxAccumulableTimeRanges map[int]map[int][]*model.TimeRange
 	err := cache.MaxAccumulableTimeRanges.Get(server, &maxAccumulableTimeRanges)

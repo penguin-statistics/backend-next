@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/repo"
@@ -23,6 +24,12 @@ func (s *DropMatrixElement) BatchSaveElements(ctx context.Context, elements []*m
 
 func (s *DropMatrixElement) DeleteByServerAndDayNum(ctx context.Context, server string, dayNum int) error {
 	return s.DropMatrixElementRepo.DeleteByServerAndDayNum(ctx, server, dayNum)
+}
+
+func (s *DropMatrixElement) GetElementsByServerAndSourceCategoryAndStartAndEndTime(
+	ctx context.Context, server string, sourceCategory string, start *time.Time, end *time.Time,
+) ([]*model.DropMatrixElement, error) {
+	return s.DropMatrixElementRepo.GetElementsByServerAndSourceCategoryAndStartAndEndTime(ctx, server, sourceCategory, start, end)
 }
 
 func (s *DropMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.DropMatrixElement, error) {

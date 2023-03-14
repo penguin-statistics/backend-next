@@ -51,12 +51,13 @@ func (c Dataset) aggregateMatrix(ctx *fiber.Ctx) (*modelv2.DropMatrixQueryResult
 		accountId.Valid = true
 	}
 
-	queryResult, err := c.DropMatrixService.GetMaxAccumulableDropMatrixResults(ctx.UserContext(), server, "", ctx.Params("itemId"), accountId)
-	if err != nil {
-		return nil, err
-	}
+	// TODO: disable for now, because v3 is not ready yet
+	// queryResult, err := c.DropMatrixService.GetMaxAccumulableDropMatrixResults(ctx.UserContext(), server, "", ctx.Params("itemId"), accountId)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	return queryResult, nil
+	return nil, nil
 }
 
 func (c Dataset) aggregateTrend(ctx *fiber.Ctx) (*modelv2.TrendQueryResult, error) {

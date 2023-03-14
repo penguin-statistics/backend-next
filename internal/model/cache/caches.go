@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/goccy/go-json"
-
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
@@ -24,7 +23,7 @@ var (
 	ItemDropSetByStageIDAndRangeID   *cache.Set[[]int]
 	ItemDropSetByStageIdAndTimeRange *cache.Set[[]int]
 
-	ShimMaxAccumulableDropMatrixResults *cache.Set[modelv2.DropMatrixQueryResult]
+	ShimGlobalDropMatrix *cache.Set[modelv2.DropMatrixQueryResult]
 
 	Formula *cache.Singular[json.RawMessage]
 
@@ -126,9 +125,9 @@ func initializeCaches() {
 	SetMap["itemDropSet#server|stageId|startTime|endTime"] = ItemDropSetByStageIdAndTimeRange.Flush
 
 	// drop_matrix
-	ShimMaxAccumulableDropMatrixResults = cache.NewSet[modelv2.DropMatrixQueryResult]("shimMaxAccumulableDropMatrixResults#server|showClosedZoned|sourceCategory")
+	ShimGlobalDropMatrix = cache.NewSet[modelv2.DropMatrixQueryResult]("shimGlobalDropMatrix#server|showClosedZoned|sourceCategory")
 
-	SetMap["shimMaxAccumulableDropMatrixResults#server|showClosedZoned|sourceCategory"] = ShimMaxAccumulableDropMatrixResults.Flush
+	SetMap["shimGlobalDropMatrix#server|showClosedZoned|sourceCategory"] = ShimGlobalDropMatrix.Flush
 
 	// formula
 	Formula = cache.NewSingular[json.RawMessage]("formula")
