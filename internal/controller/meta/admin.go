@@ -51,8 +51,8 @@ type AdminController struct {
 	DropReportService        *service.DropReport
 	DropReportRepo           *repo.DropReport
 	PropertyRepo             *repo.Property
-	DropMatrixGlobalService  *service.DropMatrixGlobal
 	DropMatrixElementService *service.DropMatrixElement
+	TimeRangeService         *service.TimeRange
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
@@ -582,7 +582,7 @@ func (c *AdminController) CalcDropMatrixElements(ctx *fiber.Ctx) error {
 		if err != nil {
 			return err
 		}
-		c.DropMatrixGlobalService.UpdateDropMatrixByGivenDate(ctx.UserContext(), request.Server, &date)
+		c.DropMatrixService.UpdateDropMatrixByGivenDate(ctx.UserContext(), request.Server, &date)
 	}
 	return ctx.SendStatus(fiber.StatusCreated)
 }

@@ -3,6 +3,7 @@ package v2
 import (
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
@@ -13,7 +14,6 @@ import (
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
-	"exusiai.dev/gommon/constant"
 )
 
 var _ modelv2.Dummy
@@ -60,7 +60,7 @@ func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.DropMatrixService.GetShimMaxAccumulableDropMatrixResults(ctx.UserContext(), server, true, "", "", accountId, category)
+	shimResult, err := c.DropMatrixService.GetShimDropMatrix(ctx.UserContext(), server, true, "", "", accountId, category)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 	if !accountId.Valid {
 		key := server + constant.CacheSep + "true" + constant.CacheSep + category
 		var lastModifiedTime time.Time
-		if err := cache.LastModifiedTime.Get("[shimMaxAccumulableDropMatrixResults#server|showClosedZoned|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
+		if err := cache.LastModifiedTime.Get("[shimGlobalDropMatrix#server|showClosedZoned|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
 			lastModifiedTime = time.Now()
 		}
 		cachectrl.OptIn(ctx, lastModifiedTime)
