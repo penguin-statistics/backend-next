@@ -211,13 +211,13 @@ func (c *Result) GetTrends(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	shimResult, err := c.TrendService.GetShimSavedTrendResults(ctx.UserContext(), server)
+	shimResult, err := c.TrendService.GetShimTrend(ctx.UserContext(), server)
 	if err != nil {
 		return err
 	}
 
 	var lastModifiedTime time.Time
-	if err := cache.LastModifiedTime.Get("[shimSavedTrendResults#server:"+server+"]", &lastModifiedTime); err != nil {
+	if err := cache.LastModifiedTime.Get("[shimTrend#server:"+server+"]", &lastModifiedTime); err != nil {
 		lastModifiedTime = time.Now()
 	}
 	cachectrl.OptIn(ctx, lastModifiedTime)

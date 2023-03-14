@@ -72,7 +72,6 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 
 	admin.Post("/refresh/matrix", c.CalcDropMatrixElements)
 	admin.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
-	admin.Get("/refresh/trend/:server", c.RefreshAllTrendElements)
 	admin.Get("/refresh/sitestats/:server", c.RefreshAllSiteStats)
 
 	admin.Get("/recognition/defects", c.GetRecognitionDefects)
@@ -327,11 +326,6 @@ func (c *AdminController) GetRecentUniqueUserCountBySource(ctx *fiber.Ctx) error
 func (c *AdminController) RefreshAllPatternMatrixElements(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	return c.PatternMatrixService.RefreshAllPatternMatrixElements(ctx.UserContext(), server, []string{constant.SourceCategoryAll})
-}
-
-func (c *AdminController) RefreshAllTrendElements(ctx *fiber.Ctx) error {
-	server := ctx.Params("server")
-	return c.TrendService.RefreshTrendElements(ctx.UserContext(), server, []string{constant.SourceCategoryAll})
 }
 
 func (c *AdminController) RefreshAllSiteStats(ctx *fiber.Ctx) error {

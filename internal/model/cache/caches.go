@@ -25,6 +25,8 @@ var (
 
 	ShimGlobalDropMatrix *cache.Set[modelv2.DropMatrixQueryResult]
 
+	ShimTrend *cache.Set[modelv2.TrendQueryResult]
+
 	Formula *cache.Singular[json.RawMessage]
 
 	FrontendConfig *cache.Singular[json.RawMessage]
@@ -58,8 +60,6 @@ var (
 	TimeRangeByID            *cache.Set[model.TimeRange]
 	TimeRangesMap            *cache.Set[map[int]*model.TimeRange]
 	MaxAccumulableTimeRanges *cache.Set[map[int]map[int][]*model.TimeRange]
-
-	ShimSavedTrendResults *cache.Set[modelv2.TrendQueryResult]
 
 	Zones           *cache.Singular[[]*model.Zone]
 	ZoneByArkID     *cache.Set[model.Zone]
@@ -128,6 +128,11 @@ func initializeCaches() {
 	ShimGlobalDropMatrix = cache.NewSet[modelv2.DropMatrixQueryResult]("shimGlobalDropMatrix#server|showClosedZoned|sourceCategory")
 
 	SetMap["shimGlobalDropMatrix#server|showClosedZoned|sourceCategory"] = ShimGlobalDropMatrix.Flush
+
+	// trend
+	ShimTrend = cache.NewSet[modelv2.TrendQueryResult]("shimTrend#server")
+
+	SetMap["shimTrend#server"] = ShimTrend.Flush
 
 	// formula
 	Formula = cache.NewSingular[json.RawMessage]("formula")
@@ -203,11 +208,6 @@ func initializeCaches() {
 	SetMap["timeRange#rangeId"] = TimeRangeByID.Flush
 	SetMap["timeRangesMap#server"] = TimeRangesMap.Flush
 	SetMap["maxAccumulableTimeRanges#server"] = MaxAccumulableTimeRanges.Flush
-
-	// trend
-	ShimSavedTrendResults = cache.NewSet[modelv2.TrendQueryResult]("shimSavedTrendResults#server")
-
-	SetMap["shimSavedTrendResults#server"] = ShimSavedTrendResults.Flush
 
 	// zone
 	Zones = cache.NewSingular[[]*model.Zone]("zones")

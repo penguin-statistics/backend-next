@@ -127,13 +127,13 @@ func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 // @Router   /PenguinStats/api/v2/_private/result/trend/{server} [GET]
 func (c *Private) GetTrends(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
-	shimResult, err := c.TrendService.GetShimSavedTrendResults(ctx.UserContext(), server)
+	shimResult, err := c.TrendService.GetShimTrend(ctx.UserContext(), server)
 	if err != nil {
 		return err
 	}
 
 	var lastModifiedTime time.Time
-	if err := cache.LastModifiedTime.Get("[shimSavedTrendResults#server:"+server+"]", &lastModifiedTime); err != nil {
+	if err := cache.LastModifiedTime.Get("[shimTrend#server:"+server+"]", &lastModifiedTime); err != nil {
 		lastModifiedTime = time.Now()
 	}
 	cachectrl.OptIn(ctx, lastModifiedTime)
