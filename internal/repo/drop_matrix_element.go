@@ -41,3 +41,11 @@ func (s *DropMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Con
 	}
 	return elements, nil
 }
+
+func (s *DropMatrixElement) IsExistByServerAndDayNum(ctx context.Context, server string, dayNum int) (bool, error) {
+	exists, err := s.db.NewSelect().Model((*model.DropMatrixElement)(nil)).Where("server = ?", server).Where("day_num = ?", dayNum).Exists(ctx)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
