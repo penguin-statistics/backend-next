@@ -6,14 +6,12 @@ import (
 
 	"exusiai.dev/gommon/constant"
 	"github.com/ahmetb/go-linq/v3"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
-	"exusiai.dev/backend-next/internal/pkg/async"
 	"exusiai.dev/backend-next/internal/pkg/gameday"
 	"exusiai.dev/backend-next/internal/util"
 )
@@ -51,13 +49,13 @@ func NewTrend(
 	}
 }
 
-// Cache: shimSavedTrendResults#server:{server}, 24hrs, records last modified time
-func (s *Trend) GetShimSavedTrendResults(ctx context.Context, server string) (*modelv2.TrendQueryResult, error) {
+// =========== Global ===========
+
+// Cache: shimTrend#server:{server}, 24hrs, records last modified time
+func (s *Trend) GetShimTrend(ctx context.Context, server string) (*modelv2.TrendQueryResult, error) {
 	valueFunc := func() (*modelv2.TrendQueryResult, error) {
-		queryResult, err := s.getSavedTrendResults(ctx, server, constant.SourceCategoryAll)
-		if err != nil {
-			return nil, err
-		}
+		// TODO: calculate trend results from drop matrix elements table
+		var queryResult *model.TrendQueryResult
 		slowShimResult, err := s.applyShimForSavedTrendQuery(ctx, server, queryResult)
 		if err != nil {
 			return nil, err
@@ -66,130 +64,31 @@ func (s *Trend) GetShimSavedTrendResults(ctx context.Context, server string) (*m
 	}
 
 	var shimResult modelv2.TrendQueryResult
-	calculated, err := cache.ShimSavedTrendResults.MutexGetSet(server, &shimResult, valueFunc, 24*time.Hour)
+	calculated, err := cache.ShimTrend.MutexGetSet(server, &shimResult, valueFunc, 24*time.Hour)
 	if err != nil {
 		return nil, err
 	} else if calculated {
-		cache.LastModifiedTime.Set("[shimSavedTrendResults#server:"+server+"]", time.Now(), 0)
+		cache.LastModifiedTime.Set("[shimTrend#server:"+server+"]", time.Now(), 0)
 	}
 	return &shimResult, nil
 }
 
+// =========== Customized ===========
+
 func (s *Trend) GetShimCustomizedTrendResults(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, itemIds []int, accountId null.Int, sourceCategory string,
 ) (*modelv2.TrendQueryResult, error) {
-	trendQueryResult, err := s.QueryTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, itemIds, accountId, sourceCategory)
+	trendQueryResult, err := s.queryTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, itemIds, accountId, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
 	return s.applyShimForCustomizedTrendQuery(ctx, trendQueryResult, startTime)
 }
 
-func (s *Trend) QueryTrend(
+func (s *Trend) queryTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId null.Int, sourceCategory string,
 ) (*model.TrendQueryResult, error) {
 	trendElements, err := s.calcTrend(ctx, server, startTime, intervalLength, intervalNum, stageIdFilter, itemIdFilter, accountId, sourceCategory)
-	if err != nil {
-		return nil, err
-	}
-	return s.convertTrendElementsToTrendQueryResult(trendElements)
-}
-
-func (s *Trend) RefreshTrendElements(ctx context.Context, server string, sourceCategories []string) error {
-	maxAccumulableTimeRanges, err := s.TimeRangeService.GetMaxAccumulableTimeRangesByServer(ctx, server)
-	if err != nil {
-		return err
-	}
-
-	calcq := make([]map[string]any, 0)
-	for stageId, maxAccumulableTimeRangesForOneStage := range maxAccumulableTimeRanges {
-		itemIdsMapByTimeRange := make(map[string][]int)
-		for itemId, timeRanges := range maxAccumulableTimeRangesForOneStage {
-			sortedTimeRanges := make([]*model.TimeRange, 0)
-
-			linq.From(timeRanges).
-				SortT(func(a, b *model.TimeRange) bool {
-					return a.StartTime.Before(*b.StartTime)
-				}).
-				ToSlice(&sortedTimeRanges)
-
-			combinedTimeRange := model.TimeRange{
-				StartTime: sortedTimeRanges[0].StartTime,
-				EndTime:   sortedTimeRanges[len(sortedTimeRanges)-1].EndTime,
-			}
-
-			combinedTimeRangeKey := combinedTimeRange.String()
-			if _, ok := itemIdsMapByTimeRange[combinedTimeRangeKey]; !ok {
-				itemIdsMapByTimeRange[combinedTimeRangeKey] = make([]int, 0)
-			}
-
-			itemIdsMapByTimeRange[combinedTimeRangeKey] = append(itemIdsMapByTimeRange[combinedTimeRangeKey], itemId)
-		}
-		for rangeStr, itemIds := range itemIdsMapByTimeRange {
-			timeRange := model.TimeRangeFromString(rangeStr)
-			startTime := *timeRange.StartTime
-			endTime := *timeRange.EndTime
-
-			if endTime.After(time.Now()) {
-				endTime = time.Now()
-			}
-
-			startTime = gameday.StartTime(server, startTime)
-			if !gameday.IsStartTime(server, endTime) {
-				endTime = gameday.EndTime(server, endTime)
-			} else {
-				loc := constant.LocMap[server]
-				endTime = endTime.In(loc)
-			}
-
-			diff := int(endTime.Sub(startTime).Hours())
-			intervalNum := diff / 24
-			if diff%24 != 0 { // shouldn't happen actually
-				intervalNum++
-			}
-
-			if intervalNum > constant.DefaultIntervalNum {
-				intervalNum = constant.DefaultIntervalNum
-				startTime = endTime.Add(time.Hour * time.Duration((-1)*24*intervalNum))
-			}
-
-			calcq = append(calcq, map[string]any{
-				"stageId":     stageId,
-				"itemIds":     itemIds,
-				"startTime":   startTime,
-				"intervalNum": intervalNum,
-			})
-		}
-	}
-
-	elements, err := async.FlatMap(calcq, constant.WorkerParallelism, func(m map[string]any) ([]*model.TrendElement, error) {
-		stageId := m["stageId"].(int)
-		itemIds := m["itemIds"].([]int)
-		startTime := m["startTime"].(time.Time)
-		intervalNum := m["intervalNum"].(int)
-
-		currentBatch := make([]*model.TrendElement, 0)
-		for _, sourceCategory := range sourceCategories {
-			results, err := s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, null.NewInt(0, false), sourceCategory)
-			if err != nil {
-				return nil, err
-			}
-			currentBatch = append(currentBatch, results...)
-		}
-		return currentBatch, nil
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to refresh trend elements")
-	}
-
-	if err := s.TrendElementService.BatchSaveElements(ctx, elements, server); err != nil {
-		return err
-	}
-	return cache.ShimSavedTrendResults.Delete(server)
-}
-
-func (s *Trend) getSavedTrendResults(ctx context.Context, server string, sourceCategory string) (*model.TrendQueryResult, error) {
-	trendElements, err := s.TrendElementService.GetElementsByServerAndSourceCategory(ctx, server, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -396,6 +295,8 @@ func (s *Trend) convertTrendElementsToTrendQueryResult(trendElements []*model.Tr
 	}
 	return trendQueryResult, nil
 }
+
+// =========== Helpers ===========
 
 func (s *Trend) applyShimForCustomizedTrendQuery(ctx context.Context, queryResult *model.TrendQueryResult, startTime *time.Time) (*modelv2.TrendQueryResult, error) {
 	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)

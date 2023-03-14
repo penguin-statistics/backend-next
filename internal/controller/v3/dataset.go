@@ -66,7 +66,7 @@ func (c Dataset) aggregateTrend(ctx *fiber.Ctx) (*modelv2.TrendQueryResult, erro
 		return nil, err
 	}
 
-	result, err := c.TrendService.GetShimSavedTrendResults(ctx.UserContext(), server)
+	result, err := c.TrendService.GetShimTrend(ctx.UserContext(), server)
 	if err != nil {
 		return nil, err
 	}
