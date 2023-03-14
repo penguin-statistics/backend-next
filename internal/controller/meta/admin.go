@@ -324,11 +324,6 @@ func (c *AdminController) GetRecentUniqueUserCountBySource(ctx *fiber.Ctx) error
 	return ctx.JSON(result)
 }
 
-func (c *AdminController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
-	server := ctx.Params("server")
-	return c.DropMatrixService.RefreshAllDropMatrixElements(ctx.UserContext(), server, []string{constant.SourceCategoryAll})
-}
-
 func (c *AdminController) RefreshAllPatternMatrixElements(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	return c.PatternMatrixService.RefreshAllPatternMatrixElements(ctx.UserContext(), server, []string{constant.SourceCategoryAll})
