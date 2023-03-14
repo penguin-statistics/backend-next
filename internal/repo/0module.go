@@ -20,7 +20,6 @@ func Module() fx.Option {
 		NewDropReport,
 		NewRejectRule,
 		NewDropPattern,
-		NewTrendElement,
 		NewDropReportExtra,
 		NewDropMatrixElement,
 		NewRecognitionDefect,

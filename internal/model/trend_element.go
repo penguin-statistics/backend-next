@@ -2,14 +2,10 @@ package model
 
 import (
 	"time"
-
-	"github.com/uptrace/bun"
 )
 
 type TrendElement struct {
-	bun.BaseModel `bun:"trend_elements,alias:te"`
-
-	ElementID      int        `bun:",pk,autoincrement" json:"id"`
+	ElementID      int        `json:"id"`
 	StageID        int        `json:"stageId"`
 	ItemID         int        `json:"itemId"`
 	GroupID        int        `json:"groupId"`
