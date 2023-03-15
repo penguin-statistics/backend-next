@@ -27,6 +27,8 @@ var (
 
 	ShimTrend *cache.Set[modelv2.TrendQueryResult]
 
+	ShimGlobalPatternMatrix *cache.Set[modelv2.PatternMatrixQueryResult]
+
 	Formula *cache.Singular[json.RawMessage]
 
 	FrontendConfig *cache.Singular[json.RawMessage]
@@ -44,8 +46,6 @@ var (
 
 	Activities     *cache.Singular[[]*model.Activity]
 	ShimActivities *cache.Singular[[]*modelv2.Activity]
-
-	ShimLatestPatternMatrixResults *cache.Set[modelv2.PatternMatrixQueryResult]
 
 	ShimSiteStats *cache.Set[modelv2.SiteStats]
 
@@ -134,6 +134,11 @@ func initializeCaches() {
 
 	SetMap["shimTrend#server"] = ShimTrend.Flush
 
+	// pattern_matrix
+	ShimGlobalPatternMatrix = cache.NewSet[modelv2.PatternMatrixQueryResult]("shimGlobalPatternMatrix#server|sourceCategory")
+
+	SetMap["shimGlobalPatternMatrix#server|sourceCategory"] = ShimGlobalPatternMatrix.Flush
+
 	// formula
 	Formula = cache.NewSingular[json.RawMessage]("formula")
 	SingularFlusherMap["formula"] = Formula.Delete
@@ -172,11 +177,6 @@ func initializeCaches() {
 
 	SingularFlusherMap["activities"] = Activities.Delete
 	SingularFlusherMap["shimActivities"] = ShimActivities.Delete
-
-	// pattern_matrix
-	ShimLatestPatternMatrixResults = cache.NewSet[modelv2.PatternMatrixQueryResult]("shimLatestPatternMatrixResults#server|sourceCategory")
-
-	SetMap["shimLatestPatternMatrixResults#server|sourceCategory"] = ShimLatestPatternMatrixResults.Flush
 
 	// site_stats
 	ShimSiteStats = cache.NewSet[modelv2.SiteStats]("shimSiteStats#server")

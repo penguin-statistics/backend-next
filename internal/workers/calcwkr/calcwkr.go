@@ -123,7 +123,7 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 
 		// PatternMatrixService
 		if err = w.microtask(ctx, WorkerCalcTypeStatsCalc, "patternMatrix", server, func() error {
-			return w.PatternMatrixService.RefreshAllPatternMatrixElements(ctx, server, sourceCategories)
+			return w.PatternMatrixService.RunCalcPatternMatrixJob(ctx, server)
 		}); err != nil {
 			return err
 		}
