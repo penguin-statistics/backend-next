@@ -74,7 +74,6 @@ func (s *Trend) calcTrendFromDropMatrixElements(ctx context.Context, server stri
 	today := time.UnixMilli(1673180430000)
 	endDayNum := util.GetDayNum(&today, server)
 	startDayNum := endDayNum - constant.DefaultIntervalNum + 1
-	log.Debug().Int("startDayNum", startDayNum).Int("endDayNum", endDayNum).Msg("startDayNum, endDayNum")
 	dropMatrixElements, err := s.DropMatrixElementService.GetElementsByServerAndSourceCategoryAndDayNumRange(ctx, server, constant.SourceCategoryAll, startDayNum, endDayNum)
 	if err != nil {
 		return nil, err
@@ -101,10 +100,6 @@ func (s *Trend) calcTrendFromDropMatrixElements(ctx context.Context, server stri
 			quantity = quantity[minDayNum-startDayNum:]
 
 			startTime := time.UnixMilli(util.GetDayStartTimestampFromDayNum(minDayNum, server))
-			if stageId == 895 {
-				log.Debug().Int("minDayNum", minDayNum).Msg("minDayNum")
-				log.Debug().Int64("startTime", startTime.UnixMilli()).Msg("aaaaa")
-			}
 			itemTrend := &model.ItemTrend{
 				ItemID:    itemId,
 				StartTime: &startTime,

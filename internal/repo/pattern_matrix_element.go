@@ -37,8 +37,8 @@ func (s *PatternMatrixElement) DeleteByServerAndDayNum(ctx context.Context, serv
 	return err
 }
 
-func (s *PatternMatrixElement) GetElementsByServerAndSourceCategoryAndStartAndEndTime(
-	ctx context.Context, server string, sourceCategory string, start *time.Time, end *time.Time,
+func (s *PatternMatrixElement) GetElementsByServerAndSourceCategoryAndStartAndEndTimeAndStageIds(
+	ctx context.Context, server string, sourceCategory string, start *time.Time, end *time.Time, stageIds []int,
 ) ([]*model.PatternMatrixElement, error) {
 	var elements []*model.PatternMatrixElement
 	startTimeStr := start.Format(time.RFC3339)
@@ -48,6 +48,7 @@ func (s *PatternMatrixElement) GetElementsByServerAndSourceCategoryAndStartAndEn
 		Where("source_category = ?", sourceCategory).
 		Where("start_time >= timestamp with time zone ?", startTimeStr).
 		Where("end_time <= timestamp with time zone ?", endTimeStr).
+		Where("stage_id IN (?)", bun.In(stageIds)).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil

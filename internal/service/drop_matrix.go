@@ -342,19 +342,14 @@ func (s *DropMatrix) calcGlobalDropMatrix(ctx context.Context, server string, so
 	for timeRangeStr, subMapByStageId := range itemIdsMapByTimeRange {
 		timeRange := model.TimeRangeFromString(timeRangeStr)
 
-		dropMatrixElements, err := s.DropMatrixElementService.GetElementsByServerAndSourceCategoryAndStartAndEndTime(
-			ctx, server, sourceCategory, timeRange.StartTime, timeRange.EndTime)
+		dropMatrixElements, err := s.DropMatrixElementService.GetElementsByServerAndSourceCategoryAndStartAndEndTimeAndStageIdAndItemIds(
+			ctx, server, sourceCategory, timeRange.StartTime, timeRange.EndTime, subMapByStageId)
 		if err != nil {
 			return nil, err
 		}
 		elementsMap := util.GetDropMatrixElementsMap(dropMatrixElements, false)
 
 		for stageId, itemIds := range subMapByStageId {
-			log.Debug().
-				Str("timeRange", timeRange.HumanReadableString(server)).
-				Int("stageId", stageId).
-				Ints("itemIds", itemIds).
-				Msg("timeRange-stageId-itemIds")
 			if _, ok := oneDropMatrixElementsMap[stageId]; !ok {
 				oneDropMatrixElementsMap[stageId] = make(map[int]*model.OneDropMatrixElement)
 			}

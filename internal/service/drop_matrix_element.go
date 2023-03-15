@@ -26,10 +26,10 @@ func (s *DropMatrixElement) DeleteByServerAndDayNum(ctx context.Context, server 
 	return s.DropMatrixElementRepo.DeleteByServerAndDayNum(ctx, server, dayNum)
 }
 
-func (s *DropMatrixElement) GetElementsByServerAndSourceCategoryAndStartAndEndTime(
-	ctx context.Context, server string, sourceCategory string, start *time.Time, end *time.Time,
+func (s *DropMatrixElement) GetElementsByServerAndSourceCategoryAndStartAndEndTimeAndStageIdAndItemIds(
+	ctx context.Context, server string, sourceCategory string, start *time.Time, end *time.Time, stageIdItemIdMap map[int][]int,
 ) ([]*model.DropMatrixElement, error) {
-	return s.DropMatrixElementRepo.GetElementsByServerAndSourceCategoryAndStartAndEndTime(ctx, server, sourceCategory, start, end)
+	return s.DropMatrixElementRepo.GetElementsByServerAndSourceCategoryAndStartAndEndTimeAndStageIdAndItemIds(ctx, server, sourceCategory, start, end, stageIdItemIdMap)
 }
 
 func (s *DropMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.DropMatrixElement, error) {
