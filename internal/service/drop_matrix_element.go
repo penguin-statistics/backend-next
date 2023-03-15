@@ -35,3 +35,9 @@ func (s *DropMatrixElement) GetElementsByServerAndSourceCategoryAndStartAndEndTi
 func (s *DropMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.DropMatrixElement, error) {
 	return s.DropMatrixElementRepo.GetElementsByServerAndSourceCategory(ctx, server, sourceCategory)
 }
+
+func (s *DropMatrixElement) GetElementsByServerAndSourceCategoryAndDayNumRange(
+	ctx context.Context, server string, sourceCategory string, startDayNum int, endDayNum int,
+) ([]*model.DropMatrixElement, error) {
+	return s.DropMatrixElementRepo.GetElementsByServerAndSourceCategoryAndDayNumRange(ctx, server, sourceCategory, startDayNum, endDayNum)
+}

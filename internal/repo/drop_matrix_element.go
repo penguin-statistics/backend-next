@@ -52,6 +52,28 @@ func (s *DropMatrixElement) GetElementsByServerAndSourceCategoryAndStartAndEndTi
 	return elements, nil
 }
 
+/**
+ * @param startDayNum inclusive
+ * @param endDayNum inclusive
+ */
+func (s *DropMatrixElement) GetElementsByServerAndSourceCategoryAndDayNumRange(
+	ctx context.Context, server string, sourceCategory string, startDayNum int, endDayNum int,
+) ([]*model.DropMatrixElement, error) {
+	var elements []*model.DropMatrixElement
+	err := s.db.NewSelect().Model(&elements).
+		Where("server = ?", server).
+		Where("source_category = ?", sourceCategory).
+		Where("day_num >= ?", startDayNum).
+		Where("day_num <= ?", endDayNum).
+		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return elements, nil
+}
+
 func (s *DropMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.DropMatrixElement, error) {
 	var elements []*model.DropMatrixElement
 	err := s.db.NewSelect().Model(&elements).Where("server = ?", server).Where("source_category = ?", sourceCategory).Scan(ctx)

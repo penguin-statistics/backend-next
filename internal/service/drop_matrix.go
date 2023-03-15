@@ -133,6 +133,9 @@ func (s *DropMatrix) RunCalcDropMatrixJob(ctx context.Context, server string) er
 			return err
 		}
 	}
+	if err := cache.ShimTrend.Delete(server); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -201,22 +204,9 @@ func (s *DropMatrix) calcDropMatrixByGivenDate(
 				StartTime:          timeRange.StartTime,
 				EndTime:            timeRange.EndTime,
 				SourceCategory:     sourceCategory,
-				ExcludeNonOneTimes: true,
+				ExcludeNonOneTimes: false,
 				StageItemFilter:    &stageIdsItemIdsMap,
 			}
-
-			log.Debug().
-				Str("timeRange", timeRange.HumanReadableString(server)).
-				Str("server", server).
-				Str("sourceCategory", sourceCategory).
-				Msg("Calculate drop matrix")
-			for stageId, itemIds := range stageIdsItemIdsMap {
-				log.Debug().
-					Int("stageId", stageId).
-					Ints("itemIds", itemIds).
-					Msg("StageId and itemIds")
-			}
-
 			res, err := s.calcDropMatrix(ctx, queryCtx)
 			if err != nil {
 				return nil, err
@@ -599,7 +589,7 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 			AccountID:          accountId,
 			StageItemFilter:    &stageItemFilter,
 			SourceCategory:     sourceCategory,
-			ExcludeNonOneTimes: true,
+			ExcludeNonOneTimes: false,
 		}
 		quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, queryCtx)
 		if err != nil {

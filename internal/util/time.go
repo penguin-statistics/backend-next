@@ -15,7 +15,13 @@ func GetDayStartTime(t *time.Time, server string) int64 {
 }
 
 func GetDayNum(t *time.Time, server string) int {
-	dayStartTime := GetDayStartTime(t, server)
-	serverOpenStartTime := constant.ServerStartTimeMapMillis[server]
-	return int((dayStartTime - serverOpenStartTime) / 86400000)
+	serverOpenStartTimeLong := constant.ServerStartTimeMapMillis[server]
+	serverOpenStartTime := time.UnixMilli(serverOpenStartTimeLong)
+	return int((GetDayStartTime(t, server) - GetDayStartTime(&serverOpenStartTime, server)) / 86400000)
+}
+
+func GetDayStartTimestampFromDayNum(dayNum int, server string) int64 {
+	serverOpenStartTimeLong := constant.ServerStartTimeMapMillis[server]
+	serverOpenStartTime := time.UnixMilli(serverOpenStartTimeLong)
+	return GetDayStartTime(&serverOpenStartTime, server) + int64(dayNum)*86400000
 }
