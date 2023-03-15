@@ -102,7 +102,7 @@ func (s *DropMatrix) RunCalcDropMatrixJob(ctx context.Context, server string) er
 		return err
 	}
 	dayNum := util.GetDayNum(&date, server)
-	exists, err := s.DropMatrixElementService.DropMatrixElementRepo.IsExistByServerAndDayNum(ctx, server, dayNum)
+	exists, err := s.DropMatrixElementService.IsExistByServerAndDayNum(ctx, server, dayNum)
 	if err != nil {
 		return err
 	}

@@ -181,7 +181,7 @@ func (c *Result) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.UserContext(), server, accountId, constant.SourceCategoryAll)
+	shimResult, err := c.PatternMatrixService.GetShimPatternMatrix(ctx.UserContext(), server, accountId, constant.SourceCategoryAll)
 	if err != nil {
 		return err
 	}
@@ -189,7 +189,7 @@ func (c *Result) GetPatternMatrix(ctx *fiber.Ctx) error {
 	if !accountId.Valid {
 		key := server + constant.CacheSep + constant.SourceCategoryAll
 		var lastModifiedTime time.Time
-		if err := cache.LastModifiedTime.Get("[shimLatestPatternMatrixResults#server|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
+		if err := cache.LastModifiedTime.Get("[shimGlobalPatternMatrix#server|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
 			lastModifiedTime = time.Now()
 		}
 		cachectrl.OptIn(ctx, lastModifiedTime)

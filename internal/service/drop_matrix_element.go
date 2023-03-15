@@ -41,3 +41,7 @@ func (s *DropMatrixElement) GetElementsByServerAndSourceCategoryAndDayNumRange(
 ) ([]*model.DropMatrixElement, error) {
 	return s.DropMatrixElementRepo.GetElementsByServerAndSourceCategoryAndDayNumRange(ctx, server, sourceCategory, startDayNum, endDayNum)
 }
+
+func (s *DropMatrixElement) IsExistByServerAndDayNum(ctx context.Context, server string, dayNum int) (bool, error) {
+	return s.DropMatrixElementRepo.IsExistByServerAndDayNum(ctx, server, dayNum)
+}

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/repo"
@@ -25,6 +26,26 @@ func (s *PatternMatrixElement) DeleteByServer(ctx context.Context, server string
 	return s.PatternMatrixElementRepo.DeleteByServer(ctx, server)
 }
 
+func (s *PatternMatrixElement) DeleteByServerAndDayNum(ctx context.Context, server string, dayNum int) error {
+	return s.PatternMatrixElementRepo.DeleteByServerAndDayNum(ctx, server, dayNum)
+}
+
+func (s *PatternMatrixElement) GetElementsByServerAndSourceCategoryAndStartAndEndTime(
+	ctx context.Context, server string, sourceCategory string, start *time.Time, end *time.Time,
+) ([]*model.PatternMatrixElement, error) {
+	return s.PatternMatrixElementRepo.GetElementsByServerAndSourceCategoryAndStartAndEndTime(ctx, server, sourceCategory, start, end)
+}
+
 func (s *PatternMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.PatternMatrixElement, error) {
 	return s.PatternMatrixElementRepo.GetElementsByServerAndSourceCategory(ctx, server, sourceCategory)
+}
+
+func (s *PatternMatrixElement) GetElementsByServerAndSourceCategoryAndDayNumRange(
+	ctx context.Context, server string, sourceCategory string, startDayNum int, endDayNum int,
+) ([]*model.PatternMatrixElement, error) {
+	return s.PatternMatrixElementRepo.GetElementsByServerAndSourceCategoryAndDayNumRange(ctx, server, sourceCategory, startDayNum, endDayNum)
+}
+
+func (s *PatternMatrixElement) IsExistByServerAndDayNum(ctx context.Context, server string, dayNum int) (bool, error) {
+	return s.PatternMatrixElementRepo.IsExistByServerAndDayNum(ctx, server, dayNum)
 }
