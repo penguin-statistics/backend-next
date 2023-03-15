@@ -6,6 +6,7 @@ import (
 
 	"exusiai.dev/gommon/constant"
 	"github.com/ahmetb/go-linq/v3"
+	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"gopkg.in/guregu/null.v3"
 
@@ -56,11 +57,17 @@ func NewPatternMatrix(
 func (s *PatternMatrix) GetShimPatternMatrix(ctx context.Context, server string, accountId null.Int, sourceCategory string,
 ) (*modelv2.PatternMatrixQueryResult, error) {
 	valueFunc := func() (*modelv2.PatternMatrixQueryResult, error) {
-		queryResult, err := s.getLatestPatternMatrixResults(ctx, server, accountId, sourceCategory)
+		var patternMatrixQueryResult *model.PatternMatrixQueryResult
+		var err error
+		if accountId.Valid {
+			patternMatrixQueryResult, err = s.getLatestPatternMatrixResults(ctx, server, accountId, sourceCategory)
+		} else {
+			patternMatrixQueryResult, err = s.calcGlobalPatternMatrix(ctx, server, sourceCategory)
+		}
 		if err != nil {
 			return nil, err
 		}
-		slowResults, err := s.applyShimForPatternMatrixQuery(ctx, queryResult)
+		slowResults, err := s.applyShimForPatternMatrixQuery(ctx, patternMatrixQueryResult)
 		if err != nil {
 			return nil, err
 		}
@@ -194,6 +201,77 @@ func (s *PatternMatrix) calcPatternMatrixByGivenDate(
 	return elements, nil
 }
 
+// Calc global pattern matrix from elements in DB
+func (s *PatternMatrix) calcGlobalPatternMatrix(ctx context.Context, server string, sourceCategory string) (*model.PatternMatrixQueryResult, error) {
+	patternMatrixQueryResult := &model.PatternMatrixQueryResult{
+		PatternMatrix: make([]*model.OnePatternMatrixElement, 0),
+	}
+	timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	latestTimeRanges, err := s.TimeRangeService.GetLatestTimeRangesByServer(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	stageIdsMap := s.getStageIdsMapByTimeRange(latestTimeRanges)
+
+	patternMatrixElementsMapByStageIdAndPatternID := make(map[int]map[int][]*model.PatternMatrixElement)
+	for rangeId, stageIds := range stageIdsMap {
+		timeRange := timeRangesMap[rangeId]
+		// get elements from DB
+		patternMatrixElementsForOneTimeRange, err := s.PatternMatrixElementService.GetElementsByServerAndSourceCategoryAndStartAndEndTimeAndStageIds(
+			ctx, server, sourceCategory, timeRange.StartTime, timeRange.EndTime, stageIds)
+		if err != nil {
+			return nil, err
+		}
+
+		// group this one batch by stage id and pattern id
+		for _, element := range patternMatrixElementsForOneTimeRange {
+			if _, ok := patternMatrixElementsMapByStageIdAndPatternID[element.StageID]; !ok {
+				patternMatrixElementsMapByStageIdAndPatternID[element.StageID] = make(map[int][]*model.PatternMatrixElement)
+			}
+			if _, ok := patternMatrixElementsMapByStageIdAndPatternID[element.StageID][element.PatternID]; !ok {
+				patternMatrixElementsMapByStageIdAndPatternID[element.StageID][element.PatternID] = make([]*model.PatternMatrixElement, 0)
+			}
+			patternMatrixElementsMapByStageIdAndPatternID[element.StageID][element.PatternID] = append(
+				patternMatrixElementsMapByStageIdAndPatternID[element.StageID][element.PatternID], element)
+		}
+
+		// combine elements for each stage id and pattern id (stage id must show up in stageIdsMap)
+		for _, stageId := range stageIds {
+			for patternID, elements := range patternMatrixElementsMapByStageIdAndPatternID[stageId] {
+				combinedElement := elements[0]
+				for _, element := range elements[1:] {
+					combinedElement, err = s.combinePatternMatrixElements(combinedElement, element)
+					if err != nil {
+						return nil, err
+					}
+				}
+				patternMatrixElementsMapByStageIdAndPatternID[stageId][patternID] = []*model.PatternMatrixElement{combinedElement}
+			}
+		}
+	}
+
+	// iterate patternMatrixElementsMapByStageIdAndPatternID to get final result
+	for stageId, patternMatrixElementsMapByPatternID := range patternMatrixElementsMapByStageIdAndPatternID {
+		for patternID, elements := range patternMatrixElementsMapByPatternID {
+			timeRange := &model.TimeRange{
+				StartTime: elements[0].StartTime,
+				EndTime:   elements[0].EndTime,
+			}
+			patternMatrixQueryResult.PatternMatrix = append(patternMatrixQueryResult.PatternMatrix, &model.OnePatternMatrixElement{
+				StageID:   stageId,
+				PatternID: patternID,
+				TimeRange: timeRange,
+				Times:     elements[0].Times,
+				Quantity:  elements[0].Quantity,
+			})
+		}
+	}
+	return patternMatrixQueryResult, nil
+}
+
 // =========== Personal ===========
 
 func (s *PatternMatrix) getLatestPatternMatrixResults(ctx context.Context, server string, accountId null.Int, sourceCategory string) (*model.PatternMatrixQueryResult, error) {
@@ -205,43 +283,39 @@ func (s *PatternMatrix) getLatestPatternMatrixResults(ctx context.Context, serve
 }
 
 func (s *PatternMatrix) getLatestPatternMatrixElements(ctx context.Context, server string, accountId null.Int, sourceCategory string) ([]*model.PatternMatrixElement, error) {
-	if accountId.Valid {
-		timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
-		if err != nil {
-			return nil, err
-		}
-		allTimeRanges, err := s.TimeRangeService.GetLatestTimeRangesByServer(ctx, server)
-		if err != nil {
-			return nil, err
-		}
-		excludeStageIdsSet, err := s.getExcludeStageIdsSet(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		stageIdsMap := s.getStageIdsMapByTimeRange(allTimeRanges)
-		elements := make([]*model.PatternMatrixElement, 0)
-		for rangeId, stageIds := range stageIdsMap {
-			// exclude some stages (gachabox, recruit) before calc
-			linq.From(stageIds).WhereT(func(stageId int) bool {
-				_, ok := excludeStageIdsSet[stageId]
-				return !ok
-			}).ToSlice(&stageIds)
-			if len(stageIds) == 0 {
-				continue
-			}
-
-			timeRanges := []*model.TimeRange{timeRangesMap[rangeId]}
-			currentBatch, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, stageIds, accountId, sourceCategory)
-			if err != nil {
-				return nil, err
-			}
-			elements = append(elements, currentBatch...)
-		}
-		return elements, nil
-	} else {
-		return s.PatternMatrixElementService.GetElementsByServerAndSourceCategory(ctx, server, sourceCategory)
+	timeRangesMap, err := s.TimeRangeService.GetTimeRangesMap(ctx, server)
+	if err != nil {
+		return nil, err
 	}
+	allTimeRanges, err := s.TimeRangeService.GetLatestTimeRangesByServer(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	excludeStageIdsSet, err := s.getExcludeStageIdsSet(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stageIdsMap := s.getStageIdsMapByTimeRange(allTimeRanges)
+	elements := make([]*model.PatternMatrixElement, 0)
+	for rangeId, stageIds := range stageIdsMap {
+		// exclude some stages (gachabox, recruit) before calc
+		linq.From(stageIds).WhereT(func(stageId int) bool {
+			_, ok := excludeStageIdsSet[stageId]
+			return !ok
+		}).ToSlice(&stageIds)
+		if len(stageIds) == 0 {
+			continue
+		}
+
+		timeRanges := []*model.TimeRange{timeRangesMap[rangeId]}
+		currentBatch, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, stageIds, accountId, sourceCategory)
+		if err != nil {
+			return nil, err
+		}
+		elements = append(elements, currentBatch...)
+	}
+	return elements, nil
 }
 
 func (s *PatternMatrix) convertPatternMatrixElementsToDropPatternQueryResult(ctx context.Context, server string, patternMatrixElements []*model.PatternMatrixElement) (*model.PatternMatrixQueryResult, error) {
@@ -471,4 +545,37 @@ func (s *PatternMatrix) applyShimForPatternMatrixQuery(ctx context.Context, quer
 		}
 	}
 	return results, nil
+}
+
+func (s *PatternMatrix) combinePatternMatrixElements(a, b *model.PatternMatrixElement) (*model.PatternMatrixElement, error) {
+	if a.StageID != b.StageID {
+		return nil, errors.New("stageId not match")
+	}
+	if a.Server != b.Server {
+		return nil, errors.New("server not match")
+	}
+	if a.SourceCategory != b.SourceCategory {
+		return nil, errors.New("sourceCategory not match")
+	}
+	if a.PatternID != b.PatternID {
+		return nil, errors.New("patternId not match")
+	}
+	startTime := a.StartTime
+	if a.StartTime.After(*b.StartTime) {
+		startTime = b.StartTime
+	}
+	endTime := a.EndTime
+	if a.EndTime.Before(*b.EndTime) {
+		endTime = b.EndTime
+	}
+	return &model.PatternMatrixElement{
+		StageID:        a.StageID,
+		PatternID:      a.PatternID,
+		StartTime:      startTime,
+		EndTime:        endTime,
+		Quantity:       a.Quantity + b.Quantity,
+		Times:          a.Times + b.Times,
+		Server:         a.Server,
+		SourceCategory: a.SourceCategory,
+	}, nil
 }

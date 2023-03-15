@@ -30,10 +30,10 @@ func (s *PatternMatrixElement) DeleteByServerAndDayNum(ctx context.Context, serv
 	return s.PatternMatrixElementRepo.DeleteByServerAndDayNum(ctx, server, dayNum)
 }
 
-func (s *PatternMatrixElement) GetElementsByServerAndSourceCategoryAndStartAndEndTime(
-	ctx context.Context, server string, sourceCategory string, start *time.Time, end *time.Time,
+func (s *PatternMatrixElement) GetElementsByServerAndSourceCategoryAndStartAndEndTimeAndStageIds(
+	ctx context.Context, server string, sourceCategory string, start *time.Time, end *time.Time, stageIds []int,
 ) ([]*model.PatternMatrixElement, error) {
-	return s.PatternMatrixElementRepo.GetElementsByServerAndSourceCategoryAndStartAndEndTime(ctx, server, sourceCategory, start, end)
+	return s.PatternMatrixElementRepo.GetElementsByServerAndSourceCategoryAndStartAndEndTimeAndStageIds(ctx, server, sourceCategory, start, end, stageIds)
 }
 
 func (s *PatternMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.PatternMatrixElement, error) {

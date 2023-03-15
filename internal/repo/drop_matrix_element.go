@@ -3,6 +3,9 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -32,24 +35,46 @@ func (s *DropMatrixElement) DeleteByServerAndDayNum(ctx context.Context, server 
 	return err
 }
 
-func (s *DropMatrixElement) GetElementsByServerAndSourceCategoryAndStartAndEndTime(
-	ctx context.Context, server string, sourceCategory string, start *time.Time, end *time.Time,
+func (s *DropMatrixElement) GetElementsByServerAndSourceCategoryAndStartAndEndTimeAndStageIdAndItemIds(
+	ctx context.Context, server string, sourceCategory string, start *time.Time, end *time.Time, stageIdItemIdMap map[int][]int,
 ) ([]*model.DropMatrixElement, error) {
 	var elements []*model.DropMatrixElement
 	startTimeStr := start.Format(time.RFC3339)
 	endTimeStr := end.Format(time.RFC3339)
-	err := s.db.NewSelect().Model(&elements).
+	query := s.db.NewSelect().Model(&elements).
 		Where("server = ?", server).
 		Where("source_category = ?", sourceCategory).
 		Where("start_time >= timestamp with time zone ?", startTimeStr).
-		Where("end_time <= timestamp with time zone ?", endTimeStr).
-		Scan(ctx)
+		Where("end_time <= timestamp with time zone ?", endTimeStr)
+	s.handleStagesAndItems(query, stageIdItemIdMap)
+	err := query.Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
 	}
 	return elements, nil
+}
+
+func (s *DropMatrixElement) handleStagesAndItems(query *bun.SelectQuery, stageIdItemIdMap map[int][]int) {
+	stageConditions := make([]string, 0)
+	for stageId, itemIds := range stageIdItemIdMap {
+		var stageB strings.Builder
+		fmt.Fprintf(&stageB, "stage_id = %d", stageId)
+		if len(itemIds) == 1 {
+			fmt.Fprintf(&stageB, " AND item_id = %d", itemIds[0])
+		} else if len(itemIds) > 1 {
+			var itemIdsStr []string
+			for _, itemId := range itemIds {
+				itemIdsStr = append(itemIdsStr, strconv.Itoa(itemId))
+			}
+			fmt.Fprintf(&stageB, " AND item_id IN (%s)", strings.Join(itemIdsStr, ","))
+		}
+		stageConditions = append(stageConditions, stageB.String())
+	}
+	if len(stageConditions) > 0 {
+		query.Where(strings.Join(stageConditions, " OR "))
+	}
 }
 
 func (s *DropMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.DropMatrixElement, error) {
