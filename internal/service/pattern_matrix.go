@@ -397,6 +397,7 @@ func (s *PatternMatrix) calcPatternMatrixForTimeRanges(
 				Times:          result.Times,
 				Server:         server,
 				SourceCategory: sourceCategory,
+				RangeID:        timeRange.RangeID,
 			})
 		}
 	}
