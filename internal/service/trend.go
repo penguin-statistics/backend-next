@@ -70,8 +70,7 @@ func (s *Trend) calcTrendFromDropMatrixElements(ctx context.Context, server stri
 	trendQueryResult := &model.TrendQueryResult{
 		Trends: make([]*model.StageTrend, 0),
 	}
-	// today := time.Now()
-	today := time.UnixMilli(1673180430000)
+	today := time.Now()
 	endDayNum := util.GetDayNum(&today, server)
 	startDayNum := endDayNum - constant.DefaultIntervalNum + 1
 	dropMatrixElements, err := s.DropMatrixElementService.GetElementsByServerAndSourceCategoryAndDayNumRange(ctx, server, constant.SourceCategoryAll, startDayNum, endDayNum)
