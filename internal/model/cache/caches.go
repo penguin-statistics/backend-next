@@ -60,6 +60,7 @@ var (
 	TimeRangeByID            *cache.Set[model.TimeRange]
 	TimeRangesMap            *cache.Set[map[int]*model.TimeRange]
 	MaxAccumulableTimeRanges *cache.Set[map[int]map[int][]*model.TimeRange]
+	LatestTimeRanges         *cache.Set[map[int]*model.TimeRange]
 
 	Zones           *cache.Singular[[]*model.Zone]
 	ZoneByArkID     *cache.Set[model.Zone]
@@ -203,11 +204,13 @@ func initializeCaches() {
 	TimeRangeByID = cache.NewSet[model.TimeRange]("timeRange#rangeId")
 	TimeRangesMap = cache.NewSet[map[int]*model.TimeRange]("timeRangesMap#server")
 	MaxAccumulableTimeRanges = cache.NewSet[map[int]map[int][]*model.TimeRange]("maxAccumulableTimeRanges#server")
+	LatestTimeRanges = cache.NewSet[map[int]*model.TimeRange]("latestTimeRanges#server")
 
 	SetMap["timeRanges#server"] = TimeRanges.Flush
 	SetMap["timeRange#rangeId"] = TimeRangeByID.Flush
 	SetMap["timeRangesMap#server"] = TimeRangesMap.Flush
 	SetMap["maxAccumulableTimeRanges#server"] = MaxAccumulableTimeRanges.Flush
+	SetMap["latestTimeRanges#server"] = LatestTimeRanges.Flush
 
 	// zone
 	Zones = cache.NewSingular[[]*model.Zone]("zones")

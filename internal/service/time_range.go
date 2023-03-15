@@ -88,7 +88,7 @@ func (s *TimeRange) GetTimeRangesMap(ctx context.Context, server string) (map[in
 	return timeRangesMap, nil
 }
 
-// Cache: maxAccumulableTimeRanges#server:{server}, 1 hr
+// Cache: maxAccumulableTimeRanges#server:{server}, 5 min
 func (s *TimeRange) GetMaxAccumulableTimeRangesByServer(ctx context.Context, server string) (map[int]map[int][]*model.TimeRange, error) {
 	var maxAccumulableTimeRanges map[int]map[int][]*model.TimeRange
 	err := cache.MaxAccumulableTimeRanges.Get(server, &maxAccumulableTimeRanges)
@@ -246,7 +246,14 @@ func (s *TimeRange) GetAllMaxAccumulableTimeRangesByServer(ctx context.Context, 
 	return maxAccumulableTimeRanges, nil
 }
 
+// Cache: latestTimeRanges#server:{server}, 5 min
 func (s *TimeRange) GetLatestTimeRangesByServer(ctx context.Context, server string) (map[int]*model.TimeRange, error) {
+	var results map[int]*model.TimeRange
+	err := cache.LatestTimeRanges.Get(server, &results)
+	if err == nil {
+		return results, nil
+	}
+
 	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
 	if err != nil {
 		return nil, err
@@ -263,7 +270,7 @@ func (s *TimeRange) GetLatestTimeRangesByServer(ctx context.Context, server stri
 			func(dropInfo *model.DropInfo) *model.DropInfo { return dropInfo },
 		).
 		ToSlice(&groupedResults)
-	results := make(map[int]*model.TimeRange)
+	results = make(map[int]*model.TimeRange)
 	for _, el := range groupedResults {
 		stageId := el.Key.(int)
 		latestDropInfo := linq.From(el.Group).
@@ -275,5 +282,6 @@ func (s *TimeRange) GetLatestTimeRangesByServer(ctx context.Context, server stri
 			First().(*model.DropInfo)
 		results[stageId] = timeRangesMap[latestDropInfo.RangeID]
 	}
+	cache.LatestTimeRanges.Set(server, results, time.Minute*5)
 	return results, nil
 }
