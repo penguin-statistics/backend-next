@@ -470,8 +470,12 @@ github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc h1:9lRDQMhESg+zvGYm
 github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc/go.mod h1:bciPuU6GHm1iF1pBvUfxfsH0Wmnc2VbpgvbI9ZWuIRs=
 github.com/uptrace/bun v1.1.11 h1:PVT+DHdLX13tIJaBoT0tkjh1TOWOybW/pz3TKiOB9lo=
 github.com/uptrace/bun v1.1.11/go.mod h1:ysoB7l3gioKLBaZH9wKuJAoeBiOthb/hTyKdbXKcaxg=
+github.com/uptrace/bun v1.1.12 h1:sOjDVHxNTuM6dNGaba0wUuz7KvDE1BmNu9Gqs2gJSXQ=
+github.com/uptrace/bun v1.1.12/go.mod h1:NPG6JGULBeQ9IU6yHp7YGELRa5Agmd7ATZdz4tGZ6z0=
 github.com/uptrace/bun/dialect/pgdialect v1.1.11 h1:z1CLRQiYtTX1Usn2OEF7EtOBYeTFJiNdTgLuXE+AZZs=
 github.com/uptrace/bun/dialect/pgdialect v1.1.11/go.mod h1:orzsx6UwNnSaTTELzLqc/XiWrR4k0Smid8Bchdg0mk4=
+github.com/uptrace/bun/dialect/pgdialect v1.1.12 h1:m/CM1UfOkoBTglGO5CUTKnIKKOApOYxkcP2qn0F9tJk=
+github.com/uptrace/bun/dialect/pgdialect v1.1.12/go.mod h1:Ij6WIxQILxLlL2frUBxUBOZJtLElD2QQNDcu/PWDHTc=
 github.com/uptrace/bun/driver/pgdriver v1.1.11 h1:0oKNY3cBuIs6wHCJP2IpUw5wPoeUa8oIDEvIdei+sDI=
 github.com/uptrace/bun/driver/pgdriver v1.1.11/go.mod h1:c5x3/2B63Vw876N1GjWJbqQOE3k68+8abMc428PKG18=
 github.com/uptrace/bun/extra/bundebug v1.1.10 h1:dBqOF9DkLgJVWfOX9ReVdXOdM1eZm+3zhnTcQhiNN7o=
