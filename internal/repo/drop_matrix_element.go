@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 )
 
 type DropMatrixElement struct {
@@ -132,6 +134,32 @@ func (s *DropMatrixElement) GetAllQuantityBucketsForGlobalDropMatrix(ctx context
 		Group("stage_id", "item_id")
 
 	results := make([]*model.AllQuantityBucketsResultForGlobalDropMatrix, 0)
+	err := mainq.Scan(ctx, &results)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func (s *DropMatrixElement) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelv2.TotalItemQuantity, error) {
+	types := []string{constant.ItemTypeMaterial, constant.ItemTypeFurniture, constant.ItemTypeChip}
+
+	subq := s.db.NewSelect().
+		TableExpr("drop_matrix_elements").
+		Column("item_id").
+		ColumnExpr("SUM(quantity) AS total_quantity").
+		Where("server = ?", server).
+		Where("source_category = ?", constant.SourceCategoryAll).
+		Group("item_id")
+
+	mainq := s.db.NewSelect().
+		Table("items").
+		TableExpr("(?) AS subq", subq).
+		Column("ark_item_id", "total_quantity").
+		Where("subq.item_id = items.item_id").
+		Where("items.type IN (?)", bun.In(types))
+
+	results := make([]*modelv2.TotalItemQuantity, 0)
 	err := mainq.Scan(ctx, &results)
 	if err != nil {
 		return nil, err
