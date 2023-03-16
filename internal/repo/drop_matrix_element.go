@@ -3,10 +3,6 @@ package repo
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
@@ -33,59 +29,6 @@ func (s *DropMatrixElement) BatchSaveElements(ctx context.Context, elements []*m
 func (s *DropMatrixElement) DeleteByServerAndDayNum(ctx context.Context, server string, dayNum int) error {
 	_, err := s.db.NewDelete().Model((*model.DropMatrixElement)(nil)).Where("server = ?", server).Where("day_num = ?", dayNum).Exec(ctx)
 	return err
-}
-
-func (s *DropMatrixElement) GetElementsByServerAndSourceCategoryAndStartAndEndTimeAndStageIdAndItemIds(
-	ctx context.Context, server string, sourceCategory string, start *time.Time, end *time.Time, stageIdItemIdMap map[int][]int,
-) ([]*model.DropMatrixElement, error) {
-	var elements []*model.DropMatrixElement
-	startTimeStr := start.Format(time.RFC3339)
-	endTimeStr := end.Format(time.RFC3339)
-	query := s.db.NewSelect().Model(&elements).
-		Where("server = ?", server).
-		Where("source_category = ?", sourceCategory).
-		Where("start_time >= timestamp with time zone ?", startTimeStr).
-		Where("end_time <= timestamp with time zone ?", endTimeStr)
-	s.handleStagesAndItems(query, stageIdItemIdMap)
-	err := query.Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	return elements, nil
-}
-
-func (s *DropMatrixElement) handleStagesAndItems(query *bun.SelectQuery, stageIdItemIdMap map[int][]int) {
-	stageConditions := make([]string, 0)
-	for stageId, itemIds := range stageIdItemIdMap {
-		var stageB strings.Builder
-		fmt.Fprintf(&stageB, "stage_id = %d", stageId)
-		if len(itemIds) == 1 {
-			fmt.Fprintf(&stageB, " AND item_id = %d", itemIds[0])
-		} else if len(itemIds) > 1 {
-			var itemIdsStr []string
-			for _, itemId := range itemIds {
-				itemIdsStr = append(itemIdsStr, strconv.Itoa(itemId))
-			}
-			fmt.Fprintf(&stageB, " AND item_id IN (%s)", strings.Join(itemIdsStr, ","))
-		}
-		stageConditions = append(stageConditions, stageB.String())
-	}
-	if len(stageConditions) > 0 {
-		query.Where(strings.Join(stageConditions, " OR "))
-	}
-}
-
-func (s *DropMatrixElement) GetElementsByServerAndSourceCategory(ctx context.Context, server string, sourceCategory string) ([]*model.DropMatrixElement, error) {
-	var elements []*model.DropMatrixElement
-	err := s.db.NewSelect().Model(&elements).Where("server = ?", server).Where("source_category = ?", sourceCategory).Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	return elements, nil
 }
 
 /**
@@ -116,4 +59,84 @@ func (s *DropMatrixElement) IsExistByServerAndDayNum(ctx context.Context, server
 		return false, err
 	}
 	return exists, nil
+}
+
+func (s *DropMatrixElement) GetAllTimesForGlobalDropMatrix(ctx context.Context, server string, sourceCategory string) ([]*model.AllTimesResultForGlobalDropMatrix, error) {
+	subq2 := s.db.NewSelect().
+		TableExpr("drop_matrix_elements").
+		Column("stage_id", "times", "day_num").
+		Where("server = ?", server).
+		Where("source_category = ?", sourceCategory).
+		Where("times > 0")
+
+	subq1 := s.db.NewSelect().
+		TableExpr("(?) AS subq2", subq2).
+		Column("stage_id", "times", "day_num").
+		Group("stage_id", "times", "day_num")
+
+	mainq := s.db.NewSelect().
+		TableExpr("(?) AS subq1", subq1).
+		Column("stage_id").
+		ColumnExpr("SUM(times) AS times").
+		ColumnExpr("min(day_num) AS day_num_min").
+		ColumnExpr("max(day_num) AS day_num_max").
+		Group("stage_id")
+
+	results := make([]*model.AllTimesResultForGlobalDropMatrix, 0)
+	err := mainq.Scan(ctx, &results)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func (s *DropMatrixElement) GetAllQuantitiesForGlobalDropMatrix(ctx context.Context, server string, sourceCategory string) ([]*model.AllQuantitiesResultForGlobalDropMatrix, error) {
+	subq1 := s.db.NewSelect().
+		TableExpr("drop_matrix_elements").
+		Column("stage_id", "item_id", "quantity").
+		Where("server = ?", server).
+		Where("source_category = ?", sourceCategory).
+		Where("quantity > 0")
+
+	mainq := s.db.NewSelect().
+		TableExpr("(?) AS subq1", subq1).
+		Column("stage_id", "item_id").
+		ColumnExpr("SUM(quantity) AS quantity").
+		Group("stage_id", "item_id")
+
+	results := make([]*model.AllQuantitiesResultForGlobalDropMatrix, 0)
+	err := mainq.Scan(ctx, &results)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func (s *DropMatrixElement) GetAllQuantityBucketsForGlobalDropMatrix(ctx context.Context, server string, sourceCategory string) ([]*model.AllQuantityBucketsResultForGlobalDropMatrix, error) {
+	subq2 := s.db.NewSelect().
+		TableExpr("drop_matrix_elements").
+		Column("stage_id", "item_id", "quantity_buckets").
+		Where("server = ?", server).
+		Where("source_category = ?", sourceCategory).
+		Where("quantity > 0")
+
+	subq1 := s.db.NewSelect().
+		TableExpr("(?) AS subq2", subq2).
+		TableExpr("jsonb_each_text(quantity_buckets)").
+		Column("stage_id", "item_id", "key").
+		ColumnExpr("sum(value::numeric) val").
+		Group("stage_id", "item_id", "key")
+
+	mainq := s.db.NewSelect().
+		TableExpr("(?) AS subq1", subq1).
+		Column("stage_id", "item_id").
+		ColumnExpr("json_object_agg(key, val) AS quantity_buckets").
+		Group("stage_id", "item_id")
+
+	results := make([]*model.AllQuantityBucketsResultForGlobalDropMatrix, 0)
+	err := mainq.Scan(ctx, &results)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
 }

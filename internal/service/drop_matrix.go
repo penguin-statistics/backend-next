@@ -314,94 +314,44 @@ func (s *DropMatrix) calcDropMatrix(ctx context.Context, queryCtx *model.DropRep
 	return dropMatrixElements, nil
 }
 
-// Calc global drop matrix from elements in DB
 func (s *DropMatrix) calcGlobalDropMatrix(ctx context.Context, server string, sourceCategory string) (*model.DropMatrixQueryResult, error) {
+	timesResults, err := s.DropMatrixElementService.GetAllTimesForGlobalDropMatrixMapByStageId(ctx, server, sourceCategory)
+	if err != nil {
+		return nil, err
+	}
+	quantityResults, err := s.DropMatrixElementService.GetAllQuantitiesForGlobalDropMatrixMapByStageIdAndItemId(ctx, server, sourceCategory)
+	if err != nil {
+		return nil, err
+	}
+	quantityUniqCountResults, err := s.DropMatrixElementService.GetAllQuantityBucketsForGlobalDropMatrixMapByStageIdAndItemId(ctx, server, sourceCategory)
+	if err != nil {
+		return nil, err
+	}
 	maxAccumulableTimeRanges, err := s.TimeRangeService.GetAllMaxAccumulableTimeRangesByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
 
-	itemIdsMapByTimeRange := make(map[string]map[int][]int)
-	// convert the stageId-itemId-timeRanges map to timeRange-stageId-itemIds map
-	for stageId, maxAccumulableTimeRangesForOneStage := range maxAccumulableTimeRanges {
-		for itemId, timeRanges := range maxAccumulableTimeRangesForOneStage {
-			for _, timeRange := range timeRanges {
-				timeRangeStr := timeRange.String()
-				if _, ok := itemIdsMapByTimeRange[timeRangeStr]; !ok {
-					itemIdsMapByTimeRange[timeRangeStr] = make(map[int][]int)
-				}
-				if _, ok := itemIdsMapByTimeRange[timeRangeStr][stageId]; !ok {
-					itemIdsMapByTimeRange[timeRangeStr][stageId] = make([]int, 0)
-				}
-				itemIdsMapByTimeRange[timeRangeStr][stageId] = append(itemIdsMapByTimeRange[timeRangeStr][stageId], itemId)
+	finalResult := &model.DropMatrixQueryResult{
+		Matrix: make([]*model.OneDropMatrixElement, 0),
+	}
+	for stageId, subMap := range quantityResults {
+		timesResult := timesResults[stageId]
+		for itemId, quantityResult := range subMap {
+			quantityUniqCountResult := quantityUniqCountResults[stageId][itemId]
+			maxAccumulableTimeRanges := maxAccumulableTimeRanges[stageId][itemId]
+			oneDropMatrixElement := &model.OneDropMatrixElement{
+				StageID:   stageId,
+				ItemID:    itemId,
+				Times:     timesResult.Times,
+				Quantity:  quantityResult.Quantity,
+				StdDev:    util.RoundFloat64(util.CalcStdDevFromQuantityBuckets(quantityUniqCountResult.QuantityBuckets, timesResult.Times, false), constant.StdDevDigits),
+				TimeRange: maxAccumulableTimeRanges[0],
 			}
+			finalResult.Matrix = append(finalResult.Matrix, oneDropMatrixElement)
 		}
 	}
-
-	oneDropMatrixElementsMap := make(map[int]map[int]*model.OneDropMatrixElement)
-	for timeRangeStr, subMapByStageId := range itemIdsMapByTimeRange {
-		timeRange := model.TimeRangeFromString(timeRangeStr)
-
-		dropMatrixElements, err := s.DropMatrixElementService.GetElementsByServerAndSourceCategoryAndStartAndEndTimeAndStageIdAndItemIds(
-			ctx, server, sourceCategory, timeRange.StartTime, timeRange.EndTime, subMapByStageId)
-		if err != nil {
-			return nil, err
-		}
-		elementsMap := util.GetDropMatrixElementsMap(dropMatrixElements, false)
-
-		for stageId, itemIds := range subMapByStageId {
-			if _, ok := oneDropMatrixElementsMap[stageId]; !ok {
-				oneDropMatrixElementsMap[stageId] = make(map[int]*model.OneDropMatrixElement)
-			}
-			elementsMapByItemId := elementsMap[stageId]
-			for _, itemId := range itemIds {
-				elementsMapByDayNum := elementsMapByItemId[itemId]
-				for _, element := range elementsMapByDayNum {
-					oneElementResult := &model.OneDropMatrixElement{
-						StageID:   stageId,
-						ItemID:    itemId,
-						Quantity:  element.Quantity,
-						Times:     element.Times,
-						StdDev:    util.RoundFloat64(util.CalcStdDevFromQuantityBuckets(element.QuantityBuckets, element.Times, false), constant.StdDevDigits),
-						TimeRange: timeRange,
-					}
-					if _, ok := oneDropMatrixElementsMap[stageId][itemId]; !ok {
-						oneDropMatrixElementsMap[stageId][itemId] = oneElementResult
-					} else {
-						originalElement := oneDropMatrixElementsMap[stageId][itemId]
-						start := originalElement.TimeRange.StartTime
-						end := originalElement.TimeRange.EndTime
-						combinedDropMatrixResult, err := s.combineDropMatrixResults(originalElement, oneElementResult)
-						if err != nil {
-							return nil, err
-						}
-						if timeRange.StartTime.Before(*start) {
-							start = timeRange.StartTime
-						}
-						if timeRange.EndTime.After(*end) {
-							end = timeRange.EndTime
-						}
-						combinedDropMatrixResult.TimeRange = &model.TimeRange{
-							StartTime: start,
-							EndTime:   end,
-						}
-						oneDropMatrixElementsMap[stageId][itemId] = combinedDropMatrixResult
-					}
-				}
-			}
-		}
-	}
-
-	oneDropMatrixElements := make([]*model.OneDropMatrixElement, 0)
-	for _, subMapByItemId := range oneDropMatrixElementsMap {
-		for _, element := range subMapByItemId {
-			oneDropMatrixElements = append(oneDropMatrixElements, element)
-		}
-	}
-	dropMatrixQueryResult := &model.DropMatrixQueryResult{
-		Matrix: oneDropMatrixElements,
-	}
-	return dropMatrixQueryResult, nil
+	return finalResult, nil
 }
 
 // =========== Personal Max Accumulable ===========
