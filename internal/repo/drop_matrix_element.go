@@ -64,23 +64,21 @@ func (s *DropMatrixElement) IsExistByServerAndDayNum(ctx context.Context, server
 func (s *DropMatrixElement) GetAllTimesForGlobalDropMatrix(ctx context.Context, server string, sourceCategory string) ([]*model.AllTimesResultForGlobalDropMatrix, error) {
 	subq2 := s.db.NewSelect().
 		TableExpr("drop_matrix_elements").
-		Column("stage_id", "times", "day_num").
+		Column("stage_id", "item_id", "times", "day_num").
 		Where("server = ?", server).
 		Where("source_category = ?", sourceCategory).
 		Where("times > 0")
 
 	subq1 := s.db.NewSelect().
 		TableExpr("(?) AS subq2", subq2).
-		Column("stage_id", "times", "day_num").
-		Group("stage_id", "times", "day_num")
+		Column("stage_id", "item_id", "times").
+		Group("stage_id", "item_id", "times", "day_num")
 
 	mainq := s.db.NewSelect().
 		TableExpr("(?) AS subq1", subq1).
-		Column("stage_id").
+		Column("stage_id", "item_id").
 		ColumnExpr("SUM(times) AS times").
-		ColumnExpr("min(day_num) AS day_num_min").
-		ColumnExpr("max(day_num) AS day_num_max").
-		Group("stage_id")
+		Group("stage_id", "item_id")
 
 	results := make([]*model.AllTimesResultForGlobalDropMatrix, 0)
 	err := mainq.Scan(ctx, &results)

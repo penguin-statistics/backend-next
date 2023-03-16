@@ -35,14 +35,17 @@ func (s *DropMatrixElement) IsExistByServerAndDayNum(ctx context.Context, server
 	return s.DropMatrixElementRepo.IsExistByServerAndDayNum(ctx, server, dayNum)
 }
 
-func (s *DropMatrixElement) GetAllTimesForGlobalDropMatrixMapByStageId(ctx context.Context, server string, sourceCategory string) (map[int]*model.AllTimesResultForGlobalDropMatrix, error) {
+func (s *DropMatrixElement) GetAllTimesForGlobalDropMatrixMapByStageIdAndItemId(ctx context.Context, server string, sourceCategory string) (map[int]map[int]*model.AllTimesResultForGlobalDropMatrix, error) {
 	allTimes, err := s.DropMatrixElementRepo.GetAllTimesForGlobalDropMatrix(ctx, server, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
-	result := make(map[int]*model.AllTimesResultForGlobalDropMatrix)
+	result := make(map[int]map[int]*model.AllTimesResultForGlobalDropMatrix)
 	for _, v := range allTimes {
-		result[v.StageID] = v
+		if _, ok := result[v.StageID]; !ok {
+			result[v.StageID] = make(map[int]*model.AllTimesResultForGlobalDropMatrix)
+		}
+		result[v.StageID][v.ItemID] = v
 	}
 	return result, nil
 }

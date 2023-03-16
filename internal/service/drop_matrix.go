@@ -315,7 +315,7 @@ func (s *DropMatrix) calcDropMatrix(ctx context.Context, queryCtx *model.DropRep
 }
 
 func (s *DropMatrix) calcGlobalDropMatrix(ctx context.Context, server string, sourceCategory string) (*model.DropMatrixQueryResult, error) {
-	timesResults, err := s.DropMatrixElementService.GetAllTimesForGlobalDropMatrixMapByStageId(ctx, server, sourceCategory)
+	timesResults, err := s.DropMatrixElementService.GetAllTimesForGlobalDropMatrixMapByStageIdAndItemId(ctx, server, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -336,8 +336,8 @@ func (s *DropMatrix) calcGlobalDropMatrix(ctx context.Context, server string, so
 		Matrix: make([]*model.OneDropMatrixElement, 0),
 	}
 	for stageId, subMap := range quantityResults {
-		timesResult := timesResults[stageId]
 		for itemId, quantityResult := range subMap {
+			timesResult := timesResults[stageId][itemId]
 			quantityUniqCountResult := quantityUniqCountResults[stageId][itemId]
 			maxAccumulableTimeRanges := maxAccumulableTimeRanges[stageId][itemId]
 			oneDropMatrixElement := &model.OneDropMatrixElement{
