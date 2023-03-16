@@ -251,18 +251,6 @@ func (s *DropReport) CalcTotalTimesForTrend(
 	return results, nil
 }
 
-func (s *DropReport) CalcTotalSanityCostForShimSiteStats(ctx context.Context, server string) (sanity int, err error) {
-	err = pgqry.New(
-		s.DB.NewSelect().
-			TableExpr("drop_reports AS dr").
-			ColumnExpr("SUM(st.sanity * dr.times)").
-			Where("dr.reliability = 0 AND dr.server = ?", server),
-	).
-		UseStageById("dr.stage_id").
-		Q.Scan(ctx, &sanity)
-	return sanity, err
-}
-
 func (s *DropReport) CalcTotalStageQuantityForShimSiteStats(ctx context.Context, server string, isRecent24h bool) ([]*modelv2.TotalStageTime, error) {
 	results := make([]*modelv2.TotalStageTime, 0)
 

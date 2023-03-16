@@ -84,3 +84,11 @@ func (s *DropMatrixElement) GetAllQuantityBucketsForGlobalDropMatrixMapByStageId
 func (s *DropMatrixElement) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelv2.TotalItemQuantity, error) {
 	return s.DropMatrixElementRepo.CalcTotalItemQuantityForShimSiteStats(ctx, server)
 }
+
+func (s *DropMatrixElement) CalcTotalStageQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelv2.TotalStageTime, error) {
+	return s.DropMatrixElementRepo.CalcTotalStageQuantityForShimSiteStats(ctx, server)
+}
+
+func (s *DropMatrixElement) CalcTotalSanityCostForShimSiteStats(ctx context.Context, server string) (sanity int, err error) {
+	return s.DropMatrixElementRepo.CalcTotalSanityCostForShimSiteStats(ctx, server)
+}

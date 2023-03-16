@@ -166,3 +166,62 @@ func (s *DropMatrixElement) CalcTotalItemQuantityForShimSiteStats(ctx context.Co
 	}
 	return results, nil
 }
+
+func (s *DropMatrixElement) CalcTotalStageQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelv2.TotalStageTime, error) {
+	results := make([]*modelv2.TotalStageTime, 0)
+	err := s.getStageTimesQuery(server, false).Scan(ctx, &results)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func (s *DropMatrixElement) CalcTotalSanityCostForShimSiteStats(ctx context.Context, server string) (sanity int, err error) {
+	mainq := s.db.NewSelect().
+		TableExpr("(?) AS subq4", s.getStageTimesQuery(server, true)).
+		ColumnExpr("SUM(sanity * total_times) AS sanity")
+	mainq.Scan(ctx, &sanity)
+	return sanity, err
+}
+
+func (s *DropMatrixElement) getStageTimesQuery(server string, containsSanity bool) *bun.SelectQuery {
+	subq3 := s.db.NewSelect().
+		TableExpr("drop_matrix_elements").
+		Column("stage_id", "item_id", "times", "day_num").
+		Where("server = ?", server).
+		Where("source_category = ?", constant.SourceCategoryAll).
+		Where("times > 0")
+
+	subq2 := s.db.NewSelect().
+		TableExpr("(?) AS subq3", subq3).
+		Column("stage_id", "item_id", "times").
+		Group("stage_id", "item_id", "times", "day_num")
+
+	subq1 := s.db.NewSelect().
+		TableExpr("(?) AS subq2", subq2).
+		Column("stage_id").
+		ColumnExpr("sum(times) AS total_times").
+		Group("stage_id", "item_id")
+
+	mainq := s.db.NewSelect().
+		Table("stages").
+		TableExpr("(?) AS subq1", subq1)
+
+	if containsSanity {
+		mainq = mainq.Column("ark_stage_id", "sanity")
+	} else {
+		mainq = mainq.Column("ark_stage_id")
+	}
+
+	mainq.ColumnExpr("max(total_times) AS total_times").
+		Where("subq1.stage_id = stages.stage_id").
+		Where("ark_stage_id != ?", "recruit").
+		Where("extra_process_type IS NULL")
+
+	if containsSanity {
+		mainq = mainq.Group("ark_stage_id", "sanity")
+	} else {
+		mainq = mainq.Group("ark_stage_id")
+	}
+	return mainq
+}

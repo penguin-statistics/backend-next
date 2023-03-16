@@ -37,7 +37,7 @@ func (s *SiteStats) GetShimSiteStats(ctx context.Context, server string) (*model
 
 func (s *SiteStats) RefreshShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
 	valueFunc := func() (*modelv2.SiteStats, error) {
-		stageTimes, err := s.DropReportRepo.CalcTotalStageQuantityForShimSiteStats(ctx, server, false)
+		stageTimes, err := s.DropMatrixElementService.CalcTotalStageQuantityForShimSiteStats(ctx, server)
 		if err != nil {
 			return nil, err
 		}
@@ -52,7 +52,7 @@ func (s *SiteStats) RefreshShimSiteStats(ctx context.Context, server string) (*m
 			return nil, err
 		}
 
-		sanity, err := s.DropReportRepo.CalcTotalSanityCostForShimSiteStats(ctx, server)
+		sanity, err := s.DropMatrixElementService.CalcTotalSanityCostForShimSiteStats(ctx, server)
 		if err != nil {
 			return nil, err
 		}
