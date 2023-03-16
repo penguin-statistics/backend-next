@@ -571,7 +571,10 @@ func (c *AdminController) CalcDropMatrixElements(ctx *fiber.Ctx) error {
 		if err != nil {
 			return err
 		}
-		c.DropMatrixService.UpdateDropMatrixByGivenDate(ctx.UserContext(), request.Server, &date)
+		err = c.DropMatrixService.UpdateDropMatrixByGivenDate(ctx.UserContext(), request.Server, &date)
+		if err != nil {
+			return err
+		}
 	}
 	return ctx.SendStatus(fiber.StatusCreated)
 }
