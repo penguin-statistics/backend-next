@@ -39,9 +39,9 @@ require (
 	github.com/swaggo/swag v1.8.10
 	github.com/tidwall/gjson v1.14.4
 	github.com/tidwall/sjson v1.2.5
-	github.com/uptrace/bun v1.1.11
+	github.com/uptrace/bun v1.1.12
 	github.com/uptrace/bun/dialect/pgdialect v1.1.11
-	github.com/uptrace/bun/driver/pgdriver v1.1.11
+	github.com/uptrace/bun/driver/pgdriver v1.1.12
 	github.com/uptrace/bun/extra/bundebug v1.1.10
 	github.com/uptrace/bun/extra/bunotel v1.1.10
 	github.com/urfave/cli/v2 v2.25.0
@@ -140,7 +140,7 @@ require (
 	go.uber.org/dig v1.16.1 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	go.uber.org/zap v1.23.0 // indirect
-	golang.org/x/crypto v0.5.0 // indirect
+	golang.org/x/crypto v0.6.0 // indirect
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/tools v0.4.0 // indirect
