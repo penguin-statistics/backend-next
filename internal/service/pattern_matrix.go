@@ -201,7 +201,7 @@ func (s *PatternMatrix) calcPatternMatrixByGivenDate(
 }
 
 func (s *PatternMatrix) calcGlobalPatternMatrix(ctx context.Context, server string, sourceCategory string) (*model.PatternMatrixQueryResult, error) {
-	timesResults, err := s.PatternMatrixElementService.GetAllTimesForGlobalPatternMatrixMapByStageIdAndItemId(ctx, server, sourceCategory)
+	timesResults, err := s.PatternMatrixElementService.GetAllTimesForGlobalPatternMatrixMapByStageId(ctx, server, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -218,9 +218,9 @@ func (s *PatternMatrix) calcGlobalPatternMatrix(ctx context.Context, server stri
 		PatternMatrix: make([]*model.OnePatternMatrixElement, 0),
 	}
 	for stageId, subMap := range quantityResults {
+		timesResult := timesResults[stageId]
 		latestTimeRange := latestTimeRanges[stageId]
 		for patternId, quantityResult := range subMap {
-			timesResult := timesResults[stageId][patternId]
 			onePatternMatrixElement := &model.OnePatternMatrixElement{
 				StageID:   stageId,
 				PatternID: patternId,
