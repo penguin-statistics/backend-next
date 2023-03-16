@@ -75,7 +75,8 @@ func (s *PatternMatrix) GetShimPatternMatrix(ctx context.Context, server string,
 
 	var results modelv2.PatternMatrixQueryResult
 	if !accountId.Valid {
-		calculated, err := cache.ShimGlobalPatternMatrix.MutexGetSet(server, &results, valueFunc, 24*time.Hour)
+		key := server + constant.CacheSep + sourceCategory
+		calculated, err := cache.ShimGlobalPatternMatrix.MutexGetSet(key, &results, valueFunc, 24*time.Hour)
 		if err != nil {
 			return nil, err
 		} else if calculated {
@@ -124,10 +125,11 @@ func (s *PatternMatrix) RunCalcPatternMatrixJob(ctx context.Context, server stri
 	}
 
 	for _, sourceCategory := range s.Config.MatrixWorkerSourceCategories {
-		if err := cache.ShimGlobalPatternMatrix.Delete(server + constant.CacheSep + sourceCategory); err != nil {
+		key := server + constant.CacheSep + sourceCategory
+		if err := cache.ShimGlobalPatternMatrix.Delete(key); err != nil {
 			return err
 		}
-		if err := cache.ShimGlobalPatternMatrix.Delete(server + constant.CacheSep + sourceCategory); err != nil {
+		if err := cache.ShimGlobalPatternMatrix.Delete(key); err != nil {
 			return err
 		}
 	}
