@@ -289,27 +289,6 @@ func (s *DropReport) CalcTotalStageQuantityForShimSiteStats(ctx context.Context,
 	return results, nil
 }
 
-func (s *DropReport) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelv2.TotalItemQuantity, error) {
-	results := make([]*modelv2.TotalItemQuantity, 0)
-
-	types := []string{constant.ItemTypeMaterial, constant.ItemTypeFurniture, constant.ItemTypeChip}
-	err := pgqry.New(
-		s.DB.NewSelect().
-			TableExpr("drop_reports AS dr").
-			Column("it.ark_item_id").
-			ColumnExpr("SUM(dpe.quantity) AS total_quantity").
-			Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id").
-			Where("dr.reliability = 0 AND dr.server = ? AND it.type IN (?)", server, bun.In(types)).
-			Group("it.ark_item_id"),
-	).
-		UseItemById("dpe.item_id").
-		Q.Scan(ctx, &results)
-	if err != nil {
-		return nil, err
-	}
-	return results, nil
-}
-
 func (s *DropReport) CalcRecentUniqueUserCountBySource(ctx context.Context, duration time.Duration) ([]*modelv2.UniqueUserCountBySource, error) {
 	results := make([]*modelv2.UniqueUserCountBySource, 0)
 	subq := s.DB.NewSelect().

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"exusiai.dev/backend-next/internal/model"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/repo"
 )
 
@@ -78,4 +79,8 @@ func (s *DropMatrixElement) GetAllQuantityBucketsForGlobalDropMatrixMapByStageId
 		result[v.StageID][v.ItemID] = v
 	}
 	return result, nil
+}
+
+func (s *DropMatrixElement) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelv2.TotalItemQuantity, error) {
+	return s.DropMatrixElementRepo.CalcTotalItemQuantityForShimSiteStats(ctx, server)
 }

@@ -10,12 +10,17 @@ import (
 )
 
 type SiteStats struct {
-	DropReportRepo *repo.DropReport
+	DropReportRepo           *repo.DropReport
+	DropMatrixElementService *DropMatrixElement
 }
 
-func NewSiteStats(dropReportRepo *repo.DropReport) *SiteStats {
+func NewSiteStats(
+	dropReportRepo *repo.DropReport,
+	dropMatrixElementService *DropMatrixElement,
+) *SiteStats {
 	return &SiteStats{
-		DropReportRepo: dropReportRepo,
+		DropReportRepo:           dropReportRepo,
+		DropMatrixElementService: dropMatrixElementService,
 	}
 }
 
@@ -42,7 +47,7 @@ func (s *SiteStats) RefreshShimSiteStats(ctx context.Context, server string) (*m
 			return nil, err
 		}
 
-		itemQuantity, err := s.DropReportRepo.CalcTotalItemQuantityForShimSiteStats(ctx, server)
+		itemQuantity, err := s.DropMatrixElementService.CalcTotalItemQuantityForShimSiteStats(ctx, server)
 		if err != nil {
 			return nil, err
 		}
