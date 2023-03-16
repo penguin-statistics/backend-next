@@ -594,7 +594,10 @@ func (c *AdminController) CalcPatternMatrixElements(ctx *fiber.Ctx) error {
 		if err != nil {
 			return err
 		}
-		c.PatternMatrixService.UpdatePatternMatrixByGivenDate(ctx.UserContext(), request.Server, &date)
+		err = c.PatternMatrixService.UpdatePatternMatrixByGivenDate(ctx.UserContext(), request.Server, &date)
+		if err != nil {
+			return err
+		}
 	}
 	return ctx.SendStatus(fiber.StatusCreated)
 }
