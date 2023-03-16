@@ -50,22 +50,10 @@ type Worker struct {
 
 type WorkerCalcType string
 
-var (
-	WorkerCalcTypeStatsCalc  = WorkerCalcType("stats")
-	WorkerCalcTypeTrendsCalc = WorkerCalcType("trends")
-)
+var WorkerCalcTypeStatsCalc = WorkerCalcType("stats")
 
 func (t WorkerCalcType) URL(w *Worker) string {
 	return w.heartbeatURL[string(t)]
-}
-
-func (t WorkerCalcType) Interval(w *Worker) time.Duration {
-	switch t {
-	case WorkerCalcTypeStatsCalc:
-		return w.interval
-	default:
-		panic("unknown worker type")
-	}
 }
 
 func Start(conf *appconfig.Config, deps WorkerDeps) {
@@ -114,7 +102,7 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 		var err error
 
 		// DropMatrixService
-		if err = w.microtask(ctx, WorkerCalcTypeStatsCalc, "dropMatrix", server, func() error {
+		if err = w.microtask(ctx, "dropMatrix", server, func() error {
 			return w.DropMatrixService.RunCalcDropMatrixJob(ctx, server)
 		}); err != nil {
 			return err
@@ -122,7 +110,7 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 		time.Sleep(w.sep)
 
 		// PatternMatrixService
-		if err = w.microtask(ctx, WorkerCalcTypeStatsCalc, "patternMatrix", server, func() error {
+		if err = w.microtask(ctx, "patternMatrix", server, func() error {
 			return w.PatternMatrixService.RunCalcPatternMatrixJob(ctx, server)
 		}); err != nil {
 			return err
@@ -130,7 +118,7 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 		time.Sleep(w.sep)
 
 		// SiteStatsService
-		if err = w.microtask(ctx, WorkerCalcTypeStatsCalc, "siteStats", server, func() error {
+		if err = w.microtask(ctx, "siteStats", server, func() error {
 			_, err := w.SiteStatsService.RefreshShimSiteStats(ctx, server)
 			return err
 		}); err != nil {
@@ -191,7 +179,7 @@ func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 					w.count++
 					cancel()
 					w.unlock()
-					time.Sleep(typ.Interval(w))
+					time.Sleep(w.interval)
 				}()
 
 				errChan := make(chan error)
@@ -227,7 +215,7 @@ func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 	}()
 }
 
-func (w *Worker) microtask(ctx context.Context, typ WorkerCalcType, service, server string, f func() error) error {
+func (w *Worker) microtask(ctx context.Context, service, server string, f func() error) error {
 	mutexNotifierTicker := time.NewTicker(time.Second * 10)
 	defer func() {
 		mutexNotifierTicker.Stop()
@@ -245,12 +233,12 @@ func (w *Worker) microtask(ctx context.Context, typ WorkerCalcType, service, ser
 		}
 	}()
 
-	log.Ctx(ctx).Info().Str("evt.name", "worker.calcwkr."+string(typ)+"."+service).Str("server", server).Msg("worker microtask started calculating")
+	log.Ctx(ctx).Info().Str("evt.name", "worker.calcwkr."+service).Str("server", server).Msg("worker microtask started calculating")
 	if err := observeCalcDuration(service, server, f); err != nil {
-		log.Ctx(ctx).Error().Str("evt.name", "worker.calcwkr."+string(typ)+"."+service).Str("server", server).Err(err).Msg("worker microtask failed")
+		log.Ctx(ctx).Error().Str("evt.name", "worker.calcwkr."+service).Str("server", server).Err(err).Msg("worker microtask failed")
 		return err
 	}
-	log.Ctx(ctx).Info().Str("evt.name", "worker.calcwkr."+string(typ)+"."+service).Str("server", server).Msg("worker microtask finished")
+	log.Ctx(ctx).Info().Str("evt.name", "worker.calcwkr."+service).Str("server", server).Msg("worker microtask finished")
 
 	return nil
 }

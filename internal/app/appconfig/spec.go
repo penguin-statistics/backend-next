@@ -107,7 +107,7 @@ type ConfigSpec struct {
 	WorkerInterval time.Duration `required:"true" split_words:"true" default:"10m"`
 
 	// WorkerSeparation describes the separation time in-between different microtasks
-	WorkerSeparation time.Duration `required:"true" split_words:"true" default:"3s"`
+	WorkerSeparation time.Duration `required:"true" split_words:"true" default:"5s"`
 
 	// WorkerTimeout describes the timeout for a single batch to run
 	WorkerTimeout time.Duration `required:"true" split_words:"true" default:"10m"`
