@@ -6,7 +6,7 @@ import (
 	"exusiai.dev/backend-next/internal/model"
 )
 
-func GetDropMatrixElementsMap(elements []*model.DropMatrixElement) map[int]map[int]map[int]*model.DropMatrixElement {
+func GetDropMatrixElementsMap(elements []*model.DropMatrixElement, hasRangeID bool) map[int]map[int]map[int]*model.DropMatrixElement {
 	elementsMap := make(map[int]map[int]map[int]*model.DropMatrixElement)
 	var groupedResults1 []linq.Group
 	linq.From(elements).
@@ -28,7 +28,11 @@ func GetDropMatrixElementsMap(elements []*model.DropMatrixElement) map[int]map[i
 			subMapByRangeId := make(map[int]*model.DropMatrixElement)
 			for _, el3 := range el2.Group {
 				element := el3.(*model.DropMatrixElement)
-				subMapByRangeId[element.RangeID] = element
+				if hasRangeID {
+					subMapByRangeId[element.RangeID] = element
+				} else {
+					subMapByRangeId[element.DayNum] = element
+				}
 			}
 			subMapByItemId[itemId] = subMapByRangeId
 		}

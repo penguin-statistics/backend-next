@@ -21,27 +21,27 @@ func NewDropReport(dropReportRepo *repo.DropReport) *DropReport {
 }
 
 func (s *DropReport) CalcTotalQuantityForDropMatrix(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int, sourceCategory string,
+	ctx context.Context, queryCtx *model.DropReportQueryContext,
 ) ([]*model.TotalQuantityResultForDropMatrix, error) {
-	return s.DropReportRepo.CalcTotalQuantityForDropMatrix(ctx, server, timeRange, stageIdItemIdMap, accountId, sourceCategory)
+	return s.DropReportRepo.CalcTotalQuantityForDropMatrix(ctx, queryCtx)
 }
 
 func (s *DropReport) CalcTotalQuantityForPatternMatrix(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int, sourceCategory string,
+	ctx context.Context, queryCtx *model.DropReportQueryContext,
 ) ([]*model.TotalQuantityResultForPatternMatrix, error) {
-	return s.DropReportRepo.CalcTotalQuantityForPatternMatrix(ctx, server, timeRange, stageIds, accountId, sourceCategory)
+	return s.DropReportRepo.CalcTotalQuantityForPatternMatrix(ctx, queryCtx)
 }
 
 func (s *DropReport) CalcTotalTimesForDropMatrix(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int, sourceCategory string,
+	ctx context.Context, queryCtx *model.DropReportQueryContext,
 ) ([]*model.TotalTimesResult, error) {
-	return s.DropReportRepo.CalcTotalTimes(ctx, server, timeRange, stageIds, accountId, false, sourceCategory)
+	return s.DropReportRepo.CalcTotalTimes(ctx, queryCtx)
 }
 
 func (s *DropReport) CalcTotalTimesForPatternMatrix(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, accountId null.Int, sourceCategory string,
+	ctx context.Context, queryCtx *model.DropReportQueryContext,
 ) ([]*model.TotalTimesResult, error) {
-	return s.DropReportRepo.CalcTotalTimes(ctx, server, timeRange, stageIds, accountId, true, sourceCategory)
+	return s.DropReportRepo.CalcTotalTimes(ctx, queryCtx)
 }
 
 func (s *DropReport) CalcTotalQuantityForTrend(
@@ -57,7 +57,7 @@ func (s *DropReport) CalcTotalTimesForTrend(
 }
 
 func (s *DropReport) CalcQuantityUniqCount(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIdItemIdMap map[int][]int, accountId null.Int, sourceCategory string,
+	ctx context.Context, queryCtx *model.DropReportQueryContext,
 ) ([]*model.QuantityUniqCountResultForDropMatrix, error) {
-	return s.DropReportRepo.CalcQuantityUniqCount(ctx, server, timeRange, stageIdItemIdMap, accountId, sourceCategory)
+	return s.DropReportRepo.CalcQuantityUniqCount(ctx, queryCtx)
 }

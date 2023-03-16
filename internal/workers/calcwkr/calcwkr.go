@@ -35,9 +35,6 @@ type Worker struct {
 	// interval describes the interval in-between different batches of stats job running
 	interval time.Duration
 
-	// trendInterval describes the interval in-between different batches of trends job running
-	trendInterval time.Duration
-
 	// timeout describes the timeout for the worker
 	timeout time.Duration
 
@@ -66,8 +63,6 @@ func (t WorkerCalcType) Interval(w *Worker) time.Duration {
 	switch t {
 	case WorkerCalcTypeStatsCalc:
 		return w.interval
-	case WorkerCalcTypeTrendsCalc:
-		return w.trendInterval
 	default:
 		panic("unknown worker type")
 	}
@@ -86,23 +81,15 @@ func Start(conf *appconfig.Config, deps WorkerDeps) {
 				Msg("The worker will send a heartbeat to those URLs when it is finished")
 		}
 		w := &Worker{
-			sep:           conf.WorkerSeparation,
-			interval:      conf.WorkerInterval,
-			trendInterval: conf.WorkerTrendInterval,
-			timeout:       conf.WorkerTimeout,
-			heartbeatURL:  conf.WorkerHeartbeatURL,
-			syncMutex:     deps.RedSync.NewMutex("mutex:calcwkr", redsync.WithExpiry(30*time.Second), redsync.WithTries(2)),
-			WorkerDeps:    deps,
+			sep:          conf.WorkerSeparation,
+			interval:     conf.WorkerInterval,
+			timeout:      conf.WorkerTimeout,
+			heartbeatURL: conf.WorkerHeartbeatURL,
+			syncMutex:    deps.RedSync.NewMutex("mutex:calcwkr", redsync.WithExpiry(30*time.Second), redsync.WithTries(2)),
+			WorkerDeps:   deps,
 		}
 		w.checkConfig()
 		w.doMainCalc(conf.MatrixWorkerSourceCategories)
-		if conf.WorkerTrendEnabled {
-			w.doTrendCalc(conf.MatrixWorkerSourceCategories)
-		} else {
-			log.Info().
-				Str("evt.name", "worker.calcwkr.trend.disabled").
-				Msg("worker trend is disabled due to configuration")
-		}
 	} else {
 		log.Info().
 			Str("evt.name", "worker.calcwkr.disabled").
@@ -117,9 +104,6 @@ func (w *Worker) checkConfig() {
 	if w.interval < 0 {
 		panic("worker interval cannot be negative")
 	}
-	if w.trendInterval < 0 {
-		panic("worker trend interval cannot be negative")
-	}
 	if w.timeout < 0 {
 		panic("worker timeout cannot be negative")
 	}
@@ -131,7 +115,7 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 
 		// DropMatrixService
 		if err = w.microtask(ctx, WorkerCalcTypeStatsCalc, "dropMatrix", server, func() error {
-			return w.DropMatrixService.RefreshAllDropMatrixElements(ctx, server, sourceCategories)
+			return w.DropMatrixService.RunCalcDropMatrixJob(ctx, server)
 		}); err != nil {
 			return err
 		}
@@ -139,7 +123,7 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 
 		// PatternMatrixService
 		if err = w.microtask(ctx, WorkerCalcTypeStatsCalc, "patternMatrix", server, func() error {
-			return w.PatternMatrixService.RefreshAllPatternMatrixElements(ctx, server, sourceCategories)
+			return w.PatternMatrixService.RunCalcPatternMatrixJob(ctx, server)
 		}); err != nil {
 			return err
 		}
@@ -149,21 +133,6 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 		if err = w.microtask(ctx, WorkerCalcTypeStatsCalc, "siteStats", server, func() error {
 			_, err := w.SiteStatsService.RefreshShimSiteStats(ctx, server)
 			return err
-		}); err != nil {
-			return err
-		}
-
-		return nil
-	})
-}
-
-func (w *Worker) doTrendCalc(sourceCategories []string) {
-	w.task(context.Background(), WorkerCalcTypeTrendsCalc, func(ctx context.Context, server string) error {
-		var err error
-
-		// TrendService
-		if err = w.microtask(ctx, WorkerCalcTypeTrendsCalc, "trend", server, func() error {
-			return w.TrendService.RefreshTrendElements(ctx, server, sourceCategories)
 		}); err != nil {
 			return err
 		}

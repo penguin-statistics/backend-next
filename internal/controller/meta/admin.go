@@ -35,22 +35,24 @@ import (
 type AdminController struct {
 	fx.In
 
-	PatternRepo           *repo.DropPattern
-	PatternElementRepo    *repo.DropPatternElement
-	RecognitionDefectRepo *repo.RecognitionDefect
-	AdminService          *service.Admin
-	ItemService           *service.Item
-	StageService          *service.Stage
-	DropMatrixService     *service.DropMatrix
-	PatternMatrixService  *service.PatternMatrix
-	TrendService          *service.Trend
-	SiteStatsService      *service.SiteStats
-	AnalyticsService      *service.Analytics
-	UpyunService          *service.Upyun
-	SnapshotService       *service.Snapshot
-	DropReportService     *service.DropReport
-	DropReportRepo        *repo.DropReport
-	PropertyRepo          *repo.Property
+	PatternRepo              *repo.DropPattern
+	PatternElementRepo       *repo.DropPatternElement
+	RecognitionDefectRepo    *repo.RecognitionDefect
+	AdminService             *service.Admin
+	ItemService              *service.Item
+	StageService             *service.Stage
+	DropMatrixService        *service.DropMatrix
+	PatternMatrixService     *service.PatternMatrix
+	TrendService             *service.Trend
+	SiteStatsService         *service.SiteStats
+	AnalyticsService         *service.Analytics
+	UpyunService             *service.Upyun
+	SnapshotService          *service.Snapshot
+	DropReportService        *service.DropReport
+	DropReportRepo           *repo.DropReport
+	PropertyRepo             *repo.Property
+	DropMatrixElementService *service.DropMatrixElement
+	TimeRangeService         *service.TimeRange
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
@@ -68,9 +70,8 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 
 	admin.Get("/analytics/report-unique-users/by-source", c.GetRecentUniqueUserCountBySource)
 
-	admin.Get("/refresh/matrix/:server", c.RefreshAllDropMatrixElements)
-	admin.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
-	admin.Get("/refresh/trend/:server", c.RefreshAllTrendElements)
+	admin.Post("/refresh/matrix", c.CalcDropMatrixElements)
+	admin.Post("/refresh/pattern", c.CalcPatternMatrixElements)
 	admin.Get("/refresh/sitestats/:server", c.RefreshAllSiteStats)
 
 	admin.Get("/recognition/defects", c.GetRecognitionDefects)
@@ -322,21 +323,6 @@ func (c *AdminController) GetRecentUniqueUserCountBySource(ctx *fiber.Ctx) error
 	return ctx.JSON(result)
 }
 
-func (c *AdminController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
-	server := ctx.Params("server")
-	return c.DropMatrixService.RefreshAllDropMatrixElements(ctx.UserContext(), server, []string{constant.SourceCategoryAll})
-}
-
-func (c *AdminController) RefreshAllPatternMatrixElements(ctx *fiber.Ctx) error {
-	server := ctx.Params("server")
-	return c.PatternMatrixService.RefreshAllPatternMatrixElements(ctx.UserContext(), server, []string{constant.SourceCategoryAll})
-}
-
-func (c *AdminController) RefreshAllTrendElements(ctx *fiber.Ctx) error {
-	server := ctx.Params("server")
-	return c.TrendService.RefreshTrendElements(ctx.UserContext(), server, []string{constant.SourceCategoryAll})
-}
-
 func (c *AdminController) RefreshAllSiteStats(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	_, err := c.SiteStatsService.RefreshShimSiteStats(ctx.UserContext(), server)
@@ -568,4 +554,44 @@ func (c *AdminController) RecognitionItemsResourcesUpdated(ctx *fiber.Ctx) error
 	}
 
 	return ctx.JSON(asset)
+}
+
+func (c *AdminController) CalcDropMatrixElements(ctx *fiber.Ctx) error {
+	type calcDropMatrixElementsRequest struct {
+		Dates  []string `json:"dates"`
+		Server string   `json:"server"`
+	}
+	var request calcDropMatrixElementsRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	for _, dateStr := range request.Dates {
+		date, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			return err
+		}
+		c.DropMatrixService.UpdateDropMatrixByGivenDate(ctx.UserContext(), request.Server, &date)
+	}
+	return ctx.SendStatus(fiber.StatusCreated)
+}
+
+func (c *AdminController) CalcPatternMatrixElements(ctx *fiber.Ctx) error {
+	type calcPatternMatrixElementsRequest struct {
+		Dates  []string `json:"dates"`
+		Server string   `json:"server"`
+	}
+	var request calcPatternMatrixElementsRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	for _, dateStr := range request.Dates {
+		date, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			return err
+		}
+		c.PatternMatrixService.UpdatePatternMatrixByGivenDate(ctx.UserContext(), request.Server, &date)
+	}
+	return ctx.SendStatus(fiber.StatusCreated)
 }

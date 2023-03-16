@@ -29,7 +29,6 @@ func Module() fx.Option {
 		NewTimeRange,
 		NewDropMatrix,
 		NewDropReport,
-		NewTrendElement,
 		NewPatternMatrix,
 		NewFrontendConfig,
 		NewDropMatrixElement,
