@@ -470,6 +470,8 @@ github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc h1:9lRDQMhESg+zvGYm
 github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc/go.mod h1:bciPuU6GHm1iF1pBvUfxfsH0Wmnc2VbpgvbI9ZWuIRs=
 github.com/uptrace/bun v1.1.11 h1:PVT+DHdLX13tIJaBoT0tkjh1TOWOybW/pz3TKiOB9lo=
 github.com/uptrace/bun v1.1.11/go.mod h1:ysoB7l3gioKLBaZH9wKuJAoeBiOthb/hTyKdbXKcaxg=
+github.com/uptrace/bun v1.1.12 h1:sOjDVHxNTuM6dNGaba0wUuz7KvDE1BmNu9Gqs2gJSXQ=
+github.com/uptrace/bun v1.1.12/go.mod h1:NPG6JGULBeQ9IU6yHp7YGELRa5Agmd7ATZdz4tGZ6z0=
 github.com/uptrace/bun/dialect/pgdialect v1.1.11 h1:z1CLRQiYtTX1Usn2OEF7EtOBYeTFJiNdTgLuXE+AZZs=
 github.com/uptrace/bun/dialect/pgdialect v1.1.11/go.mod h1:orzsx6UwNnSaTTELzLqc/XiWrR4k0Smid8Bchdg0mk4=
 github.com/uptrace/bun/driver/pgdriver v1.1.11 h1:0oKNY3cBuIs6wHCJP2IpUw5wPoeUa8oIDEvIdei+sDI=
@@ -478,8 +480,12 @@ github.com/uptrace/bun/extra/bundebug v1.1.10 h1:dBqOF9DkLgJVWfOX9ReVdXOdM1eZm+3
 github.com/uptrace/bun/extra/bundebug v1.1.10/go.mod h1:95exjcLLWAmzxk/4FaYZqgroa/AcH0S7o3cv192P3Tw=
 github.com/uptrace/bun/extra/bunotel v1.1.10 h1:bq8r/pWqTR0IReZd3E/x6qE709qe6z4o/Xt1Kjt4Ogw=
 github.com/uptrace/bun/extra/bunotel v1.1.10/go.mod h1:MOMlG+ZMIY/Fxu81977mJ2bu/KPW4PCa4GTyMWBQst8=
+github.com/uptrace/bun/extra/bunotel v1.1.12 h1:uWPU75j9dYGXMRC9jF0ASlndZZAcngoqZagH4w3kn54=
+github.com/uptrace/bun/extra/bunotel v1.1.12/go.mod h1:QfszJGLzNaTTGvvg17cEEUyEwxXq2NJ7sRvrPYvYSIU=
 github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.18 h1:NS1VEAtfDB9d5tyYR/VdsHE9UMMd88isuwW8N+XrsXw=
 github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.18/go.mod h1:YsFzaDbIGJJDr5O++EndEXcVCRd9W4GdPRlOjJV+sEE=
+github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.21 h1:iHkIlTU2P3xbSbVJbAiHL9IT+ekYV5empheF+652yeQ=
+github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.21/go.mod h1:hiCFa1UeZITKXi8lhu2qwOD5LHXjdGMCUIQHbybxoF0=
 github.com/urfave/cli/v2 v2.3.0/go.mod h1:LJmUH05zAU44vOAcrfzZQKsZbVcdbOG8rtL3/XcUArI=
 github.com/urfave/cli/v2 v2.25.0 h1:ykdZKuQey2zq0yin/l7JOm9Mh+pg72ngYMeB0ABn6q8=
 github.com/urfave/cli/v2 v2.25.0/go.mod h1:GHupkWPMM0M/sj1a2b4wUrWBPzazNrIjouW6fmdJLxc=
@@ -526,6 +532,8 @@ go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.14.0 h1:sEL90JjOO/4yhqu
 go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.14.0/go.mod h1:oCslUcizYdpKYyS9e8srZEqM6BB8fq41VJBjLAE6z1w=
 go.opentelemetry.io/otel/metric v0.34.0 h1:MCPoQxcg/26EuuJwpYN1mZTeCYAUGx8ABxfW07YkjP8=
 go.opentelemetry.io/otel/metric v0.34.0/go.mod h1:ZFuI4yQGNCupurTXCwkeD/zHBt+C2bR7bw5JqUm/AP8=
+go.opentelemetry.io/otel/metric v0.36.0 h1:t0lgGI+L68QWt3QtOIlqM9gXoxqxWLhZ3R/e5oOAY0Q=
+go.opentelemetry.io/otel/metric v0.36.0/go.mod h1:wKVw57sd2HdSZAzyfOM9gTqqE8v7CbqWsYL6AyrH9qk=
 go.opentelemetry.io/otel/oteltest v1.0.0-RC3 h1:MjaeegZTaX0Bv9uB9CrdVjOFM/8slRjReoWoV9xDCpY=
 go.opentelemetry.io/otel/sdk v1.14.0 h1:PDCppFRDq8A1jL9v6KMI6dYesaq+DFcDZvjsoGvxGzY=
 go.opentelemetry.io/otel/sdk v1.14.0/go.mod h1:bwIC5TjrNG6QDCHNWvW4HLHtUQ4I+VQDsnjhvyZCALM=

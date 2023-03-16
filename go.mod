@@ -39,11 +39,11 @@ require (
 	github.com/swaggo/swag v1.8.10
 	github.com/tidwall/gjson v1.14.4
 	github.com/tidwall/sjson v1.2.5
-	github.com/uptrace/bun v1.1.11
+	github.com/uptrace/bun v1.1.12
 	github.com/uptrace/bun/dialect/pgdialect v1.1.11
 	github.com/uptrace/bun/driver/pgdriver v1.1.11
 	github.com/uptrace/bun/extra/bundebug v1.1.10
-	github.com/uptrace/bun/extra/bunotel v1.1.10
+	github.com/uptrace/bun/extra/bunotel v1.1.12
 	github.com/urfave/cli/v2 v2.25.0
 	github.com/vmihailenco/msgpack/v5 v5.3.5
 	github.com/zeebo/xxh3 v1.0.2
@@ -129,12 +129,12 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
-	github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.18 // indirect
+	github.com/uptrace/opentelemetry-go-extra/otelsql v0.1.21 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.44.0
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
-	go.opentelemetry.io/otel/metric v0.34.0 // indirect
+	go.opentelemetry.io/otel/metric v0.36.0 // indirect
 	go.opentelemetry.io/otel/trace v1.14.0
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/dig v1.16.1 // indirect
