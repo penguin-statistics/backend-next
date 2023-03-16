@@ -134,7 +134,7 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 	)
 	otel.SetTracerProvider(tracerProvider)
 
-	app.Use(otelfiber.Middleware("pgbackend"))
+	app.Use(otelfiber.Middleware(otelfiber.WithServerName("pgbackend")))
 
 	prometheusRegisterOnce.Do(func() {
 		fiberprometheus.New(observability.ServiceName).RegisterAt(app, "/metrics")
