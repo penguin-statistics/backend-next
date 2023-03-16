@@ -29,17 +29,14 @@ func (s *PatternMatrixElement) IsExistByServerAndDayNum(ctx context.Context, ser
 	return s.PatternMatrixElementRepo.IsExistByServerAndDayNum(ctx, server, dayNum)
 }
 
-func (s *PatternMatrixElement) GetAllTimesForGlobalPatternMatrixMapByStageIdAndItemId(ctx context.Context, server string, sourceCategory string) (map[int]map[int]*model.AllTimesResultForGlobalPatternMatrix, error) {
+func (s *PatternMatrixElement) GetAllTimesForGlobalPatternMatrixMapByStageId(ctx context.Context, server string, sourceCategory string) (map[int]*model.AllTimesResultForGlobalPatternMatrix, error) {
 	allTimes, err := s.PatternMatrixElementRepo.GetAllTimesForGlobalPatternMatrix(ctx, server, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
-	result := make(map[int]map[int]*model.AllTimesResultForGlobalPatternMatrix)
+	result := make(map[int]*model.AllTimesResultForGlobalPatternMatrix)
 	for _, v := range allTimes {
-		if _, ok := result[v.StageID]; !ok {
-			result[v.StageID] = make(map[int]*model.AllTimesResultForGlobalPatternMatrix)
-		}
-		result[v.StageID][v.PatternID] = v
+		result[v.StageID] = v
 	}
 	return result, nil
 }
