@@ -7,7 +7,6 @@ import (
 
 	"exusiai.dev/gommon/constant"
 	"github.com/ahmetb/go-linq/v3"
-	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
 	"gopkg.in/guregu/null.v3"
 
@@ -535,7 +534,6 @@ func (s *PatternMatrix) interceptPatternMatrixResults(onePatternMatrixElements [
 	for stageId, elements := range elementsMapByStageId {
 		linq.From(elements).OrderByDescendingT(func(el *model.OnePatternMatrixElement) int { return el.Times }).ToSlice(&elements)
 		if len(elements) > limit {
-			log.Debug().Int("stageId", elements[0].StageID).Int("limit", limit).Msg("interceptPatternMatrixResults")
 			elementsMapByStageId[stageId] = elements[:limit]
 		}
 	}
