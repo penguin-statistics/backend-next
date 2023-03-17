@@ -128,7 +128,7 @@ type ConfigSpec struct {
 	MatrixWorkerSourceCategories []string `required:"true" split_words:"true" default:"all"`
 
 	// For PatternMatrix query api, if showAllPatterns is false, then only show the top 50 patterns for all stages
-	PatternMatrixLimit int `split_words:"true" default:"20"`
+	PatternMatrixLimit int `split_words:"true" default:"19"`
 }
 
 type Config struct {
