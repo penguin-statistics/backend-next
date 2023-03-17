@@ -80,6 +80,8 @@ func (c Dataset) aggregatePattern(ctx *fiber.Ctx) (*modelv3.PatternMatrixQueryRe
 		return nil, err
 	}
 
+	showAllPatterns := ctx.Query("show_all_patterns", "false") == "true"
+
 	isPersonal, err := strconv.ParseBool(ctx.Query("is_personal", "false"))
 	if err != nil {
 		return nil, err
@@ -95,7 +97,7 @@ func (c Dataset) aggregatePattern(ctx *fiber.Ctx) (*modelv3.PatternMatrixQueryRe
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.PatternMatrixService.GetShimPatternMatrix(ctx.UserContext(), server, accountId, constant.SourceCategoryAll)
+	shimResult, err := c.PatternMatrixService.GetShimPatternMatrix(ctx.UserContext(), server, accountId, constant.SourceCategoryAll, showAllPatterns)
 	if err != nil {
 		return nil, err
 	}

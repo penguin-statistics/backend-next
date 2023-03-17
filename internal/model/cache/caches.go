@@ -136,9 +136,9 @@ func initializeCaches() {
 	SetMap["shimTrend#server"] = ShimTrend.Flush
 
 	// pattern_matrix
-	ShimGlobalPatternMatrix = cache.NewSet[modelv2.PatternMatrixQueryResult]("shimGlobalPatternMatrix#server|sourceCategory")
+	ShimGlobalPatternMatrix = cache.NewSet[modelv2.PatternMatrixQueryResult]("shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns")
 
-	SetMap["shimGlobalPatternMatrix#server|sourceCategory"] = ShimGlobalPatternMatrix.Flush
+	SetMap["shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns"] = ShimGlobalPatternMatrix.Flush
 
 	// formula
 	Formula = cache.NewSingular[json.RawMessage]("formula")

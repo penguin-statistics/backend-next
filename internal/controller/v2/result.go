@@ -154,10 +154,11 @@ func (c *Result) GetDropMatrix(ctx *fiber.Ctx) error {
 // @Summary   Get Pattern Matrix
 // @Tags      Result
 // @Produce   json
-// @Param     server       query     string  true   "Server; default to CN"  Enums(CN, US, JP, KR)
-// @Param     is_personal  query     bool    false  "Whether to query for personal drop matrix or not. If `is_personal` equals to `true`, a valid PenguinID would be required to be provided (PenguinIDAuth)"
-// @Success   200          {object}  modelv2.PatternMatrixQueryResult
-// @Failure   500          {object}  pgerr.PenguinError  "An unexpected error occurred"
+// @Param     server          query     string  true   "Server; default to CN"  Enums(CN, US, JP, KR)
+// @Param     is_personal     query     bool    false  "Whether to query for personal drop matrix or not. If `is_personal` equals to `true`, a valid PenguinID would be required to be provided (PenguinIDAuth)"
+// @Param     showAllPatterns query     bool    false  "Show all patterns; default to false"
+// @Success   200             {object}  modelv2.PatternMatrixQueryResult
+// @Failure   500             {object}  pgerr.PenguinError  "An unexpected error occurred"
 // @Security  PenguinIDAuth
 // @Router    /PenguinStats/api/v2/result/pattern [GET]
 func (c *Result) GetPatternMatrix(ctx *fiber.Ctx) error {
@@ -165,6 +166,8 @@ func (c *Result) GetPatternMatrix(ctx *fiber.Ctx) error {
 	if err := rekuest.ValidServer(ctx, server); err != nil {
 		return err
 	}
+
+	showAllPatterns := ctx.Query("show_all_patterns", "false") == "true"
 
 	isPersonal, err := strconv.ParseBool(ctx.Query("is_personal", "false"))
 	if err != nil {
@@ -181,15 +184,15 @@ func (c *Result) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.PatternMatrixService.GetShimPatternMatrix(ctx.UserContext(), server, accountId, constant.SourceCategoryAll)
+	shimResult, err := c.PatternMatrixService.GetShimPatternMatrix(ctx.UserContext(), server, accountId, constant.SourceCategoryAll, showAllPatterns)
 	if err != nil {
 		return err
 	}
 
 	if !accountId.Valid {
-		key := server + constant.CacheSep + constant.SourceCategoryAll
+		key := server + constant.CacheSep + constant.SourceCategoryAll + constant.CacheSep + strconv.FormatBool(showAllPatterns)
 		var lastModifiedTime time.Time
-		if err := cache.LastModifiedTime.Get("[shimGlobalPatternMatrix#server|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
+		if err := cache.LastModifiedTime.Get("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:"+key+"]", &lastModifiedTime); err != nil {
 			lastModifiedTime = time.Now()
 		}
 		cachectrl.OptIn(ctx, lastModifiedTime)

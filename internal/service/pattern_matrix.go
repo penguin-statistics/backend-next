@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"exusiai.dev/gommon/constant"
 	"github.com/ahmetb/go-linq/v3"
+	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
 	"gopkg.in/guregu/null.v3"
 
@@ -51,9 +53,9 @@ func NewPatternMatrix(
 
 // =========== Global & Personal, Latest Timeranges ===========
 
-// Cache: shimGlobalPatternMatrix#server|sourceCategory:{server}|{sourceCategory}, 24hrs, records last modified time
+// Cache: shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:{server}|{sourceCategory}|{showAllPatterns}, 24hrs, records last modified time
 // Called by frontend, used for both global and personal, only for latest timeranges
-func (s *PatternMatrix) GetShimPatternMatrix(ctx context.Context, server string, accountId null.Int, sourceCategory string,
+func (s *PatternMatrix) GetShimPatternMatrix(ctx context.Context, server string, accountId null.Int, sourceCategory string, showAllPatterns bool,
 ) (*modelv2.PatternMatrixQueryResult, error) {
 	valueFunc := func() (*modelv2.PatternMatrixQueryResult, error) {
 		var patternMatrixQueryResult *model.PatternMatrixQueryResult
@@ -65,6 +67,13 @@ func (s *PatternMatrix) GetShimPatternMatrix(ctx context.Context, server string,
 		}
 		if err != nil {
 			return nil, err
+		}
+		if !showAllPatterns {
+			newPatternMatrix, err := s.interceptPatternMatrixResults(patternMatrixQueryResult.PatternMatrix, s.Config.PatternMatrixLimit)
+			if err != nil {
+				return nil, err
+			}
+			patternMatrixQueryResult.PatternMatrix = newPatternMatrix
 		}
 		slowResults, err := s.applyShimForPatternMatrixQuery(ctx, patternMatrixQueryResult)
 		if err != nil {
@@ -80,8 +89,8 @@ func (s *PatternMatrix) GetShimPatternMatrix(ctx context.Context, server string,
 		if err != nil {
 			return nil, err
 		} else if calculated {
-			key := server + constant.CacheSep + sourceCategory
-			cache.LastModifiedTime.Set("[shimGlobalPatternMatrix#server|sourceCategory:"+key+"]", time.Now(), 0)
+			key := server + constant.CacheSep + sourceCategory + constant.CacheSep + strconv.FormatBool(showAllPatterns)
+			cache.LastModifiedTime.Set("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:"+key+"]", time.Now(), 0)
 		}
 		return &results, nil
 	} else {
@@ -125,12 +134,14 @@ func (s *PatternMatrix) RunCalcPatternMatrixJob(ctx context.Context, server stri
 	}
 
 	for _, sourceCategory := range s.Config.MatrixWorkerSourceCategories {
-		key := server + constant.CacheSep + sourceCategory
-		if err := cache.ShimGlobalPatternMatrix.Delete(key); err != nil {
-			return err
-		}
-		if err := cache.ShimGlobalPatternMatrix.Delete(key); err != nil {
-			return err
+		for _, showAllPatterns := range []bool{true, false} {
+			key := server + constant.CacheSep + sourceCategory + constant.CacheSep + strconv.FormatBool(showAllPatterns)
+			if err := cache.ShimGlobalPatternMatrix.Delete(key); err != nil {
+				return err
+			}
+			if err := cache.ShimGlobalPatternMatrix.Delete(key); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -508,6 +519,29 @@ func (s *PatternMatrix) applyShimForPatternMatrixQuery(ctx context.Context, quer
 			}
 			results.PatternMatrix = append(results.PatternMatrix, &onePatternMatrixElement)
 		}
+	}
+	return results, nil
+}
+
+func (s *PatternMatrix) interceptPatternMatrixResults(onePatternMatrixElements []*model.OnePatternMatrixElement, limit int) ([]*model.OnePatternMatrixElement, error) {
+	elementsMapByStageId := make(map[int][]*model.OnePatternMatrixElement)
+	for _, onePatternMatrixElement := range onePatternMatrixElements {
+		if _, ok := elementsMapByStageId[onePatternMatrixElement.StageID]; !ok {
+			elementsMapByStageId[onePatternMatrixElement.StageID] = make([]*model.OnePatternMatrixElement, 0)
+		}
+		elementsMapByStageId[onePatternMatrixElement.StageID] = append(elementsMapByStageId[onePatternMatrixElement.StageID], onePatternMatrixElement)
+	}
+	// sort all elements by times desc, and limit the number of elements
+	for stageId, elements := range elementsMapByStageId {
+		linq.From(elements).OrderByDescendingT(func(el *model.OnePatternMatrixElement) int { return el.Times }).ToSlice(&elements)
+		if len(elements) > limit {
+			log.Debug().Int("stageId", elements[0].StageID).Int("limit", limit).Msg("interceptPatternMatrixResults")
+			elementsMapByStageId[stageId] = elements[:limit]
+		}
+	}
+	results := make([]*model.OnePatternMatrixElement, 0)
+	for _, elements := range elementsMapByStageId {
+		results = append(results, elements...)
 	}
 	return results, nil
 }

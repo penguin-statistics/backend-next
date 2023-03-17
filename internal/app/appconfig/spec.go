@@ -126,6 +126,9 @@ type ConfigSpec struct {
 	// MatrixWorkerSourceCategories is a list of categories that the matrix worker will run for.
 	// Available categories are: all, automated, manual.
 	MatrixWorkerSourceCategories []string `required:"true" split_words:"true" default:"all"`
+
+	// For PatternMatrix query api, if showAllPatterns is false, then only show the top 50 patterns for all stages
+	PatternMatrixLimit int `split_words:"true" default:"20"`
 }
 
 type Config struct {
