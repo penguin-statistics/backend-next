@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"strconv"
 	"time"
 
 	"exusiai.dev/gommon/constant"
@@ -90,6 +91,7 @@ func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	isPersonal := ctx.Params("source") == "personal"
 	category := ctx.Params("category", "all")
+	showAllPatterns := false
 
 	accountId := null.NewInt(0, false)
 	if isPersonal {
@@ -101,15 +103,15 @@ func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.PatternMatrixService.GetShimPatternMatrix(ctx.UserContext(), server, accountId, category)
+	shimResult, err := c.PatternMatrixService.GetShimPatternMatrix(ctx.UserContext(), server, accountId, category, showAllPatterns)
 	if err != nil {
 		return err
 	}
 
 	if !accountId.Valid {
-		key := server + constant.CacheSep + category
+		key := server + constant.CacheSep + category + constant.CacheSep + strconv.FormatBool(showAllPatterns)
 		var lastModifiedTime time.Time
-		if err := cache.LastModifiedTime.Get("[shimGlobalPatternMatrix#server|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
+		if err := cache.LastModifiedTime.Get("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:"+key+"]", &lastModifiedTime); err != nil {
 			lastModifiedTime = time.Now()
 		}
 		cachectrl.OptIn(ctx, lastModifiedTime)
