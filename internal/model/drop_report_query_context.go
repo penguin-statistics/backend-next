@@ -28,3 +28,14 @@ func (queryCtx *DropReportQueryContext) GetStageIds() []int {
 	}
 	return stageIds
 }
+
+func (queryCtx *DropReportQueryContext) GetItemIdsSet(stageId int) map[int]struct{} {
+	if queryCtx.StageItemFilter == nil {
+		return nil
+	}
+	itemIdsSet := make(map[int]struct{})
+	for _, itemId := range (*queryCtx.StageItemFilter)[stageId] {
+		itemIdsSet[itemId] = struct{}{}
+	}
+	return itemIdsSet
+}

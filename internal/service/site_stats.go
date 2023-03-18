@@ -6,20 +6,19 @@ import (
 
 	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
-	"exusiai.dev/backend-next/internal/repo"
 )
 
 type SiteStats struct {
-	DropReportRepo           *repo.DropReport
+	DropReportService        *DropReport
 	DropMatrixElementService *DropMatrixElement
 }
 
 func NewSiteStats(
-	dropReportRepo *repo.DropReport,
+	dropReportService *DropReport,
 	dropMatrixElementService *DropMatrixElement,
 ) *SiteStats {
 	return &SiteStats{
-		DropReportRepo:           dropReportRepo,
+		DropReportService:        dropReportService,
 		DropMatrixElementService: dropMatrixElementService,
 	}
 }
@@ -42,7 +41,7 @@ func (s *SiteStats) RefreshShimSiteStats(ctx context.Context, server string) (*m
 			return nil, err
 		}
 
-		stageTimes24h, err := s.DropReportRepo.CalcTotalStageQuantityForShimSiteStats(ctx, server, true)
+		stageTimes24h, err := s.DropReportService.CalcTotalStageQuantityForShimSiteStats(ctx, server, true)
 		if err != nil {
 			return nil, err
 		}
