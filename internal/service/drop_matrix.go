@@ -219,10 +219,6 @@ func (s *DropMatrix) calcDropMatrixByGivenDate(
 
 func (s *DropMatrix) calcDropMatrix(ctx context.Context, queryCtx *model.DropReportQueryContext) ([]*model.DropMatrixElement, error) {
 	var combinedResults []*model.CombinedResultForDropMatrix
-	quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, queryCtx)
-	if err != nil {
-		return nil, err
-	}
 	timesResults, err := s.DropReportService.CalcTotalTimesForDropMatrix(ctx, queryCtx)
 	if err != nil {
 		return nil, err
@@ -231,6 +227,7 @@ func (s *DropMatrix) calcDropMatrix(ctx context.Context, queryCtx *model.DropRep
 	if err != nil {
 		return nil, err
 	}
+	quantityResults := calcTotalQuantityForDropMatrix(quantityUniqCountResults)
 
 	oneBatch := s.combineQuantityAndTimesResults(quantityResults, timesResults, quantityUniqCountResults, nil)
 	combinedResults = append(combinedResults, oneBatch...)
@@ -536,10 +533,6 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 			SourceCategory:     sourceCategory,
 			ExcludeNonOneTimes: false,
 		}
-		quantityResults, err := s.DropReportService.CalcTotalQuantityForDropMatrix(ctx, queryCtx)
-		if err != nil {
-			return nil, err
-		}
 		timesResults, err := s.DropReportService.CalcTotalTimesForDropMatrix(ctx, queryCtx)
 		if err != nil {
 			return nil, err
@@ -548,6 +541,7 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 		if err != nil {
 			return nil, err
 		}
+		quantityResults := calcTotalQuantityForDropMatrix(quantityUniqCountResults)
 		oneBatch := s.combineQuantityAndTimesResults(quantityResults, timesResults, quantityUniqCountResults, timeRange)
 		combinedResults = append(combinedResults, oneBatch...)
 	}
@@ -733,6 +727,38 @@ func (s *DropMatrix) combineQuantityAndTimesResults(
 		}
 	}
 	return combinedResults
+}
+
+func calcTotalQuantityForDropMatrix(uniqCountResults []*model.QuantityUniqCountResultForDropMatrix) []*model.TotalQuantityResultForDropMatrix {
+	uniqCountResultsMapByStageIdAndItemId := make(map[int]map[int][]*model.QuantityUniqCountResultForDropMatrix)
+	for _, result := range uniqCountResults {
+		if _, ok := uniqCountResultsMapByStageIdAndItemId[result.StageID]; !ok {
+			uniqCountResultsMapByStageIdAndItemId[result.StageID] = make(map[int][]*model.QuantityUniqCountResultForDropMatrix)
+		}
+		if _, ok := uniqCountResultsMapByStageIdAndItemId[result.StageID][result.ItemID]; !ok {
+			uniqCountResultsMapByStageIdAndItemId[result.StageID][result.ItemID] = make([]*model.QuantityUniqCountResultForDropMatrix, 0)
+		}
+		uniqCountResultsMapByStageIdAndItemId[result.StageID][result.ItemID] = append(uniqCountResultsMapByStageIdAndItemId[result.StageID][result.ItemID], result)
+	}
+	results := make([]*model.TotalQuantityResultForDropMatrix, 0)
+	for _, uniqCountResultsMapByItemId := range uniqCountResultsMapByStageIdAndItemId {
+		for _, uniqCountResults := range uniqCountResultsMapByItemId {
+			results = append(results, convertUniqCountResultsForOneItemToQuantityResult(uniqCountResults))
+		}
+	}
+	return results
+}
+
+func convertUniqCountResultsForOneItemToQuantityResult(uniqCountResults []*model.QuantityUniqCountResultForDropMatrix) *model.TotalQuantityResultForDropMatrix {
+	sum := 0
+	for _, result := range uniqCountResults {
+		sum += result.Quantity * result.Count
+	}
+	return &model.TotalQuantityResultForDropMatrix{
+		StageID:       uniqCountResults[0].StageID,
+		ItemID:        uniqCountResults[0].ItemID,
+		TotalQuantity: sum,
+	}
 }
 
 func (s *DropMatrix) validateQuantityBucketsAndTimes(quantityBuckets map[int]int, times int) bool {

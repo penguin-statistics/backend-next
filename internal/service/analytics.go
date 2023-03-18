@@ -4,20 +4,19 @@ import (
 	"context"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
 
 	v2 "exusiai.dev/backend-next/internal/model/v2"
-	"exusiai.dev/backend-next/internal/repo"
-	"exusiai.dev/gommon/constant"
 )
 
 type Analytics struct {
-	DropReportRepo *repo.DropReport
+	DropReportService *DropReport
 }
 
-func NewAnalytics(dropReportRepo *repo.DropReport) *Analytics {
+func NewAnalytics(dropReportService *DropReport) *Analytics {
 	return &Analytics{
-		DropReportRepo: dropReportRepo,
+		DropReportService: dropReportService,
 	}
 }
 
@@ -33,7 +32,7 @@ func (s *Analytics) GetRecentUniqueUserCountBySource(ctx context.Context, recent
 	if duration > maxDuration {
 		return nil, errors.New("duration is too long")
 	}
-	uniqueUserCount, err := s.DropReportRepo.CalcRecentUniqueUserCountBySource(ctx, duration)
+	uniqueUserCount, err := s.DropReportService.CalcRecentUniqueUserCountBySource(ctx, duration)
 	if err != nil {
 		return nil, err
 	}

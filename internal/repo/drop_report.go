@@ -52,45 +52,19 @@ func (s *DropReport) UpdateDropReportReliability(ctx context.Context, tx bun.Tx,
 	return err
 }
 
-func (s *DropReport) CalcTotalQuantityForDropMatrix(
+// only filtered by stage_id, not item_id, needs post-filtering
+func (s *DropReport) CalcQuantityUniqCount(
 	ctx context.Context, queryCtx *model.DropReportQueryContext,
-) ([]*model.TotalQuantityResultForDropMatrix, error) {
-	results := make([]*model.TotalQuantityResultForDropMatrix, 0)
+) ([]*model.QuantityUniqCountResultForDropMatrix, error) {
+	results := make([]*model.QuantityUniqCountResultForDropMatrix, 0)
 
 	subq1 := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
-		Column("dr.stage_id", "dr.source_name", "dpe.item_id", "dpe.quantity").
+		Column("dr.stage_id", "dpe.item_id", "dpe.quantity").
 		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id")
-	s.handleAccountAndReliability(subq1, queryCtx.AccountID)
-	if queryCtx.ExcludeNonOneTimes {
-		s.handleTimes(subq1, 1)
+	if queryCtx.SourceCategory != constant.SourceCategoryAll {
+		subq1 = subq1.Column("dr.source_name")
 	}
-	s.handleCreatedAtWithTime(subq1, queryCtx.StartTime, queryCtx.EndTime)
-	s.handleServer(subq1, queryCtx.Server)
-	s.handleStagesAndItems(subq1, *queryCtx.StageItemFilter)
-
-	mainq := s.DB.NewSelect().
-		TableExpr("(?) AS a", subq1).
-		Column("stage_id", "item_id").
-		ColumnExpr("SUM(quantity) AS total_quantity")
-	s.handleSourceName(mainq, queryCtx.SourceCategory)
-
-	if err := mainq.
-		Group("stage_id", "item_id").
-		Scan(ctx, &results); err != nil {
-		return nil, err
-	}
-	return results, nil
-}
-
-func (s *DropReport) CalcTotalQuantityForPatternMatrix(
-	ctx context.Context, queryCtx *model.DropReportQueryContext,
-) ([]*model.TotalQuantityResultForPatternMatrix, error) {
-	results := make([]*model.TotalQuantityResultForPatternMatrix, 0)
-
-	subq1 := s.DB.NewSelect().
-		TableExpr("drop_reports AS dr").
-		Column("dr.source_name", "dr.stage_id", "dr.pattern_id")
 	s.handleAccountAndReliability(subq1, queryCtx.AccountID)
 	if queryCtx.ExcludeNonOneTimes {
 		s.handleTimes(subq1, 1)
@@ -98,16 +72,15 @@ func (s *DropReport) CalcTotalQuantityForPatternMatrix(
 	s.handleCreatedAtWithTime(subq1, queryCtx.StartTime, queryCtx.EndTime)
 	s.handleServer(subq1, queryCtx.Server)
 	s.handleStages(subq1, queryCtx.GetStageIds())
-	s.handleTimes(subq1, 1)
 
 	mainq := s.DB.NewSelect().
 		TableExpr("(?) AS a", subq1).
-		Column("stage_id", "pattern_id").
-		ColumnExpr("COUNT(*) AS total_quantity")
+		Column("stage_id", "item_id", "quantity").
+		ColumnExpr("COUNT(*) AS count")
 	s.handleSourceName(mainq, queryCtx.SourceCategory)
 
 	if err := mainq.
-		Group("stage_id", "pattern_id").
+		Group("stage_id", "item_id", "quantity").
 		Scan(ctx, &results); err != nil {
 		return nil, err
 	}
@@ -147,31 +120,31 @@ func (s *DropReport) CalcTotalTimes(
 	return results, nil
 }
 
-func (s *DropReport) CalcQuantityUniqCount(
+func (s *DropReport) CalcTotalQuantityForPatternMatrix(
 	ctx context.Context, queryCtx *model.DropReportQueryContext,
-) ([]*model.QuantityUniqCountResultForDropMatrix, error) {
-	results := make([]*model.QuantityUniqCountResultForDropMatrix, 0)
+) ([]*model.TotalQuantityResultForPatternMatrix, error) {
+	results := make([]*model.TotalQuantityResultForPatternMatrix, 0)
 
 	subq1 := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
-		Column("dr.source_name", "dr.stage_id", "dpe.item_id", "dpe.quantity").
-		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id")
+		Column("dr.source_name", "dr.stage_id", "dr.pattern_id")
 	s.handleAccountAndReliability(subq1, queryCtx.AccountID)
 	if queryCtx.ExcludeNonOneTimes {
 		s.handleTimes(subq1, 1)
 	}
 	s.handleCreatedAtWithTime(subq1, queryCtx.StartTime, queryCtx.EndTime)
 	s.handleServer(subq1, queryCtx.Server)
-	s.handleStagesAndItems(subq1, *queryCtx.StageItemFilter)
+	s.handleStages(subq1, queryCtx.GetStageIds())
+	s.handleTimes(subq1, 1)
 
 	mainq := s.DB.NewSelect().
 		TableExpr("(?) AS a", subq1).
-		Column("stage_id", "item_id", "quantity").
-		ColumnExpr("COUNT(*) AS count")
+		Column("stage_id", "pattern_id").
+		ColumnExpr("COUNT(*) AS total_quantity")
 	s.handleSourceName(mainq, queryCtx.SourceCategory)
 
 	if err := mainq.
-		Group("stage_id", "item_id", "quantity").
+		Group("stage_id", "pattern_id").
 		Scan(ctx, &results); err != nil {
 		return nil, err
 	}
