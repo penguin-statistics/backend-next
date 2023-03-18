@@ -8,7 +8,7 @@ import (
 )
 
 func OptIn(ctx *fiber.Ctx, lastModifiedAt time.Time) {
-	offset := time.Minute * 10
+	offset := time.Minute * 5
 	OptInCustom(ctx, lastModifiedAt, offset)
 }
 
