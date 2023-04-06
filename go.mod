@@ -16,7 +16,6 @@ require (
 	github.com/go-playground/locales v0.14.1
 	github.com/go-playground/universal-translator v0.18.1
 	github.com/go-playground/validator/v10 v10.11.2
-	github.com/go-redis/redis/v9 v9.0.3
 	github.com/go-redsync/redsync/v4 v4.8.1
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/contrib/fibersentry v1.0.2
@@ -32,6 +31,7 @@ require (
 	github.com/oschwald/geoip2-golang v1.8.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.14.0
+	github.com/redis/go-redis/v9 v9.0.3
 	github.com/rs/xid v1.4.0
 	github.com/rs/zerolog v1.29.0
 	github.com/samber/lo v1.37.0

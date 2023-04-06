@@ -6,11 +6,11 @@ import (
 
 	"exusiai.dev/gommon/constant"
 	"github.com/dchest/uniuri"
-	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model/types"
