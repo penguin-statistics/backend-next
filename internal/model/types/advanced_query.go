@@ -13,6 +13,6 @@ type AdvancedQuery struct {
 	IsPersonal     null.Bool `json:"isPersonal" swaggertype:"boolean"`
 	SourceCategory string    `json:"sourceCategory" validate:"sourcecategory"`
 	StartTime      null.Int  `json:"start" swaggertype:"integer"`
-	EndTime        null.Int  `json:"end" swaggertype:"integer"`
+	EndTime        null.Int  `json:"end" validate:"gtfield=StartTime" swaggertype:"integer"`
 	Interval       null.Int  `json:"interval" swaggertype:"integer"`
 }

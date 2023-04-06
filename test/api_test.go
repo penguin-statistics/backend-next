@@ -1,6 +1,8 @@
 package test
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -8,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/tidwall/gjson"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 
@@ -50,6 +53,30 @@ func request(t *testing.T, req *http.Request, msTimeout ...int) *http.Response {
 	}
 
 	return resp
+}
+
+func JsonRequestCustom(t *testing.T, req *http.Request) (*http.Response, *gjson.Result) {
+	t.Helper()
+
+	resp := request(t, req)
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err, "failed to read response body")
+
+	body := gjson.ParseBytes(bodyBytes)
+
+	return resp, &body
+}
+
+func JsonRequest(t *testing.T, path, body string, headers *http.Header) (*http.Response, *gjson.Result) {
+	t.Helper()
+
+	req := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(body))
+	if headers != nil {
+		req.Header = *headers
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return JsonRequestCustom(t, req)
 }
 
 func TestAPIMeta(t *testing.T) {

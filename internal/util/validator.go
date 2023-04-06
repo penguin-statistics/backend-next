@@ -22,6 +22,7 @@ func NewValidator() *validator.Validate {
 	validate.RegisterValidation("semverprefixed", semverPrefixed)
 	validate.RegisterValidation("arkserver", arkServer)
 	validate.RegisterValidation("sourcecategory", sourceCategory)
+	validate.RegisterCustomTypeFunc(nullIntValuer, null.Int{})
 	validate.RegisterCustomTypeFunc(nullStringValuer, null.String{})
 
 	return validate
@@ -53,6 +54,14 @@ func arkServer(fl validator.FieldLevel) bool {
 func sourceCategory(fl validator.FieldLevel) bool {
 	val := fl.Field().String()
 	return val == "" || val == constant.SourceCategoryAll || val == constant.SourceCategoryAutomated || val == constant.SourceCategoryManual
+}
+
+func nullIntValuer(field reflect.Value) interface{} {
+	if valuer, ok := field.Interface().(null.Int); ok {
+		return valuer.Int64
+	}
+
+	return nil
 }
 
 func nullStringValuer(field reflect.Value) interface{} {
