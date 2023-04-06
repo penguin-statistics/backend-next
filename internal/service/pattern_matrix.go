@@ -213,34 +213,45 @@ func (s *PatternMatrix) calcPatternMatrixByGivenDate(
 }
 
 func (s *PatternMatrix) calcGlobalPatternMatrix(ctx context.Context, server string, sourceCategory string) (*model.PatternMatrixQueryResult, error) {
-	timesResults, err := s.PatternMatrixElementService.GetAllTimesForGlobalPatternMatrixMapByStageId(ctx, server, sourceCategory)
-	if err != nil {
-		return nil, err
+	finalResult := &model.PatternMatrixQueryResult{
+		PatternMatrix: make([]*model.OnePatternMatrixElement, 0),
 	}
-	quantityResults, err := s.PatternMatrixElementService.GetAllQuantitiesForGlobalPatternMatrixMapByStageIdAndItemId(ctx, server, sourceCategory)
-	if err != nil {
-		return nil, err
-	}
+
 	latestTimeRanges, err := s.TimeRangeService.GetLatestTimeRangesByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
-
-	finalResult := &model.PatternMatrixQueryResult{
-		PatternMatrix: make([]*model.OnePatternMatrixElement, 0),
+	stageIdsMapByTimeRangeStr := make(map[string][]int, 0)
+	for stageId, timeRange := range latestTimeRanges {
+		timeRangeStr := timeRange.String()
+		if _, ok := stageIdsMapByTimeRangeStr[timeRangeStr]; !ok {
+			stageIdsMapByTimeRangeStr[timeRangeStr] = make([]int, 0)
+		}
+		stageIdsMapByTimeRangeStr[timeRangeStr] = append(stageIdsMapByTimeRangeStr[timeRangeStr], stageId)
 	}
-	for stageId, subMap := range quantityResults {
-		timesResult := timesResults[stageId]
-		latestTimeRange := latestTimeRanges[stageId]
-		for patternId, quantityResult := range subMap {
-			onePatternMatrixElement := &model.OnePatternMatrixElement{
-				StageID:   stageId,
-				PatternID: patternId,
-				TimeRange: latestTimeRange,
-				Times:     timesResult.Times,
-				Quantity:  quantityResult.Quantity,
+	for timeRangeStr, stageIds := range stageIdsMapByTimeRangeStr {
+		timeRange := model.TimeRangeFromString(timeRangeStr)
+
+		timesResults, err := s.PatternMatrixElementService.GetAllTimesForGlobalPatternMatrixMapByStageId(ctx, server, timeRange, stageIds, sourceCategory)
+		if err != nil {
+			return nil, err
+		}
+		quantityResults, err := s.PatternMatrixElementService.GetAllQuantitiesForGlobalPatternMatrixMapByStageIdAndPatternId(ctx, server, timeRange, stageIds, sourceCategory)
+		if err != nil {
+			return nil, err
+		}
+		for _, stageId := range stageIds {
+			timesResult := timesResults[stageId]
+			for patternId, quantityResult := range quantityResults[stageId] {
+				onePatternMatrixElement := &model.OnePatternMatrixElement{
+					StageID:   stageId,
+					PatternID: patternId,
+					TimeRange: timeRange,
+					Times:     timesResult.Times,
+					Quantity:  quantityResult.Quantity,
+				}
+				finalResult.PatternMatrix = append(finalResult.PatternMatrix, onePatternMatrixElement)
 			}
-			finalResult.PatternMatrix = append(finalResult.PatternMatrix, onePatternMatrixElement)
 		}
 	}
 	return finalResult, nil
@@ -483,7 +494,6 @@ func (s *PatternMatrix) applyShimForPatternMatrixQuery(ctx context.Context, quer
 		for _, el := range group.Group {
 			oneDropPattern := el.(*model.OnePatternMatrixElement)
 			stage := stagesMapById[oneDropPattern.StageID]
-			endTime := null.NewInt(oneDropPattern.TimeRange.EndTime.UnixMilli(), true)
 			dropPatternElements, err := s.DropPatternElementService.GetDropPatternElementsByPatternId(ctx, patternId)
 			if err != nil {
 				return nil, err
@@ -505,6 +515,14 @@ func (s *PatternMatrix) applyShimForPatternMatrixQuery(ctx context.Context, quer
 					Quantity: dropPatternElement.Quantity,
 				})
 			}
+
+			// if end time is after now, set it to be null, so that the frontend will show it as "till now"
+			var endTime null.Int
+			if oneDropPattern.TimeRange.EndTime.After(time.Now()) {
+				endTime = null.NewInt(0, false)
+			} else {
+				endTime = null.NewInt(oneDropPattern.TimeRange.EndTime.UnixMilli(), true)
+			}
 			onePatternMatrixElement := modelv2.OnePatternMatrixElement{
 				StageID:   stage.ArkStageID,
 				Times:     oneDropPattern.Times,
@@ -512,9 +530,6 @@ func (s *PatternMatrix) applyShimForPatternMatrixQuery(ctx context.Context, quer
 				StartTime: oneDropPattern.TimeRange.StartTime.UnixMilli(),
 				EndTime:   endTime,
 				Pattern:   &pattern,
-			}
-			if onePatternMatrixElement.EndTime.Int64 == constant.FakeEndTimeMilli {
-				onePatternMatrixElement.EndTime = null.NewInt(0, false)
 			}
 			results.PatternMatrix = append(results.PatternMatrix, &onePatternMatrixElement)
 		}

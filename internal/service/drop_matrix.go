@@ -312,40 +312,83 @@ func (s *DropMatrix) calcDropMatrix(ctx context.Context, queryCtx *model.DropRep
 }
 
 func (s *DropMatrix) calcGlobalDropMatrix(ctx context.Context, server string, sourceCategory string) (*model.DropMatrixQueryResult, error) {
-	timesResults, err := s.DropMatrixElementService.GetAllTimesForGlobalDropMatrixMapByStageIdAndItemId(ctx, server, sourceCategory)
-	if err != nil {
-		return nil, err
+	finalResult := &model.DropMatrixQueryResult{
+		Matrix: make([]*model.OneDropMatrixElement, 0),
 	}
-	quantityResults, err := s.DropMatrixElementService.GetAllQuantitiesForGlobalDropMatrixMapByStageIdAndItemId(ctx, server, sourceCategory)
-	if err != nil {
-		return nil, err
-	}
-	quantityUniqCountResults, err := s.DropMatrixElementService.GetAllQuantityBucketsForGlobalDropMatrixMapByStageIdAndItemId(ctx, server, sourceCategory)
-	if err != nil {
-		return nil, err
-	}
+
 	maxAccumulableTimeRanges, err := s.TimeRangeService.GetAllMaxAccumulableTimeRangesByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
 
-	finalResult := &model.DropMatrixQueryResult{
-		Matrix: make([]*model.OneDropMatrixElement, 0),
+	// Only consider the latest (max accumulable) time range for each stage
+	latestMaxAccumulableTimeRanges := make(map[int]map[int]*model.TimeRange, 0)
+	for stageId, timeRangesMapByItemId := range maxAccumulableTimeRanges {
+		if _, ok := latestMaxAccumulableTimeRanges[stageId]; !ok {
+			latestMaxAccumulableTimeRanges[stageId] = make(map[int]*model.TimeRange, 0)
+		}
+		for itemId, timeRanges := range timeRangesMapByItemId {
+			latestMaxAccumulableTimeRanges[stageId][itemId] = timeRanges[len(timeRanges)-1]
+		}
 	}
-	for stageId, subMap := range quantityResults {
-		for itemId, quantityResult := range subMap {
-			timesResult := timesResults[stageId][itemId]
-			quantityUniqCountResult := quantityUniqCountResults[stageId][itemId]
-			maxAccumulableTimeRanges := maxAccumulableTimeRanges[stageId][itemId]
-			oneDropMatrixElement := &model.OneDropMatrixElement{
-				StageID:   stageId,
-				ItemID:    itemId,
-				Times:     timesResult.Times,
-				Quantity:  quantityResult.Quantity,
-				StdDev:    util.RoundFloat64(util.CalcStdDevFromQuantityBuckets(quantityUniqCountResult.QuantityBuckets, timesResult.Times, false), constant.StdDevDigits),
-				TimeRange: maxAccumulableTimeRanges[0],
+
+	stageIdsItemIdsMapByTimeRangeStr := make(map[string]map[int][]int, 0)
+	for stageId, timeRangeMapByItemId := range latestMaxAccumulableTimeRanges {
+		for itemId, timeRange := range timeRangeMapByItemId {
+			timeRangeStr := timeRange.String()
+			if _, ok := stageIdsItemIdsMapByTimeRangeStr[timeRangeStr]; !ok {
+				stageIdsItemIdsMapByTimeRangeStr[timeRangeStr] = make(map[int][]int, 0)
 			}
-			finalResult.Matrix = append(finalResult.Matrix, oneDropMatrixElement)
+			if _, ok := stageIdsItemIdsMapByTimeRangeStr[timeRangeStr][stageId]; !ok {
+				stageIdsItemIdsMapByTimeRangeStr[timeRangeStr][stageId] = make([]int, 0)
+			}
+			stageIdsItemIdsMapByTimeRangeStr[timeRangeStr][stageId] = append(stageIdsItemIdsMapByTimeRangeStr[timeRangeStr][stageId], itemId)
+		}
+	}
+	for timeRangeStr, stageIdsItemIdsMap := range stageIdsItemIdsMapByTimeRangeStr {
+		timeRange := model.TimeRangeFromString(timeRangeStr)
+		stageIds := make([]int, 0)
+		for stageId := range stageIdsItemIdsMap {
+			stageIds = append(stageIds, stageId)
+		}
+
+		timesResults, err := s.DropMatrixElementService.GetAllTimesForGlobalDropMatrixMapByStageIdAndItemId(ctx, server, timeRange, stageIds, sourceCategory)
+		if err != nil {
+			return nil, err
+		}
+		quantityResults, err := s.DropMatrixElementService.GetAllQuantitiesForGlobalDropMatrixMapByStageIdAndItemId(ctx, server, timeRange, stageIds, sourceCategory)
+		if err != nil {
+			return nil, err
+		}
+		quantityUniqCountResults, err := s.DropMatrixElementService.GetAllQuantityBucketsForGlobalDropMatrixMapByStageIdAndItemId(ctx, server, timeRange, stageIds, sourceCategory)
+		if err != nil {
+			return nil, err
+		}
+
+		for stageId, itemIds := range stageIdsItemIdsMap {
+			for _, itemId := range itemIds {
+				timesResult, foundTimesResult := timesResults[stageId][itemId]
+				if !foundTimesResult {
+					continue
+				}
+				quantityResult, foundQuantityResult := quantityResults[stageId][itemId]
+				if !foundQuantityResult {
+					continue
+				}
+				quantityUniqCountResult, foundQuantityUniqCountResult := quantityUniqCountResults[stageId][itemId]
+				if !foundQuantityUniqCountResult {
+					continue
+				}
+				oneDropMatrixElement := &model.OneDropMatrixElement{
+					StageID:   stageId,
+					ItemID:    itemId,
+					Times:     timesResult.Times,
+					Quantity:  quantityResult.Quantity,
+					TimeRange: timeRange,
+					StdDev:    util.RoundFloat64(util.CalcStdDevFromQuantityBuckets(quantityUniqCountResult.QuantityBuckets, timesResult.Times, false), constant.StdDevDigits),
+				}
+				finalResult.Matrix = append(finalResult.Matrix, oneDropMatrixElement)
+			}
 		}
 	}
 	return finalResult, nil
@@ -872,7 +915,13 @@ func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, server str
 			}
 		}
 
-		endTime := null.NewInt(el.TimeRange.EndTime.UnixMilli(), true)
+		// if end time is after now, set it to be null, so that the frontend will show it as "till now"
+		var endTime null.Int
+		if el.TimeRange.EndTime.After(time.Now()) {
+			endTime = null.NewInt(0, false)
+		} else {
+			endTime = null.NewInt(el.TimeRange.EndTime.UnixMilli(), true)
+		}
 		oneDropMatrixElement := modelv2.OneDropMatrixElement{
 			StageID:   stage.ArkStageID,
 			ItemID:    item.ArkItemID,
@@ -881,9 +930,6 @@ func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, server str
 			StdDev:    el.StdDev,
 			StartTime: el.TimeRange.StartTime.UnixMilli(),
 			EndTime:   endTime,
-		}
-		if oneDropMatrixElement.EndTime.Int64 == constant.FakeEndTimeMilli {
-			oneDropMatrixElement.EndTime = null.NewInt(0, false)
 		}
 		results.Matrix = append(results.Matrix, &oneDropMatrixElement)
 	}

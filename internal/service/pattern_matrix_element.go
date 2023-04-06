@@ -29,8 +29,10 @@ func (s *PatternMatrixElement) IsExistByServerAndDayNum(ctx context.Context, ser
 	return s.PatternMatrixElementRepo.IsExistByServerAndDayNum(ctx, server, dayNum)
 }
 
-func (s *PatternMatrixElement) GetAllTimesForGlobalPatternMatrixMapByStageId(ctx context.Context, server string, sourceCategory string) (map[int]*model.AllTimesResultForGlobalPatternMatrix, error) {
-	allTimes, err := s.PatternMatrixElementRepo.GetAllTimesForGlobalPatternMatrix(ctx, server, sourceCategory)
+func (s *PatternMatrixElement) GetAllTimesForGlobalPatternMatrixMapByStageId(
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
+) (map[int]*model.AllTimesResultForGlobalPatternMatrix, error) {
+	allTimes, err := s.PatternMatrixElementRepo.GetAllTimesForGlobalPatternMatrix(ctx, server, timeRange, stageIds, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +43,10 @@ func (s *PatternMatrixElement) GetAllTimesForGlobalPatternMatrixMapByStageId(ctx
 	return result, nil
 }
 
-func (s *PatternMatrixElement) GetAllQuantitiesForGlobalPatternMatrixMapByStageIdAndItemId(ctx context.Context, server string, sourceCategory string) (map[int]map[int]*model.AllQuantitiesResultForGlobalPatternMatrix, error) {
-	allQuantities, err := s.PatternMatrixElementRepo.GetAllQuantitiesForGlobalPatternMatrix(ctx, server, sourceCategory)
+func (s *PatternMatrixElement) GetAllQuantitiesForGlobalPatternMatrixMapByStageIdAndPatternId(
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
+) (map[int]map[int]*model.AllQuantitiesResultForGlobalPatternMatrix, error) {
+	allQuantities, err := s.PatternMatrixElementRepo.GetAllQuantitiesForGlobalPatternMatrix(ctx, server, timeRange, stageIds, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
