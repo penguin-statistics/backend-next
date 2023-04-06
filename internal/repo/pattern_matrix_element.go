@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -37,13 +38,18 @@ func (s *PatternMatrixElement) IsExistByServerAndDayNum(ctx context.Context, ser
 	return exists, nil
 }
 
-func (s *PatternMatrixElement) GetAllTimesForGlobalPatternMatrix(ctx context.Context, server string, sourceCategory string) ([]*model.AllTimesResultForGlobalPatternMatrix, error) {
+func (s *PatternMatrixElement) GetAllTimesForGlobalPatternMatrix(
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
+) ([]*model.AllTimesResultForGlobalPatternMatrix, error) {
 	subq2 := s.db.NewSelect().
 		TableExpr("pattern_matrix_elements").
 		Column("stage_id", "times", "day_num").
 		Where("server = ?", server).
 		Where("source_category = ?", sourceCategory).
-		Where("times > 0")
+		Where("times > 0").
+		Where("stage_id IN (?)", bun.In(stageIds)).
+		Where("start_time >= timestamp with time zone ?", timeRange.StartTime.Format(time.RFC3339)).
+		Where("end_time <= timestamp with time zone ?", timeRange.EndTime.Format(time.RFC3339))
 
 	subq1 := s.db.NewSelect().
 		TableExpr("(?) AS subq2", subq2).
@@ -65,13 +71,18 @@ func (s *PatternMatrixElement) GetAllTimesForGlobalPatternMatrix(ctx context.Con
 	return results, nil
 }
 
-func (s *PatternMatrixElement) GetAllQuantitiesForGlobalPatternMatrix(ctx context.Context, server string, sourceCategory string) ([]*model.AllQuantitiesResultForGlobalPatternMatrix, error) {
+func (s *PatternMatrixElement) GetAllQuantitiesForGlobalPatternMatrix(
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
+) ([]*model.AllQuantitiesResultForGlobalPatternMatrix, error) {
 	subq1 := s.db.NewSelect().
 		TableExpr("pattern_matrix_elements").
 		Column("stage_id", "pattern_id", "quantity").
 		Where("server = ?", server).
 		Where("source_category = ?", sourceCategory).
-		Where("quantity > 0")
+		Where("quantity > 0").
+		Where("stage_id IN (?)", bun.In(stageIds)).
+		Where("start_time >= timestamp with time zone ?", timeRange.StartTime.Format(time.RFC3339)).
+		Where("end_time <= timestamp with time zone ?", timeRange.EndTime.Format(time.RFC3339))
 
 	mainq := s.db.NewSelect().
 		TableExpr("(?) AS subq1", subq1).
