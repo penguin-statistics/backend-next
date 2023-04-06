@@ -55,7 +55,7 @@ type ConfigSpec struct {
 	NatsURL string `required:"true" split_words:"true" default:"nats://127.0.0.1:4222"`
 
 	// RedisURL is the URL of the Redis server, and by default uses redis db 1, to avoid potential collision
-	// with the previous running backend instance. See https://pkg.go.dev/github.com/go-redis/redis/v8#ParseURL
+	// with the previous running backend instance. See https://pkg.go.dev/github.com/redis/go-redis/v9#ParseURL
 	// for more information on how to construct a Redis URL.
 	RedisURL string `required:"true" split_words:"true" default:"redis://127.0.0.1:6379/1"`
 

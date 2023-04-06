@@ -4,10 +4,10 @@ import (
 	"strings"
 
 	"exusiai.dev/gommon/constant"
-	"github.com/go-redis/redis/v8"
 	"github.com/go-redsync/redsync/v4"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
+	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 

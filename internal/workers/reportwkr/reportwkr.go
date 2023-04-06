@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"exusiai.dev/gommon/constant"
-	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 	"go.opentelemetry.io/otel"
