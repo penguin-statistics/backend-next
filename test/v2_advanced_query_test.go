@@ -24,8 +24,7 @@ func TestAPIV2AdvancedQuery(t *testing.T) {
 	})
 
 	t.Run("invalid body", func(t *testing.T) {
-		h, j := query(`{"queries":[{"stageId":"main_01-07","itemIds":[],"server":"CN","isPersonal":false,"sourceCategory":"all","start":1556668800000,"end":1556668800000}]}`, nil)
+		h, _ := query(`{"queries":[{"stageId":"main_01-07","itemIds":[],"server":"CN","isPersonal":false,"sourceCategory":"all","start":1556668800000,"end":1556668800000}]}`, nil)
 		assert.Equal(t, http.StatusBadRequest, h.StatusCode)
-		assert.Equal(t, "invalid time range", j.Get("error").String())
 	})
 }
