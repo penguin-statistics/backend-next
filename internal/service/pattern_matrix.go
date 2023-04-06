@@ -494,7 +494,6 @@ func (s *PatternMatrix) applyShimForPatternMatrixQuery(ctx context.Context, quer
 		for _, el := range group.Group {
 			oneDropPattern := el.(*model.OnePatternMatrixElement)
 			stage := stagesMapById[oneDropPattern.StageID]
-			endTime := null.NewInt(oneDropPattern.TimeRange.EndTime.UnixMilli(), true)
 			dropPatternElements, err := s.DropPatternElementService.GetDropPatternElementsByPatternId(ctx, patternId)
 			if err != nil {
 				return nil, err
@@ -516,6 +515,14 @@ func (s *PatternMatrix) applyShimForPatternMatrixQuery(ctx context.Context, quer
 					Quantity: dropPatternElement.Quantity,
 				})
 			}
+
+			// if end time is after now, set it to be null, so that the frontend will show it as "till now"
+			var endTime null.Int
+			if oneDropPattern.TimeRange.EndTime.After(time.Now()) {
+				endTime = null.NewInt(0, false)
+			} else {
+				endTime = null.NewInt(oneDropPattern.TimeRange.EndTime.UnixMilli(), true)
+			}
 			onePatternMatrixElement := modelv2.OnePatternMatrixElement{
 				StageID:   stage.ArkStageID,
 				Times:     oneDropPattern.Times,
@@ -523,9 +530,6 @@ func (s *PatternMatrix) applyShimForPatternMatrixQuery(ctx context.Context, quer
 				StartTime: oneDropPattern.TimeRange.StartTime.UnixMilli(),
 				EndTime:   endTime,
 				Pattern:   &pattern,
-			}
-			if onePatternMatrixElement.EndTime.Int64 == constant.FakeEndTimeMilli {
-				onePatternMatrixElement.EndTime = null.NewInt(0, false)
 			}
 			results.PatternMatrix = append(results.PatternMatrix, &onePatternMatrixElement)
 		}

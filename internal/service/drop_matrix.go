@@ -915,7 +915,13 @@ func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, server str
 			}
 		}
 
-		endTime := null.NewInt(el.TimeRange.EndTime.UnixMilli(), true)
+		// if end time is after now, set it to be null, so that the frontend will show it as "till now"
+		var endTime null.Int
+		if el.TimeRange.EndTime.After(time.Now()) {
+			endTime = null.NewInt(0, false)
+		} else {
+			endTime = null.NewInt(el.TimeRange.EndTime.UnixMilli(), true)
+		}
 		oneDropMatrixElement := modelv2.OneDropMatrixElement{
 			StageID:   stage.ArkStageID,
 			ItemID:    item.ArkItemID,
@@ -924,9 +930,6 @@ func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, server str
 			StdDev:    el.StdDev,
 			StartTime: el.TimeRange.StartTime.UnixMilli(),
 			EndTime:   endTime,
-		}
-		if oneDropMatrixElement.EndTime.Int64 == constant.FakeEndTimeMilli {
-			oneDropMatrixElement.EndTime = null.NewInt(0, false)
 		}
 		results.Matrix = append(results.Matrix, &oneDropMatrixElement)
 	}
