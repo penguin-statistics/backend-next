@@ -36,8 +36,10 @@ func (s *DropMatrixElement) IsExistByServerAndDayNum(ctx context.Context, server
 	return s.DropMatrixElementRepo.IsExistByServerAndDayNum(ctx, server, dayNum)
 }
 
-func (s *DropMatrixElement) GetAllTimesForGlobalDropMatrixMapByStageIdAndItemId(ctx context.Context, server string, sourceCategory string) (map[int]map[int]*model.AllTimesResultForGlobalDropMatrix, error) {
-	allTimes, err := s.DropMatrixElementRepo.GetAllTimesForGlobalDropMatrix(ctx, server, sourceCategory)
+func (s *DropMatrixElement) GetAllTimesForGlobalDropMatrixMapByStageIdAndItemId(
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
+) (map[int]map[int]*model.AllTimesResultForGlobalDropMatrix, error) {
+	allTimes, err := s.DropMatrixElementRepo.GetAllTimesForGlobalDropMatrix(ctx, server, timeRange, stageIds, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -51,8 +53,10 @@ func (s *DropMatrixElement) GetAllTimesForGlobalDropMatrixMapByStageIdAndItemId(
 	return result, nil
 }
 
-func (s *DropMatrixElement) GetAllQuantitiesForGlobalDropMatrixMapByStageIdAndItemId(ctx context.Context, server string, sourceCategory string) (map[int]map[int]*model.AllQuantitiesResultForGlobalDropMatrix, error) {
-	allQuantities, err := s.DropMatrixElementRepo.GetAllQuantitiesForGlobalDropMatrix(ctx, server, sourceCategory)
+func (s *DropMatrixElement) GetAllQuantitiesForGlobalDropMatrixMapByStageIdAndItemId(
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
+) (map[int]map[int]*model.AllQuantitiesResultForGlobalDropMatrix, error) {
+	allQuantities, err := s.DropMatrixElementRepo.GetAllQuantitiesForGlobalDropMatrix(ctx, server, timeRange, stageIds, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -66,8 +70,10 @@ func (s *DropMatrixElement) GetAllQuantitiesForGlobalDropMatrixMapByStageIdAndIt
 	return result, nil
 }
 
-func (s *DropMatrixElement) GetAllQuantityBucketsForGlobalDropMatrixMapByStageIdAndItemId(ctx context.Context, server string, sourceCategory string) (map[int]map[int]*model.AllQuantityBucketsResultForGlobalDropMatrix, error) {
-	allQuantityBuckets, err := s.DropMatrixElementRepo.GetAllQuantityBucketsForGlobalDropMatrix(ctx, server, sourceCategory)
+func (s *DropMatrixElement) GetAllQuantityBucketsForGlobalDropMatrixMapByStageIdAndItemId(
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
+) (map[int]map[int]*model.AllQuantityBucketsResultForGlobalDropMatrix, error) {
+	allQuantityBuckets, err := s.DropMatrixElementRepo.GetAllQuantityBucketsForGlobalDropMatrix(ctx, server, timeRange, stageIds, sourceCategory)
 	if err != nil {
 		return nil, err
 	}

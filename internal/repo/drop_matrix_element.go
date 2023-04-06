@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
@@ -63,13 +64,18 @@ func (s *DropMatrixElement) IsExistByServerAndDayNum(ctx context.Context, server
 	return exists, nil
 }
 
-func (s *DropMatrixElement) GetAllTimesForGlobalDropMatrix(ctx context.Context, server string, sourceCategory string) ([]*model.AllTimesResultForGlobalDropMatrix, error) {
+func (s *DropMatrixElement) GetAllTimesForGlobalDropMatrix(
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
+) ([]*model.AllTimesResultForGlobalDropMatrix, error) {
 	subq2 := s.db.NewSelect().
 		TableExpr("drop_matrix_elements").
 		Column("stage_id", "item_id", "times", "day_num").
 		Where("server = ?", server).
 		Where("source_category = ?", sourceCategory).
-		Where("times > 0")
+		Where("times > 0").
+		Where("stage_id IN (?)", bun.In(stageIds)).
+		Where("start_time >= timestamp with time zone ?", timeRange.StartTime.Format(time.RFC3339)).
+		Where("end_time <= timestamp with time zone ?", timeRange.EndTime.Format(time.RFC3339))
 
 	subq1 := s.db.NewSelect().
 		TableExpr("(?) AS subq2", subq2).
@@ -90,13 +96,18 @@ func (s *DropMatrixElement) GetAllTimesForGlobalDropMatrix(ctx context.Context, 
 	return results, nil
 }
 
-func (s *DropMatrixElement) GetAllQuantitiesForGlobalDropMatrix(ctx context.Context, server string, sourceCategory string) ([]*model.AllQuantitiesResultForGlobalDropMatrix, error) {
+func (s *DropMatrixElement) GetAllQuantitiesForGlobalDropMatrix(
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
+) ([]*model.AllQuantitiesResultForGlobalDropMatrix, error) {
 	subq1 := s.db.NewSelect().
 		TableExpr("drop_matrix_elements").
 		Column("stage_id", "item_id", "quantity").
 		Where("server = ?", server).
 		Where("source_category = ?", sourceCategory).
-		Where("quantity > 0")
+		Where("quantity > 0").
+		Where("stage_id IN (?)", bun.In(stageIds)).
+		Where("start_time >= timestamp with time zone ?", timeRange.StartTime.Format(time.RFC3339)).
+		Where("end_time <= timestamp with time zone ?", timeRange.EndTime.Format(time.RFC3339))
 
 	mainq := s.db.NewSelect().
 		TableExpr("(?) AS subq1", subq1).
@@ -112,13 +123,18 @@ func (s *DropMatrixElement) GetAllQuantitiesForGlobalDropMatrix(ctx context.Cont
 	return results, nil
 }
 
-func (s *DropMatrixElement) GetAllQuantityBucketsForGlobalDropMatrix(ctx context.Context, server string, sourceCategory string) ([]*model.AllQuantityBucketsResultForGlobalDropMatrix, error) {
+func (s *DropMatrixElement) GetAllQuantityBucketsForGlobalDropMatrix(
+	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
+) ([]*model.AllQuantityBucketsResultForGlobalDropMatrix, error) {
 	subq2 := s.db.NewSelect().
 		TableExpr("drop_matrix_elements").
 		Column("stage_id", "item_id", "quantity_buckets").
 		Where("server = ?", server).
 		Where("source_category = ?", sourceCategory).
-		Where("quantity > 0")
+		Where("quantity > 0").
+		Where("stage_id IN (?)", bun.In(stageIds)).
+		Where("start_time >= timestamp with time zone ?", timeRange.StartTime.Format(time.RFC3339)).
+		Where("end_time <= timestamp with time zone ?", timeRange.EndTime.Format(time.RFC3339))
 
 	subq1 := s.db.NewSelect().
 		TableExpr("(?) AS subq2", subq2).
