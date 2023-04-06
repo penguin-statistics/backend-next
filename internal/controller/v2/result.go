@@ -235,7 +235,7 @@ func (c *Result) GetTrends(ctx *fiber.Ctx) error {
 // @Success  200    {object}  modelv2.AdvancedQueryResult{advanced_results=[]modelv2.DropMatrixQueryResult}  "Drop Matrix Response: when `interval` has been left undefined."
 // @Success  202    {object}  modelv2.AdvancedQueryResult{advanced_results=[]modelv2.TrendQueryResult}       "Trend Response: when `interval` has been defined a value greater than `0`. Notice that this response still responds with a status code of `200`, but due to swagger limitations, to denote a different response with the same status code is not possible. Therefore, a status code of `202` is used, only for the purpose of workaround."
 // @Failure  500    {object}  pgerr.PenguinError                                                             "An unexpected error occurred"
-// @Router   /PenguinStats/api/v2/advanced [POST]
+// @Router   /PenguinStats/api/v2/result/advanced [POST]
 func (c *Result) AdvancedQuery(ctx *fiber.Ctx) error {
 	var request types.AdvancedQueryRequest
 	if err := rekuest.ValidBody(ctx, &request); err != nil {

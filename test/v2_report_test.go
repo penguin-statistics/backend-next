@@ -1,10 +1,7 @@
 package test
 
 import (
-	"bytes"
-	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -17,39 +14,14 @@ func TestAPIV2Reports(t *testing.T) {
 	startup(t)
 	t.Parallel()
 
-	// helpers
-	jsonReqCustom := func(req *http.Request) (*http.Response, *gjson.Result) {
-		t.Helper()
-
-		resp := request(t, req)
-
-		bodyBytes, err := io.ReadAll(resp.Body)
-		assert.NoError(t, err, "failed to read response body")
-
-		body := gjson.ParseBytes(bodyBytes)
-
-		return resp, &body
-	}
-
-	jsonReq := func(path, body string, headers *http.Header) (*http.Response, *gjson.Result) {
-		t.Helper()
-
-		req := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(body))
-		if headers != nil {
-			req.Header = *headers
-		}
-		req.Header.Set("Content-Type", "application/json")
-		return jsonReqCustom(req)
-	}
-
 	report := func(body string, headers *http.Header) (*http.Response, *gjson.Result) {
 		t.Helper()
-		return jsonReq("/PenguinStats/api/v2/report", body, headers)
+		return JsonRequest(t, "/PenguinStats/api/v2/report", body, headers)
 	}
 
 	recall := func(body string, headers *http.Header) (*http.Response, *gjson.Result) {
 		t.Helper()
-		return jsonReq("/PenguinStats/api/v2/report/recall", body, headers)
+		return JsonRequest(t, "/PenguinStats/api/v2/report/recall", body, headers)
 	}
 
 	// tests
