@@ -269,7 +269,7 @@ type RejectRulesReevaluationEvaluationResultSetChangeSet []*RejectRulesReevaluat
 
 func (s RejectRulesReevaluationEvaluationResultSet) ChangeSet() RejectRulesReevaluationEvaluationResultSetChangeSet {
 	changeSet := make(RejectRulesReevaluationEvaluationResultSetChangeSet, 0, len(s))
-	for i, result := range s {
+	for _, result := range s {
 		originalReliability := result.OriginalReport.Reliability
 		toReliability := originalReliability
 		if result.EvaluationShouldRejectToReliability != nil {
@@ -280,11 +280,11 @@ func (s RejectRulesReevaluationEvaluationResultSet) ChangeSet() RejectRulesReeva
 			continue
 		}
 
-		changeSet[i] = &RejectRulesReevaluationEvaluationResultSetDiff{
+		changeSet = append(changeSet, &RejectRulesReevaluationEvaluationResultSetDiff{
 			ReportID:        result.OriginalReport.ReportID,
 			FromReliability: originalReliability,
 			ToReliability:   toReliability,
-		}
+		})
 	}
 
 	return changeSet
