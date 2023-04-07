@@ -52,7 +52,7 @@ func NewDropMatrix(
 
 // =========== Global & Personal, Max Accumulable ===========
 
-// Cache: shimGlobalDropMatrix#server|showClosedZoned|sourceCategory:{server}|{showClosedZones}|{sourceCategory}, 24 hrs, records last modified time
+// Cache: shimGlobalDropMatrix#server|showClosedZones|sourceCategory:{server}|{showClosedZones}|{sourceCategory}, 24 hrs, records last modified time
 // Called by frontend, used for both global and personal, only for max accumulable results
 func (s *DropMatrix) GetShimDropMatrix(
 	ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId null.Int, sourceCategory string,
@@ -82,7 +82,7 @@ func (s *DropMatrix) GetShimDropMatrix(
 		if err != nil {
 			return nil, err
 		} else if calculated {
-			cache.LastModifiedTime.Set("[shimGlobalDropMatrix#server|showClosedZoned|sourceCategory:"+key+"]", time.Now(), 0)
+			cache.LastModifiedTime.Set("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", time.Now(), 0)
 		}
 	} else {
 		return valueFunc()
@@ -328,7 +328,17 @@ func (s *DropMatrix) calcGlobalDropMatrix(ctx context.Context, server string, so
 			latestMaxAccumulableTimeRanges[stageId] = make(map[int]*model.TimeRange, 0)
 		}
 		for itemId, timeRanges := range timeRangesMapByItemId {
-			latestMaxAccumulableTimeRanges[stageId][itemId] = timeRanges[len(timeRanges)-1]
+			timeRangeToAdd := timeRanges[len(timeRanges)-1]
+			latestMaxAccumulableTimeRanges[stageId][itemId] = timeRangeToAdd
+
+			// TODO: remove this after debugging
+			if server == "CN" && stageId == 18 && itemId == 7 && sourceCategory == "all" {
+				log.Info().
+					Str("evt.name", "debug.drop_matrix.endtime").
+					Int64("StartTime", timeRangeToAdd.StartTime.UnixMilli()).
+					Int64("EndTime", timeRangeToAdd.EndTime.UnixMilli()).
+					Msg("EndTime at the end of generating latestMaxAccumulableTimeRanges")
+			}
 		}
 	}
 
@@ -388,6 +398,16 @@ func (s *DropMatrix) calcGlobalDropMatrix(ctx context.Context, server string, so
 					StdDev:    util.RoundFloat64(util.CalcStdDevFromQuantityBuckets(quantityUniqCountResult.QuantityBuckets, timesResult.Times, false), constant.StdDevDigits),
 				}
 				finalResult.Matrix = append(finalResult.Matrix, oneDropMatrixElement)
+
+				// TODO: remove this after debugging
+				if server == "CN" && stageId == 18 && itemId == 7 && sourceCategory == "all" {
+					log.Info().
+						Str("evt.name", "debug.drop_matrix.endtime").
+						Int64("StartTime", timeRange.StartTime.UnixMilli()).
+						Int64("EndTime", timeRange.EndTime.UnixMilli()).
+						Str("timeRangeStr", timeRangeStr).
+						Msg("EndTime at the end of calcGlobalDropMatrix")
+				}
 			}
 		}
 	}
@@ -932,6 +952,15 @@ func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, server str
 			EndTime:   endTime,
 		}
 		results.Matrix = append(results.Matrix, &oneDropMatrixElement)
+
+		// TODO: remove this after debugging
+		if server == "CN" && stage.ArkStageID == "main_01-07" && item.ArkItemID == "30012" && stageFilterStr == "" && itemFilterStr == "" {
+			log.Info().
+				Str("evt.name", "debug.drop_matrix.endtime").
+				Int64("StartTime", el.TimeRange.StartTime.UnixMilli()).
+				Int64("EndTime", endTime.Int64).
+				Msg("EndTime at the end of applyShimForDropMatrixQuery")
+		}
 	}
 	return results, nil
 }

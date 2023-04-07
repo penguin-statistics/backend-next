@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
+	"github.com/rs/zerolog/log"
 
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
@@ -66,7 +67,7 @@ func (s *TimeRange) GetCurrentTimeRangesByServer(ctx context.Context, server str
 	return timeRanges, nil
 }
 
-// Cache: timeRangesMap#server:{server}, 1 hr
+// Cache: timeRangesMap#server:{server}, 5 min
 func (s *TimeRange) GetTimeRangesMap(ctx context.Context, server string) (map[int]*model.TimeRange, error) {
 	var timeRangesMap map[int]*model.TimeRange
 	err := cache.TimeRangesMap.Get(server, &timeRangesMap)
@@ -237,6 +238,14 @@ func (s *TimeRange) GetAllMaxAccumulableTimeRangesByServer(ctx context.Context, 
 			}
 			if len(timeRanges) > 0 {
 				maxAccumulableTimeRangesForOneStage[itemId] = timeRanges
+			}
+
+			// TODO: remove this after debugging
+			if server == "CN" && stageId == 18 && itemId == 7 {
+				log.Info().
+					Str("evt.name", "debug.drop_matrix.endtime").
+					Interface("timeRanges", timeRanges).
+					Msg("timeRanges at the end of GetAllMaxAccumulableTimeRangesByServer")
 			}
 		}
 		if len(maxAccumulableTimeRangesForOneStage) > 0 {
