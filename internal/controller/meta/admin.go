@@ -499,13 +499,11 @@ func (c *AdminController) RejectRulesReevaluationApply(ctx *fiber.Ctx) error {
 	}
 
 	type rejectRulesReevaluationApplyResponse struct {
-		Summary   service.RejectRulesReevaluationEvaluationResultSetSummary   `json:"summary"`
-		ChangeSet service.RejectRulesReevaluationEvaluationResultSetChangeSet `json:"changeset"`
+		Summary service.RejectRulesReevaluationEvaluationResultSetSummary `json:"summary"`
 	}
 
 	return ctx.JSON(&rejectRulesReevaluationApplyResponse{
-		Summary:   evaluation.Summary(),
-		ChangeSet: changeSet,
+		Summary: evaluation.Summary(),
 	})
 }
 
