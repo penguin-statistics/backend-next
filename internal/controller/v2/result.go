@@ -272,15 +272,15 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 
 	// handle start time (might be null)
 	startTimeMilli := constant.ServerStartTimeMapMillis[query.Server]
-	if query.StartTime.Valid {
-		startTimeMilli = query.StartTime.Int64
+	if query.StartTime != 0 {
+		startTimeMilli = query.StartTime
 	}
 	startTime := time.UnixMilli(startTimeMilli)
 
 	// handle end time (might be null)
 	endTimeMilli := time.Now().UnixMilli()
-	if query.EndTime.Valid {
-		endTimeMilli = query.EndTime.Int64
+	if query.EndTime != 0 {
+		endTimeMilli = query.EndTime
 	}
 	endTime := time.UnixMilli(endTimeMilli)
 
