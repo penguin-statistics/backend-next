@@ -52,7 +52,7 @@ func NewDropMatrix(
 
 // =========== Global & Personal, Max Accumulable ===========
 
-// Cache: shimGlobalDropMatrix#server|showClosedZoned|sourceCategory:{server}|{showClosedZones}|{sourceCategory}, 24 hrs, records last modified time
+// Cache: shimGlobalDropMatrix#server|showClosedZones|sourceCategory:{server}|{showClosedZones}|{sourceCategory}, 24 hrs, records last modified time
 // Called by frontend, used for both global and personal, only for max accumulable results
 func (s *DropMatrix) GetShimDropMatrix(
 	ctx context.Context, server string, showClosedZones bool, stageFilterStr string, itemFilterStr string, accountId null.Int, sourceCategory string,
@@ -82,7 +82,7 @@ func (s *DropMatrix) GetShimDropMatrix(
 		if err != nil {
 			return nil, err
 		} else if calculated {
-			cache.LastModifiedTime.Set("[shimGlobalDropMatrix#server|showClosedZoned|sourceCategory:"+key+"]", time.Now(), 0)
+			cache.LastModifiedTime.Set("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", time.Now(), 0)
 		}
 	} else {
 		return valueFunc()

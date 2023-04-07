@@ -66,7 +66,7 @@ func (s *TimeRange) GetCurrentTimeRangesByServer(ctx context.Context, server str
 	return timeRanges, nil
 }
 
-// Cache: timeRangesMap#server:{server}, 1 hr
+// Cache: timeRangesMap#server:{server}, 5 min
 func (s *TimeRange) GetTimeRangesMap(ctx context.Context, server string) (map[int]*model.TimeRange, error) {
 	var timeRangesMap map[int]*model.TimeRange
 	err := cache.TimeRangesMap.Get(server, &timeRangesMap)
