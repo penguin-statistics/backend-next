@@ -188,7 +188,7 @@ func (s *Admin) GetRejectRulesReportContext(ctx context.Context, req types.Rejec
 	for i, dropReport := range dropReports {
 		var createdAt int64
 		if dropReport.CreatedAt != nil {
-			createdAt = dropReport.CreatedAt.Unix()
+			createdAt = dropReport.CreatedAt.UnixMicro()
 		}
 
 		originalReport := dropReport.DropReport
