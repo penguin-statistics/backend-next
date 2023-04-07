@@ -332,15 +332,6 @@ func (s *PatternMatrix) calcPatternMatrixForTimeRanges(
 ) ([]*model.PatternMatrixElement, error) {
 	results := make([]*model.PatternMatrixElement, 0)
 
-	// For one time range whose end time is FakeEndTimeMilli, we will make separate query to get times and quantity.
-	// We need to make sure they are queried based on the same set of drop reports. So we will use a unified end time instead of FakeEndTimeMilli.
-	unifiedEndTime := time.Now()
-	for _, timeRange := range timeRanges {
-		if timeRange.EndTime.After(unifiedEndTime) {
-			timeRange.EndTime = &unifiedEndTime
-		}
-	}
-
 	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, nil)
 	if err != nil {
 		return nil, err
