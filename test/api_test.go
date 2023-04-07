@@ -55,10 +55,10 @@ func request(t *testing.T, req *http.Request, msTimeout ...int) *http.Response {
 	return resp
 }
 
-func JsonRequestCustom(t *testing.T, req *http.Request) (*http.Response, *gjson.Result) {
+func JsonRequestCustom(t *testing.T, req *http.Request, msTimeout ...int) (*http.Response, *gjson.Result) {
 	t.Helper()
 
-	resp := request(t, req)
+	resp := request(t, req, msTimeout...)
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err, "failed to read response body")
@@ -68,7 +68,7 @@ func JsonRequestCustom(t *testing.T, req *http.Request) (*http.Response, *gjson.
 	return resp, &body
 }
 
-func JsonRequest(t *testing.T, path, body string, headers *http.Header) (*http.Response, *gjson.Result) {
+func JsonRequest(t *testing.T, path, body string, headers *http.Header, msTimeout ...int) (*http.Response, *gjson.Result) {
 	t.Helper()
 
 	req := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(body))
@@ -76,7 +76,7 @@ func JsonRequest(t *testing.T, path, body string, headers *http.Header) (*http.R
 		req.Header = *headers
 	}
 	req.Header.Set("Content-Type", "application/json")
-	return JsonRequestCustom(t, req)
+	return JsonRequestCustom(t, req, msTimeout...)
 }
 
 func TestAPIMeta(t *testing.T) {

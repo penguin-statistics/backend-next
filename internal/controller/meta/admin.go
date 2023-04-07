@@ -471,7 +471,12 @@ func (c *AdminController) RejectRulesReevaluationApply(ctx *fiber.Ctx) error {
 				Int("to_reliability", change.ToReliability).
 				Msg("applying reliability modification to report")
 
-			if err := c.DropReportRepo.UpdateDropReportReliability(ictx, tx, change.ReportID, change.ToReliability); err != nil {
+			if _, err := tx.NewUpdate().
+				Model((*model.DropReport)(nil)).
+				Set("reliability = ?", change.ToReliability).
+				Where("report_id = ?", change.ReportID).
+				Bulk().
+				Exec(ictx); err != nil {
 				log.Error().
 					Err(err).
 					Str("evt.name", "admin.reject_rules.reevaluation.apply").
@@ -481,12 +486,6 @@ func (c *AdminController) RejectRulesReevaluationApply(ctx *fiber.Ctx) error {
 
 				return err
 			}
-
-			log.Debug().
-				Str("evt.name", "admin.reject_rules.reevaluation.apply").
-				Int("report_id", change.ReportID).
-				Int("to_reliability", change.ToReliability).
-				Msg("reliability modification applied to report")
 		}
 
 		return nil
