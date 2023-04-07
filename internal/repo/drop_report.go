@@ -295,6 +295,9 @@ func (s *DropReport) handleStagesAndItems(query *bun.SelectQuery, stageIdItemIdM
 }
 
 func (s *DropReport) handleStages(query *bun.SelectQuery, stageIds []int) {
+	if len(stageIds) == 0 {
+		return
+	}
 	var b strings.Builder
 	b.WriteString("dr.stage_id")
 	if len(stageIds) == 1 {
