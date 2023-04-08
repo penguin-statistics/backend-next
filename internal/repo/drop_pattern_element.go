@@ -107,3 +107,19 @@ func (r *DropPatternElement) GetDropPatternElementsByPatternId(ctx context.Conte
 	}
 	return elements, nil
 }
+
+func (r *DropPatternElement) GetDropPatternElementsByPatternIds(ctx context.Context, patternIds []int) ([]*model.DropPatternElement, error) {
+	var elements []*model.DropPatternElement
+	err := r.DB.NewSelect().
+		Model(&elements).
+		Where("drop_pattern_id IN (?)", bun.In(patternIds)).
+		Order("drop_pattern_id", "quantity DESC", "item_id").
+		Scan(ctx)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		elements = make([]*model.DropPatternElement, 0)
+	} else if err != nil {
+		return nil, err
+	}
+	return elements, nil
+}

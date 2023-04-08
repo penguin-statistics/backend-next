@@ -35,3 +35,18 @@ func (s *DropPatternElement) GetDropPatternElementsByPatternId(ctx context.Conte
 	cache.DropPatternElementsByPatternID.Set(strconv.Itoa(patternId), dbDropPatternElements, 24*time.Hour)
 	return dbDropPatternElements, nil
 }
+
+func (s *DropPatternElement) GetDropPatternElementsMapByPatternIds(ctx context.Context, patternIds []int) (map[int][]*model.DropPatternElement, error) {
+	elements, err := s.DropPatternElementRepo.GetDropPatternElementsByPatternIds(ctx, patternIds)
+	if err != nil {
+		return nil, err
+	}
+	elementsMap := make(map[int][]*model.DropPatternElement)
+	for _, element := range elements {
+		if _, ok := elementsMap[element.DropPatternID]; !ok {
+			elementsMap[element.DropPatternID] = make([]*model.DropPatternElement, 0)
+		}
+		elementsMap[element.DropPatternID] = append(elementsMap[element.DropPatternID], element)
+	}
+	return elementsMap, nil
+}

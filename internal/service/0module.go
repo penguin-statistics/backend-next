@@ -34,5 +34,6 @@ func Module() fx.Option {
 		NewDropMatrixElement,
 		NewDropPatternElement,
 		NewPatternMatrixElement,
+		NewExport,
 	))
 }
