@@ -20,6 +20,7 @@ import (
 	"github.com/uptrace/bun"
 	"github.com/zeebo/xxh3"
 	"go.uber.org/fx"
+	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
@@ -53,6 +54,8 @@ type AdminController struct {
 	PropertyRepo             *repo.Property
 	DropMatrixElementService *service.DropMatrixElement
 	TimeRangeService         *service.TimeRange
+	ExportService            *service.Export
+	AccountService           *service.Account
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
@@ -77,6 +80,8 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Get("/recognition/defects", c.GetRecognitionDefects)
 	admin.Get("/recognition/defects/:defectId", c.GetRecognitionDefect)
 	admin.Post("/recognition/items-resources/updated", c.RecognitionItemsResourcesUpdated)
+
+	admin.Post("/export/drop-report", c.ExportDropReport)
 
 	admin.Post("/snapshots", c.CreateSnapshot)
 }
@@ -597,4 +602,73 @@ func (c *AdminController) CalcPatternMatrixElements(ctx *fiber.Ctx) error {
 		}
 	}
 	return ctx.SendStatus(fiber.StatusCreated)
+}
+
+func (c *AdminController) ExportDropReport(ctx *fiber.Ctx) error {
+	type exportDropReportRequest struct {
+		Server         string    `json:"server" validate:"required,arkserver" required:"true"`
+		StageID        string    `json:"stageId" validate:"required" required:"true"`
+		ItemIDs        []string  `json:"itemIds"`
+		IsPersonal     null.Bool `json:"isPersonal" swaggertype:"boolean"`
+		SourceCategory string    `json:"sourceCategory" validate:"omitempty,sourcecategory"`
+		StartTime      int64     `json:"start" swaggertype:"integer"`
+		EndTime        int64     `json:"end" validate:"omitempty,gtfield=StartTime" swaggertype:"integer"`
+	}
+	var request exportDropReportRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	// handle account id
+	accountId := null.NewInt(0, false)
+	if request.IsPersonal.Bool {
+		account, err := c.AccountService.GetAccountFromRequest(ctx)
+		if err != nil {
+			return err
+		}
+		accountId.Int64 = int64(account.AccountID)
+		accountId.Valid = true
+	}
+
+	// handle start time (might be null)
+	startTimeMilli := constant.ServerStartTimeMapMillis[request.Server]
+	if request.StartTime != 0 {
+		startTimeMilli = request.StartTime
+	}
+	startTime := time.UnixMilli(startTimeMilli)
+
+	// handle end time (might be null)
+	endTimeMilli := time.Now().UnixMilli()
+	if request.EndTime != 0 {
+		endTimeMilli = request.EndTime
+	}
+	endTime := time.UnixMilli(endTimeMilli)
+
+	// handle ark stage id
+	stage, err := c.StageService.GetStageByArkId(ctx.UserContext(), request.StageID)
+	if err != nil {
+		return err
+	}
+
+	// handle item ids
+	itemIds := make([]int, 0)
+	for _, arkItemID := range request.ItemIDs {
+		item, err := c.ItemService.GetItemByArkId(ctx.UserContext(), arkItemID)
+		if err != nil {
+			return err
+		}
+		itemIds = append(itemIds, item.ItemID)
+	}
+
+	// handle sourceCategory, default to all
+	sourceCategory := request.SourceCategory
+	if sourceCategory == "" {
+		sourceCategory = constant.SourceCategoryAll
+	}
+
+	result, err := c.ExportService.ExportDropReportsAndPatterns(ctx.UserContext(), request.Server, &startTime, &endTime, stage.StageID, itemIds, accountId, request.SourceCategory)
+	if err != nil {
+		return err
+	}
+	return ctx.JSON(result)
 }
