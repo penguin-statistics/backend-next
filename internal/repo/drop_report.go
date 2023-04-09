@@ -273,6 +273,35 @@ func (s *DropReport) CalcRecentUniqueUserCountBySource(ctx context.Context, dura
 	return results, nil
 }
 
+/**
+ * Only return drop reports under one stage.
+ */
+func (s *DropReport) GetDropReports(ctx context.Context, queryCtx *model.DropReportQueryContext) ([]*model.DropReport, error) {
+	results := make([]*model.DropReport, 0)
+	query := s.DB.NewSelect().
+		TableExpr("drop_reports AS dr").
+		Column("pattern_id", "created_at", "account_id", "source_name", "version").
+		Order("created_at")
+	s.handleServer(query, queryCtx.Server)
+	s.handleCreatedAtWithTime(query, queryCtx.StartTime, queryCtx.EndTime)
+
+	if queryCtx.HasItemIds() {
+		query = query.Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id")
+		s.handleStagesAndItems(query, *queryCtx.StageItemFilter)
+	} else {
+		s.handleStages(query, queryCtx.GetStageIds())
+	}
+
+	s.handleAccountAndReliability(query, queryCtx.AccountID)
+	s.handleSourceName(query, queryCtx.SourceCategory)
+
+	if err := query.
+		Scan(ctx, &results); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 func (s *DropReport) handleStagesAndItems(query *bun.SelectQuery, stageIdItemIdMap map[int][]int) {
 	stageConditions := make([]string, 0)
 	for stageId, itemIds := range stageIdItemIdMap {
@@ -350,7 +379,9 @@ func (s *DropReport) handleSourceName(query *bun.SelectQuery, sourceCategory str
 	if sourceCategory == constant.SourceCategoryManual {
 		query = query.Where("source_name IN (?)", bun.In(constant.ManualSources))
 	} else if sourceCategory == constant.SourceCategoryAutomated {
-		query = query.Where("source_name NOT IN (?)", bun.In(constant.ManualSources)).WhereOr("source_name IS NULL")
+		query = query.WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Where("source_name NOT IN (?)", bun.In(constant.ManualSources)).WhereOr("source_name IS NULL")
+		})
 	}
 }
 

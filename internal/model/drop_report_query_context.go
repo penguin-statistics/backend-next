@@ -39,3 +39,14 @@ func (queryCtx *DropReportQueryContext) GetItemIdsSet(stageId int) map[int]struc
 	}
 	return itemIdsSet
 }
+
+func (queryCtx *DropReportQueryContext) HasItemIds() bool {
+	hasItemIdsFilter := false
+	for _, itemIds := range *queryCtx.StageItemFilter {
+		if len(itemIds) > 0 {
+			hasItemIdsFilter = true
+			break
+		}
+	}
+	return hasItemIdsFilter
+}

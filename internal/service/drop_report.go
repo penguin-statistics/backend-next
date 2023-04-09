@@ -102,3 +102,9 @@ func (s *DropReport) CalcTotalStageQuantityForShimSiteStats(ctx context.Context,
 func (s *DropReport) CalcRecentUniqueUserCountBySource(ctx context.Context, duration time.Duration) ([]*modelv2.UniqueUserCountBySource, error) {
 	return s.DropReportRepo.CalcRecentUniqueUserCountBySource(ctx, duration)
 }
+
+func (s *DropReport) GetDropReports(
+	ctx context.Context, queryCtx *model.DropReportQueryContext,
+) ([]*model.DropReport, error) {
+	return s.DropReportRepo.GetDropReports(ctx, queryCtx)
+}
