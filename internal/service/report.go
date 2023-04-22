@@ -231,8 +231,8 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 		return "", err
 	}
 
-	// If a perm stage id is provided, we will try to see if the corresponding rerun stage is available or not.
-	// If so, we will use the rerun stage id instead. (MAA sometimes uses perm stage id for rerun stages)
+	// If stage id is for a perm stage and it's from MAA, we will try to see if the corresponding rerun stage is available or not.
+	// If available, we will use the rerun stage id instead. (MAA sometimes uses perm stage id for rerun stages)
 	err = s.PipelinePreprocessRerunStageIdForMaa(ctx.UserContext(), req)
 	if err != nil {
 		return "", err
