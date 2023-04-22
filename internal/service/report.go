@@ -115,18 +115,6 @@ func (s *Report) PipelinePreprocessRecruitmentTags(ctx context.Context, req *typ
 	return nil
 }
 
-func (s *Report) PipelineConvertLegacySuppliesForMaa(ctx context.Context, req *types.SingularReportRequest) error {
-	if time.Now().UnixMilli() <= 1666641600000 && req.FragmentReportCommon.Source == constant.MeoAssistant {
-		for i := range req.Drops {
-			if req.Drops[i].ItemID == "randomMaterial_5" {
-				req.Drops[i].ItemID = "randomMaterial_7"
-				break
-			}
-		}
-	}
-	return nil
-}
-
 func (s *Report) PipelineMergeDropsAndMapDropTypes(ctx context.Context, drops []types.ArkDrop) ([]*types.Drop, error) {
 	convertedDrops := make([]*types.Drop, 0, len(drops))
 	for _, drop := range drops {
@@ -202,12 +190,6 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 	}
 
 	err = s.PipelinePreprocessRecruitmentTags(ctx.UserContext(), req)
-	if err != nil {
-		return "", err
-	}
-
-	// Temporarily add this pipeline to convert randomMaterial_5 to randomMaterial_7 for MAA's drop. Should be removed when the event is ended.
-	err = s.PipelineConvertLegacySuppliesForMaa(ctx.UserContext(), req)
 	if err != nil {
 		return "", err
 	}
