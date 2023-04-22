@@ -20,9 +20,7 @@ func NewRecognitionDefect(db *bun.DB) *RecognitionDefect {
 }
 
 func (s *RecognitionDefect) CreateDefectReportDraft(ctx context.Context, defectReport *model.RecognitionDefect) error {
-	if defectReport.DefectID == "" {
-		defectReport.DefectID = strings.ToLower(ulid.Make().String())
-	}
+	defectReport.DefectID = strings.ToLower(ulid.Make().String())
 
 	_, err := s.DB.NewInsert().
 		Model(defectReport).
