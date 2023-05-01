@@ -24,7 +24,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze
-    runs-on: self-hosted
+    runs-on: latest-ubuntu
     permissions:
       actions: read
       contents: read
