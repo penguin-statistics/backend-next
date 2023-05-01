@@ -24,7 +24,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze
-    runs-on: [nya]
+    runs-on: [self-hosted, Linux]
     permissions:
       actions: read
       contents: read
