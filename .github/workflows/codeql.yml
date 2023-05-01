@@ -22,10 +22,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  runs-on: 'self-hosted'
   analyze:
     name: Analyze
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions:
       actions: read
       contents: read
