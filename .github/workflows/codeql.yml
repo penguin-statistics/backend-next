@@ -24,7 +24,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze
-    runs-on: nya
+    runs-on: [nya]
     permissions:
       actions: read
       contents: read
