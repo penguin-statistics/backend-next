@@ -24,7 +24,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze
-    runs-on: latest-ubuntu
+    runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
