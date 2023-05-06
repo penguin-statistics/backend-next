@@ -2,9 +2,9 @@ package middlewares
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"exusiai.dev/gommon/constant"
 
 	"exusiai.dev/backend-next/internal/util/rekuest"
-	"exusiai.dev/gommon/constant"
 )
 
 func ValidateServerAsParam(c *fiber.Ctx) error {
@@ -23,7 +23,7 @@ func ValidateServerAsQuery(c *fiber.Ctx) error {
 }
 
 func ValidateCategoryAsParam(c *fiber.Ctx) error {
-	if err := rekuest.ValidCategory(c, c.Params("category", "all")); err != nil {
+	if err := rekuest.ValidCategory(c, c.Params("category", constant.SourceCategoryAll)); err != nil {
 		return err
 	}
 	return c.Next()
