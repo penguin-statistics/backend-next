@@ -37,15 +37,6 @@ func RegisterPrivate(v2 *svr.V2, c Private) {
 	result.Get("/trend/:server", middlewares.ValidateServerAsParam, c.GetTrends)
 }
 
-//	@Summary	Get Drop Matrix
-//	@Tags		Private
-//	@Produce	json
-//	@Param		server		path		string	true	"Server; default to CN"					Enums(CN, US, JP, KR)
-//	@Param		source		path		string	true	"Global or Personal; default to global"	Enums(global, personal)
-//	@Param		category	path		string	false	"Category; default to all"				Enums(all, automated, manual)
-//	@Success	200			{object}	modelv2.DropMatrixQueryResult
-//	@Failure	500			{object}	pgerr.PenguinError	"An unexpected error occurred"
-//	@Router		/PenguinStats/api/v2/_private/result/matrix/{server}/{source}/{category} [GET]
 func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	isPersonal := ctx.Params("source") == "personal"
@@ -78,15 +69,6 @@ func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 	return ctx.JSON(shimResult)
 }
 
-//	@Summary	Get Pattern Matrix
-//	@Tags		Private
-//	@Produce	json
-//	@Param		server		path		string	true	"Server; default to CN"					Enums(CN, US, JP, KR)
-//	@Param		source		path		string	true	"Global or Personal; default to global"	Enums(global, personal)
-//	@Param		category	path		string	false	"Category; default to all"				Enums(all, automated, manual)
-//	@Success	200			{object}	modelv2.PatternMatrixQueryResult
-//	@Failure	500			{object}	pgerr.PenguinError	"An unexpected error occurred"
-//	@Router		/PenguinStats/api/v2/_private/result/pattern/{server}/{source}/{category} [GET]
 func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	isPersonal := ctx.Params("source") == "personal"
@@ -120,13 +102,6 @@ func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 	return ctx.JSON(shimResult)
 }
 
-//	@Summary	Get Trends
-//	@Tags		Private
-//	@Produce	json
-//	@Param		server	path		string	true	"Server; default to CN"	Enums(CN, US, JP, KR)
-//	@Success	200		{object}	modelv2.TrendQueryResult
-//	@Failure	500		{object}	pgerr.PenguinError	"An unexpected error occurred"
-//	@Router		/PenguinStats/api/v2/_private/result/trend/{server} [GET]
 func (c *Private) GetTrends(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	shimResult, err := c.TrendService.GetShimTrend(ctx.UserContext(), server)
