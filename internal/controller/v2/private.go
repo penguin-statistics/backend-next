@@ -49,7 +49,7 @@ func RegisterPrivate(v2 *svr.V2, c Private) {
 func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	isPersonal := ctx.Params("source") == "personal"
-	category := ctx.Params("category", "all")
+	category := ctx.Params("category", constant.SourceCategoryAll)
 
 	accountId := null.NewInt(0, false)
 	if isPersonal {
@@ -90,7 +90,7 @@ func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	isPersonal := ctx.Params("source") == "personal"
-	category := ctx.Params("category", "all")
+	category := ctx.Params("category", constant.SourceCategoryAll)
 	showAllPatterns := false
 
 	accountId := null.NewInt(0, false)
