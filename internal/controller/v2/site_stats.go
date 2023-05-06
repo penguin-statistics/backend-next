@@ -27,13 +27,13 @@ func RegisterSiteStats(v2 *svr.V2, c SiteStats) {
 	v2.Get("/stats", middlewares.ValidateServerAsQuery, c.GetSiteStats)
 }
 
-// @Summary  Get Site Stats
-// @Tags     SiteStats
-// @Produce  json
-// @Param    server  query     string  true  "Server; default to CN"  Enums(CN, US, JP, KR)
-// @Success  200     {array}   modelv2.SiteStats
-// @Failure  500     {object}  pgerr.PenguinError  "An unexpected error occurred"
-// @Router   /PenguinStats/api/v2/stats [GET]
+//	@Summary	Get Site Stats
+//	@Tags		SiteStats
+//	@Produce	json
+//	@Param		server	query		string	true	"Server; default to CN"	Enums(CN, US, JP, KR)
+//	@Success	200		{array}		modelv2.SiteStats
+//	@Failure	500		{object}	pgerr.PenguinError	"An unexpected error occurred"
+//	@Router		/PenguinStats/api/v2/stats [GET]
 func (c *SiteStats) GetSiteStats(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 	if err := rekuest.ValidServer(ctx, server); err != nil {

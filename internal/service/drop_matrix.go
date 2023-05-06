@@ -156,11 +156,12 @@ func (s *DropMatrix) UpdateDropMatrixByGivenDate(ctx context.Context, server str
 
 /**
  * Calculate drop matrix for a given date
- * @param date indicates the date to calculate drop matrix
- * @param endTime if nil, the calculation will be done for the entire day; otherwise, the calculation will be done for the partial day
+ * date: indicates the date to calculate drop matrix
+ * endTime: if nil, the calculation will be done for the entire day; otherwise, the calculation will be done for the partial day
  */
 func (s *DropMatrix) calcDropMatrixByGivenDate(
-	ctx context.Context, server string, date *time.Time, endTime *time.Time, sourceCategories []string) ([]*model.DropMatrixElement, error) {
+	ctx context.Context, server string, date *time.Time, endTime *time.Time, sourceCategories []string,
+) ([]*model.DropMatrixElement, error) {
 	dropMatrixElements := make([]*model.DropMatrixElement, 0)
 
 	start := time.UnixMilli(util.GetDayStartTime(date, server))

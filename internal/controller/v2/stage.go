@@ -27,12 +27,12 @@ func RegisterStage(v2 *svr.V2, c Stage) {
 	v2.Get("/stages/:stageId", middlewares.ValidateServerAsQuery, c.GetStageByArkId)
 }
 
-// @Summary  Get All Stages
-// @Tags     Stage
-// @Produce  json
-// @Success  200  {array}   modelv2.Stage{existence=model.Existence,code_i18n=model.I18nString}
-// @Failure  500  {object}  pgerr.PenguinError  "An unexpected error occurred"
-// @Router   /PenguinStats/api/v2/stages [GET]
+//	@Summary	Get All Stages
+//	@Tags		Stage
+//	@Produce	json
+//	@Success	200	{array}		modelv2.Stage{existence=model.Existence,code_i18n=model.I18nString}
+//	@Failure	500	{object}	pgerr.PenguinError	"An unexpected error occurred"
+//	@Router		/PenguinStats/api/v2/stages [GET]
 func (c *Stage) GetStages(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 
@@ -48,14 +48,14 @@ func (c *Stage) GetStages(ctx *fiber.Ctx) error {
 	return ctx.JSON(stages)
 }
 
-// @Summary  Get a Stage with ID
-// @Tags     Stage
-// @Produce  json
-// @Param    stageId  path      int  true  "Stage ID"
-// @Success  200      {object}  modelv2.Stage{existence=model.Existence,code_i18n=model.I18nString}
-// @Failure  400      {object}  pgerr.PenguinError  "Invalid or missing stageId. Notice that this shall be the **string ID** of the stage, instead of the internally used numerical ID of the stage."
-// @Failure  500      {object}  pgerr.PenguinError  "An unexpected error occurred"
-// @Router   /PenguinStats/api/v2/stages/{stageId} [GET]
+//	@Summary	Get a Stage with ID
+//	@Tags		Stage
+//	@Produce	json
+//	@Param		stageId	path		int	true	"Stage ID"
+//	@Success	200		{object}	modelv2.Stage{existence=model.Existence,code_i18n=model.I18nString}
+//	@Failure	400		{object}	pgerr.PenguinError	"Invalid or missing stageId. Notice that this shall be the **string ID** of the stage, instead of the internally used numerical ID of the stage."
+//	@Failure	500		{object}	pgerr.PenguinError	"An unexpected error occurred"
+//	@Router		/PenguinStats/api/v2/stages/{stageId} [GET]
 func (c *Stage) GetStageByArkId(ctx *fiber.Ctx) error {
 	stageId := ctx.Params("stageId")
 	server := ctx.Query("server", "CN")

@@ -71,17 +71,17 @@ func (c *Report) MiddlewareGetOrCreateAccount(ctx *fiber.Ctx) error {
 	return ctx.Next()
 }
 
-// @Summary      Submit a Drop Report
-// @Description  Submit a Drop Report. You can use the `reportHash` in the response to recall the report in 24 hours after it has been submitted.
-// @Tags         Report
-// @Accept       json
-// @Produce      json
-// @Param        report  body      types.SingleReportRequest  true  "Report request"
-// @Success      200     {object}  modelv2.ReportResponse     "Report has been successfully submitted"
-// @Failure      400     {object}  pgerr.PenguinError         "Invalid request"
-// @Failure      500     {object}  pgerr.PenguinError         "An unexpected error occurred"
-// @Security     PenguinIDAuth
-// @Router       /PenguinStats/api/v2/report [POST]
+//	@Summary		Submit a Drop Report
+//	@Description	Submit a Drop Report. You can use the `reportHash` in the response to recall the report in 24 hours after it has been submitted.
+//	@Tags			Report
+//	@Accept			json
+//	@Produce		json
+//	@Param			report	body		types.SingularReportRequest	true	"Report request"
+//	@Success		200		{object}	modelv2.ReportResponse		"Report has been successfully submitted"
+//	@Failure		400		{object}	pgerr.PenguinError			"Invalid request"
+//	@Failure		500		{object}	pgerr.PenguinError			"An unexpected error occurred"
+//	@Security		PenguinIDAuth
+//	@Router			/PenguinStats/api/v2/report [POST]
 func (c *Report) SingularReport(ctx *fiber.Ctx) error {
 	req := ctx.Locals("body").(types.SingularReportRequest)
 
@@ -92,16 +92,16 @@ func (c *Report) SingularReport(ctx *fiber.Ctx) error {
 	return ctx.JSON(modelv2.ReportResponse{ReportHash: taskId})
 }
 
-// @Summary      Recall a Drop Report
-// @Description  Recall a Drop Report by its `reportHash`. The farest report you can recall is limited to 24 hours. Recalling a report after it has been already recalled will result in an error.
-// @Tags         Report
-// @Accept       json
-// @Produce      json
-// @Param        report  body  types.SingleReportRecallRequest  true  "Report Recall request"
-// @Success      204     "Report has been successfully recalled"
-// @Failure      400     {object}  pgerr.PenguinError  "`reportHash` is missing, invalid, or already been recalled."
-// @Failure      500     {object}  pgerr.PenguinError  "An unexpected error occurred"
-// @Router       /PenguinStats/api/v2/report/recall [POST]
+//	@Summary		Recall a Drop Report
+//	@Description	Recall a Drop Report by its `reportHash`. The farest report you can recall is limited to 24 hours. Recalling a report after it has been already recalled will result in an error.
+//	@Tags			Report
+//	@Accept			json
+//	@Produce		json
+//	@Param			report	body	types.SingularReportRecallRequest	true	"Report Recall request"
+//	@Success		204		"Report has been successfully recalled"
+//	@Failure		400		{object}	pgerr.PenguinError	"`reportHash` is missing, invalid, or already been recalled."
+//	@Failure		500		{object}	pgerr.PenguinError	"An unexpected error occurred"
+//	@Router			/PenguinStats/api/v2/report/recall [POST]
 func (c *Report) RecallSingularReport(ctx *fiber.Ctx) error {
 	req := ctx.Locals("body").(types.SingularReportRecallRequest)
 
@@ -117,16 +117,16 @@ func (c *Report) RecallSingularReport(ctx *fiber.Ctx) error {
 	return ctx.SendStatus(fiber.StatusOK)
 }
 
-// @Summary      Bulk Submit with Frontend Recognition
-// @Description  Submit an Item Drop Report with Frontend Recognition. Notice that this is a **private API** and is not designed for external use.
-// @Tags         Report
-// @Produce      json
-// @Param        report  body      string                             true  "Recognition Report Request"
-// @Success      200     {object}  modelv2.RecognitionReportResponse  "Report has been successfully submitted for queue processing"
-// @Failure      400     {object}  pgerr.PenguinError                 "Invalid request"
-// @Failure      500     {object}  pgerr.PenguinError                 "An unexpected error occurred"
-// @Security     PenguinIDAuth
-// @Router       /PenguinStats/api/v2/report/recognition [POST]
+//	@Summary		Bulk Submit with Frontend Recognition
+//	@Description	Submit an Item Drop Report with Frontend Recognition. Notice that this is a **private API** and is not designed for external use.
+//	@Tags			Report
+//	@Produce		json
+//	@Param			report	body		string								true	"Recognition Report Request"
+//	@Success		200		{object}	modelv2.RecognitionReportResponse	"Report has been successfully submitted for queue processing"
+//	@Failure		400		{object}	pgerr.PenguinError					"Invalid request"
+//	@Failure		500		{object}	pgerr.PenguinError					"An unexpected error occurred"
+//	@Security		PenguinIDAuth
+//	@Router			/PenguinStats/api/v2/report/recognition [POST]
 func (c *Report) RecognitionReport(ctx *fiber.Ctx) error {
 	encrypted := string(ctx.Body())
 

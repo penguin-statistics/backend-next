@@ -35,8 +35,8 @@ func (s *DropMatrixElement) DeleteByServerAndDayNum(ctx context.Context, server 
 }
 
 /**
- * @param startDayNum inclusive
- * @param endDayNum inclusive
+ * startDayNum inclusive
+ * endDayNum inclusive
  */
 func (s *DropMatrixElement) GetElementsByServerAndSourceCategoryAndDayNumRange(
 	ctx context.Context, server string, sourceCategory string, startDayNum int, endDayNum int,

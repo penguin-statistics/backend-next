@@ -26,12 +26,12 @@ func RegisterItem(v2 *svr.V2, c Item) {
 	v2.Get("/items/:itemId", c.GetItemByArkId)
 }
 
-// @Summary  Get All Items
-// @Tags     Item
-// @Produce  json
-// @Success  200  {array}   modelv2.Item{name_i18n=model.I18nString,existence=model.Existence}
-// @Failure  500  {object}  pgerr.PenguinError  "An unexpected error occurred"
-// @Router   /PenguinStats/api/v2/items [GET]
+//	@Summary	Get All Items
+//	@Tags		Item
+//	@Produce	json
+//	@Success	200	{array}		modelv2.Item{name_i18n=model.I18nString,existence=model.Existence}
+//	@Failure	500	{object}	pgerr.PenguinError	"An unexpected error occurred"
+//	@Router		/PenguinStats/api/v2/items [GET]
 func (c *Item) GetItems(ctx *fiber.Ctx) error {
 	items, err := c.ItemService.GetShimItems(ctx.UserContext())
 	if err != nil {
@@ -45,14 +45,14 @@ func (c *Item) GetItems(ctx *fiber.Ctx) error {
 	return ctx.JSON(items)
 }
 
-// @Summary  Get an Item with ID
-// @Tags     Item
-// @Produce  json
-// @Param    itemId  path      string  true  "Item ID"
-// @Success  200     {object}  modelv2.Item{name_i18n=model.I18nString,existence=model.Existence}
-// @Failure  400     {object}  pgerr.PenguinError  "Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item."
-// @Failure  500     {object}  pgerr.PenguinError  "An unexpected error occurred"
-// @Router   /PenguinStats/api/v2/items/{itemId} [GET]
+//	@Summary	Get an Item with ID
+//	@Tags		Item
+//	@Produce	json
+//	@Param		itemId	path		string	true	"Item ID"
+//	@Success	200		{object}	modelv2.Item{name_i18n=model.I18nString,existence=model.Existence}
+//	@Failure	400		{object}	pgerr.PenguinError	"Invalid or missing itemId. Notice that this shall be the **string ID** of the item, instead of the internally used numerical ID of the item."
+//	@Failure	500		{object}	pgerr.PenguinError	"An unexpected error occurred"
+//	@Router		/PenguinStats/api/v2/items/{itemId} [GET]
 func (c *Item) GetItemByArkId(ctx *fiber.Ctx) error {
 	itemId := ctx.Params("itemId")
 
