@@ -20,7 +20,7 @@ require (
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/contrib/fibersentry v1.0.2
 	github.com/gofiber/contrib/otelfiber v1.0.3
-	github.com/gofiber/fiber/v2 v2.48.0
+	github.com/gofiber/fiber/v2 v2.47.0
 	github.com/gofiber/helmet/v2 v2.2.26
 	github.com/gofiber/swagger v0.1.9
 	github.com/jinzhu/copier v0.3.5
@@ -142,7 +142,7 @@ require (
 	go.uber.org/zap v1.23.0 // indirect
 	golang.org/x/crypto v0.7.0 // indirect
 	golang.org/x/net v0.8.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
+	golang.org/x/sys v0.9.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	mellium.im/sasl v0.3.1 // indirect
