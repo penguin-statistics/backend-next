@@ -72,6 +72,22 @@ func (c *Stage) GetStageByArkId(ctx context.Context, arkStageId string) (*model.
 	return &stage, nil
 }
 
+func (c *Stage) GetStagesByZoneId(ctx context.Context, zoneId int) ([]*model.Stage, error) {
+	var stages []*model.Stage
+	err := c.db.NewSelect().
+		Model(&stages).
+		Where("zone_id = ?", zoneId).
+		Scan(ctx)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, pgerr.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return stages, nil
+}
+
 func (c *Stage) shimStageQuery(ctx context.Context, server string, stages *[]*modelv2.Stage, t time.Time) error {
 	return c.db.NewSelect().
 		Model(stages).

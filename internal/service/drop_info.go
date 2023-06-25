@@ -5,13 +5,13 @@ import (
 	"strconv"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/ahmetb/go-linq/v3"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/repo"
-	"exusiai.dev/gommon/constant"
 )
 
 type DropInfo struct {
@@ -107,4 +107,8 @@ func (s *DropInfo) GetCurrentDropInfosByServer(ctx context.Context, server strin
 		return currentTimeRangesMap[dropInfo.RangeID] != nil
 	}).ToSlice(&dropInfos)
 	return dropInfos, nil
+}
+
+func (s *DropInfo) CloneDropInfosFromCN(ctx context.Context, originRangeId int, destRangeId int, server string) error {
+	return s.DropInfoRepo.CloneDropInfosFromCN(ctx, originRangeId, destRangeId, server)
 }

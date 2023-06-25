@@ -67,6 +67,10 @@ func (s *Stage) GetStageByArkId(ctx context.Context, arkStageId string) (*model.
 	return dbStage, nil
 }
 
+func (s *Stage) GetStagesByZoneId(ctx context.Context, zoneId int) ([]*model.Stage, error) {
+	return s.StageRepo.GetStagesByZoneId(ctx, zoneId)
+}
+
 func (s *Stage) SearchStageByCode(ctx context.Context, code string) (*model.Stage, error) {
 	return s.StageRepo.SearchStageByCode(ctx, code)
 }

@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"time"
 
 	"gopkg.in/guregu/null.v3"
@@ -44,4 +45,23 @@ type RejectRulesReevaluationPreviewRequest struct {
 		From time.Time `json:"from"`
 		To   time.Time `json:"to"`
 	} `json:"reevaluateRange"`
+}
+
+type CloneFromCNRequest struct {
+	ArkZoneID        string           `json:"arkZoneId" validate:"required" required:"true"`
+	RangeID          int              `json:"rangeId" validate:"required" required:"true"`
+	ActivityID       int              `json:"activityId"`
+	ForeignZoneName  json.RawMessage  `json:"foreignZoneName"`
+	ForeignTimeRange ForeignTimeRange `json:"foreignTimeRange"`
+}
+
+type ForeignTimeRange struct {
+	US ForeignTimeRangeString `json:"US"`
+	JP ForeignTimeRangeString `json:"JP"`
+	KR ForeignTimeRangeString `json:"KR"`
+}
+
+type ForeignTimeRangeString struct {
+	Start string `json:"start"`
+	End   string `json:"end"`
 }

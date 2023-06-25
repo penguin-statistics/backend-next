@@ -25,3 +25,9 @@ func GetDayStartTimestampFromDayNum(dayNum int, server string) int64 {
 	serverOpenStartTime := time.UnixMilli(serverOpenStartTimeLong)
 	return GetDayStartTime(&serverOpenStartTime, server) + int64(dayNum)*86400000
 }
+
+func GetTimeStampInServer(t *time.Time, server string) int64 {
+	loc := constant.LocMap[server]
+	localT := t.In(loc)
+	return localT.UnixMilli()
+}
