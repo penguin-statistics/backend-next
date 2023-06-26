@@ -345,9 +345,15 @@ func (s *Admin) CloneFromCN(ctx context.Context, req types.CloneFromCNRequest) e
 
 	err = s.DB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		s.AdminRepo.SaveZones(ctx, tx, &([]*model.Zone{zone}))
-		s.AdminRepo.SaveStages(ctx, tx, &stages)
-		s.AdminRepo.SaveActivities(ctx, tx, &activitiesToSave)
-		s.AdminRepo.SaveTimeRanges(ctx, tx, &timeRangesToSave)
+		if len(stages) != 0 {
+			s.AdminRepo.SaveStages(ctx, tx, &stages)
+		}
+		if len(activitiesToSave) != 0 {
+			s.AdminRepo.SaveActivities(ctx, tx, &activitiesToSave)
+		}
+		if len(timeRangesToSave) != 0 {
+			s.AdminRepo.SaveTimeRanges(ctx, tx, &timeRangesToSave)
+		}
 		return nil
 	})
 	if err != nil {
