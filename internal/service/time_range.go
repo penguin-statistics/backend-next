@@ -286,3 +286,7 @@ func (s *TimeRange) GetLatestTimeRangesByServer(ctx context.Context, server stri
 	cache.LatestTimeRanges.Set(server, results, time.Minute*5)
 	return results, nil
 }
+
+func (s *TimeRange) GetTimeRangeByServerAndName(ctx context.Context, server string, name string) (*model.TimeRange, error) {
+	return s.TimeRangeRepo.GetTimeRangeByServerAndName(ctx, server, name)
+}

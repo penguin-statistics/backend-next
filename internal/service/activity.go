@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/repo"
-	"exusiai.dev/gommon/constant"
 )
 
 type Activity struct {
@@ -59,6 +59,10 @@ func (s *Activity) GetShimActivities(ctx context.Context) ([]*modelv2.Activity, 
 	cache.ShimActivities.Set(shimActivities, time.Minute*5)
 	cache.LastModifiedTime.Set("[shimActivities]", time.Now(), 0)
 	return shimActivities, nil
+}
+
+func (s *Activity) GetActivityById(ctx context.Context, activityId int) (*model.Activity, error) {
+	return s.ActivityRepo.GetActivityById(ctx, activityId)
 }
 
 func (s *Activity) applyShim(activity *model.Activity) *modelv2.Activity {

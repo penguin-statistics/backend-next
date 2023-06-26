@@ -63,6 +63,8 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Post("/save", c.SaveRenderedObjects)
 	admin.Post("/purge", c.PurgeCache)
 
+	admin.Post("/clone", c.CloneFromCN)
+
 	admin.Post("/rejections/reject-rules/reevaluation/preview", c.RejectRulesReevaluationPreview)
 	admin.Post("/rejections/reject-rules/reevaluation/apply", c.RejectRulesReevaluationApply)
 
@@ -671,4 +673,17 @@ func (c *AdminController) ExportDropReport(ctx *fiber.Ctx) error {
 		return err
 	}
 	return ctx.JSON(result)
+}
+
+func (c *AdminController) CloneFromCN(ctx *fiber.Ctx) error {
+	var request types.CloneFromCNRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	err := c.AdminService.CloneFromCN(ctx.UserContext(), request)
+	if err != nil {
+		return err
+	}
+	return ctx.SendStatus(fiber.StatusCreated)
 }
