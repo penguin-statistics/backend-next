@@ -77,7 +77,10 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 		Timeout: time.Second * 5,
 	}))
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*",
+		AllowOrigins: "*",
+		AllowOriginsFunc: func(origin string) bool {
+			return true
+		},
 		AllowMethods:     "GET, POST, DELETE, OPTIONS",
 		AllowHeaders:     "Content-Type, Authorization, X-Requested-With, X-Penguin-Variant, sentry-trace",
 		ExposeHeaders:    "Content-Type, X-Penguin-Set-PenguinID, X-Penguin-Upgrade, X-Penguin-Compatible, X-Penguin-Request-ID",
