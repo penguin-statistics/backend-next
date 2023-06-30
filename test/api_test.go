@@ -100,14 +100,29 @@ func TestAPIMeta(t *testing.T) {
 	})
 
 	t.Run("CORS Anonymous Origin", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/PenguinStats/api/v2/config", nil)
+		req.Header.Set("Origin", "https://penguin-stats.io")
+
 		resp := request(
 			t,
-			httptest.NewRequest(http.MethodOptions, "/PenguinStats/api/v2/config", nil),
+			req,
 		)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, "https://penguin-stats.io", resp.Header.Get("Access-Control-Allow-Origin"))
+		assert.Equal(t, "true", resp.Header.Get("Access-Control-Allow-Credentials"))
+	})
+
+	t.Run("CORS Origin", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodOptions, "/PenguinStats/api/v2/config", nil)
+		req.Header.Set("Origin", "https://penguin-stats.io")
+		req.Header.Set("Access-Control-Request-Headers", "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace")
+		req.Header.Set("Access-Control-Request-Method", "GET")
+		req.Header.Set("Access-Control-Request-Credentials", "true")
+
+		resp := request(t, req)
 		assert.Equal(t, http.StatusNoContent, resp.StatusCode)
 		assert.Equal(t, "GET,POST,DELETE,OPTIONS", resp.Header.Get("Access-Control-Allow-Methods"))
-		assert.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
+		assert.Equal(t, "https://penguin-stats.io", resp.Header.Get("Access-Control-Allow-Origin"))
 		assert.Equal(t, "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace", resp.Header.Get("Access-Control-Allow-Headers"))
-		assert.Equal(t, "true", resp.Header.Get("Access-Control-Allow-Credentials"))
 	})
 }
