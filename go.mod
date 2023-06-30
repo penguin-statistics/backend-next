@@ -22,7 +22,7 @@ require (
 	github.com/gofiber/contrib/otelfiber v1.0.3
 	github.com/gofiber/fiber/v2 v2.47.0
 	github.com/gofiber/helmet/v2 v2.2.26
-	github.com/gofiber/swagger v0.1.9
+	github.com/gofiber/swagger v0.1.12
 	github.com/jinzhu/copier v0.3.5
 	github.com/joho/godotenv v1.5.1
 	github.com/kelseyhightower/envconfig v1.4.0
@@ -92,6 +92,7 @@ require (
 	github.com/savsgio/gotils v0.0.0-20230208104028-c358bd845dee // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/swaggo/files v0.0.0-20220728132757-551d4a08d97a // indirect
+	github.com/swaggo/files/v2 v2.0.0 // indirect
 	github.com/tinylib/msgp v1.1.8 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	go.opentelemetry.io/contrib v1.15.0 // indirect
