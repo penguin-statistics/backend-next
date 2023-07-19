@@ -6,7 +6,7 @@ require (
 	exusiai.dev/gommon v0.0.7
 	github.com/ahmetb/go-linq/v3 v3.2.0
 	github.com/ansrivas/fiberprometheus/v2 v2.6.0
-	github.com/antonmedv/expr v1.12.5
+	github.com/antonmedv/expr v1.12.7
 	github.com/avast/retry-go/v4 v4.3.4
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/uniuri v1.2.0
