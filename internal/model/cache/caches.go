@@ -24,6 +24,7 @@ var (
 	ItemDropSetByStageIdAndTimeRange *cache.Set[[]int]
 
 	ShimGlobalDropMatrix *cache.Set[modelv2.DropMatrixQueryResult]
+	GlobalDropMatrix     *cache.Set[model.DropMatrixQueryResult]
 
 	ShimTrend *cache.Set[modelv2.TrendQueryResult]
 
@@ -128,8 +129,10 @@ func initializeCaches() {
 
 	// drop_matrix
 	ShimGlobalDropMatrix = cache.NewSet[modelv2.DropMatrixQueryResult]("shimGlobalDropMatrix#server|showClosedZones|sourceCategory")
+	GlobalDropMatrix = cache.NewSet[model.DropMatrixQueryResult]("globalDropMatrix#server|sourceCategory")
 
 	SetMap["shimGlobalDropMatrix#server|showClosedZones|sourceCategory"] = ShimGlobalDropMatrix.Flush
+	SetMap["globalDropMatrix#server|sourceCategory"] = GlobalDropMatrix.Flush
 
 	// trend
 	ShimTrend = cache.NewSet[modelv2.TrendQueryResult]("shimTrend#server")
