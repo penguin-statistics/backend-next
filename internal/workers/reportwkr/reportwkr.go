@@ -15,7 +15,7 @@ import (
 	"github.com/uptrace/bun"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
@@ -38,7 +38,7 @@ type WorkerDeps struct {
 	DB                     *bun.DB
 	Redis                  *redis.Client
 	NatsJS                 nats.JetStreamContext
-	StageRepo              *repo.Stage
+	StageService           *service.Stage
 	DropReportRepo         *repo.DropReport
 	DropPatternRepo        *repo.DropPattern
 	DropReportExtraRepo    *repo.DropReportExtra
@@ -147,7 +147,7 @@ func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
 			trace.WithSpanKind(trace.SpanKindConsumer),
 			trace.WithAttributes(
 				semconv.MessagingSystemKey.String("nats"),
-				semconv.MessagingDestinationKey.String(msg.Subject),
+				semconv.MessagingDestinationNameKey.String(msg.Subject),
 				semconv.MessagingMessageIDKey.String(jetstream.MessageID(metadata.Sequence)),
 				semconv.MessagingMessagePayloadSizeBytesKey.Int(len(msg.Data)),
 			))
@@ -241,7 +241,7 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 			}
 		}
 
-		stage, err := w.StageRepo.GetStageByArkId(pstCtx, report.StageID)
+		stage, err := w.StageService.GetStageByArkId(pstCtx, report.StageID)
 		if err != nil {
 			return errors.Wrap(err, "failed to get stage")
 		}

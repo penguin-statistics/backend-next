@@ -39,7 +39,7 @@ func URLHandler(fieldKey string) func(ctx *fiber.Ctx) error {
 	return func(ctx *fiber.Ctx) error {
 		log := zerolog.Ctx(ctx.UserContext())
 		log.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str(fieldKey, ctx.Path())
+			return c.Str(fieldKey, string(ctx.Request().URI().RequestURI()))
 		})
 		return ctx.Next()
 	}
