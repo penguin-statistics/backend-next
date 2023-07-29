@@ -19,6 +19,9 @@ COPY go.sum ./
 RUN go mod download
 COPY . .
 
+# add gcc for cgo
+RUN apk add --no-cache gcc musl-dev
+
 # inject versioning information & build the binary
 # appsec: datadog ASM
 RUN export BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ"); export CGO_ENABLED=1; go build -v -tags appsec -o backend -ldflags "-X exusiai.dev/backend-next/internal/pkg/bininfo.Version=$VERSION -X exusiai.dev/backend-next/internal/pkg/bininfo.BuildTime=$BUILD_TIME" .
