@@ -30,7 +30,7 @@ require (
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/oschwald/geoip2-golang v1.8.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.14.0
+	github.com/prometheus/client_golang v1.16.0
 	github.com/redis/go-redis/v9 v9.0.5
 	github.com/rs/xid v1.4.0
 	github.com/rs/zerolog v1.29.1
@@ -81,11 +81,11 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
-	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/philhofer/fwd v1.1.2 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
-	github.com/prometheus/common v0.37.0 // indirect
-	github.com/prometheus/procfs v0.8.0 // indirect
+	github.com/prometheus/common v0.42.0 // indirect
+	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/richardartoul/molecule v1.0.1-0.20221107223329-32cfee06a052 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
