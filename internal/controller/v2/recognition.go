@@ -40,7 +40,7 @@ type (
 		SessionID               string `json:"sessionId" validate:"required,len=8,alphanum"`
 	}
 	InitDefectReportRequest struct {
-		RecognitionResult json.RawMessage                    `json:"recognitionResult" validate:"required,dive"`
+		RecognitionResult json.RawMessage                    `json:"recognitionResult" validate:"dive"`
 		Environment       InitDefectReportRequestEnvironment `json:"environment" validate:"required,dive"`
 	}
 	InitDefectReportResponseUploadParams struct {
