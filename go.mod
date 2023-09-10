@@ -16,7 +16,7 @@ require (
 	github.com/go-playground/locales v0.14.1
 	github.com/go-playground/universal-translator v0.18.1
 	github.com/go-playground/validator/v10 v10.14.1
-	github.com/go-redsync/redsync/v4 v4.8.1
+	github.com/go-redsync/redsync/v4 v4.9.4
 	github.com/goccy/go-json v0.10.2
 	github.com/gofiber/contrib/fibersentry v1.0.4
 	github.com/gofiber/contrib/otelfiber v1.0.10
