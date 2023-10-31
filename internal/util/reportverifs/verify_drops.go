@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
@@ -12,7 +13,6 @@ import (
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/repo"
-	"exusiai.dev/gommon/constant"
 )
 
 var (
@@ -51,6 +51,8 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.ReportTaskSingl
 			Message:     err.Error(),
 		}
 	}
+
+	d.adjustDropInfosByTimes(itemDropInfos, typeDropInfos, report.Times)
 
 	if l := log.Trace(); l.Enabled() {
 		l.Interface("itemDropInfos", itemDropInfos).
@@ -116,6 +118,32 @@ func (d *DropVerifier) verifyDropType(report *types.ReportTaskSingleReport, drop
 	}
 
 	return errs
+}
+
+func (d *DropVerifier) adjustDropInfosByTimes(itemDropInfos []*model.DropInfo, typeDropInfos []*model.DropInfo, times int) {
+	dropTypeItemTypeCountMap := make(map[string]int)
+
+	for _, dropInfo := range itemDropInfos {
+		dropTypeItemTypeCountMap[dropInfo.DropType] += 1
+		dropInfo.Bounds.Lower *= times
+		dropInfo.Bounds.Upper *= times
+		if dropInfo.Bounds.Exceptions != nil {
+			dropInfo.Bounds.Exceptions = nil
+		}
+	}
+
+	for _, dropInfo := range typeDropInfos {
+		min := times
+		if dropTypeItemTypeCountMap[dropInfo.DropType] < min {
+			min = dropTypeItemTypeCountMap[dropInfo.DropType]
+		}
+		if min > dropInfo.Bounds.Upper {
+			dropInfo.Bounds.Upper = min
+		}
+		if dropInfo.Bounds.Exceptions != nil {
+			dropInfo.Bounds.Exceptions = nil
+		}
+	}
 }
 
 type DropInfoTuple struct {
