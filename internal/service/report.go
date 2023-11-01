@@ -244,12 +244,14 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 		return "", err
 	}
 
+	if req.Times == 0 {
+		req.Times = 1
+	}
 	singleReport := &types.ReportTaskSingleReport{
 		FragmentStageID: req.FragmentStageID,
 		Drops:           drops,
-		// for now, we do not support multiple report by specifying `times`
-		Times:    1,
-		Metadata: req.Metadata,
+		Times:           req.Times,
+		Metadata:        req.Metadata,
 	}
 
 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops

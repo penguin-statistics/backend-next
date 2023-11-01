@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
@@ -12,7 +13,6 @@ import (
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/repo"
-	"exusiai.dev/gommon/constant"
 )
 
 var (
@@ -51,6 +51,8 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.ReportTaskSingl
 			Message:     err.Error(),
 		}
 	}
+
+	d.adjustDropInfosByTimes(itemDropInfos, typeDropInfos, report.Times)
 
 	if l := log.Trace(); l.Enabled() {
 		l.Interface("itemDropInfos", itemDropInfos).
@@ -116,6 +118,38 @@ func (d *DropVerifier) verifyDropType(report *types.ReportTaskSingleReport, drop
 	}
 
 	return errs
+}
+
+func (d *DropVerifier) adjustDropInfosByTimes(itemDropInfos []*model.DropInfo, typeDropInfos []*model.DropInfo, times int) {
+	dropTypeItemTypeCountMap := make(map[string]int)
+
+	for _, dropInfo := range itemDropInfos {
+		dropTypeItemTypeCountMap[dropInfo.DropType] += 1
+		// for item drop info, we need to adjust multiple the original bounds by times
+		dropInfo.Bounds.Lower *= times
+		dropInfo.Bounds.Upper *= times
+		if dropInfo.Bounds.Exceptions != nil {
+			// Adjusting exceptions by times will make the range very complicated, so we just remove it
+			dropInfo.Bounds.Exceptions = nil
+		}
+	}
+
+	for _, dropInfo := range typeDropInfos {
+		// The lower bound remains the same, because no matter how many times you play, you can always get at least as many types as the lower bound
+		// For upper bound, if times < item_type_count_for_this_drop_type, it means it's impossible to get each type at least once, so we adjust upper bound to be max(oldUpper, times)
+		// if times > item_type_count_for_this_drop_type, it means you are able to get each type at lease once, so we adjust upper bound to be max(oldUpper, item_type_count_for_this_drop_type)
+		// newUpper = max(oldUpper, min(times, item_type_count_for_this_drop_type))
+		minBetweenTimesAndItemTypeCount := times
+		if dropTypeItemTypeCountMap[dropInfo.DropType] < minBetweenTimesAndItemTypeCount {
+			minBetweenTimesAndItemTypeCount = dropTypeItemTypeCountMap[dropInfo.DropType]
+		}
+		if minBetweenTimesAndItemTypeCount > dropInfo.Bounds.Upper {
+			dropInfo.Bounds.Upper = minBetweenTimesAndItemTypeCount
+		}
+		if dropInfo.Bounds.Exceptions != nil {
+			dropInfo.Bounds.Exceptions = nil
+		}
+	}
 }
 
 type DropInfoTuple struct {
