@@ -471,24 +471,30 @@ func (c *AdminController) RejectRulesReevaluationApply(ctx *fiber.Ctx) error {
 	changeSet := evaluation.ChangeSet()
 
 	err = c.DropReportRepo.DB.RunInTx(ctx.UserContext(), nil, func(ictx context.Context, tx bun.Tx) error {
-		for _, change := range changeSet {
+		chunks := lo.Chunk(changeSet, 100)
+		for _, changeChunk := range chunks {
 			log.Debug().
-				Str("evt.name", "admin.reject_rules.reevaluation.apply").
-				Int("report_id", change.ReportID).
-				Int("to_reliability", change.ToReliability).
-				Msg("applying reliability modification to report")
+				Str("evt.name", "admin.reject_rules.reevaluation.apply_chunk").
+				Int("chunk_size", len(changeChunk)).
+				Msg("applying reliability modification chunk to report")
+
+			data := lo.Map(changeChunk, func(change *service.RejectRulesReevaluationEvaluationResultSetDiff, _ int) *model.DropReport {
+				return &model.DropReport{
+					ReportID:    change.ReportID,
+					Reliability: change.ToReliability,
+				}
+			})
 
 			if _, err := tx.NewUpdate().
+				With("_data", tx.NewValues(&data)).
 				Model((*model.DropReport)(nil)).
-				Set("reliability = ?", change.ToReliability).
-				Where("report_id = ?", change.ReportID).
-				Bulk().
+				Set("reliability = _data.reliability").
+				Where("report_id = _data.report_id").
 				Exec(ictx); err != nil {
 				log.Error().
 					Err(err).
-					Str("evt.name", "admin.reject_rules.reevaluation.apply").
-					Int("report_id", change.ReportID).
-					Int("to_reliability", change.ToReliability).
+					Str("evt.name", "admin.reject_rules.reevaluation.apply_chunk").
+					Int("chunk_size", len(changeChunk)).
 					Msg("failed to apply reliability modification to report")
 
 				return err
