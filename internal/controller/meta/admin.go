@@ -618,6 +618,7 @@ func (c *AdminController) ExportDropReport(ctx *fiber.Ctx) error {
 		StageID        string    `json:"stageId" validate:"required" required:"true"`
 		ItemIDs        []string  `json:"itemIds"`
 		IsPersonal     null.Bool `json:"isPersonal" swaggertype:"boolean"`
+		AccountID      string    `json:"accountId"`
 		SourceCategory string    `json:"sourceCategory" validate:"omitempty,sourcecategory"`
 		StartTime      int64     `json:"start" swaggertype:"integer"`
 		EndTime        int64     `json:"end" validate:"omitempty,gtfield=StartTime" swaggertype:"integer"`
@@ -630,7 +631,7 @@ func (c *AdminController) ExportDropReport(ctx *fiber.Ctx) error {
 	// handle account id
 	accountId := null.NewInt(0, false)
 	if request.IsPersonal.Bool {
-		account, err := c.AccountService.GetAccountFromRequest(ctx)
+		account, err := c.AccountService.GetAccountByPenguinId(ctx.UserContext(), request.AccountID)
 		if err != nil {
 			return err
 		}
