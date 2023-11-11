@@ -14,6 +14,7 @@ type DropReportQueryContext struct {
 	StageItemFilter    *map[int][]int `json:"stageItemFilter"`
 	SourceCategory     string         `json:"sourceCategory"`
 	ExcludeNonOneTimes bool           `json:"excludeNonOneTimes"`
+	Times              null.Int       `json:"times"`
 }
 
 func (queryCtx *DropReportQueryContext) GetStageIds() []int {

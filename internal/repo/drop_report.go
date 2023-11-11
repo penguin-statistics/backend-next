@@ -280,7 +280,7 @@ func (s *DropReport) GetDropReports(ctx context.Context, queryCtx *model.DropRep
 	results := make([]*model.DropReport, 0)
 	query := s.DB.NewSelect().
 		TableExpr("drop_reports AS dr").
-		Column("pattern_id", "created_at", "account_id", "source_name", "version").
+		Column("pattern_id", "created_at", "account_id", "source_name", "version", "times").
 		Order("created_at")
 	s.handleServer(query, queryCtx.Server)
 	s.handleCreatedAtWithTime(query, queryCtx.StartTime, queryCtx.EndTime)
@@ -294,6 +294,12 @@ func (s *DropReport) GetDropReports(ctx context.Context, queryCtx *model.DropRep
 
 	s.handleAccountAndReliability(query, queryCtx.AccountID)
 	s.handleSourceName(query, queryCtx.SourceCategory)
+
+	if queryCtx.ExcludeNonOneTimes {
+		s.handleTimes(query, 1)
+	} else if queryCtx.Times.Valid {
+		s.handleTimes(query, int(queryCtx.Times.Int64))
+	}
 
 	if err := query.
 		Scan(ctx, &results); err != nil {

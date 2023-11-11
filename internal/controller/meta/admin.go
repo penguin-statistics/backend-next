@@ -622,6 +622,7 @@ func (c *AdminController) ExportDropReport(ctx *fiber.Ctx) error {
 		SourceCategory string    `json:"sourceCategory" validate:"omitempty,sourcecategory"`
 		StartTime      int64     `json:"start" swaggertype:"integer"`
 		EndTime        int64     `json:"end" validate:"omitempty,gtfield=StartTime" swaggertype:"integer"`
+		Times          int       `json:"times" validate:"gte=0,lte=6"`
 	}
 	var request exportDropReportRequest
 	if err := rekuest.ValidBody(ctx, &request); err != nil {
@@ -675,7 +676,16 @@ func (c *AdminController) ExportDropReport(ctx *fiber.Ctx) error {
 		sourceCategory = constant.SourceCategoryAll
 	}
 
-	result, err := c.ExportService.ExportDropReportsAndPatterns(ctx.UserContext(), request.Server, &startTime, &endTime, stage.StageID, itemIds, accountId, request.SourceCategory)
+	// handle times, 0 means no filter on times
+	var times null.Int
+	if request.Times != 0 {
+		times.Int64 = int64(request.Times)
+		times.Valid = true
+	} else {
+		times.Valid = false
+	}
+
+	result, err := c.ExportService.ExportDropReportsAndPatterns(ctx.UserContext(), request.Server, &startTime, &endTime, times, stage.StageID, itemIds, accountId, request.SourceCategory)
 	if err != nil {
 		return err
 	}
