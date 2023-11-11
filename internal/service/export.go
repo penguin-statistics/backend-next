@@ -50,6 +50,7 @@ func (s *Export) ExportDropReportsAndPatterns(
 	dropReportForExportList := make([]*model.DropReportForExport, 0)
 	for _, dropReport := range dropReports {
 		dropReportForExportList = append(dropReportForExportList, &model.DropReportForExport{
+			Times:      dropReport.Times,
 			PatternID:  dropReport.PatternID,
 			CreatedAt:  dropReport.CreatedAt.UnixMilli(),
 			AccountID:  dropReport.AccountID,
