@@ -6,6 +6,7 @@ type ExportDropReportsAndPatternsResult struct {
 }
 
 type DropReportForExport struct {
+	Times      int    `json:"times"`
 	PatternID  int    `json:"pattern_id"`
 	CreatedAt  int64  `json:"created_at"`
 	AccountID  int    `json:"account_id"`
