@@ -8,6 +8,10 @@ import (
 	"time"
 
 	"exusiai.dev/gommon/constant"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
@@ -15,22 +19,29 @@ import (
 	"exusiai.dev/backend-next/internal/model"
 )
 
-type Archive struct {
+type DropReportArchive struct {
 	DropReportService *DropReport
-	S3Service         *S3
 	Config            *appconfig.Config
+
+	Uploader *s3manager.Uploader
 }
 
-func NewArchive(dropReportService *DropReport, s3Service *S3, config *appconfig.Config) *Archive {
-	return &Archive{
+func NewDropReportArchive(dropReportService *DropReport, config *appconfig.Config) *DropReportArchive {
+	awsConfig := aws.NewConfig().
+		WithCredentials(credentials.NewStaticCredentials(config.AWSAccessKey, config.AWSSecretKey, "")).
+		WithRegion(config.DropReportArchiveS3Region)
+	sess := session.Must(session.NewSession(awsConfig))
+	uploader := s3manager.NewUploader(sess)
+
+	return &DropReportArchive{
 		DropReportService: dropReportService,
-		S3Service:         s3Service,
 		Config:            config,
+		Uploader:          uploader,
 	}
 }
 
-func (s Archive) ArchiveDropReports(ctx context.Context, server string, date *time.Time) error {
-	loc := constant.LocMap[server]
+func (s DropReportArchive) ArchiveDropReports(ctx context.Context, date *time.Time) error {
+	loc := constant.LocMap["CN"] // we use CN server's day start time as the day start time for all servers for archive
 	localT := date.In(loc)
 	filePrefix := os.TempDir() + "/penguin_drop_report_archive"
 	if _, err := os.Stat(filePrefix); os.IsNotExist(err) {
@@ -39,7 +50,7 @@ func (s Archive) ArchiveDropReports(ctx context.Context, server string, date *ti
 			return errors.Wrap(err, "failed to create directory "+filePrefix)
 		}
 	}
-	fileName := "drop_reports_" + server + "_" + localT.Format("2006-01-02") + ".jsonl.gz"
+	fileName := "drop_reports_" + localT.Format("2006-01-02") + ".jsonl.gz"
 	localFilePath := filePrefix + "/" + fileName
 
 	if err := s.writeDropReportArchiveFile(ctx, date, localFilePath); err != nil {
@@ -48,7 +59,7 @@ func (s Archive) ArchiveDropReports(ctx context.Context, server string, date *ti
 
 	log.Info().Str("localFilePath", localFilePath).Str("fileName", fileName).Msg("uploading file to s3")
 
-	if err := s.S3Service.UploadFileToS3(ctx, s.Config.DropReportArchiveS3Bucket, localFilePath, fileName); err != nil {
+	if err := s.uploadFileToS3(ctx, s.Config.DropReportArchiveS3Bucket, localFilePath, fileName); err != nil {
 		return errors.Wrap(err, "failed to UploadFileToS3")
 	}
 
@@ -59,7 +70,7 @@ func (s Archive) ArchiveDropReports(ctx context.Context, server string, date *ti
 	return nil
 }
 
-func (s Archive) writeDropReportArchiveFile(ctx context.Context, date *time.Time, localFilePath string) error {
+func (s DropReportArchive) writeDropReportArchiveFile(ctx context.Context, date *time.Time, localFilePath string) error {
 	// If the file exists, delete it
 	if _, err := os.Stat(localFilePath); err == nil {
 		err = os.Remove(localFilePath)
@@ -79,8 +90,9 @@ func (s Archive) writeDropReportArchiveFile(ctx context.Context, date *time.Time
 	var reports []*model.DropReport
 	var cursor model.Cursor
 	page := 0
+	totalCount := 0
 	for {
-		reports, cursor, err = s.DropReportService.GetDropReportsForArchive(ctx, &cursor, "CN", date, 10000)
+		reports, cursor, err = s.DropReportService.GetDropReportsForArchive(ctx, &cursor, date, 10000)
 		if err != nil {
 			return errors.Wrap(err, "failed to GetDropReportsForArchive")
 		}
@@ -90,6 +102,7 @@ func (s Archive) writeDropReportArchiveFile(ctx context.Context, date *time.Time
 		log.Info().Int("page", page).Int("cursor_start", cursor.Start).Int("cursor_end", cursor.End).Int("count", len(reports)).Msg("got reports")
 		cursor.Start = cursor.End
 		page++
+		totalCount += len(reports)
 
 		for _, report := range reports {
 			jsonBytes, err := json.Marshal(report)
@@ -105,5 +118,26 @@ func (s Archive) writeDropReportArchiveFile(ctx context.Context, date *time.Time
 	}
 	gw.Close()
 	file.Close()
+	log.Info().Int("total_count", totalCount).Msg("finished writing file")
+	return nil
+}
+
+func (s DropReportArchive) uploadFileToS3(ctx context.Context, bucket string, localFilePath string, remoteFileKey string) error {
+	f, err := os.Open(localFilePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	result, err := s.Uploader.UploadWithContext(ctx, &s3manager.UploadInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String("v1/" + remoteFileKey),
+		Body:   f,
+	})
+	if err != nil {
+		return err
+	}
+
+	log.Info().Str("location", result.Location).Msg("Successfully uploaded")
 	return nil
 }
