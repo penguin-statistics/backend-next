@@ -108,3 +108,9 @@ func (s *DropReport) GetDropReports(
 ) ([]*model.DropReport, error) {
 	return s.DropReportRepo.GetDropReports(ctx, queryCtx)
 }
+
+// Archive
+
+func (s *DropReport) GetDropReportsForArchive(ctx context.Context, cursor *model.Cursor, server string, date *time.Time, limit int) ([]*model.DropReport, model.Cursor, error) {
+	return s.DropReportRepo.GetDropReportsForArchive(ctx, cursor, server, date, limit)
+}

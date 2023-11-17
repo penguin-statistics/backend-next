@@ -113,6 +113,7 @@ func (s *DropMatrix) RunCalcDropMatrixJob(ctx context.Context, server string) er
 	}
 
 	// If this is the first time we run the job for this server at this day, we need to update the drop matrix for the previous day.
+	// TODO: archive all drop reports for the today-60d and upload to s3
 	if !exists {
 		yesterday := date.Add(time.Hour * -24)
 		dropMatrixElementsForYesterday, err := s.calcDropMatrixByGivenDate(ctx, server, &yesterday, nil, s.Config.MatrixWorkerSourceCategories)
