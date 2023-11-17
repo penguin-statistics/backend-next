@@ -5,6 +5,7 @@ import (
 	"go.uber.org/fx"
 
 	cliapp "exusiai.dev/backend-next/cmd/app/cli"
+	script_archive_drop_reports "exusiai.dev/backend-next/cmd/app/cli/runscript/scripts/archive_drop_reports"
 	script_migrate_drop_report_extras_cols "exusiai.dev/backend-next/cmd/app/cli/runscript/scripts/at20230110-migrate_drop_report_extras_cols"
 )
 
@@ -22,6 +23,7 @@ func Command() *cli.Command {
 		Description: "run maintenance go scripts",
 		Subcommands: []*cli.Command{
 			script_migrate_drop_report_extras_cols.Command(depsFn[script_migrate_drop_report_extras_cols.CommandDeps]()),
+			script_archive_drop_reports.Command(depsFn[script_archive_drop_reports.CommandDeps]()),
 		},
 	}
 }

@@ -129,6 +129,11 @@ type ConfigSpec struct {
 
 	// For PatternMatrix query api, if showAllPatterns is false, then only show the top 50 patterns for all stages
 	PatternMatrixLimit int `split_words:"true" default:"19"`
+
+	DropReportArchiveS3Bucket string `required:"true" split_words:"true" default:"penguin-stats-drop-report-archive"`
+	DropReportArchiveS3Region string `required:"true" split_words:"true" default:"ap-southeast-1"`
+	AWSAccessKey              string `required:"true" split_words:"true"`
+	AWSSecretKey              string `required:"true" split_words:"true"`
 }
 
 type Config struct {
