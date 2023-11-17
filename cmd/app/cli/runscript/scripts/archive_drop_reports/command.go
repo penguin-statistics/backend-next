@@ -10,7 +10,7 @@ import (
 type CommandDeps struct {
 	fx.In
 
-	ArchiveService *service.Archive
+	DropReportArchiveService *service.DropReportArchive
 }
 
 func Command(depsFn func() CommandDeps) *cli.Command {
