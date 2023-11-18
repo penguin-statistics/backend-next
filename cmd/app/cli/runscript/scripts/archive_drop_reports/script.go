@@ -24,10 +24,10 @@ func run(deps CommandDeps) error {
 func archiveDropReports(deps CommandDeps) error {
 	ctx := context.Background()
 
-	// start := time.UnixMilli(1664294400000)
-	start := time.UnixMilli(1558108800000)
+	start := time.UnixMilli(1664294400000)
+	// start := time.UnixMilli(1558108800000)
 
-	err := deps.DropReportArchiveService.ArchiveDropReports(ctx, &start)
+	err := deps.DropReportArchiveService.Archive(ctx, &start)
 	if err != nil {
 		return errors.Wrap(err, "failed to ArchiveDropReports")
 	}
