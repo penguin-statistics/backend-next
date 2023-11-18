@@ -20,13 +20,14 @@ import (
 )
 
 type DropReportArchive struct {
-	DropReportService *DropReport
-	Config            *appconfig.Config
+	DropReportService      *DropReport
+	DropReportExtraService *DropReportExtra
+	Config                 *appconfig.Config
 
 	Uploader *s3manager.Uploader
 }
 
-func NewDropReportArchive(dropReportService *DropReport, config *appconfig.Config) *DropReportArchive {
+func NewDropReportArchive(dropReportService *DropReport, dropReportExtraService *DropReportExtra, config *appconfig.Config) *DropReportArchive {
 	awsConfig := aws.NewConfig().
 		WithCredentials(credentials.NewStaticCredentials(config.AWSAccessKey, config.AWSSecretKey, "")).
 		WithRegion(config.DropReportArchiveS3Region)
@@ -34,33 +35,75 @@ func NewDropReportArchive(dropReportService *DropReport, config *appconfig.Confi
 	uploader := s3manager.NewUploader(sess)
 
 	return &DropReportArchive{
-		DropReportService: dropReportService,
-		Config:            config,
-		Uploader:          uploader,
+		DropReportService:      dropReportService,
+		DropReportExtraService: dropReportExtraService,
+		Config:                 config,
+		Uploader:               uploader,
 	}
 }
 
-func (s DropReportArchive) ArchiveDropReports(ctx context.Context, date *time.Time) error {
+func (s DropReportArchive) Archive(ctx context.Context, date *time.Time) error {
 	loc := constant.LocMap["CN"] // we use CN server's day start time as the day start time for all servers for archive
 	localT := date.In(loc)
 	filePrefix := os.TempDir() + "/penguin_drop_report_archive"
-	if _, err := os.Stat(filePrefix); os.IsNotExist(err) {
-		err = os.Mkdir(filePrefix, 0755)
+	if _, err := os.Stat(filePrefix + "/drop_reports"); os.IsNotExist(err) {
+		err = os.Mkdir(filePrefix+"/drop_reports", 0755)
 		if err != nil {
-			return errors.Wrap(err, "failed to create directory "+filePrefix)
+			return errors.Wrap(err, "failed to create directory "+filePrefix+"/drop_reports")
 		}
 	}
-	fileName := "drop_reports_" + localT.Format("2006-01-02") + ".jsonl.gz"
-	localFilePath := filePrefix + "/" + fileName
+	if _, err := os.Stat(filePrefix + "/drop_report_extras"); os.IsNotExist(err) {
+		err = os.Mkdir(filePrefix+"/drop_report_extras", 0755)
+		if err != nil {
+			return errors.Wrap(err, "failed to create directory "+filePrefix+"/drop_report_extras")
+		}
+	}
 
-	if err := s.writeDropReportArchiveFile(ctx, date, localFilePath); err != nil {
-		return errors.Wrap(err, "failed to writeDropReportArchiveFile")
+	fileNameForReports := "drop_reports/drop_reports_" + localT.Format("2006-01-02") + ".jsonl.gz"
+	localFilePathForReports := filePrefix + "/" + fileNameForReports
+	firstId, lastId, err := s.writeDropReportArchiveFileAndUpload(ctx, date, localFilePathForReports, fileNameForReports)
+	if err != nil {
+		return errors.Wrap(err, "failed to writeFileAndUpload for drop reports")
+	}
+	log.Info().Int("first_id", firstId).Int("last_id", lastId).Msg("first and last id for drop reports")
+
+	fileNameForExtras := "drop_report_extras/drop_report_extras_" + localT.Format("2006-01-02") + ".jsonl.gz"
+	localFilePathForExtras := filePrefix + "/" + fileNameForExtras
+	if err := s.writeDropReportExtraArchiveFileAndUpload(ctx, firstId, lastId, localFilePathForExtras, fileNameForExtras); err != nil {
+		return errors.Wrap(err, "failed to writeArchiveFile for drop report extras")
+	}
+
+	// TODO: delete drop reports and extras from database
+
+	return nil
+}
+
+func (s DropReportArchive) writeDropReportArchiveFileAndUpload(ctx context.Context, date *time.Time, localFilePath string, fileName string) (int, int, error) {
+	firstId, lastId, err := s.writeDropReportArchiveFile(ctx, date, localFilePath)
+	if err != nil {
+		return firstId, lastId, err
 	}
 
 	log.Info().Str("localFilePath", localFilePath).Str("fileName", fileName).Msg("uploading file to s3")
-
 	if err := s.uploadFileToS3(ctx, s.Config.DropReportArchiveS3Bucket, localFilePath, fileName); err != nil {
-		return errors.Wrap(err, "failed to UploadFileToS3")
+		return firstId, lastId, err
+	}
+
+	if err := os.Remove(localFilePath); err != nil {
+		return firstId, lastId, errors.Wrap(err, "failed to remove file "+localFilePath)
+	}
+
+	return firstId, lastId, nil
+}
+
+func (s DropReportArchive) writeDropReportExtraArchiveFileAndUpload(ctx context.Context, idInclusiveStart int, idInclusiveEnd int, localFilePath string, fileName string) error {
+	if err := s.writeDropReportExtraArchiveFile(ctx, idInclusiveStart, idInclusiveEnd, localFilePath); err != nil {
+		return err
+	}
+
+	log.Info().Str("localFilePath", localFilePath).Str("fileName", fileName).Msg("uploading file to s3")
+	if err := s.uploadFileToS3(ctx, s.Config.DropReportArchiveS3Bucket, localFilePath, fileName); err != nil {
+		return err
 	}
 
 	if err := os.Remove(localFilePath); err != nil {
@@ -70,7 +113,67 @@ func (s DropReportArchive) ArchiveDropReports(ctx context.Context, date *time.Ti
 	return nil
 }
 
-func (s DropReportArchive) writeDropReportArchiveFile(ctx context.Context, date *time.Time, localFilePath string) error {
+func (s DropReportArchive) writeDropReportArchiveFile(ctx context.Context, date *time.Time, localFilePath string) (int, int, error) {
+	// If the file exists, delete it
+	if _, err := os.Stat(localFilePath); err == nil {
+		err = os.Remove(localFilePath)
+		if err != nil {
+			return 0, 0, errors.Wrap(err, "failed to remove existing file "+localFilePath)
+		}
+	}
+
+	file, err := os.Create(localFilePath)
+	if err != nil {
+		return 0, 0, errors.Wrap(err, "failed to create file "+localFilePath)
+	}
+
+	// Create a new gzip writer
+	gw := gzip.NewWriter(file)
+
+	var dropReports []*model.DropReport
+	var cursor model.Cursor
+	page := 0
+	totalCount := 0
+	firstId := 0
+	lastId := 0
+	for {
+		dropReports, cursor, err = s.DropReportService.GetDropReportsForArchive(ctx, &cursor, date, 10000)
+		if err != nil {
+			return 0, 0, errors.Wrap(err, "failed to extract drop reports")
+		}
+		if firstId == 0 {
+			firstId = cursor.Start
+		}
+		if cursor.End != 0 {
+			lastId = cursor.End
+		}
+		if len(dropReports) == 0 {
+			break
+		}
+		log.Info().Int("page", page).Int("cursor_start", cursor.Start).Int("cursor_end", cursor.End).Int("count", len(dropReports)).Msg("got drop reports")
+		cursor.Start = cursor.End
+		page++
+		totalCount += len(dropReports)
+
+		for _, dropReport := range dropReports {
+			jsonBytes, err := json.Marshal(dropReport)
+			if err != nil {
+				return 0, 0, errors.Wrap(err, "failed to Marshal dropReport")
+			}
+			jsonBytes = append(jsonBytes, '\n')
+			_, err = gw.Write(jsonBytes)
+			if err != nil {
+				return 0, 0, errors.Wrap(err, "failed to Write jsonStr")
+			}
+		}
+	}
+	gw.Close()
+	file.Close()
+	log.Info().Int("total_count", totalCount).Msg("finished writing drop reports archive file")
+	return firstId, lastId, nil
+}
+
+func (s DropReportArchive) writeDropReportExtraArchiveFile(ctx context.Context, idInclusiveStart int, idInclusiveEnd int, localFilePath string) error {
 	// If the file exists, delete it
 	if _, err := os.Stat(localFilePath); err == nil {
 		err = os.Remove(localFilePath)
@@ -87,27 +190,27 @@ func (s DropReportArchive) writeDropReportArchiveFile(ctx context.Context, date 
 	// Create a new gzip writer
 	gw := gzip.NewWriter(file)
 
-	var reports []*model.DropReport
+	var extras []*model.DropReportExtra
 	var cursor model.Cursor
 	page := 0
 	totalCount := 0
 	for {
-		reports, cursor, err = s.DropReportService.GetDropReportsForArchive(ctx, &cursor, date, 10000)
+		extras, cursor, err = s.DropReportExtraService.GetDropReportExtraForArchive(ctx, &cursor, idInclusiveStart, idInclusiveEnd, 10000)
 		if err != nil {
-			return errors.Wrap(err, "failed to GetDropReportsForArchive")
+			return errors.Wrap(err, "failed to extract drop report extras")
 		}
-		if len(reports) == 0 {
+		if len(extras) == 0 {
 			break
 		}
-		log.Info().Int("page", page).Int("cursor_start", cursor.Start).Int("cursor_end", cursor.End).Int("count", len(reports)).Msg("got reports")
+		log.Info().Int("page", page).Int("cursor_start", cursor.Start).Int("cursor_end", cursor.End).Int("count", len(extras)).Msg("got extras")
 		cursor.Start = cursor.End
 		page++
-		totalCount += len(reports)
+		totalCount += len(extras)
 
-		for _, report := range reports {
-			jsonBytes, err := json.Marshal(report)
+		for _, extra := range extras {
+			jsonBytes, err := json.Marshal(extra)
 			if err != nil {
-				return errors.Wrap(err, "failed to Marshal report")
+				return errors.Wrap(err, "failed to Marshal drop report extra")
 			}
 			jsonBytes = append(jsonBytes, '\n')
 			_, err = gw.Write(jsonBytes)
@@ -118,7 +221,7 @@ func (s DropReportArchive) writeDropReportArchiveFile(ctx context.Context, date 
 	}
 	gw.Close()
 	file.Close()
-	log.Info().Int("total_count", totalCount).Msg("finished writing file")
+	log.Info().Int("total_count", totalCount).Msg("finished writing drop report extras archive file")
 	return nil
 }
 
