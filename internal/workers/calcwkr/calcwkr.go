@@ -18,11 +18,12 @@ import (
 
 type WorkerDeps struct {
 	fx.In
-	DropMatrixService    *service.DropMatrix
-	PatternMatrixService *service.PatternMatrix
-	TrendService         *service.Trend
-	SiteStatsService     *service.SiteStats
-	RedSync              *redsync.Redsync
+	DropMatrixService        *service.DropMatrix
+	PatternMatrixService     *service.PatternMatrix
+	TrendService             *service.Trend
+	SiteStatsService         *service.SiteStats
+	DropReportArchiveService *service.DropReportArchive
+	RedSync                  *redsync.Redsync
 }
 
 type Worker struct {
@@ -123,6 +124,16 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 			return err
 		}); err != nil {
 			return err
+		}
+
+		if server == "CN" {
+			// Archive
+			if err = w.microtask(ctx, "archive", server, func() error {
+				err := w.DropReportArchiveService.RunArchiveJob(ctx)
+				return err
+			}); err != nil {
+				return err
+			}
 		}
 
 		return nil

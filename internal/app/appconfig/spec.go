@@ -135,6 +135,8 @@ type ConfigSpec struct {
 	DropReportArchiveS3Region string `required:"true" split_words:"true" default:"ap-southeast-1"`
 	AWSAccessKey              string `required:"true" split_words:"true"`
 	AWSSecretKey              string `required:"true" split_words:"true"`
+
+	NotArchiveDays int `split_words:"true" default:"60"`
 }
 
 type Config struct {
