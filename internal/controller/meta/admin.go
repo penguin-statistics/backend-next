@@ -56,6 +56,7 @@ type AdminController struct {
 	TimeRangeService         *service.TimeRange
 	ExportService            *service.Export
 	AccountService           *service.Account
+	DropReportArchiveService *service.DropReportArchive
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
@@ -86,6 +87,8 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Post("/export/drop-report", c.ExportDropReport)
 
 	admin.Post("/snapshots", c.CreateSnapshot)
+
+	admin.Post("/archive", c.ArchiveDropReports)
 }
 
 type CliGameDataSeedResponse struct {
@@ -703,4 +706,22 @@ func (c *AdminController) CloneFromCN(ctx *fiber.Ctx) error {
 		return err
 	}
 	return ctx.SendStatus(fiber.StatusCreated)
+}
+
+func (c *AdminController) ArchiveDropReports(ctx *fiber.Ctx) error {
+	var request types.ArchiveDropReportRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	date, err := time.Parse("2006-01-02", request.Date)
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).SendString("invalid date")
+	}
+
+	err = c.DropReportArchiveService.Archive(ctx.UserContext(), &date)
+	if err != nil {
+		return err
+	}
+	return ctx.SendStatus(fiber.StatusOK)
 }
