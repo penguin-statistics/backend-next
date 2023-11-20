@@ -17,8 +17,17 @@ func Command(depsFn func() CommandDeps) *cli.Command {
 	return &cli.Command{
 		Name:        "archive_drop_reports",
 		Description: "archive one day's drop reports to S3",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "date",
+				Aliases:  []string{"d"},
+				Usage:    "date to archive in GMT+8, in format of YYYY-MM-DD",
+				Required: true,
+			},
+		},
 		Action: func(ctx *cli.Context) error {
-			return run(depsFn())
+			date := ctx.String("date")
+			return run(depsFn(), date)
 		},
 	}
 }

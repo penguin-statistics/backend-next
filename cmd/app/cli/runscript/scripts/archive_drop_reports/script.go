@@ -8,11 +8,17 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func run(deps CommandDeps) error {
-	log.Info().Interface("deps", deps).Msg("running script")
+func run(deps CommandDeps, dateStr string) error {
+	log.Info().Interface("deps", deps).Str("date", dateStr).Msg("running script")
 
 	var err error
-	if err = archiveDropReports(deps); err != nil {
+
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse date")
+	}
+
+	if err = archiveDropReports(deps, date); err != nil {
 		return errors.Wrap(err, "failed to run archiveDropReports")
 	}
 
@@ -21,13 +27,10 @@ func run(deps CommandDeps) error {
 	return nil
 }
 
-func archiveDropReports(deps CommandDeps) error {
+func archiveDropReports(deps CommandDeps, date time.Time) error {
 	ctx := context.Background()
 
-	start := time.UnixMilli(1664294400000)
-	// start := time.UnixMilli(1558108800000)
-
-	err := deps.DropReportArchiveService.Archive(ctx, &start)
+	err := deps.DropReportArchiveService.Archive(ctx, &date)
 	if err != nil {
 		return errors.Wrap(err, "failed to ArchiveDropReports")
 	}
