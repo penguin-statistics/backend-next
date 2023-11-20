@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"sync"
 	"time"
 
 	"exusiai.dev/gommon/constant"
@@ -26,8 +27,9 @@ type DropReportArchive struct {
 	DropReportExtraService *DropReportExtra
 	Config                 *appconfig.Config
 
-	Uploader *s3manager.Uploader
-	S3Client *s3.S3
+	uploader     *s3manager.Uploader
+	s3Client     *s3.S3
+	archiveMutex sync.Mutex
 }
 
 func NewDropReportArchive(dropReportService *DropReport, dropReportExtraService *DropReportExtra, config *appconfig.Config) *DropReportArchive {
@@ -42,12 +44,12 @@ func NewDropReportArchive(dropReportService *DropReport, dropReportExtraService 
 		DropReportService:      dropReportService,
 		DropReportExtraService: dropReportExtraService,
 		Config:                 config,
-		Uploader:               uploader,
-		S3Client:               s3client,
+		uploader:               uploader,
+		s3Client:               s3client,
 	}
 }
 
-func (s DropReportArchive) RunArchiveJob(ctx context.Context) error {
+func (s *DropReportArchive) RunArchiveJob(ctx context.Context) error {
 	targetDay := time.Now().AddDate(0, 0, -1*s.Config.NotArchiveDays)
 	localT := getLocalTimeForArchive(targetDay)
 
@@ -76,7 +78,10 @@ func (s DropReportArchive) RunArchiveJob(ctx context.Context) error {
 	return nil
 }
 
-func (s DropReportArchive) Archive(ctx context.Context, date *time.Time) error {
+func (s *DropReportArchive) Archive(ctx context.Context, date *time.Time) error {
+	s.archiveMutex.Lock()
+	defer s.archiveMutex.Unlock()
+
 	filePrefix := os.TempDir() + "/penguin_drop_report_archive"
 	if _, err := os.Stat(filePrefix + "/drop_reports"); os.IsNotExist(err) {
 		err = os.Mkdir(filePrefix+"/drop_reports", 0755)
@@ -125,7 +130,7 @@ func getLocalTimeForArchive(time time.Time) time.Time {
 	return time.In(loc)
 }
 
-func (s DropReportArchive) writeDropReportArchiveFileAndUpload(ctx context.Context, date *time.Time, localFilePath string, fileName string) (int, int, error) {
+func (s *DropReportArchive) writeDropReportArchiveFileAndUpload(ctx context.Context, date *time.Time, localFilePath string, fileName string) (int, int, error) {
 	firstId, lastId, err := s.writeDropReportArchiveFile(ctx, date, localFilePath)
 	if err != nil {
 		return firstId, lastId, err
@@ -143,7 +148,7 @@ func (s DropReportArchive) writeDropReportArchiveFileAndUpload(ctx context.Conte
 	return firstId, lastId, nil
 }
 
-func (s DropReportArchive) writeDropReportExtraArchiveFileAndUpload(ctx context.Context, idInclusiveStart int, idInclusiveEnd int, localFilePath string, fileName string) error {
+func (s *DropReportArchive) writeDropReportExtraArchiveFileAndUpload(ctx context.Context, idInclusiveStart int, idInclusiveEnd int, localFilePath string, fileName string) error {
 	if err := s.writeDropReportExtraArchiveFile(ctx, idInclusiveStart, idInclusiveEnd, localFilePath); err != nil {
 		return err
 	}
@@ -160,7 +165,7 @@ func (s DropReportArchive) writeDropReportExtraArchiveFileAndUpload(ctx context.
 	return nil
 }
 
-func (s DropReportArchive) writeDropReportArchiveFile(ctx context.Context, date *time.Time, localFilePath string) (int, int, error) {
+func (s *DropReportArchive) writeDropReportArchiveFile(ctx context.Context, date *time.Time, localFilePath string) (int, int, error) {
 	// If the file exists, delete it
 	if _, err := os.Stat(localFilePath); err == nil {
 		err = os.Remove(localFilePath)
@@ -220,7 +225,7 @@ func (s DropReportArchive) writeDropReportArchiveFile(ctx context.Context, date 
 	return firstId, lastId, nil
 }
 
-func (s DropReportArchive) writeDropReportExtraArchiveFile(ctx context.Context, idInclusiveStart int, idInclusiveEnd int, localFilePath string) error {
+func (s *DropReportArchive) writeDropReportExtraArchiveFile(ctx context.Context, idInclusiveStart int, idInclusiveEnd int, localFilePath string) error {
 	// If the file exists, delete it
 	if _, err := os.Stat(localFilePath); err == nil {
 		err = os.Remove(localFilePath)
@@ -272,14 +277,14 @@ func (s DropReportArchive) writeDropReportExtraArchiveFile(ctx context.Context, 
 	return nil
 }
 
-func (s DropReportArchive) uploadFileToS3(ctx context.Context, bucket string, localFilePath string, remoteFileKey string) error {
+func (s *DropReportArchive) uploadFileToS3(ctx context.Context, bucket string, localFilePath string, remoteFileKey string) error {
 	f, err := os.Open(localFilePath)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	result, err := s.Uploader.UploadWithContext(ctx, &s3manager.UploadInput{
+	result, err := s.uploader.UploadWithContext(ctx, &s3manager.UploadInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String("v1/" + remoteFileKey),
 		Body:   f,
@@ -292,8 +297,8 @@ func (s DropReportArchive) uploadFileToS3(ctx context.Context, bucket string, lo
 	return nil
 }
 
-func (s DropReportArchive) fileExistsInS3(ctx context.Context, bucket string, remoteFileKey string) (bool, error) {
-	_, err := s.S3Client.HeadObjectWithContext(ctx, &s3.HeadObjectInput{
+func (s *DropReportArchive) fileExistsInS3(ctx context.Context, bucket string, remoteFileKey string) (bool, error) {
+	_, err := s.s3Client.HeadObjectWithContext(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String("v1/" + remoteFileKey),
 	})
