@@ -9,8 +9,10 @@ import (
 
 	"exusiai.dev/gommon/constant"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -25,6 +27,7 @@ type DropReportArchive struct {
 	Config                 *appconfig.Config
 
 	Uploader *s3manager.Uploader
+	S3Client *s3.S3
 }
 
 func NewDropReportArchive(dropReportService *DropReport, dropReportExtraService *DropReportExtra, config *appconfig.Config) *DropReportArchive {
@@ -33,18 +36,47 @@ func NewDropReportArchive(dropReportService *DropReport, dropReportExtraService 
 		WithRegion(config.DropReportArchiveS3Region)
 	sess := session.Must(session.NewSession(awsConfig))
 	uploader := s3manager.NewUploader(sess)
+	s3client := s3.New(sess)
 
 	return &DropReportArchive{
 		DropReportService:      dropReportService,
 		DropReportExtraService: dropReportExtraService,
 		Config:                 config,
 		Uploader:               uploader,
+		S3Client:               s3client,
 	}
 }
 
+func (s DropReportArchive) RunArchiveJob(ctx context.Context) error {
+	targetDay := time.Now().AddDate(0, 0, -1*s.Config.NotArchiveDays)
+	localT := getLocalTimeForArchive(targetDay)
+
+	fileNameForReports := getFileNameForDropReportArhive(localT)
+	fileNameForExtras := getFileNameForDropReportArhiveExtra(localT)
+
+	reportExists, err := s.fileExistsInS3(ctx, s.Config.DropReportArchiveS3Bucket, fileNameForReports)
+	if err != nil {
+		return errors.Wrap(err, "failed to check if file exists in s3")
+	}
+	extraExists, err := s.fileExistsInS3(ctx, s.Config.DropReportArchiveS3Bucket, fileNameForExtras)
+	if err != nil {
+		return errors.Wrap(err, "failed to check if file exists in s3")
+	}
+	log.Info().Bool("report_exists", reportExists).Bool("extra_exists", extraExists).Str("target_day_CN", localT.Format("2006-01-02")).Msg("checking if archive files exist in s3")
+
+	if reportExists && extraExists {
+		log.Info().Msg("archive files already exist in s3")
+		return nil
+	}
+
+	if err := s.Archive(ctx, &targetDay); err != nil {
+		return errors.Wrap(err, "failed to Archive")
+	}
+
+	return nil
+}
+
 func (s DropReportArchive) Archive(ctx context.Context, date *time.Time) error {
-	loc := constant.LocMap["CN"] // we use CN server's day start time as the day start time for all servers for archive
-	localT := date.In(loc)
 	filePrefix := os.TempDir() + "/penguin_drop_report_archive"
 	if _, err := os.Stat(filePrefix + "/drop_reports"); os.IsNotExist(err) {
 		err = os.Mkdir(filePrefix+"/drop_reports", 0755)
@@ -59,7 +91,7 @@ func (s DropReportArchive) Archive(ctx context.Context, date *time.Time) error {
 		}
 	}
 
-	fileNameForReports := "drop_reports/drop_reports_" + localT.Format("2006-01-02") + ".jsonl.gz"
+	fileNameForReports := getFileNameForDropReportArhive(*date)
 	localFilePathForReports := filePrefix + "/" + fileNameForReports
 	firstId, lastId, err := s.writeDropReportArchiveFileAndUpload(ctx, date, localFilePathForReports, fileNameForReports)
 	if err != nil {
@@ -67,7 +99,7 @@ func (s DropReportArchive) Archive(ctx context.Context, date *time.Time) error {
 	}
 	log.Info().Int("first_id", firstId).Int("last_id", lastId).Msg("first and last id for drop reports")
 
-	fileNameForExtras := "drop_report_extras/drop_report_extras_" + localT.Format("2006-01-02") + ".jsonl.gz"
+	fileNameForExtras := getFileNameForDropReportArhiveExtra(*date)
 	localFilePathForExtras := filePrefix + "/" + fileNameForExtras
 	if err := s.writeDropReportExtraArchiveFileAndUpload(ctx, firstId, lastId, localFilePathForExtras, fileNameForExtras); err != nil {
 		return errors.Wrap(err, "failed to writeArchiveFile for drop report extras")
@@ -76,6 +108,21 @@ func (s DropReportArchive) Archive(ctx context.Context, date *time.Time) error {
 	// TODO: delete drop reports and extras from database
 
 	return nil
+}
+
+func getFileNameForDropReportArhive(date time.Time) string {
+	localT := getLocalTimeForArchive(date)
+	return "drop_reports/drop_reports_" + localT.Format("2006-01-02") + ".jsonl.gz"
+}
+
+func getFileNameForDropReportArhiveExtra(date time.Time) string {
+	localT := getLocalTimeForArchive(date)
+	return "drop_report_extras/drop_report_extras_" + localT.Format("2006-01-02") + ".jsonl.gz"
+}
+
+func getLocalTimeForArchive(time time.Time) time.Time {
+	loc := constant.LocMap["CN"] // we use CN server's day start time as the day start time for all servers for archive
+	return time.In(loc)
 }
 
 func (s DropReportArchive) writeDropReportArchiveFileAndUpload(ctx context.Context, date *time.Time, localFilePath string, fileName string) (int, int, error) {
@@ -243,4 +290,22 @@ func (s DropReportArchive) uploadFileToS3(ctx context.Context, bucket string, lo
 
 	log.Info().Str("location", result.Location).Msg("Successfully uploaded")
 	return nil
+}
+
+func (s DropReportArchive) fileExistsInS3(ctx context.Context, bucket string, remoteFileKey string) (bool, error) {
+	_, err := s.S3Client.HeadObjectWithContext(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String("v1/" + remoteFileKey),
+	})
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case "NotFound":
+				return false, nil
+			default:
+				return false, err
+			}
+		}
+	}
+	return true, nil
 }
