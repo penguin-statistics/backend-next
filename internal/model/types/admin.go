@@ -55,6 +55,10 @@ type CloneFromCNRequest struct {
 	ForeignTimeRange ForeignTimeRange `json:"foreignTimeRange"`
 }
 
+type ArchiveDropReportRequest struct {
+	Date string `json:"date" validate:"required" required:"true"`
+}
+
 type ForeignTimeRange struct {
 	US ForeignTimeRangeString `json:"US"`
 	JP ForeignTimeRangeString `json:"JP"`
