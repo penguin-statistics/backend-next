@@ -22,7 +22,6 @@ const (
 	RealmDropReportExtras = "drop_report_extras"
 
 	ArchiveS3Prefix = "v1/"
-	BatchSize       = 1000
 )
 
 type Archive struct {
@@ -118,7 +117,7 @@ func (s *Archive) populateDropReportsToArchiver(ctx context.Context, date time.T
 	var err error
 	var page, totalCount, firstId, lastId int
 	for {
-		dropReports, cursor, err = s.DropReportService.GetDropReportsForArchive(ctx, &cursor, date, 1000)
+		dropReports, cursor, err = s.DropReportService.GetDropReportsForArchive(ctx, &cursor, date, s.Config.DropReportArchiveBatchSize)
 		if err != nil {
 			return 0, 0, errors.Wrap(err, "failed to extract drop reports")
 		}
@@ -160,7 +159,7 @@ func (s *Archive) populateDropReportExtrasToArchiver(ctx context.Context, idIncl
 	var err error
 	var page, totalCount int
 	for {
-		extras, cursor, err = s.DropReportExtraService.GetDropReportExtraForArchive(ctx, &cursor, idInclusiveStart, idInclusiveEnd, 1000)
+		extras, cursor, err = s.DropReportExtraService.GetDropReportExtraForArchive(ctx, &cursor, idInclusiveStart, idInclusiveEnd, s.Config.DropReportArchiveBatchSize)
 		if err != nil {
 			return errors.Wrap(err, "failed to extract drop report extras")
 		}
