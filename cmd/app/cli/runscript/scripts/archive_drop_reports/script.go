@@ -1,15 +1,23 @@
 package script_archive_drop_reports
 
 import (
-	"context"
+	"net/http"
+	_ "net/http/pprof"
 	"time"
 
+	"github.com/felixge/fgprof"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/urfave/cli/v2"
 )
 
-func run(deps CommandDeps, dateStr string) error {
-	log.Info().Interface("deps", deps).Str("date", dateStr).Msg("running script")
+func run(ctx *cli.Context, deps CommandDeps, dateStr string) error {
+	http.DefaultServeMux.Handle("/debug/fgprof", fgprof.Handler())
+	go func() {
+		log.Print(http.ListenAndServe("127.0.0.1:6060", nil))
+	}()
+
+	log.Info().Str("date", dateStr).Msg("running script")
 
 	var err error
 
@@ -18,22 +26,11 @@ func run(deps CommandDeps, dateStr string) error {
 		return errors.Wrap(err, "failed to parse date")
 	}
 
-	if err = archiveDropReports(deps, date); err != nil {
+	if err = deps.DropReportArchiveService.ArchiveByDate(ctx.Context, date); err != nil {
 		return errors.Wrap(err, "failed to run archiveDropReports")
 	}
 
 	log.Info().Msg("script finished")
-
-	return nil
-}
-
-func archiveDropReports(deps CommandDeps, date time.Time) error {
-	ctx := context.Background()
-
-	err := deps.DropReportArchiveService.Archive(ctx, &date)
-	if err != nil {
-		return errors.Wrap(err, "failed to ArchiveDropReports")
-	}
 
 	return nil
 }

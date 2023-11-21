@@ -131,12 +131,12 @@ type ConfigSpec struct {
 	// We don't want to show all patterns because it will be too many. So we set a limit here (default 19)
 	PatternMatrixLimit int `split_words:"true" default:"19"`
 
-	DropReportArchiveS3Bucket string `required:"true" split_words:"true" default:"penguin-stats-drop-report-archive"`
-	DropReportArchiveS3Region string `required:"true" split_words:"true" default:"ap-southeast-1"`
+	DropReportArchiveS3Bucket string `required:"true" split_words:"true"`
+	DropReportArchiveS3Region string `required:"true" split_words:"true"`
 	AWSAccessKey              string `required:"true" split_words:"true"`
 	AWSSecretKey              string `required:"true" split_words:"true"`
 
-	NotArchiveDays int `split_words:"true" default:"60"`
+	NoArchiveDays int `split_words:"true" default:"60"`
 }
 
 type Config struct {
