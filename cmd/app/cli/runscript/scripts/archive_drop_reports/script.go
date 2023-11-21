@@ -1,22 +1,15 @@
 package script_archive_drop_reports
 
 import (
-	"net/http"
 	_ "net/http/pprof"
 	"time"
 
-	"github.com/felixge/fgprof"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 )
 
 func run(ctx *cli.Context, deps CommandDeps, dateStr string) error {
-	http.DefaultServeMux.Handle("/debug/fgprof", fgprof.Handler())
-	go func() {
-		log.Print(http.ListenAndServe("127.0.0.1:6060", nil))
-	}()
-
 	log.Info().Str("date", dateStr).Msg("running script")
 
 	var err error
