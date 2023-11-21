@@ -309,8 +309,8 @@ func (s *DropReport) GetDropReports(ctx context.Context, queryCtx *model.DropRep
 	return results, nil
 }
 
-func (s *DropReport) GetDropReportsForArchive(ctx context.Context, cursor *model.Cursor, date *time.Time, limit int) ([]*model.DropReport, model.Cursor, error) {
-	start := time.UnixMilli(util.GetDayStartTime(date, "CN")) // we use CN server's day start time across all servers for archive
+func (s *DropReport) GetDropReportsForArchive(ctx context.Context, cursor *model.Cursor, date time.Time, limit int) ([]*model.DropReport, model.Cursor, error) {
+	start := time.UnixMilli(util.GetDayStartTime(&date, "CN")) // we use CN server's day start time across all servers for archive
 	end := start.Add(time.Hour * 24)
 	results := make([]*model.DropReport, 0)
 	query := s.DB.NewSelect().

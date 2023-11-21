@@ -10,7 +10,7 @@ import (
 type CommandDeps struct {
 	fx.In
 
-	DropReportArchiveService *service.DropReportArchive
+	DropReportArchiveService *service.Archive
 }
 
 func Command(depsFn func() CommandDeps) *cli.Command {
@@ -27,7 +27,7 @@ func Command(depsFn func() CommandDeps) *cli.Command {
 		},
 		Action: func(ctx *cli.Context) error {
 			date := ctx.String("date")
-			return run(depsFn(), date)
+			return run(ctx, depsFn(), date)
 		},
 	}
 }
