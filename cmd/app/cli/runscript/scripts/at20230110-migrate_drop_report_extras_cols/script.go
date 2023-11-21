@@ -19,7 +19,7 @@ func run(deps CommandDeps) error {
 		log.Print(http.ListenAndServe("127.0.0.1:6060", nil))
 	}()
 
-	log.Info().Interface("deps", deps).Msg("running script")
+	log.Info().Msg("running script")
 
 	var err error
 	if err = stage1_addSourceNameAndVersionToDropReportTable(deps); err != nil {

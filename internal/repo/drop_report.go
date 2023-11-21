@@ -15,6 +15,7 @@ import (
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/gameday"
 	"exusiai.dev/backend-next/internal/pkg/pgqry"
+	"exusiai.dev/backend-next/internal/util"
 )
 
 type DropReport struct {
@@ -308,6 +309,26 @@ func (s *DropReport) GetDropReports(ctx context.Context, queryCtx *model.DropRep
 	return results, nil
 }
 
+func (s *DropReport) GetDropReportsForArchive(ctx context.Context, cursor *model.Cursor, date time.Time, limit int) ([]*model.DropReport, model.Cursor, error) {
+	start := time.UnixMilli(util.GetDayStartTime(&date, "CN")) // we use CN server's day start time across all servers for archive
+	end := start.Add(time.Hour * 24)
+	results := make([]*model.DropReport, 0)
+	query := s.DB.NewSelect().
+		Model(&results).
+		Where("created_at >= to_timestamp(?)", start.Unix()).
+		Where("created_at < to_timestamp(?)", end.Unix()).
+		Order("report_id").
+		Limit(limit)
+	if cursor != nil && cursor.Start > 0 {
+		query = query.Where("report_id > ?", cursor.Start)
+	}
+	if err := query.
+		Scan(ctx); err != nil {
+		return nil, model.Cursor{}, err
+	}
+	return results, newCursor(results), nil
+}
+
 func (s *DropReport) handleStagesAndItems(query *bun.SelectQuery, stageIdItemIdMap map[int][]int) {
 	stageConditions := make([]string, 0)
 	for stageId, itemIds := range stageIdItemIdMap {
@@ -404,4 +425,14 @@ func (s *DropReport) genSubQueryForTrendSegments(gameDayStart time.Time, interva
 			int(intervalLength.Hours()),
 			int(intervalLength.Hours()),
 		)
+}
+
+func newCursor(reports []*model.DropReport) model.Cursor {
+	if len(reports) == 0 {
+		return model.Cursor{}
+	}
+	return model.Cursor{
+		Start: reports[0].ReportID,
+		End:   reports[len(reports)-1].ReportID,
+	}
 }

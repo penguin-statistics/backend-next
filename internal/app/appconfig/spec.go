@@ -128,7 +128,15 @@ type ConfigSpec struct {
 	MatrixWorkerSourceCategories []string `required:"true" split_words:"true" default:"all"`
 
 	// For PatternMatrix query api, if showAllPatterns is false, then only show the top 50 patterns for all stages
+	// We don't want to show all patterns because it will be too many. So we set a limit here (default 19)
 	PatternMatrixLimit int `split_words:"true" default:"19"`
+
+	DropReportArchiveS3Bucket string `required:"true" split_words:"true"`
+	DropReportArchiveS3Region string `required:"true" split_words:"true"`
+	AWSAccessKey              string `required:"true" split_words:"true"`
+	AWSSecretKey              string `required:"true" split_words:"true"`
+
+	NoArchiveDays int `split_words:"true" default:"60"`
 }
 
 type Config struct {
