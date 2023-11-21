@@ -84,13 +84,13 @@ func (s *DropReportArchive) Archive(ctx context.Context, date *time.Time) error 
 
 	filePrefix := os.TempDir() + "/penguin_drop_report_archive"
 	if _, err := os.Stat(filePrefix + "/drop_reports"); os.IsNotExist(err) {
-		err = os.Mkdir(filePrefix+"/drop_reports", 0755)
+		err = os.Mkdir(filePrefix+"/drop_reports", 0o755)
 		if err != nil {
 			return errors.Wrap(err, "failed to create directory "+filePrefix+"/drop_reports")
 		}
 	}
 	if _, err := os.Stat(filePrefix + "/drop_report_extras"); os.IsNotExist(err) {
-		err = os.Mkdir(filePrefix+"/drop_report_extras", 0755)
+		err = os.Mkdir(filePrefix+"/drop_report_extras", 0o755)
 		if err != nil {
 			return errors.Wrap(err, "failed to create directory "+filePrefix+"/drop_report_extras")
 		}
@@ -285,9 +285,11 @@ func (s *DropReportArchive) uploadFileToS3(ctx context.Context, bucket string, l
 	defer f.Close()
 
 	result, err := s.uploader.UploadWithContext(ctx, &s3manager.UploadInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String("v1/" + remoteFileKey),
-		Body:   f,
+		Bucket:            aws.String(bucket),
+		Key:               aws.String("v1/" + remoteFileKey),
+		Body:              f,
+		StorageClass:      aws.String(s3.StorageClassGlacierIr),
+		ChecksumAlgorithm: aws.String(s3.ChecksumAlgorithmSha256),
 	})
 	if err != nil {
 		return err
