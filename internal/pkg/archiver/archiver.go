@@ -22,7 +22,7 @@ import (
 const (
 	FileExt                = ".jsonl.gz"
 	LocalTempDirPattern    = "penguin_stats-archiver-*"
-	ArchiverChanBufferSize = 2
+	ArchiverChanBufferSize = 1000
 )
 
 var ErrFileAlreadyExists = errors.New("file already exists")
