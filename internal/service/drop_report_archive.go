@@ -131,6 +131,7 @@ func (s *Archive) populateDropReportsToArchiver(ctx context.Context, date time.T
 			break
 		}
 		log.Info().
+			Str("evt.name", "archive.populate.drop_reports").
 			Int("page", page).
 			Int("cursor_start", cursor.Start).
 			Int("cursor_end", cursor.End).
@@ -166,6 +167,7 @@ func (s *Archive) populateDropReportExtrasToArchiver(ctx context.Context, idIncl
 			break
 		}
 		log.Info().
+			Str("evt.name", "archive.populate.drop_report_extras").
 			Int("page", page).
 			Int("cursor_start", cursor.Start).
 			Int("cursor_end", cursor.End).
