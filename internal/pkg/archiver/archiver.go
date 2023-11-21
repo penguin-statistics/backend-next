@@ -62,19 +62,29 @@ func (a *Archiver) canonicalFilePath() string {
 func (a *Archiver) Prepare(ctx context.Context, date time.Time) error {
 	a.initLogger()
 
-	a.logger.Info().Str("date", date.Format("2006-01-02")).Msg("preparing archiver")
+	a.logger.Info().
+		Str("evt.name", "archiver.prepare").
+		Str("date", date.Format("2006-01-02")).
+		Msg("preparing archiver")
+
 	a.date = date
 	a.writerCh = make(chan interface{}, ArchiverChanBufferSize)
 
 	if err := a.assertS3FileNonExistence(ctx); err != nil {
 		return errors.Wrap(err, "failed to assertFileNonExistence")
 	}
-	a.logger.Trace().Msg("asserted S3 file non-existence")
+	a.logger.Debug().
+		Str("evt.name", "archiver.prepare.assertFileNonExistence").
+		Str("canonicalFilePath", a.canonicalFilePath()).
+		Msg("asserted S3 file non-existence")
 
 	if err := a.createLocalTempDir(); err != nil {
 		return errors.Wrap(err, "failed to createLocalTempDir")
 	}
-	a.logger.Trace().Str("localTempDir", a.localTempDir).Msg("created local temp dir")
+	a.logger.Debug().
+		Str("evt.name", "archiver.prepare.createLocalTempDir").
+		Str("localTempDir", a.localTempDir).
+		Msg("created local temp dir")
 
 	return nil
 }
@@ -132,12 +142,16 @@ func (a *Archiver) Collect(ctx context.Context) error {
 	if err := a.archiveToLocalFile(ctx); err != nil {
 		return errors.Wrap(err, "failed to archiveToLocalFile")
 	}
-	a.logger.Trace().Msg("archived to local file")
+	a.logger.Debug().
+		Str("evt.name", "archiver.collect.archiveToLocalFile").
+		Msg("archived to local file")
 
 	if err := a.uploadToS3(ctx); err != nil {
 		return errors.Wrap(err, "failed to uploadToS3")
 	}
-	a.logger.Trace().Msg("uploaded to S3")
+	a.logger.Debug().
+		Str("evt.name", "archiver.collect.uploadToS3").
+		Msg("uploaded to S3")
 
 	if err := a.Cleanup(); err != nil {
 		return errors.Wrap(err, "failed to Cleanup")
@@ -150,14 +164,18 @@ func (a *Archiver) archiveToLocalFile(ctx context.Context) error {
 	if err := a.ensureFileBaseDir(localTempFilePath); err != nil {
 		return errors.Wrap(err, "failed to ensureFileBaseDir")
 	}
-	a.logger.Trace().Str("localTempFilePath", localTempFilePath).Msg("ensured file base dir")
+	a.logger.Debug().
+		Str("evt.name", "archiver.collect.archiveToLocalFile.ensureFileBaseDir").
+		Str("localTempFilePath", localTempFilePath).Msg("ensured file base dir")
 
 	file, err := os.OpenFile(localTempFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return errors.Wrap(err, "failed to open file")
 	}
 	defer file.Close()
-	a.logger.Trace().Str("localTempFilePath", localTempFilePath).Msg("opened file, ready to write gzip stream")
+	a.logger.Debug().
+		Str("evt.name", "archiver.collect.archiveToLocalFile.openFile").
+		Str("localTempFilePath", localTempFilePath).Msg("opened file, ready to write gzip stream")
 
 	gzipWriter := gzip.NewWriter(file)
 	defer gzipWriter.Close()
@@ -170,7 +188,9 @@ func (a *Archiver) archiveToLocalFile(ctx context.Context) error {
 			return nil
 		case item, ok := <-a.writerCh:
 			if !ok {
-				a.logger.Trace().Msg("writerCh closed, exiting archiveToLocalFile (closing gzipWriter and file)")
+				a.logger.Debug().
+					Str("evt.name", "archiver.collect.archiveToLocalFile.writerChClosed").
+					Msg("writerCh closed, exiting archiveToLocalFile (closing gzipWriter and file)")
 				return nil
 			}
 			if err := jsonEncoder.Encode(item); err != nil {

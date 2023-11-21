@@ -26,6 +26,7 @@ import (
 	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/model/gamedata"
 	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/flog"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/repo"
 	"exusiai.dev/backend-next/internal/server/svr"
@@ -721,6 +722,11 @@ func (c *AdminController) ArchiveDropReports(ctx *fiber.Ctx) error {
 
 	err = c.DropReportArchiveService.ArchiveByDate(ctx.UserContext(), date)
 	if err != nil {
+		flog.ErrorFrom(ctx, "archive.drop_report").
+			Err(err).
+			Time("targetDay", date).
+			Msg("failed to archive drop report")
+
 		return err
 	}
 	return ctx.SendStatus(fiber.StatusOK)
