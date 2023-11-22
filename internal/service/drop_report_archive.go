@@ -81,9 +81,25 @@ func (s *Archive) ArchiveByDate(ctx context.Context, date time.Time) error {
 	eg := errgroup.Group{}
 
 	if err := s.dropReportsArchiver.Prepare(ctx, date); err != nil {
+		if errors.Is(err, archiver.ErrFileAlreadyExists) {
+			log.Info().
+				Str("evt.name", "archive.drop_reports").
+				Str("realm", RealmDropReports).
+				Msg("already archived")
+
+			return nil
+		}
 		return errors.Wrap(err, "failed to prepare drop reports archiver")
 	}
 	if err := s.dropReportExtrasArchiver.Prepare(ctx, date); err != nil {
+		if errors.Is(err, archiver.ErrFileAlreadyExists) {
+			log.Info().
+				Str("evt.name", "archive.drop_report_extras").
+				Str("realm", RealmDropReportExtras).
+				Msg("already archived")
+
+			return nil
+		}
 		return errors.Wrap(err, "failed to prepare drop report extras archiver")
 	}
 
@@ -104,9 +120,12 @@ func (s *Archive) ArchiveByDate(ctx context.Context, date time.Time) error {
 	}
 
 	err = eg.Wait()
-	log.Info().Err(err).Msg("finished archiving")
+	log.Info().
+		Str("evt.name", "archive.finished").
+		Err(err).
+		Msg("finished archiving")
 
-	return nil
+	return err
 }
 
 func (s *Archive) populateDropReportsToArchiver(ctx context.Context, date time.Time) (int, int, error) {
