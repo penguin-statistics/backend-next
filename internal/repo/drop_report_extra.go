@@ -67,6 +67,16 @@ func (c *DropReportExtra) GetDropReportExtraForArchive(ctx context.Context, curs
 	return dropReportExtras, newCursor, nil
 }
 
+func (c *DropReportExtra) DeleteDropReportExtrasForArchive(ctx context.Context, tx bun.Tx, idInclusiveStart int, idInclusiveEnd int) error {
+	_, err := tx.NewDelete().
+		Model((*model.DropReportExtra)(nil)).
+		Where("report_id >= ?", idInclusiveStart).
+		Where("report_id <= ?", idInclusiveEnd).
+		Exec(ctx)
+
+	return err
+}
+
 func (c *DropReportExtra) IsDropReportExtraMD5Exist(ctx context.Context, md5 string) bool {
 	var dropReportExtra model.DropReportExtra
 

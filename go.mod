@@ -10,7 +10,7 @@ require (
 	github.com/avast/retry-go/v4 v4.3.4
 	github.com/aws/aws-sdk-go-v2 v1.23.1
 	github.com/aws/aws-sdk-go-v2/config v1.25.4
-	github.com/aws/aws-sdk-go-v2/credentials v1.16.3
+	github.com/aws/aws-sdk-go-v2/credentials v1.16.4
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.43.1
 	github.com/aws/smithy-go v1.17.0
 	github.com/davecgh/go-spew v1.1.1

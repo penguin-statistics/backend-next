@@ -329,6 +329,17 @@ func (s *DropReport) GetDropReportsForArchive(ctx context.Context, cursor *model
 	return results, newCursor(results), nil
 }
 
+func (s *DropReport) DeleteDropReportsForArchive(ctx context.Context, tx bun.Tx, date time.Time) error {
+	start := time.UnixMilli(util.GetDayStartTime(&date, "CN")) // we use CN server's day start time across all servers for archive
+	end := start.Add(time.Hour * 24)
+	_, err := tx.NewDelete().
+		Model((*model.DropReport)(nil)).
+		Where("created_at >= to_timestamp(?)", start.Unix()).
+		Where("created_at < to_timestamp(?)", end.Unix()).
+		Exec(ctx)
+	return err
+}
+
 func (s *DropReport) handleStagesAndItems(query *bun.SelectQuery, stageIdItemIdMap map[int][]int) {
 	stageConditions := make([]string, 0)
 	for stageId, itemIds := range stageIdItemIdMap {

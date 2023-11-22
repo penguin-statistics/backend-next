@@ -9,7 +9,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func run(ctx *cli.Context, deps CommandDeps, dateStr string) error {
+func run(ctx *cli.Context, deps CommandDeps, dateStr string, deleteAfterArchive bool) error {
 	log.Info().Str("date", dateStr).Msg("running script")
 
 	var err error
@@ -19,7 +19,7 @@ func run(ctx *cli.Context, deps CommandDeps, dateStr string) error {
 		return errors.Wrap(err, "failed to parse date")
 	}
 
-	if err = deps.DropReportArchiveService.ArchiveByDate(ctx.Context, date); err != nil {
+	if err = deps.DropReportArchiveService.ArchiveByDate(ctx.Context, date, deleteAfterArchive); err != nil {
 		return errors.Wrap(err, "failed to run archiveDropReports")
 	}
 

@@ -10,6 +10,7 @@ import (
 	"github.com/go-redsync/redsync/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/uptrace/bun"
 	"golang.org/x/sync/errgroup"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
@@ -31,12 +32,13 @@ type Archive struct {
 
 	s3Client *s3.Client
 	lock     *redsync.Mutex
+	db       *bun.DB
 
 	dropReportsArchiver      *archiver.Archiver
 	dropReportExtrasArchiver *archiver.Archiver
 }
 
-func NewArchive(dropReportService *DropReport, dropReportExtraService *DropReportExtra, conf *appconfig.Config, lock *redsync.Redsync) (*Archive, error) {
+func NewArchive(dropReportService *DropReport, dropReportExtraService *DropReportExtra, conf *appconfig.Config, lock *redsync.Redsync, db *bun.DB) (*Archive, error) {
 	cfg, err := config.LoadDefaultConfig(context.Background(),
 		config.WithRegion(conf.DropReportArchiveS3Region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(conf.AWSAccessKey, conf.AWSSecretKey, "")),
@@ -52,6 +54,7 @@ func NewArchive(dropReportService *DropReport, dropReportExtraService *DropRepor
 		Config:                 conf,
 		s3Client:               s3Client,
 		lock:                   lock.NewMutex("mutex:archiver", redsync.WithExpiry(30*time.Minute), redsync.WithTries(2)),
+		db:                     db,
 		dropReportsArchiver: &archiver.Archiver{
 			S3Client:  s3Client,
 			S3Bucket:  conf.DropReportArchiveS3Bucket,
@@ -69,10 +72,10 @@ func NewArchive(dropReportService *DropReport, dropReportExtraService *DropRepor
 
 func (s *Archive) ArchiveByGlobalConfig(ctx context.Context) error {
 	targetDay := time.Now().AddDate(0, 0, -1*s.Config.NoArchiveDays)
-	return s.ArchiveByDate(ctx, targetDay)
+	return s.ArchiveByDate(ctx, targetDay, s.Config.DeleteDropReportAfterArchive)
 }
 
-func (s *Archive) ArchiveByDate(ctx context.Context, date time.Time) error {
+func (s *Archive) ArchiveByDate(ctx context.Context, date time.Time, deleteAfterArchive bool) error {
 	if err := s.lock.Lock(); err != nil {
 		return errors.Wrap(err, "failed to acquire lock")
 	}
@@ -124,6 +127,10 @@ func (s *Archive) ArchiveByDate(ctx context.Context, date time.Time) error {
 		Str("evt.name", "archive.finished").
 		Err(err).
 		Msg("finished archiving")
+
+	if deleteAfterArchive {
+		s.DeleteReportsAndExtras(ctx, date, firstId, lastId)
+	}
 
 	return err
 }
@@ -206,5 +213,53 @@ func (s *Archive) populateDropReportExtrasToArchiver(ctx context.Context, idIncl
 	log.Info().
 		Int("total_count", totalCount).
 		Msg("finished populating drop report extras")
+	return nil
+}
+
+func (s *Archive) DeleteReportsAndExtras(ctx context.Context, date time.Time, idInclusiveStart int, idInclusiveEnd int) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to start transaction")
+	}
+
+	log.Info().
+		Str("evt.name", "archive.deletion").
+		Str("date", date.Format("2006-01-02")).
+		Int("first_id", idInclusiveStart).
+		Int("last_id", idInclusiveEnd).
+		Msg("start deleting drop reports and extras")
+
+	err = s.DropReportService.DeleteDropReportsForArchive(ctx, tx, date)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete drop reports")
+	}
+
+	log.Info().
+		Str("evt.name", "archive.deletion.drop_report").
+		Str("date", date.Format("2006-01-02")).
+		Msg("finished deleting drop reports")
+
+	err = s.DropReportExtraService.DeleteDropReportExtrasForArchive(ctx, tx, idInclusiveStart, idInclusiveEnd)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete drop report extras")
+	}
+
+	log.Info().
+		Str("evt.name", "archive.deletion.drop_report_extra").
+		Int("first_id", idInclusiveStart).
+		Int("last_id", idInclusiveEnd).
+		Msg("finished deleting drop report extras")
+
+	if err := tx.Commit(); err != nil {
+		return errors.Wrap(err, "failed to commit transaction")
+	}
+
+	log.Info().
+		Str("evt.name", "archive.deletion.success").
+		Str("date", date.Format("2006-01-02")).
+		Int("first_id", idInclusiveStart).
+		Int("last_id", idInclusiveEnd).
+		Msg("finished committing the transaction of deleting drop reports and extras")
+
 	return nil
 }
