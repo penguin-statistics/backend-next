@@ -103,13 +103,12 @@ jobs:
                 let data = ''
                 res.on('data', chunk => data += chunk)
                 res.on('end', () => {
-                  console.log(data)
                   resolve(JSON.parse(data).choices[0].message.text)
                 })
               })
               req.on('error', reject)
               req.write(JSON.stringify({
-                "model": "gpt-3.5-turbo",
+                "model": "gpt-4",
                 "messages": [
                   {
                     "role": "system",
