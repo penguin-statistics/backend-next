@@ -64,6 +64,9 @@ jobs:
           # replace newlines with spaces
           sed -i ':a;N;$!ba;s/\n/ /g' /tmp/summary.txt
 
+          # replace " with \"
+          sed -i 's/"/\\"/g' /tmp/summary.txt
+
           echo "summary=$(cat /tmp/summary.txt)" >> $GITHUB_OUTPUT
 
       # create a PR from dev to main, with title in form: Release <semver>
@@ -79,7 +82,8 @@ jobs:
             })
             const nextRelease = lastRelease.replace(/(\d+)$/, (match, p1) => Number(p1) + 1)
             const prTitle = `Release ${nextRelease}`
-            const body = `> *This PR is automatically created by actions defined in this repository. To see the run log of this action, please click [here](/${{ github.repository }}/actions/runs/${{ github.run_id }})*\n\n---\n\n## Summary\n\n${{ steps.get_summary.outputs.summary || '(no summary)' }}`
+            let body = `> *This PR is automatically created by actions defined in this repository. To see the run log of this action, please click [here](/${{ github.repository }}/actions/runs/${{ github.run_id }})*\n\n---\n\n## Summary\n\n`
+            body += "${{ steps.get_summary.outputs.summary || '(no summary)' }}"
             const existedPR = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
