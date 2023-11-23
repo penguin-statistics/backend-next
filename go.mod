@@ -62,7 +62,7 @@ require (
 	golang.org/x/exp v0.0.0-20220823124025-807a23277127
 	golang.org/x/mod v0.9.0
 	golang.org/x/sync v0.5.0
-	golang.org/x/text v0.13.0
+	golang.org/x/text v0.14.0
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.48.0
 	gopkg.in/guregu/null.v3 v3.5.0
