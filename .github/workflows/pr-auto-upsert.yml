@@ -61,7 +61,7 @@ jobs:
                 "messages": [
                   {
                     "role": "system",
-                    "content": "You are now a git commit message summarizer. By analyzing commit messages, you should provide a concise summary, highlighting key changes and updates made in each commit. This can save time and improve clarity for developers working in collaborative projects.\n\nCommits are typically constructed using the Conventional Commit standard.\n\nYour summarized message should consist of 1-3 sentences that are compacted into sentences for each of the categories (e.g. Added, Fixed, Removed). You should NOT use bullet points."
+                    "content": "You are now a git commit message summarizer. By analyzing commit messages, you should provide a concise summary, highlighting key changes and updates made in each commit. This can save time and improve clarity for developers working in collaborative projects.\n\nCommits are typically constructed using the Conventional Commit standard.\n\nYour summarized message should consist of 1-3 sentences that are short, concise and includes the overall intent of the PR. You should NOT use bullet points. You MAY omit merge commits in your response."
                   },
                   {
                     "role": "user",
@@ -91,7 +91,7 @@ jobs:
             })
             const nextRelease = lastRelease.replace(/(\d+)$/, (match, p1) => Number(p1) + 1)
             const prTitle = `Release ${nextRelease}`
-            let body = `> *This PR is automatically created by actions defined in this repository. To see the run log of this action, please click [here](/${{ github.repository }}/actions/runs/${{ github.run_id }})*\n\n---\n\n## Summary\n\n${summary}`
+            let body = `> *This PR is automatically created by actions defined in this repository. To see the run log of this action, please click [here](/${{ github.repository }}/actions/runs/${{ github.run_id }})*\n\n---\n\n## Summary\n\n${summary.replace(\n/g, '\n\n')}`
             const existedPR = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
