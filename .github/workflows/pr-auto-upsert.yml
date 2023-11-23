@@ -103,7 +103,7 @@ jobs:
                 let data = ''
                 res.on('data', chunk => data += chunk)
                 res.on('end', () => {
-                  resolve(JSON.parse(data).choices[0].message.text)
+                  resolve(JSON.parse(data).choices[0].message.content)
                 })
               })
               req.on('error', reject)
