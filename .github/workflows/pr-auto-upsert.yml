@@ -23,60 +23,9 @@ jobs:
           # fetch all history so that git log can get all commit messages
           fetch-depth: 0
 
-      # - id: get_summary
-      #   name: Get summary from GPT
-      #   continue-on-error: true
-      #   run: |
-      #     set -e
-
-      #     # get all commit messages from last release tag to HEAD
-      #     COMMIT_MESSAGES=$(git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:%s)
-
-      #     # replace newlines with \n
-      #     COMMIT_MESSAGES=$(echo $COMMIT_MESSAGES | sed ':a;N;$!ba;s/\n/\\n/g')
-
-      #     echo "commit messages: $COMMIT_MESSAGES"
-
-      #     RESULT=$(curl https://api.openai.com/v1/chat/completions \
-      #       -H "Content-Type: application/json" \
-      #       -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
-      #       -d '{
-      #       "model": "gpt-3.5-turbo",
-      #       "messages": [
-      #         {
-      #           "role": "system",
-      #           "content": "You are now a git commit message summarizer. By analyzing commit messages, you should provide a concise summary, highlighting key changes and updates made in each commit. This can save time and improve clarity for developers working in collaborative projects.\n\nCommits are typically constructed using the Conventional Commit standard.\n\nYour summarized message should consist of 1-3 sentences that are compacted into sentences for each of the categories (e.g. Added, Fixed, Removed). You should NOT use bullet points."
-      #         },
-      #         {
-      #           "role": "user",
-      #           "content": "feat: remove deleted required flag\nbuild: add workflow_dispatch\nfeat: add rowsAffected & fix json struct tag\nchore: add logs"
-      #         },
-      #         {
-      #           "role": "assistant",
-      #           "content": "Added: `workflow_dispatch`, `rowsAffected`, logs.\nFixed: JSON struct tag.\nRemoved: required flag of `deleted`."
-      #         },
-      #         {
-      #           "role": "user",
-      #           "content": "'$COMMIT_MESSAGES'"
-      #         }
-      #       ],
-      #       "temperature": 1,
-      #       "max_tokens": 256,
-      #       "top_p": 1,
-      #       "frequency_penalty": 0.1,
-      #       "presence_penalty": 0.2
-      #     }' | jq -r '.choices[0].message.content')
-
-      #     # replace " with \"
-      #     RESULT=$(echo $RESULT | sed 's/"/\\"/g')
-
-      #     echo "summary: $RESULT"
-
-      #     echo "summary=$RESULT" >> $GITHUB_OUTPUT
-
       # create a PR from dev to main, with title in form: Release <semver>
       # where, <semver> is the next version number to be released, based on the last release in git tag
-      - name: Create PR
+      - name: Upsert PR Content
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.PAT_FOR_RELEASE_TAGGER }}
