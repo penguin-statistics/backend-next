@@ -19,7 +19,7 @@ func run(ctx *cli.Context, deps CommandDeps, dateStr string, deleteAfterArchive 
 		return errors.Wrap(err, "failed to parse date")
 	}
 
-	if err = deps.DropReportArchiveService.ArchiveByDate(ctx.Context, date, deleteAfterArchive); err != nil {
+	if err = deps.ArchiveService.ArchiveByDate(ctx.Context, date, deleteAfterArchive); err != nil {
 		return errors.Wrap(err, "failed to run archiveDropReports")
 	}
 
