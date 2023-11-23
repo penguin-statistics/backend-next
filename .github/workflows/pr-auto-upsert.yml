@@ -28,16 +28,16 @@ jobs:
         continue-on-error: true
         run: |
           set -e
-          
+
           # get all commit messages from last release tag to HEAD
-          git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:%s > /tmp/commit_messages.txt
+          COMMIT_MESSAGES=$(git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:%s)
 
           # replace newlines with \n
-          sed -i ':a;N;$!ba;s/\n/\\n/g' /tmp/commit_messages.txt
+          COMMIT_MESSAGES=$(echo $COMMIT_MESSAGES | sed ':a;N;$!ba;s/\n/\\n/g')
 
-          echo "commit messages: $(cat /tmp/commit_messages.txt)"
+          echo "commit messages: $COMMIT_MESSAGES"
 
-          curl https://api.openai.com/v1/chat/completions \
+          RESULT=$(curl https://api.openai.com/v1/chat/completions \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
             -d '{
@@ -65,17 +65,14 @@ jobs:
             "top_p": 1,
             "frequency_penalty": 0.1,
             "presence_penalty": 0.2
-          }' | jq -r '.choices[0].message.content' > /tmp/summary.txt
-
-          # replace newlines with spaces
-          sed -i ':a;N;$!ba;s/\n/ /g' /tmp/summary.txt
+          }' | jq -r '.choices[0].message.content')
 
           # replace " with \"
-          sed -i 's/"/\\"/g' /tmp/summary.txt
+          RESULT=$(echo $RESULT | sed 's/"/\\"/g')
 
-          echo "summary: $(cat /tmp/summary.txt)"
+          echo "summary: $RESULT"
 
-          echo "summary=$(cat /tmp/summary.txt)" >> $GITHUB_OUTPUT
+          echo "summary=$RESULT" >> $GITHUB_OUTPUT
 
       # create a PR from dev to main, with title in form: Release <semver>
       # where, <semver> is the next version number to be released, based on the last release in git tag
