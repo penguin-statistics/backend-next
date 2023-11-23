@@ -62,12 +62,6 @@ type ConfigSpec struct {
 	// SentryDSN is the DSN of the Sentry server. See https://pkg.go.dev/github.com/getsentry/sentry-go#ClientOptions
 	SentryDSN string `split_words:"true"`
 
-	// LiveHouseEnabled to indicate whether to enable LiveHouse reporting.
-	LiveHouseEnabled bool `split_words:"true" default:"false"`
-
-	// LiveHouseGRPCAddress is the address of the LiveHouse gRPC server.
-	LiveHouseGRPCAddress string `split_words:"true" default:"localhost:9015"`
-
 	// DatadogProfilerEnabled to indicate whether to enable Datadog profiler.
 	DatadogProfilerEnabled bool `split_words:"true" default:"false"`
 

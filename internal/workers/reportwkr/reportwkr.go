@@ -44,7 +44,6 @@ type WorkerDeps struct {
 	DropReportExtraRepo    *repo.DropReportExtra
 	DropPatternElementRepo *repo.DropPatternElement
 	ReportVerifier         *reportverifs.ReportVerifiers
-	LiveHouseService       *service.LiveHouse
 }
 
 type Worker struct {
@@ -271,6 +270,12 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 		}
 		if reportTask.IP == "" {
 			// FIXME: temporary hack; find why ip is empty
+			log.Warn().
+				Str("evt.name", "reportwkr.ip.empty").
+				Str("taskId", reportTask.TaskID).
+				Interface("reportTask", reportTask).
+				Msg("ip is empty; using 127.0.0.1 as a fallback")
+
 			reportTask.IP = "127.0.0.1"
 		}
 		if err = w.DropReportExtraRepo.CreateDropReportExtra(pstCtx, tx, &model.DropReportExtra{
@@ -284,12 +289,6 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 
 		if err := w.Redis.Set(pstCtx, constant.ReportRedisPrefix+reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
 			return errors.Wrap(err, "failed to set report id in redis")
-		}
-
-		if reliability == 0 {
-			if err := w.LiveHouseService.PushReport(report, uint32(stage.StageID), reportTask.Server); err != nil {
-				L.Warn().Err(err).Msg("failed to push report to LiveHouse")
-			}
 		}
 	}
 
