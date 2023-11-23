@@ -25,6 +25,12 @@ jobs:
         name: Get summary from GPT
         continue-on-error: true
         run: |
+          # get all commit messages from last release tag to HEAD
+          git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:%s > /tmp/commit_messages.txt
+
+          # replace newlines with \n
+          sed -i ':a;N;$!ba;s/\n/\\n/g' /tmp/commit_messages.txt
+
           curl https://api.openai.com/v1/chat/completions \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
@@ -42,6 +48,10 @@ jobs:
               {
                 "role": "assistant",
                 "content": "Added workflow_dispatch to build, `rowsAffected`, logs. Fixed JSON struct tag. Removed the required flag of `deleted`."
+              },
+              {
+                "role": "user",
+                "content": "$(cat /tmp/commit_messages.txt)"
               }
             ],
             "temperature": 1,
