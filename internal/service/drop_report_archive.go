@@ -129,7 +129,18 @@ func (s *Archive) ArchiveByDate(ctx context.Context, date time.Time, deleteAfter
 		Msg("finished archiving")
 
 	if deleteAfterArchive {
-		s.DeleteReportsAndExtras(ctx, date, firstId, lastId)
+		log.Info().
+			Str("evt.name", "archive.delete").
+			Msg("deleting drop reports and extras")
+
+		err = s.DeleteReportsAndExtras(ctx, date, firstId, lastId)
+		if err != nil {
+			return errors.Wrap(err, "failed to delete drop reports and extras")
+		}
+
+		log.Info().
+			Str("evt.name", "archive.delete").
+			Msg("finished deleting drop reports and extras")
 	}
 
 	return err
