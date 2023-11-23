@@ -91,7 +91,7 @@ jobs:
             })
             const nextRelease = lastRelease.replace(/(\d+)$/, (match, p1) => Number(p1) + 1)
             const prTitle = `Release ${nextRelease}`
-            let body = `> *This PR is automatically created by actions defined in this repository. To see the run log of this action, please click [here](/${{ github.repository }}/actions/runs/${{ github.run_id }})*\n\n---\n\n## Summary\n\n${summary.replace(\n/g, '\n\n')}`
+            let body = `> *This PR is automatically created by actions defined in this repository. To see the run log of this action, please click [here](/${{ github.repository }}/actions/runs/${{ github.run_id }})*\n\n---\n\n## Summary\n\n${summary.replace(/\n/g, '\n\n')}`
             const existedPR = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
