@@ -23,6 +23,6 @@ func (s *DropReportExtra) GetDropReportExtraForArchive(ctx context.Context, curs
 	return s.DropReportExtraRepo.GetDropReportExtraForArchive(ctx, cursor, idInclusiveStart, idInclusiveEnd, limit)
 }
 
-func (c *DropReportExtra) DeleteDropReportExtrasForArchive(ctx context.Context, tx bun.Tx, idInclusiveStart int, idInclusiveEnd int) error {
+func (c *DropReportExtra) DeleteDropReportExtrasForArchive(ctx context.Context, tx bun.Tx, idInclusiveStart int, idInclusiveEnd int) (int64, error) {
 	return c.DropReportExtraRepo.DeleteDropReportExtrasForArchive(ctx, tx, idInclusiveStart, idInclusiveEnd)
 }

@@ -67,14 +67,19 @@ func (c *DropReportExtra) GetDropReportExtraForArchive(ctx context.Context, curs
 	return dropReportExtras, newCursor, nil
 }
 
-func (c *DropReportExtra) DeleteDropReportExtrasForArchive(ctx context.Context, tx bun.Tx, idInclusiveStart int, idInclusiveEnd int) error {
-	_, err := tx.NewDelete().
+// DeleteDropReportExtrasForArchive deletes all drop report extras with report_id between idInclusiveStart and idInclusiveEnd.
+// Returns the number of rows affected and an error if any.
+func (c *DropReportExtra) DeleteDropReportExtrasForArchive(ctx context.Context, tx bun.Tx, idInclusiveStart int, idInclusiveEnd int) (int64, error) {
+	r, err := tx.NewDelete().
 		Model((*model.DropReportExtra)(nil)).
 		Where("report_id >= ?", idInclusiveStart).
 		Where("report_id <= ?", idInclusiveEnd).
 		Exec(ctx)
+	if err != nil {
+		return -1, err
+	}
 
-	return err
+	return r.RowsAffected()
 }
 
 func (c *DropReportExtra) IsDropReportExtraMD5Exist(ctx context.Context, md5 string) bool {

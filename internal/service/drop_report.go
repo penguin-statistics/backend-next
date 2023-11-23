@@ -116,6 +116,6 @@ func (s *DropReport) GetDropReportsForArchive(ctx context.Context, cursor *model
 	return s.DropReportRepo.GetDropReportsForArchive(ctx, cursor, date, limit)
 }
 
-func (s *DropReport) DeleteDropReportsForArchive(ctx context.Context, tx bun.Tx, date time.Time) error {
+func (s *DropReport) DeleteDropReportsForArchive(ctx context.Context, tx bun.Tx, date time.Time) (int64, error) {
 	return s.DropReportRepo.DeleteDropReportsForArchive(ctx, tx, date)
 }

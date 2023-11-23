@@ -229,17 +229,19 @@ func (s *Archive) DeleteReportsAndExtras(ctx context.Context, date time.Time, id
 		Int("last_id", idInclusiveEnd).
 		Msg("start deleting drop reports and extras")
 
-	err = s.DropReportService.DeleteDropReportsForArchive(ctx, tx, date)
+	var rowsAffected int64
+	rowsAffected, err = s.DropReportService.DeleteDropReportsForArchive(ctx, tx, date)
 	if err != nil {
 		return errors.Wrap(err, "failed to delete drop reports")
 	}
 
 	log.Info().
+		Int64("rows_affected", rowsAffected).
 		Str("evt.name", "archive.deletion.drop_report").
 		Str("date", date.Format("2006-01-02")).
 		Msg("finished deleting drop reports")
 
-	err = s.DropReportExtraService.DeleteDropReportExtrasForArchive(ctx, tx, idInclusiveStart, idInclusiveEnd)
+	rowsAffected, err = s.DropReportExtraService.DeleteDropReportExtrasForArchive(ctx, tx, idInclusiveStart, idInclusiveEnd)
 	if err != nil {
 		return errors.Wrap(err, "failed to delete drop report extras")
 	}
@@ -248,6 +250,7 @@ func (s *Archive) DeleteReportsAndExtras(ctx context.Context, date time.Time, id
 		Str("evt.name", "archive.deletion.drop_report_extra").
 		Int("first_id", idInclusiveStart).
 		Int("last_id", idInclusiveEnd).
+		Int64("rows_affected", rowsAffected).
 		Msg("finished deleting drop report extras")
 
 	if err := tx.Commit(); err != nil {
