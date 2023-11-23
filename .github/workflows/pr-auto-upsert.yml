@@ -57,7 +57,7 @@ jobs:
               },
               {
                 "role": "user",
-                "content": "$COMMIT_MESSAGES"
+                "content": "'$COMMIT_MESSAGES'"
               }
             ],
             "temperature": 1,
