@@ -25,10 +25,8 @@ func Command(depsFn func() CommandDeps) *cli.Command {
 				Required: true,
 			},
 			&cli.BoolFlag{
-				Name:     "delete-after-archive",
-				Aliases:  []string{"D"},
-				Usage:    "delete the archived drop reports and extras after archiving",
-				Required: true,
+				Name:  "delete-after-archive",
+				Usage: "delete the archived drop reports and extras after archiving",
 			},
 		},
 		Action: func(ctx *cli.Context) error {
