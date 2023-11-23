@@ -95,7 +95,7 @@ func (r *DropInfo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server
 	}
 
 	results = lo.Uniq(results)
-	sort.Ints(results)
+	results = sort.IntSlice(results)
 	return results, nil
 }
 

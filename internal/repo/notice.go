@@ -21,5 +21,5 @@ func NewNotice(db *bun.DB) *Notice {
 func (r *Notice) GetNotices(ctx context.Context) ([]*model.Notice, error) {
 	return r.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Order("notice_id ASC")
-	})
+	}, selector.OptionUseZeroLenSliceOnNull)
 }

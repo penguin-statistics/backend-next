@@ -68,7 +68,7 @@ func (r *DropPatternElement) CreateDropPatternElements(ctx context.Context, tx b
 func (r *DropPatternElement) GetDropPatternElementsByPatternId(ctx context.Context, patternId int) ([]*model.DropPatternElement, error) {
 	return r.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("drop_pattern_id = ?", patternId)
-	})
+	}, selector.OptionUseZeroLenSliceOnNull)
 }
 
 func (r *DropPatternElement) GetDropPatternElementsByPatternIds(ctx context.Context, patternIds []int) ([]*model.DropPatternElement, error) {
