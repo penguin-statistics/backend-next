@@ -2,7 +2,9 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 
+	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model"
@@ -71,7 +73,7 @@ func (r *DropPatternElement) GetDropPatternElementsByPatternId(ctx context.Conte
 
 func (r *DropPatternElement) GetDropPatternElementsByPatternIds(ctx context.Context, patternIds []int) ([]*model.DropPatternElement, error) {
 	var elements []*model.DropPatternElement
-	err := r.DB.NewSelect().
+	err := r.db.NewSelect().
 		Model(&elements).
 		Where("drop_pattern_id IN (?)", bun.In(patternIds)).
 		Order("drop_pattern_id", "quantity DESC", "item_id").

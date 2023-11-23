@@ -21,7 +21,7 @@ func NewRecognitionDefect(db *bun.DB) *RecognitionDefect {
 	return &RecognitionDefect{db: db, sel: selector.New[model.RecognitionDefect](db)}
 }
 
-func (s *RecognitionDefect) CreateDefectReportDraft(ctx context.Context, defectReport *model.RecognitionDefect) error {
+func (r *RecognitionDefect) CreateDefectReportDraft(ctx context.Context, defectReport *model.RecognitionDefect) error {
 	defectReport.DefectID = strings.ToLower(ulid.Make().String())
 
 	_, err := r.db.NewInsert().

@@ -2,7 +2,9 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 
+	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model"
@@ -24,9 +26,9 @@ func (r *Activity) GetActivities(ctx context.Context) ([]*model.Activity, error)
 	})
 }
 
-func (c *Activity) GetActivityById(ctx context.Context, activityId int) (*model.Activity, error) {
+func (r *Activity) GetActivityById(ctx context.Context, activityId int) (*model.Activity, error) {
 	var activity model.Activity
-	err := c.DB.NewSelect().
+	err := r.db.NewSelect().
 		Model(&activity).
 		Where("activity_id = ?", activityId).
 		Scan(ctx)

@@ -2,10 +2,13 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 
+	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
@@ -30,9 +33,9 @@ func (r *Property) GetPropertyByKey(ctx context.Context, key string) (*model.Pro
 	})
 }
 
-func (c *Property) UpdatePropertyByKey(ctx context.Context, key string, value string) (*model.Property, error) {
+func (r *Property) UpdatePropertyByKey(ctx context.Context, key string, value string) (*model.Property, error) {
 	var property model.Property
-	err := c.db.NewSelect().
+	err := r.db.NewSelect().
 		Model(&property).
 		Where("key = ?", key).
 		Scan(ctx)
@@ -44,7 +47,7 @@ func (c *Property) UpdatePropertyByKey(ctx context.Context, key string, value st
 	}
 
 	property.Value = value
-	_, err = c.db.NewUpdate().
+	_, err = r.db.NewUpdate().
 		Model(&property).
 		Where("key = ?", key).
 		Exec(ctx)
