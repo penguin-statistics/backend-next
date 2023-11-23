@@ -8,7 +8,6 @@ func Module() fx.Option {
 		Redis,
 		RedSync,
 		Postgres,
-		LiveHouse,
 		GeoIPDatabase,
 	), fx.Invoke(Datadog))
 }
