@@ -27,6 +27,8 @@ jobs:
         name: Get summary from GPT
         continue-on-error: true
         run: |
+          set -e
+          
           # get all commit messages from last release tag to HEAD
           git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:%s > /tmp/commit_messages.txt
 
