@@ -20,7 +20,7 @@ import (
 	"exusiai.dev/backend-next/internal/workers/reportwkr"
 )
 
-func New(ctx appcontext.Ctx, additionalOpts ...fx.Option) *fx.App {
+func Options(ctx appcontext.Ctx, additionalOpts ...fx.Option) []fx.Option {
 	conf, err := appconfig.Parse(ctx)
 	if err != nil {
 		panic(err)
@@ -29,16 +29,6 @@ func New(ctx appcontext.Ctx, additionalOpts ...fx.Option) *fx.App {
 	// logger and configuration are the only two things that are not in the fx graph
 	// because some other packages need them to be initialized before fx starts
 	logger.Configure(conf)
-
-	// baseOpts := []fx.Option{
-	// 	fx.WithLogger(fxlogger.Logger),
-	// 	fx.Supply(conf),
-	// 	controller.Module(),
-	// 	infra.Module(),
-	// 	repo.Module(),
-	// 	service.Module(),
-	// 	server.Module(),
-	// }
 
 	baseOpts := []fx.Option{
 		// fx meta
@@ -84,5 +74,9 @@ func New(ctx appcontext.Ctx, additionalOpts ...fx.Option) *fx.App {
 		fx.StopTimeout(5 * time.Minute),
 	}
 
-	return fx.New(append(baseOpts, additionalOpts...)...)
+	return append(baseOpts, additionalOpts...)
+}
+
+func New(ctx appcontext.Ctx, additionalOpts ...fx.Option) *fx.App {
+	return fx.New(Options(ctx, additionalOpts...)...)
 }

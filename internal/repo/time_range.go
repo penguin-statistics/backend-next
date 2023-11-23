@@ -40,3 +40,16 @@ func (r *TimeRange) GetTimeRangeById(ctx context.Context, rangeId int) (*model.T
 
 	return &timeRange, nil
 }
+
+func (c *TimeRange) GetTimeRangeByServerAndName(ctx context.Context, server string, name string) (*model.TimeRange, error) {
+	var timeRange model.TimeRange
+	if err := c.db.NewSelect().
+		Model(&timeRange).
+		Where("tr.server = ?", server).
+		Where("tr.name = ?", name).
+		Scan(ctx); err != nil {
+		return nil, err
+	}
+
+	return &timeRange, nil
+}

@@ -43,6 +43,22 @@ func (r *Stage) GetStageById(ctx context.Context, stageId int) (*model.Stage, er
 	})
 }
 
+func (c *Stage) GetStagesByZoneId(ctx context.Context, zoneId int) ([]*model.Stage, error) {
+	var stages []*model.Stage
+	err := c.db.NewSelect().
+		Model(&stages).
+		Where("zone_id = ?", zoneId).
+		Scan(ctx)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, pgerr.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return stages, nil
+}
+
 func (r *Stage) GetStageByArkId(ctx context.Context, arkStageId string) (*model.Stage, error) {
 	return r.v3sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("ark_stage_id = ?", arkStageId)

@@ -11,6 +11,7 @@ import (
 	"github.com/uptrace/bun/driver/pgdriver"
 	"github.com/uptrace/bun/extra/bundebug"
 	"github.com/uptrace/bun/extra/bunotel"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
 )
@@ -22,10 +23,10 @@ func Postgres(conf *appconfig.Config) (*bun.DB, error) {
 	// Create a Bun db on top of it.
 	db := bun.NewDB(pgdb, pgdialect.New())
 	if conf.DevMode {
-		db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithEnabled(true), bundebug.WithVerbose(conf.BunDebugVerbose)))
+		db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithEnabled(true), bundebug.WithVerbose(conf.BunDebugVerbose), bundebug.WithWriter(log.Logger)))
 	}
 	if conf.TracingEnabled {
-		db.AddQueryHook(bunotel.NewQueryHook(bunotel.WithDBName("penguin-postgres")))
+		db.AddQueryHook(bunotel.NewQueryHook(bunotel.WithDBName("penguin-postgres"), bunotel.WithAttributes(semconv.DBSystemPostgreSQL)))
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)

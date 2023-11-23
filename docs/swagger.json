@@ -20,242 +20,6 @@
     "host": "penguin-stats.io",
     "basePath": "/",
     "paths": {
-        "/PenguinStats/api/v2/_private/result/matrix/{server}/{source}/{category}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Private"
-                ],
-                "summary": "Get Drop Matrix",
-                "parameters": [
-                    {
-                        "enum": [
-                            "CN",
-                            "US",
-                            "JP",
-                            "KR"
-                        ],
-                        "type": "string",
-                        "description": "Server; default to CN",
-                        "name": "server",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "enum": [
-                            "global",
-                            "personal"
-                        ],
-                        "type": "string",
-                        "description": "Global or Personal; default to global",
-                        "name": "source",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "enum": [
-                            "all",
-                            "automated",
-                            "manual"
-                        ],
-                        "type": "string",
-                        "description": "Category; default to all",
-                        "name": "category",
-                        "in": "path"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/v2.DropMatrixQueryResult"
-                        }
-                    },
-                    "500": {
-                        "description": "An unexpected error occurred",
-                        "schema": {
-                            "$ref": "#/definitions/pgerr.PenguinError"
-                        }
-                    }
-                }
-            }
-        },
-        "/PenguinStats/api/v2/_private/result/pattern/{server}/{source}/{category}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Private"
-                ],
-                "summary": "Get Pattern Matrix",
-                "parameters": [
-                    {
-                        "enum": [
-                            "CN",
-                            "US",
-                            "JP",
-                            "KR"
-                        ],
-                        "type": "string",
-                        "description": "Server; default to CN",
-                        "name": "server",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "enum": [
-                            "global",
-                            "personal"
-                        ],
-                        "type": "string",
-                        "description": "Global or Personal; default to global",
-                        "name": "source",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "enum": [
-                            "all",
-                            "automated",
-                            "manual"
-                        ],
-                        "type": "string",
-                        "description": "Category; default to all",
-                        "name": "category",
-                        "in": "path"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/v2.PatternMatrixQueryResult"
-                        }
-                    },
-                    "500": {
-                        "description": "An unexpected error occurred",
-                        "schema": {
-                            "$ref": "#/definitions/pgerr.PenguinError"
-                        }
-                    }
-                }
-            }
-        },
-        "/PenguinStats/api/v2/_private/result/trend/{server}": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Private"
-                ],
-                "summary": "Get Trends",
-                "parameters": [
-                    {
-                        "enum": [
-                            "CN",
-                            "US",
-                            "JP",
-                            "KR"
-                        ],
-                        "type": "string",
-                        "description": "Server; default to CN",
-                        "name": "server",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/v2.TrendQueryResult"
-                        }
-                    },
-                    "500": {
-                        "description": "An unexpected error occurred",
-                        "schema": {
-                            "$ref": "#/definitions/pgerr.PenguinError"
-                        }
-                    }
-                }
-            }
-        },
-        "/PenguinStats/api/v2/advanced": {
-            "post": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Result"
-                ],
-                "summary": "Execute Advanced Query",
-                "parameters": [
-                    {
-                        "description": "Query",
-                        "name": "query",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/types.AdvancedQueryRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Drop Matrix Response: when `interval` has been left undefined.",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/v2.AdvancedQueryResult"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "advanced_results": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/v2.DropMatrixQueryResult"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "202": {
-                        "description": "Trend Response: when `interval` has been defined a value greater than `0`. Notice that this response still responds with a status code of `200`, but due to swagger limitations, to denote a different response with the same status code is not possible. Therefore, a status code of `202` is used, only for the purpose of workaround.",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/v2.AdvancedQueryResult"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "advanced_results": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/v2.TrendQueryResult"
-                                            }
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "500": {
-                        "description": "An unexpected error occurred",
-                        "schema": {
-                            "$ref": "#/definitions/pgerr.PenguinError"
-                        }
-                    }
-                }
-            }
-        },
         "/PenguinStats/api/v2/config": {
             "get": {
                 "produces": [
@@ -267,7 +31,7 @@
                 "summary": "Get FrontendConfig",
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "OK"
                     },
                     "500": {
                         "description": "An unexpected error occurred",
@@ -289,7 +53,7 @@
                 "summary": "Get Formula",
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "OK"
                     },
                     "500": {
                         "description": "An unexpected error occurred",
@@ -317,7 +81,7 @@
                             "items": {
                                 "allOf": [
                                     {
-                                        "$ref": "#/definitions/v2.Item"
+                                        "$ref": "#/definitions/exusiai_dev_backend-next_internal_model_v2.Item"
                                     },
                                     {
                                         "type": "object",
@@ -367,7 +131,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/v2.Item"
+                                    "$ref": "#/definitions/exusiai_dev_backend-next_internal_model_v2.Item"
                                 },
                                 {
                                     "type": "object",
@@ -494,7 +258,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.SingleReportRequest"
+                            "$ref": "#/definitions/types.SingularReportRequest"
                         }
                     }
                 ],
@@ -540,7 +304,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/types.SingleReportRecallRequest"
+                            "$ref": "#/definitions/types.SingularReportRecallRequest"
                         }
                     }
                 ],
@@ -611,6 +375,78 @@
                 }
             }
         },
+        "/PenguinStats/api/v2/result/advanced": {
+            "post": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Result"
+                ],
+                "summary": "Execute Advanced Query",
+                "parameters": [
+                    {
+                        "description": "Query",
+                        "name": "query",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/types.AdvancedQueryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Drop Matrix Response: when `interval` has been left undefined.",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/v2.AdvancedQueryResult"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "advanced_results": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/v2.DropMatrixQueryResult"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "202": {
+                        "description": "Trend Response: when `interval` has been defined a value greater than `0`. Notice that this response still responds with a status code of `200`, but due to swagger limitations, to denote a different response with the same status code is not possible. Therefore, a status code of `202` is used, only for the purpose of workaround.",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/v2.AdvancedQueryResult"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "advanced_results": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/v2.TrendQueryResult"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "An unexpected error occurred",
+                        "schema": {
+                            "$ref": "#/definitions/pgerr.PenguinError"
+                        }
+                    }
+                }
+            }
+        },
         "/PenguinStats/api/v2/result/matrix": {
             "get": {
                 "security": [
@@ -649,6 +485,17 @@
                         "type": "boolean",
                         "description": "Whether to show closed stages or not",
                         "name": "show_closed_zones",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "all",
+                            "automated",
+                            "manual"
+                        ],
+                        "type": "string",
+                        "description": "Category; default to all",
+                        "name": "category",
                         "in": "query"
                     },
                     {
@@ -720,6 +567,12 @@
                         "type": "boolean",
                         "description": "Whether to query for personal drop matrix or not. If `is_personal` equals to `true`, a valid PenguinID would be required to be provided (PenguinIDAuth)",
                         "name": "is_personal",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Show all patterns; default to false",
+                        "name": "showAllPatterns",
                         "in": "query"
                     }
                 ],
@@ -796,7 +649,7 @@
                             "items": {
                                 "allOf": [
                                     {
-                                        "$ref": "#/definitions/v2.Stage"
+                                        "$ref": "#/definitions/exusiai_dev_backend-next_internal_model_v2.Stage"
                                     },
                                     {
                                         "type": "object",
@@ -846,7 +699,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/v2.Stage"
+                                    "$ref": "#/definitions/exusiai_dev_backend-next_internal_model_v2.Stage"
                                 },
                                 {
                                     "type": "object",
@@ -907,7 +760,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/v2.SiteStats"
+                                "$ref": "#/definitions/exusiai_dev_backend-next_internal_model_v2.SiteStats"
                             }
                         }
                     },
@@ -981,7 +834,7 @@
                             "items": {
                                 "allOf": [
                                     {
-                                        "$ref": "#/definitions/v2.Zone"
+                                        "$ref": "#/definitions/exusiai_dev_backend-next_internal_model_v2.Zone"
                                     },
                                     {
                                         "type": "object",
@@ -1031,7 +884,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/v2.Zone"
+                                    "$ref": "#/definitions/exusiai_dev_backend-next_internal_model_v2.Zone"
                                 },
                                 {
                                     "type": "object",
@@ -1064,6 +917,172 @@
         }
     },
     "definitions": {
+        "exusiai_dev_backend-next_internal_model_v2.Item": {
+            "type": "object",
+            "properties": {
+                "alias": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "existence": {
+                    "type": "object"
+                },
+                "groupID": {
+                    "type": "string"
+                },
+                "itemId": {
+                    "type": "string"
+                },
+                "itemType": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "name_i18n": {
+                    "type": "object"
+                },
+                "pron": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "rarity": {
+                    "type": "integer"
+                },
+                "sortId": {
+                    "type": "integer"
+                },
+                "spriteCoord": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "exusiai_dev_backend-next_internal_model_v2.SiteStats": {
+            "type": "object",
+            "properties": {
+                "totalApCost": {
+                    "type": "integer"
+                },
+                "totalItemQuantities": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.TotalItemQuantity"
+                    }
+                },
+                "totalStageTimes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.TotalStageTime"
+                    }
+                },
+                "totalStageTimes_24h": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.TotalStageTime"
+                    }
+                }
+            }
+        },
+        "exusiai_dev_backend-next_internal_model_v2.Stage": {
+            "type": "object",
+            "properties": {
+                "apCost": {
+                    "type": "integer",
+                    "example": 6
+                },
+                "code": {
+                    "type": "string",
+                    "example": "1-7"
+                },
+                "code_i18n": {
+                    "type": "object"
+                },
+                "dropInfos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/v2.DropInfo"
+                    }
+                },
+                "existence": {
+                    "type": "object"
+                },
+                "isGacha": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "minClearTime": {
+                    "type": "integer",
+                    "example": 118000
+                },
+                "recognitionOnly": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stageId": {
+                    "type": "string",
+                    "example": "main_01-07"
+                },
+                "stageType": {
+                    "description": "StageType is the type of the stage\n* MAIN - Mainline Stages\n* SUB - Sub Stages\n* ACTIVITY - Activity Stages\n* DAILY - Daily Stages",
+                    "type": "string",
+                    "enum": [
+                        "MAIN",
+                        "SUB",
+                        "ACTIVITY",
+                        "DAILY"
+                    ],
+                    "example": "MAIN"
+                },
+                "zoneId": {
+                    "type": "string",
+                    "example": "main_1"
+                }
+            }
+        },
+        "exusiai_dev_backend-next_internal_model_v2.Zone": {
+            "type": "object",
+            "properties": {
+                "background": {
+                    "type": "string"
+                },
+                "existence": {
+                    "type": "object"
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "subType": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "zoneId": {
+                    "type": "string"
+                },
+                "zoneIndex": {
+                    "type": "integer"
+                },
+                "zoneName": {
+                    "type": "string"
+                },
+                "zoneName_i18n": {
+                    "type": "object"
+                }
+            }
+        },
         "model.Existence": {
             "type": "object",
             "required": [
@@ -1075,19 +1094,35 @@
             "properties": {
                 "CN": {
                     "description": "CN: 国服 Mainland China Server (maintained by Hypergryph Network Technology Co., Ltd.)",
-                    "$ref": "#/definitions/model.ServerExistence"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ServerExistence"
+                        }
+                    ]
                 },
                 "JP": {
                     "description": "JP: 日服 Japan Server (maintained by Yostar Inc,.)",
-                    "$ref": "#/definitions/model.ServerExistence"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ServerExistence"
+                        }
+                    ]
                 },
                 "KR": {
                     "description": "KR: 韩服 Korea Server (maintained by Yostar Limited)",
-                    "$ref": "#/definitions/model.ServerExistence"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ServerExistence"
+                        }
+                    ]
                 },
                 "US": {
                     "description": "US: 美服/国际服 Global Server (maintained by Yostar Limited)",
-                    "$ref": "#/definitions/model.ServerExistence"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.ServerExistence"
+                        }
+                    ]
                 }
             }
         },
@@ -1196,6 +1231,9 @@
                 "server": {
                     "type": "string"
                 },
+                "sourceCategory": {
+                    "type": "string"
+                },
                 "stageId": {
                     "type": "string"
                 },
@@ -1244,7 +1282,8 @@
                 },
                 "quantity": {
                     "type": "integer",
-                    "maximum": 1000
+                    "maximum": 1000,
+                    "minimum": 0
                 }
             }
         },
@@ -1276,7 +1315,7 @@
                 }
             }
         },
-        "types.SingleReportRecallRequest": {
+        "types.SingularReportRecallRequest": {
             "type": "object",
             "required": [
                 "reportHash"
@@ -1288,7 +1327,7 @@
                 }
             }
         },
-        "types.SingleReportRequest": {
+        "types.SingularReportRequest": {
             "type": "object",
             "required": [
                 "server",
@@ -1320,6 +1359,11 @@
                     "type": "string",
                     "example": "main_01-07"
                 },
+                "times": {
+                    "type": "integer",
+                    "maximum": 6,
+                    "minimum": 0
+                },
                 "version": {
                     "description": "Version describes the version of the source app used to submit this report. Third-party API consumers should change this to their own app version.",
                     "type": "string",
@@ -1350,9 +1394,7 @@
             "properties": {
                 "advanced_results": {
                     "type": "array",
-                    "items": {
-                        "type": "any"
-                    }
+                    "items": {}
                 }
             }
         },
@@ -1377,53 +1419,6 @@
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/v2.OneDropMatrixElement"
-                    }
-                }
-            }
-        },
-        "v2.Item": {
-            "type": "object",
-            "properties": {
-                "alias": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "existence": {
-                    "type": "object"
-                },
-                "groupID": {
-                    "type": "string"
-                },
-                "itemId": {
-                    "type": "string"
-                },
-                "itemType": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "name_i18n": {
-                    "type": "object"
-                },
-                "pron": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "rarity": {
-                    "type": "integer"
-                },
-                "sortId": {
-                    "type": "integer"
-                },
-                "spriteCoord": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
                     }
                 }
             }
@@ -1572,86 +1567,6 @@
                 }
             }
         },
-        "v2.SiteStats": {
-            "type": "object",
-            "properties": {
-                "totalApCost": {
-                    "type": "integer"
-                },
-                "totalItemQuantities": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/v2.TotalItemQuantity"
-                    }
-                },
-                "totalStageTimes": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/v2.TotalStageTime"
-                    }
-                },
-                "totalStageTimes_24h": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/v2.TotalStageTime"
-                    }
-                }
-            }
-        },
-        "v2.Stage": {
-            "type": "object",
-            "properties": {
-                "apCost": {
-                    "type": "integer",
-                    "example": 6
-                },
-                "code": {
-                    "type": "string",
-                    "example": "1-7"
-                },
-                "code_i18n": {
-                    "type": "object"
-                },
-                "dropInfos": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/v2.DropInfo"
-                    }
-                },
-                "existence": {
-                    "type": "object"
-                },
-                "minClearTime": {
-                    "type": "integer",
-                    "example": 118000
-                },
-                "recognitionOnly": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "stageId": {
-                    "type": "string",
-                    "example": "main_01-07"
-                },
-                "stageType": {
-                    "description": "StageType is the type of the stage\n* MAIN - Mainline Stages\n* SUB - Sub Stages\n* ACTIVITY - Activity Stages\n* DAILY - Daily Stages",
-                    "type": "string",
-                    "enum": [
-                        "MAIN",
-                        "SUB",
-                        "ACTIVITY",
-                        "DAILY"
-                    ],
-                    "example": "MAIN"
-                },
-                "zoneId": {
-                    "type": "string",
-                    "example": "main_1"
-                }
-            }
-        },
         "v2.StageTrend": {
             "type": "object",
             "properties": {
@@ -1696,41 +1611,6 @@
                     "additionalProperties": {
                         "$ref": "#/definitions/v2.StageTrend"
                     }
-                }
-            }
-        },
-        "v2.Zone": {
-            "type": "object",
-            "properties": {
-                "background": {
-                    "type": "string"
-                },
-                "existence": {
-                    "type": "object"
-                },
-                "stages": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "subType": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                },
-                "zoneId": {
-                    "type": "string"
-                },
-                "zoneIndex": {
-                    "type": "integer"
-                },
-                "zoneName": {
-                    "type": "string"
-                },
-                "zoneName_i18n": {
-                    "type": "object"
                 }
             }
         }

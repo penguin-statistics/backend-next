@@ -16,14 +16,17 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
+	"github.com/tidwall/sjson"
 	"github.com/uptrace/bun"
 	"github.com/zeebo/xxh3"
 	"go.uber.org/fx"
+	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/model/gamedata"
 	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/flog"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/repo"
 	"exusiai.dev/backend-next/internal/server/svr"
@@ -34,28 +37,35 @@ import (
 type AdminController struct {
 	fx.In
 
-	DB                    *bun.DB
-	PatternRepo           *repo.DropPattern
-	PatternElementRepo    *repo.DropPatternElement
-	RecognitionDefectRepo *repo.RecognitionDefect
-	AdminService          *service.Admin
-	ItemService           *service.Item
-	StageService          *service.Stage
-	DropMatrixService     *service.DropMatrix
-	PatternMatrixService  *service.PatternMatrix
-	TrendService          *service.Trend
-	SiteStatsService      *service.SiteStats
-	AnalyticsService      *service.Analytics
-	UpyunService          *service.Upyun
-	SnapshotService       *service.Snapshot
-	DropReportService     *service.DropReport
-	DropReportRepo        *repo.DropReport
+	PatternRepo              *repo.DropPattern
+	PatternElementRepo       *repo.DropPatternElement
+	RecognitionDefectRepo    *repo.RecognitionDefect
+	AdminService             *service.Admin
+	ItemService              *service.Item
+	StageService             *service.Stage
+	DropMatrixService        *service.DropMatrix
+	PatternMatrixService     *service.PatternMatrix
+	TrendService             *service.Trend
+	SiteStatsService         *service.SiteStats
+	AnalyticsService         *service.Analytics
+	UpyunService             *service.Upyun
+	SnapshotService          *service.Snapshot
+	DropReportService        *service.DropReport
+	DropReportRepo           *repo.DropReport
+	PropertyRepo             *repo.Property
+	DropMatrixElementService *service.DropMatrixElement
+	TimeRangeService         *service.TimeRange
+	ExportService            *service.Export
+	AccountService           *service.Account
+	ArchiveService           *service.Archive
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Get("/bonjour", c.Bonjour)
 	admin.Post("/save", c.SaveRenderedObjects)
 	admin.Post("/purge", c.PurgeCache)
+
+	admin.Post("/clone", c.CloneFromCN)
 
 	admin.Post("/rejections/reject-rules/reevaluation/preview", c.RejectRulesReevaluationPreview)
 	admin.Post("/rejections/reject-rules/reevaluation/apply", c.RejectRulesReevaluationApply)
@@ -67,15 +77,19 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 
 	admin.Get("/analytics/report-unique-users/by-source", c.GetRecentUniqueUserCountBySource)
 
-	admin.Get("/refresh/matrix/:server", c.RefreshAllDropMatrixElements)
-	admin.Get("/refresh/pattern/:server", c.RefreshAllPatternMatrixElements)
-	admin.Get("/refresh/trend/:server", c.RefreshAllTrendElements)
+	admin.Post("/refresh/matrix", c.CalcDropMatrixElements)
+	admin.Post("/refresh/pattern", c.CalcPatternMatrixElements)
 	admin.Get("/refresh/sitestats/:server", c.RefreshAllSiteStats)
 
 	admin.Get("/recognition/defects", c.GetRecognitionDefects)
 	admin.Get("/recognition/defects/:defectId", c.GetRecognitionDefect)
+	admin.Post("/recognition/items-resources/updated", c.RecognitionItemsResourcesUpdated)
+
+	admin.Post("/export/drop-report", c.ExportDropReport)
 
 	admin.Post("/snapshots", c.CreateSnapshot)
+
+	admin.Post("/archive", c.ArchiveDropReports)
 }
 
 type CliGameDataSeedResponse struct {
@@ -320,21 +334,6 @@ func (c *AdminController) GetRecentUniqueUserCountBySource(ctx *fiber.Ctx) error
 	return ctx.JSON(result)
 }
 
-func (c *AdminController) RefreshAllDropMatrixElements(ctx *fiber.Ctx) error {
-	server := ctx.Params("server")
-	return c.DropMatrixService.RefreshAllDropMatrixElements(ctx.UserContext(), server, []string{constant.SourceCategoryAll})
-}
-
-func (c *AdminController) RefreshAllPatternMatrixElements(ctx *fiber.Ctx) error {
-	server := ctx.Params("server")
-	return c.PatternMatrixService.RefreshAllPatternMatrixElements(ctx.UserContext(), server, []string{constant.SourceCategoryAll})
-}
-
-func (c *AdminController) RefreshAllTrendElements(ctx *fiber.Ctx) error {
-	server := ctx.Params("server")
-	return c.TrendService.RefreshTrendElements(ctx.UserContext(), server, []string{constant.SourceCategoryAll})
-}
-
 func (c *AdminController) RefreshAllSiteStats(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
 	_, err := c.SiteStatsService.RefreshShimSiteStats(ctx.UserContext(), server)
@@ -478,27 +477,31 @@ func (c *AdminController) RejectRulesReevaluationApply(ctx *fiber.Ctx) error {
 	err = c.DB.RunInTx(ctx.UserContext(), nil, func(ictx context.Context, tx bun.Tx) error {
 		for _, change := range changeSet {
 			log.Debug().
-				Str("evt.name", "admin.reject_rules.reevaluation.apply").
-				Int("report_id", change.ReportID).
-				Int("to_reliability", change.ToReliability).
-				Msg("applying reliability modification to report")
+				Str("evt.name", "admin.reject_rules.reevaluation.apply_chunk").
+				Int("chunk_size", len(changeChunk)).
+				Msg("applying reliability modification chunk to report")
 
-			if err := c.DropReportRepo.UpdateDropReportReliability(ictx, tx, change.ReportID, change.ToReliability); err != nil {
+			data := lo.Map(changeChunk, func(change *service.RejectRulesReevaluationEvaluationResultSetDiff, _ int) *model.DropReport {
+				return &model.DropReport{
+					ReportID:    change.ReportID,
+					Reliability: change.ToReliability,
+				}
+			})
+
+			if _, err := tx.NewUpdate().
+				With("_data", tx.NewValues(&data)).
+				Model((*model.DropReport)(nil)).
+				Set("reliability = _data.reliability").
+				Where("report_id = _data.report_id").
+				Exec(ictx); err != nil {
 				log.Error().
 					Err(err).
-					Str("evt.name", "admin.reject_rules.reevaluation.apply").
-					Int("report_id", change.ReportID).
-					Int("to_reliability", change.ToReliability).
+					Str("evt.name", "admin.reject_rules.reevaluation.apply_chunk").
+					Int("chunk_size", len(changeChunk)).
 					Msg("failed to apply reliability modification to report")
 
 				return err
 			}
-
-			log.Debug().
-				Str("evt.name", "admin.reject_rules.reevaluation.apply").
-				Int("report_id", change.ReportID).
-				Int("to_reliability", change.ToReliability).
-				Msg("reliability modification applied to report")
 		}
 
 		return nil
@@ -511,13 +514,11 @@ func (c *AdminController) RejectRulesReevaluationApply(ctx *fiber.Ctx) error {
 	}
 
 	type rejectRulesReevaluationApplyResponse struct {
-		Summary   service.RejectRulesReevaluationEvaluationResultSetSummary   `json:"summary"`
-		ChangeSet service.RejectRulesReevaluationEvaluationResultSetChangeSet `json:"changeset"`
+		Summary service.RejectRulesReevaluationEvaluationResultSetSummary `json:"summary"`
 	}
 
 	return ctx.JSON(&rejectRulesReevaluationApplyResponse{
-		Summary:   evaluation.Summary(),
-		ChangeSet: changeSet,
+		Summary: evaluation.Summary(),
 	})
 }
 
@@ -537,4 +538,195 @@ func (c *AdminController) CreateSnapshot(ctx *fiber.Ctx) error {
 	}
 
 	return ctx.JSON(snapshot)
+}
+
+func (c *AdminController) RecognitionItemsResourcesUpdated(ctx *fiber.Ctx) error {
+	type createRecognitionAssetRequest struct {
+		Server string `json:"server" validate:"required,arkserver"`
+		Prefix string `json:"prefix" validate:"required"`
+	}
+	var request createRecognitionAssetRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	property, err := c.PropertyRepo.GetPropertyByKey(ctx.UserContext(), "frontend_config")
+	if err != nil {
+		return err
+	}
+
+	s, err := sjson.Set(property.Value, "recognition.items-resources.prefix."+request.Server, request.Prefix)
+	if err != nil {
+		return err
+	}
+	// j.Get("recognition").Get("items-resources").Get("prefix").Get(request.Server).
+
+	asset, err := c.PropertyRepo.UpdatePropertyByKey(ctx.UserContext(), "frontend_config", s)
+	if err != nil {
+		return err
+	}
+
+	return ctx.JSON(asset)
+}
+
+func (c *AdminController) CalcDropMatrixElements(ctx *fiber.Ctx) error {
+	type calcDropMatrixElementsRequest struct {
+		Dates  []string `json:"dates"`
+		Server string   `json:"server"`
+	}
+	var request calcDropMatrixElementsRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	for _, dateStr := range request.Dates {
+		date, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			return err
+		}
+		err = c.DropMatrixService.UpdateDropMatrixByGivenDate(ctx.UserContext(), request.Server, &date)
+		if err != nil {
+			return err
+		}
+	}
+	return ctx.SendStatus(fiber.StatusCreated)
+}
+
+func (c *AdminController) CalcPatternMatrixElements(ctx *fiber.Ctx) error {
+	type calcPatternMatrixElementsRequest struct {
+		Dates  []string `json:"dates"`
+		Server string   `json:"server"`
+	}
+	var request calcPatternMatrixElementsRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	for _, dateStr := range request.Dates {
+		date, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			return err
+		}
+		err = c.PatternMatrixService.UpdatePatternMatrixByGivenDate(ctx.UserContext(), request.Server, &date)
+		if err != nil {
+			return err
+		}
+	}
+	return ctx.SendStatus(fiber.StatusCreated)
+}
+
+func (c *AdminController) ExportDropReport(ctx *fiber.Ctx) error {
+	type exportDropReportRequest struct {
+		Server         string    `json:"server" validate:"required,arkserver" required:"true"`
+		StageID        string    `json:"stageId" validate:"required" required:"true"`
+		ItemIDs        []string  `json:"itemIds"`
+		IsPersonal     null.Bool `json:"isPersonal" swaggertype:"boolean"`
+		AccountID      string    `json:"accountId"`
+		SourceCategory string    `json:"sourceCategory" validate:"omitempty,sourcecategory"`
+		StartTime      int64     `json:"start" swaggertype:"integer"`
+		EndTime        int64     `json:"end" validate:"omitempty,gtfield=StartTime" swaggertype:"integer"`
+		Times          int       `json:"times" validate:"gte=0,lte=6"`
+	}
+	var request exportDropReportRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	// handle account id
+	accountId := null.NewInt(0, false)
+	if request.IsPersonal.Bool {
+		account, err := c.AccountService.GetAccountByPenguinId(ctx.UserContext(), request.AccountID)
+		if err != nil {
+			return err
+		}
+		accountId.Int64 = int64(account.AccountID)
+		accountId.Valid = true
+	}
+
+	// handle start time (might be null)
+	startTimeMilli := constant.ServerStartTimeMapMillis[request.Server]
+	if request.StartTime != 0 {
+		startTimeMilli = request.StartTime
+	}
+	startTime := time.UnixMilli(startTimeMilli)
+
+	// handle end time (might be null)
+	endTimeMilli := time.Now().UnixMilli()
+	if request.EndTime != 0 {
+		endTimeMilli = request.EndTime
+	}
+	endTime := time.UnixMilli(endTimeMilli)
+
+	// handle ark stage id
+	stage, err := c.StageService.GetStageByArkId(ctx.UserContext(), request.StageID)
+	if err != nil {
+		return err
+	}
+
+	// handle item ids
+	itemIds := make([]int, 0)
+	for _, arkItemID := range request.ItemIDs {
+		item, err := c.ItemService.GetItemByArkId(ctx.UserContext(), arkItemID)
+		if err != nil {
+			return err
+		}
+		itemIds = append(itemIds, item.ItemID)
+	}
+
+	// handle sourceCategory, default to all
+	sourceCategory := request.SourceCategory
+	if sourceCategory == "" {
+		sourceCategory = constant.SourceCategoryAll
+	}
+
+	// handle times, 0 means no filter on times
+	var times null.Int
+	if request.Times != 0 {
+		times.Int64 = int64(request.Times)
+		times.Valid = true
+	} else {
+		times.Valid = false
+	}
+
+	result, err := c.ExportService.ExportDropReportsAndPatterns(ctx.UserContext(), request.Server, &startTime, &endTime, times, stage.StageID, itemIds, accountId, request.SourceCategory)
+	if err != nil {
+		return err
+	}
+	return ctx.JSON(result)
+}
+
+func (c *AdminController) CloneFromCN(ctx *fiber.Ctx) error {
+	var request types.CloneFromCNRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	err := c.AdminService.CloneFromCN(ctx.UserContext(), request)
+	if err != nil {
+		return err
+	}
+	return ctx.SendStatus(fiber.StatusCreated)
+}
+
+func (c *AdminController) ArchiveDropReports(ctx *fiber.Ctx) error {
+	var request types.ArchiveDropReportRequest
+	if err := rekuest.ValidBody(ctx, &request); err != nil {
+		return err
+	}
+
+	date, err := time.Parse("2006-01-02", request.Date)
+	if err != nil {
+		return ctx.Status(fiber.StatusBadRequest).SendString("invalid date")
+	}
+
+	err = c.ArchiveService.ArchiveByDate(ctx.UserContext(), date, request.DeleteAfterArchive)
+	if err != nil {
+		flog.ErrorFrom(ctx, "archive.drop_report").
+			Err(err).
+			Time("targetDay", date).
+			Msg("failed to archive drop report")
+
+		return err
+	}
+	return ctx.SendStatus(fiber.StatusOK)
 }

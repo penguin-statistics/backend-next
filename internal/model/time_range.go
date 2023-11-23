@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 )
@@ -22,6 +23,20 @@ type TimeRange struct {
 
 func (tr *TimeRange) String() string {
 	return strconv.FormatInt(tr.StartTime.UnixMilli(), 10) + "-" + strconv.FormatInt(tr.EndTime.UnixMilli(), 10)
+}
+
+func (tr *TimeRange) Includes(t time.Time) bool {
+	if tr.StartTime != nil && tr.StartTime.After(t) {
+		return false
+	}
+	if tr.EndTime != nil && tr.EndTime.Before(t) {
+		return false
+	}
+	return true
+}
+
+func (tr *TimeRange) HumanReadableString(server string) string {
+	return tr.StartTime.In(constant.LocMap[server]).Format("2006-01-02 15:04:05") + " - " + tr.EndTime.In(constant.LocMap[server]).Format("2006-01-02 15:04:05")
 }
 
 func TimeRangeFromString(s string) *TimeRange {

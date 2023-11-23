@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/goccy/go-json"
-
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
@@ -24,7 +23,12 @@ var (
 	ItemDropSetByStageIDAndRangeID   *cache.Set[[]int]
 	ItemDropSetByStageIdAndTimeRange *cache.Set[[]int]
 
-	ShimMaxAccumulableDropMatrixResults *cache.Set[modelv2.DropMatrixQueryResult]
+	ShimGlobalDropMatrix *cache.Set[modelv2.DropMatrixQueryResult]
+	GlobalDropMatrix     *cache.Set[model.DropMatrixQueryResult]
+
+	ShimTrend *cache.Set[modelv2.TrendQueryResult]
+
+	ShimGlobalPatternMatrix *cache.Set[modelv2.PatternMatrixQueryResult]
 
 	Formula *cache.Singular[json.RawMessage]
 
@@ -44,8 +48,6 @@ var (
 	Activities     *cache.Singular[[]*model.Activity]
 	ShimActivities *cache.Singular[[]*modelv2.Activity]
 
-	ShimLatestPatternMatrixResults *cache.Set[modelv2.PatternMatrixQueryResult]
-
 	ShimSiteStats *cache.Set[modelv2.SiteStats]
 
 	Stages           *cache.Singular[[]*model.Stage]
@@ -55,12 +57,12 @@ var (
 	StagesMapByID    *cache.Singular[map[int]*model.Stage]
 	StagesMapByArkID *cache.Singular[map[string]*model.Stage]
 
-	TimeRanges               *cache.Set[[]*model.TimeRange]
-	TimeRangeByID            *cache.Set[model.TimeRange]
-	TimeRangesMap            *cache.Set[map[int]*model.TimeRange]
-	MaxAccumulableTimeRanges *cache.Set[map[int]map[int][]*model.TimeRange]
-
-	ShimSavedTrendResults *cache.Set[modelv2.TrendQueryResult]
+	TimeRanges                  *cache.Set[[]*model.TimeRange]
+	TimeRangeByID               *cache.Set[model.TimeRange]
+	TimeRangesMap               *cache.Set[map[int]*model.TimeRange]
+	MaxAccumulableTimeRanges    *cache.Set[map[int]map[int][]*model.TimeRange]
+	AllMaxAccumulableTimeRanges *cache.Set[map[int]map[int][]*model.TimeRange]
+	LatestTimeRanges            *cache.Set[map[int]*model.TimeRange]
 
 	Zones           *cache.Singular[[]*model.Zone]
 	ZoneByArkID     *cache.Set[model.Zone]
@@ -126,9 +128,21 @@ func initializeCaches() {
 	SetMap["itemDropSet#server|stageId|startTime|endTime"] = ItemDropSetByStageIdAndTimeRange.Flush
 
 	// drop_matrix
-	ShimMaxAccumulableDropMatrixResults = cache.NewSet[modelv2.DropMatrixQueryResult]("shimMaxAccumulableDropMatrixResults#server|showClosedZoned|sourceCategory")
+	ShimGlobalDropMatrix = cache.NewSet[modelv2.DropMatrixQueryResult]("shimGlobalDropMatrix#server|showClosedZones|sourceCategory")
+	GlobalDropMatrix = cache.NewSet[model.DropMatrixQueryResult]("globalDropMatrix#server|sourceCategory")
 
-	SetMap["shimMaxAccumulableDropMatrixResults#server|showClosedZoned|sourceCategory"] = ShimMaxAccumulableDropMatrixResults.Flush
+	SetMap["shimGlobalDropMatrix#server|showClosedZones|sourceCategory"] = ShimGlobalDropMatrix.Flush
+	SetMap["globalDropMatrix#server|sourceCategory"] = GlobalDropMatrix.Flush
+
+	// trend
+	ShimTrend = cache.NewSet[modelv2.TrendQueryResult]("shimTrend#server")
+
+	SetMap["shimTrend#server"] = ShimTrend.Flush
+
+	// pattern_matrix
+	ShimGlobalPatternMatrix = cache.NewSet[modelv2.PatternMatrixQueryResult]("shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns")
+
+	SetMap["shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns"] = ShimGlobalPatternMatrix.Flush
 
 	// formula
 	Formula = cache.NewSingular[json.RawMessage]("formula")
@@ -169,11 +183,6 @@ func initializeCaches() {
 	SingularFlusherMap["activities"] = Activities.Delete
 	SingularFlusherMap["shimActivities"] = ShimActivities.Delete
 
-	// pattern_matrix
-	ShimLatestPatternMatrixResults = cache.NewSet[modelv2.PatternMatrixQueryResult]("shimLatestPatternMatrixResults#server|sourceCategory")
-
-	SetMap["shimLatestPatternMatrixResults#server|sourceCategory"] = ShimLatestPatternMatrixResults.Flush
-
 	// site_stats
 	ShimSiteStats = cache.NewSet[modelv2.SiteStats]("shimSiteStats#server")
 
@@ -199,16 +208,15 @@ func initializeCaches() {
 	TimeRangeByID = cache.NewSet[model.TimeRange]("timeRange#rangeId")
 	TimeRangesMap = cache.NewSet[map[int]*model.TimeRange]("timeRangesMap#server")
 	MaxAccumulableTimeRanges = cache.NewSet[map[int]map[int][]*model.TimeRange]("maxAccumulableTimeRanges#server")
+	AllMaxAccumulableTimeRanges = cache.NewSet[map[int]map[int][]*model.TimeRange]("allMaxAccumulableTimeRanges#server")
+	LatestTimeRanges = cache.NewSet[map[int]*model.TimeRange]("latestTimeRanges#server")
 
 	SetMap["timeRanges#server"] = TimeRanges.Flush
 	SetMap["timeRange#rangeId"] = TimeRangeByID.Flush
 	SetMap["timeRangesMap#server"] = TimeRangesMap.Flush
 	SetMap["maxAccumulableTimeRanges#server"] = MaxAccumulableTimeRanges.Flush
-
-	// trend
-	ShimSavedTrendResults = cache.NewSet[modelv2.TrendQueryResult]("shimSavedTrendResults#server")
-
-	SetMap["shimSavedTrendResults#server"] = ShimSavedTrendResults.Flush
+	SetMap["allMaxAccumulableTimeRanges#server"] = AllMaxAccumulableTimeRanges.Flush
+	SetMap["latestTimeRanges#server"] = LatestTimeRanges.Flush
 
 	// zone
 	Zones = cache.NewSingular[[]*model.Zone]("zones")

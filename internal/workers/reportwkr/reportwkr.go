@@ -7,15 +7,15 @@ import (
 	"time"
 
 	"exusiai.dev/gommon/constant"
-	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
@@ -38,13 +38,12 @@ type WorkerDeps struct {
 	DB                     *bun.DB
 	Redis                  *redis.Client
 	NatsJS                 nats.JetStreamContext
-	StageRepo              *repo.Stage
+	StageService           *service.Stage
 	DropReportRepo         *repo.DropReport
 	DropPatternRepo        *repo.DropPattern
 	DropReportExtraRepo    *repo.DropReportExtra
 	DropPatternElementRepo *repo.DropPatternElement
 	ReportVerifier         *reportverifs.ReportVerifiers
-	LiveHouseService       *service.LiveHouse
 }
 
 type Worker struct {
@@ -85,7 +84,7 @@ func Start(conf *appconfig.Config, deps WorkerDeps) {
 }
 
 func (w *Worker) Consumer(ctx context.Context, ch chan error) error {
-	msgChan := make(chan *nats.Msg, 16)
+	msgChan := make(chan *nats.Msg, 512)
 
 	_, err := w.NatsJS.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.AckWait(time.Second*10), nats.MaxAckPending(128))
 	if err != nil {
@@ -147,7 +146,7 @@ func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
 			trace.WithSpanKind(trace.SpanKindConsumer),
 			trace.WithAttributes(
 				semconv.MessagingSystemKey.String("nats"),
-				semconv.MessagingDestinationKey.String(msg.Subject),
+				semconv.MessagingDestinationNameKey.String(msg.Subject),
 				semconv.MessagingMessageIDKey.String(jetstream.MessageID(metadata.Sequence)),
 				semconv.MessagingMessagePayloadSizeBytesKey.Int(len(msg.Data)),
 			))
@@ -241,7 +240,7 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 			}
 		}
 
-		stage, err := w.StageRepo.GetStageByArkId(pstCtx, report.StageID)
+		stage, err := w.StageService.GetStageByArkId(pstCtx, report.StageID)
 		if err != nil {
 			return errors.Wrap(err, "failed to get stage")
 		}
@@ -271,6 +270,12 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 		}
 		if reportTask.IP == "" {
 			// FIXME: temporary hack; find why ip is empty
+			log.Warn().
+				Str("evt.name", "reportwkr.ip.empty").
+				Str("taskId", reportTask.TaskID).
+				Interface("reportTask", reportTask).
+				Msg("ip is empty; using 127.0.0.1 as a fallback")
+
 			reportTask.IP = "127.0.0.1"
 		}
 		if err = w.DropReportExtraRepo.CreateDropReportExtra(pstCtx, tx, &model.DropReportExtra{
@@ -284,12 +289,6 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 
 		if err := w.Redis.Set(pstCtx, constant.ReportRedisPrefix+reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
 			return errors.Wrap(err, "failed to set report id in redis")
-		}
-
-		if reliability == 0 {
-			if err := w.LiveHouseService.PushReport(report, uint32(stage.StageID), reportTask.Server); err != nil {
-				L.Warn().Err(err).Msg("failed to push report to LiveHouse")
-			}
 		}
 	}
 

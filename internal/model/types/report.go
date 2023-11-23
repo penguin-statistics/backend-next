@@ -4,7 +4,7 @@ package types
 type ArkDrop struct {
 	DropType string `json:"dropType" validate:"required,oneof=REGULAR_DROP NORMAL_DROP SPECIAL_DROP EXTRA_DROP FURNITURE"`
 	ItemID   string `json:"itemId" validate:"required" example:"30013"`
-	Quantity int    `json:"quantity" validate:"required,lte=1000"`
+	Quantity int    `json:"quantity" validate:"required,gte=0,lte=1000"`
 }
 
 type Drop struct {
@@ -28,6 +28,7 @@ type SingularReportRequest struct {
 	FragmentReportCommon
 
 	Drops []ArkDrop `json:"drops" validate:"dive"`
+	Times int       `json:"times" validate:"gte=0,lte=6"`
 
 	Metadata *ReportRequestMetadata `json:"metadata" validate:"omitempty,dive"`
 }

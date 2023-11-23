@@ -28,7 +28,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/pkg/bininfo"
@@ -77,7 +77,10 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 		Timeout: time.Second * 5,
 	}))
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*",
+		AllowOrigins: "*",
+		AllowOriginsFunc: func(origin string) bool {
+			return true
+		},
 		AllowMethods:     "GET, POST, DELETE, OPTIONS",
 		AllowHeaders:     "Content-Type, Authorization, X-Requested-With, X-Penguin-Variant, sentry-trace",
 		ExposeHeaders:    "Content-Type, X-Penguin-Set-PenguinID, X-Penguin-Upgrade, X-Penguin-Compatible, X-Penguin-Request-ID",
@@ -134,7 +137,7 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 	)
 	otel.SetTracerProvider(tracerProvider)
 
-	app.Use(otelfiber.Middleware("pgbackend"))
+	app.Use(otelfiber.Middleware(otelfiber.WithServerName("pgbackend")))
 
 	prometheusRegisterOnce.Do(func() {
 		fiberprometheus.New(observability.ServiceName).RegisterAt(app, "/metrics")

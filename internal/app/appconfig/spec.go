@@ -55,18 +55,12 @@ type ConfigSpec struct {
 	NatsURL string `required:"true" split_words:"true" default:"nats://127.0.0.1:4222"`
 
 	// RedisURL is the URL of the Redis server, and by default uses redis db 1, to avoid potential collision
-	// with the previous running backend instance. See https://pkg.go.dev/github.com/go-redis/redis/v8#ParseURL
+	// with the previous running backend instance. See https://pkg.go.dev/github.com/redis/go-redis/v9#ParseURL
 	// for more information on how to construct a Redis URL.
 	RedisURL string `required:"true" split_words:"true" default:"redis://127.0.0.1:6379/1"`
 
 	// SentryDSN is the DSN of the Sentry server. See https://pkg.go.dev/github.com/getsentry/sentry-go#ClientOptions
 	SentryDSN string `split_words:"true"`
-
-	// LiveHouseEnabled to indicate whether to enable LiveHouse reporting.
-	LiveHouseEnabled bool `split_words:"true" default:"false"`
-
-	// LiveHouseGRPCAddress is the address of the LiveHouse gRPC server.
-	LiveHouseGRPCAddress string `split_words:"true" default:"localhost:9015"`
 
 	// DatadogProfilerEnabled to indicate whether to enable Datadog profiler.
 	DatadogProfilerEnabled bool `split_words:"true" default:"false"`
@@ -106,11 +100,8 @@ type ConfigSpec struct {
 	// WorkerInterval describes the interval in-between different batches
 	WorkerInterval time.Duration `required:"true" split_words:"true" default:"10m"`
 
-	// WorkerTrendInterval describes the interval in-between different batches
-	WorkerTrendInterval time.Duration `required:"true" split_words:"true" default:"6h"`
-
 	// WorkerSeparation describes the separation time in-between different microtasks
-	WorkerSeparation time.Duration `required:"true" split_words:"true" default:"3s"`
+	WorkerSeparation time.Duration `required:"true" split_words:"true" default:"5s"`
 
 	// WorkerTimeout describes the timeout for a single batch to run
 	WorkerTimeout time.Duration `required:"true" split_words:"true" default:"10m"`
@@ -129,6 +120,21 @@ type ConfigSpec struct {
 	// MatrixWorkerSourceCategories is a list of categories that the matrix worker will run for.
 	// Available categories are: all, automated, manual.
 	MatrixWorkerSourceCategories []string `required:"true" split_words:"true" default:"all"`
+
+	// For PatternMatrix query api, if showAllPatterns is false, then only show the top 50 patterns for all stages
+	// We don't want to show all patterns because it will be too many. So we set a limit here (default 19)
+	PatternMatrixLimit int `split_words:"true" default:"19"`
+
+	DropReportArchiveBatchSize int `split_words:"true" default:"1000"`
+
+	DropReportArchiveS3Bucket string `required:"true" split_words:"true"`
+	DropReportArchiveS3Region string `required:"true" split_words:"true"`
+	AWSAccessKey              string `required:"true" split_words:"true"`
+	AWSSecretKey              string `required:"true" split_words:"true"`
+
+	NoArchiveDays int `split_words:"true" default:"60"`
+
+	DeleteDropReportAfterArchive bool `split_words:"true" default:"false"`
 }
 
 type Config struct {

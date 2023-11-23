@@ -22,6 +22,7 @@ type WorkerDeps struct {
 	PatternMatrixService *service.PatternMatrix
 	TrendService         *service.Trend
 	SiteStatsService     *service.SiteStats
+	ArchiveService       *service.Archive
 	RedSync              *redsync.Redsync
 }
 
@@ -34,9 +35,6 @@ type Worker struct {
 
 	// interval describes the interval in-between different batches of stats job running
 	interval time.Duration
-
-	// trendInterval describes the interval in-between different batches of trends job running
-	trendInterval time.Duration
 
 	// timeout describes the timeout for the worker
 	timeout time.Duration
@@ -53,24 +51,10 @@ type Worker struct {
 
 type WorkerCalcType string
 
-var (
-	WorkerCalcTypeStatsCalc  = WorkerCalcType("stats")
-	WorkerCalcTypeTrendsCalc = WorkerCalcType("trends")
-)
+var WorkerCalcTypeStatsCalc = WorkerCalcType("stats")
 
 func (t WorkerCalcType) URL(w *Worker) string {
 	return w.heartbeatURL[string(t)]
-}
-
-func (t WorkerCalcType) Interval(w *Worker) time.Duration {
-	switch t {
-	case WorkerCalcTypeStatsCalc:
-		return w.interval
-	case WorkerCalcTypeTrendsCalc:
-		return w.trendInterval
-	default:
-		panic("unknown worker type")
-	}
 }
 
 func Start(conf *appconfig.Config, deps WorkerDeps) {
@@ -86,17 +70,15 @@ func Start(conf *appconfig.Config, deps WorkerDeps) {
 				Msg("The worker will send a heartbeat to those URLs when it is finished")
 		}
 		w := &Worker{
-			sep:           conf.WorkerSeparation,
-			interval:      conf.WorkerInterval,
-			trendInterval: conf.WorkerTrendInterval,
-			timeout:       conf.WorkerTimeout,
-			heartbeatURL:  conf.WorkerHeartbeatURL,
-			syncMutex:     deps.RedSync.NewMutex("mutex:calcwkr", redsync.WithExpiry(30*time.Second), redsync.WithTries(2)),
-			WorkerDeps:    deps,
+			sep:          conf.WorkerSeparation,
+			interval:     conf.WorkerInterval,
+			timeout:      conf.WorkerTimeout,
+			heartbeatURL: conf.WorkerHeartbeatURL,
+			syncMutex:    deps.RedSync.NewMutex("mutex:calcwkr", redsync.WithExpiry(30*time.Second), redsync.WithTries(2)),
+			WorkerDeps:   deps,
 		}
 		w.checkConfig()
 		w.doMainCalc(conf.MatrixWorkerSourceCategories)
-		w.doTrendCalc(conf.MatrixWorkerSourceCategories)
 	} else {
 		log.Info().
 			Str("evt.name", "worker.calcwkr.disabled").
@@ -111,9 +93,6 @@ func (w *Worker) checkConfig() {
 	if w.interval < 0 {
 		panic("worker interval cannot be negative")
 	}
-	if w.trendInterval < 0 {
-		panic("worker trend interval cannot be negative")
-	}
 	if w.timeout < 0 {
 		panic("worker timeout cannot be negative")
 	}
@@ -124,42 +103,38 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 		var err error
 
 		// DropMatrixService
-		if err = w.microtask(ctx, WorkerCalcTypeStatsCalc, "dropMatrix", server, func() error {
-			return w.DropMatrixService.RefreshAllDropMatrixElements(ctx, server, sourceCategories)
+		if err = w.microtask(ctx, "dropMatrix", server, func() error {
+			return w.DropMatrixService.RunCalcDropMatrixJob(ctx, server)
 		}); err != nil {
 			return err
 		}
 		time.Sleep(w.sep)
 
 		// PatternMatrixService
-		if err = w.microtask(ctx, WorkerCalcTypeStatsCalc, "patternMatrix", server, func() error {
-			return w.PatternMatrixService.RefreshAllPatternMatrixElements(ctx, server, sourceCategories)
+		if err = w.microtask(ctx, "patternMatrix", server, func() error {
+			return w.PatternMatrixService.RunCalcPatternMatrixJob(ctx, server)
 		}); err != nil {
 			return err
 		}
 		time.Sleep(w.sep)
 
 		// SiteStatsService
-		if err = w.microtask(ctx, WorkerCalcTypeStatsCalc, "siteStats", server, func() error {
+		if err = w.microtask(ctx, "siteStats", server, func() error {
 			_, err := w.SiteStatsService.RefreshShimSiteStats(ctx, server)
 			return err
 		}); err != nil {
 			return err
 		}
 
-		return nil
-	})
-}
-
-func (w *Worker) doTrendCalc(sourceCategories []string) {
-	w.task(context.Background(), WorkerCalcTypeTrendsCalc, func(ctx context.Context, server string) error {
-		var err error
-
-		// TrendService
-		if err = w.microtask(ctx, WorkerCalcTypeTrendsCalc, "trend", server, func() error {
-			return w.TrendService.RefreshTrendElements(ctx, server, sourceCategories)
-		}); err != nil {
-			return err
+		// server == "CN": we only run archive job on a singular server
+		if server == "CN" {
+			// Archive
+			if err = w.microtask(ctx, "archive", server, func() error {
+				err := w.ArchiveService.ArchiveByGlobalConfig(ctx)
+				return err
+			}); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -216,7 +191,7 @@ func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 					w.count++
 					cancel()
 					w.unlock()
-					time.Sleep(typ.Interval(w))
+					time.Sleep(w.interval)
 				}()
 
 				errChan := make(chan error)
@@ -252,7 +227,7 @@ func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 	}()
 }
 
-func (w *Worker) microtask(ctx context.Context, typ WorkerCalcType, service, server string, f func() error) error {
+func (w *Worker) microtask(ctx context.Context, service, server string, f func() error) error {
 	mutexNotifierTicker := time.NewTicker(time.Second * 10)
 	defer func() {
 		mutexNotifierTicker.Stop()
@@ -270,12 +245,12 @@ func (w *Worker) microtask(ctx context.Context, typ WorkerCalcType, service, ser
 		}
 	}()
 
-	log.Ctx(ctx).Info().Str("evt.name", "worker.calcwkr."+string(typ)+"."+service).Str("server", server).Msg("worker microtask started calculating")
+	log.Ctx(ctx).Info().Str("evt.name", "worker.calcwkr."+service).Str("server", server).Msg("worker microtask started calculating")
 	if err := observeCalcDuration(service, server, f); err != nil {
-		log.Ctx(ctx).Error().Str("evt.name", "worker.calcwkr."+string(typ)+"."+service).Str("server", server).Err(err).Msg("worker microtask failed")
+		log.Ctx(ctx).Error().Str("evt.name", "worker.calcwkr."+service).Str("server", server).Err(err).Msg("worker microtask failed")
 		return err
 	}
-	log.Ctx(ctx).Info().Str("evt.name", "worker.calcwkr."+string(typ)+"."+service).Str("server", server).Msg("worker microtask finished")
+	log.Ctx(ctx).Info().Str("evt.name", "worker.calcwkr."+service).Str("server", server).Msg("worker microtask finished")
 
 	return nil
 }

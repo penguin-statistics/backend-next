@@ -165,3 +165,37 @@ func (r *DropInfo) GetDropInfosWithFilters(ctx context.Context, server string, t
 	}
 	return results, nil
 }
+
+func (s *DropInfo) GetDropInfosByServerAndRangeId(ctx context.Context, server string, rangeId int) ([]*model.DropInfo, error) {
+	var dropInfo []*model.DropInfo
+	err := s.DB.NewSelect().
+		Model(&dropInfo).
+		Where("server = ?", server).
+		Where("range_id = ?", rangeId).
+		Scan(ctx)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, pgerr.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return dropInfo, nil
+}
+
+func (s *DropInfo) CloneDropInfosFromCN(ctx context.Context, originRangeId int, destRangeId int, server string) error {
+	dropInfos, err := s.GetDropInfosByServerAndRangeId(ctx, "CN", originRangeId)
+	if err != nil {
+		return err
+	}
+	for _, dropInfo := range dropInfos {
+		dropInfo.DropID = 0
+		dropInfo.RangeID = destRangeId
+		dropInfo.Server = server
+	}
+	_, err = s.DB.NewInsert().Model(&dropInfos).Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}

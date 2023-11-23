@@ -4,61 +4,52 @@ import (
 	"context"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/ahmetb/go-linq/v3"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
-	"exusiai.dev/backend-next/internal/pkg/async"
-	"exusiai.dev/backend-next/internal/pkg/gameday"
 	"exusiai.dev/backend-next/internal/util"
-	"exusiai.dev/gommon/constant"
 )
 
 type Trend struct {
-	TimeRangeService            *TimeRange
-	DropReportService           *DropReport
-	DropInfoService             *DropInfo
-	PatternMatrixElementService *PatternMatrixElement
-	DropPatternElementService   *DropPatternElement
-	TrendElementService         *TrendElement
-	StageService                *Stage
-	ItemService                 *Item
+	DropReportService        *DropReport
+	DropInfoService          *DropInfo
+	StageService             *Stage
+	ItemService              *Item
+	DropMatrixElementService *DropMatrixElement
 }
 
 func NewTrend(
-	timeRangeService *TimeRange,
 	dropReportService *DropReport,
 	dropInfoService *DropInfo,
-	patternMatrixElementService *PatternMatrixElement,
-	dropPatternElementService *DropPatternElement,
-	trendElementService *TrendElement,
 	stageService *Stage,
 	itemService *Item,
+	dropMatrixElementService *DropMatrixElement,
 ) *Trend {
 	return &Trend{
-		TimeRangeService:            timeRangeService,
-		DropReportService:           dropReportService,
-		DropInfoService:             dropInfoService,
-		PatternMatrixElementService: patternMatrixElementService,
-		DropPatternElementService:   dropPatternElementService,
-		TrendElementService:         trendElementService,
-		StageService:                stageService,
-		ItemService:                 itemService,
+		DropReportService:        dropReportService,
+		DropInfoService:          dropInfoService,
+		StageService:             stageService,
+		ItemService:              itemService,
+		DropMatrixElementService: dropMatrixElementService,
 	}
 }
 
-// Cache: shimSavedTrendResults#server:{server}, 24hrs, records last modified time
-func (s *Trend) GetShimSavedTrendResults(ctx context.Context, server string) (*modelv2.TrendQueryResult, error) {
+// =========== Global ===========
+
+// Cache: shimTrend#server:{server}, 24hrs, records last modified time
+// Called by frontend, only for global
+func (s *Trend) GetShimTrend(ctx context.Context, server string) (*modelv2.TrendQueryResult, error) {
 	valueFunc := func() (*modelv2.TrendQueryResult, error) {
-		queryResult, err := s.getSavedTrendResults(ctx, server, constant.SourceCategoryAll)
+		queryResult, err := s.calcTrendFromDropMatrixElements(ctx, server)
 		if err != nil {
 			return nil, err
 		}
-		slowShimResult, err := s.applyShimForSavedTrendQuery(ctx, server, queryResult)
+		slowShimResult, err := s.applyShimForTrendQuery(ctx, queryResult, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -66,130 +57,78 @@ func (s *Trend) GetShimSavedTrendResults(ctx context.Context, server string) (*m
 	}
 
 	var shimResult modelv2.TrendQueryResult
-	calculated, err := cache.ShimSavedTrendResults.MutexGetSet(server, &shimResult, valueFunc, 24*time.Hour)
+	key := server
+	calculated, err := cache.ShimTrend.MutexGetSet(key, &shimResult, valueFunc, 24*time.Hour)
 	if err != nil {
 		return nil, err
 	} else if calculated {
-		cache.LastModifiedTime.Set("[shimSavedTrendResults#server:"+server+"]", time.Now(), 0)
+		cache.LastModifiedTime.Set("[shimTrend#server:"+key+"]", time.Now(), 0)
 	}
 	return &shimResult, nil
 }
 
-func (s *Trend) GetShimCustomizedTrendResults(
-	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, itemIds []int, accountId null.Int,
-) (*modelv2.TrendQueryResult, error) {
-	trendQueryResult, err := s.QueryTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, itemIds, accountId, constant.SourceCategoryAll)
+func (s *Trend) calcTrendFromDropMatrixElements(ctx context.Context, server string) (*model.TrendQueryResult, error) {
+	trendQueryResult := &model.TrendQueryResult{
+		Trends: make([]*model.StageTrend, 0),
+	}
+	today := time.Now()
+	endDayNum := util.GetDayNum(&today, server)
+	startDayNum := endDayNum - constant.DefaultIntervalNum + 1
+	dropMatrixElements, err := s.DropMatrixElementService.GetElementsByServerAndSourceCategoryAndDayNumRange(ctx, server, constant.SourceCategoryAll, startDayNum, endDayNum)
 	if err != nil {
 		return nil, err
 	}
-	return s.applyShimForCustomizedTrendQuery(ctx, trendQueryResult, startTime)
+	elementsMap := util.GetDropMatrixElementsMap(dropMatrixElements, false)
+	for stageId, elementsMapByItemId := range elementsMap {
+		stageTrend := &model.StageTrend{
+			StageID: stageId,
+			Results: make([]*model.ItemTrend, 0),
+		}
+		for itemId, elementsByDayNum := range elementsMapByItemId {
+			times := make([]int, constant.DefaultIntervalNum)
+			quantity := make([]int, constant.DefaultIntervalNum)
+			minDayNum := endDayNum
+			for dayNum, element := range elementsByDayNum {
+				if dayNum < minDayNum {
+					minDayNum = dayNum
+				}
+				times[dayNum-startDayNum] = element.Times
+				quantity[dayNum-startDayNum] = element.Quantity
+			}
+			// remove heading zeros, totally (minDayNum - startDayNum) zeros
+			times = times[minDayNum-startDayNum:]
+			quantity = quantity[minDayNum-startDayNum:]
+
+			startTime := time.UnixMilli(util.GetDayStartTimestampFromDayNum(minDayNum, server))
+			itemTrend := &model.ItemTrend{
+				ItemID:    itemId,
+				StartTime: &startTime,
+				Times:     times,
+				Quantity:  quantity,
+			}
+			stageTrend.Results = append(stageTrend.Results, itemTrend)
+		}
+		trendQueryResult.Trends = append(trendQueryResult.Trends, stageTrend)
+	}
+	return trendQueryResult, nil
 }
 
-func (s *Trend) QueryTrend(
+// =========== Customized ===========
+
+func (s *Trend) GetShimCustomizedTrendResults(
+	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, itemIds []int, accountId null.Int, sourceCategory string,
+) (*modelv2.TrendQueryResult, error) {
+	trendQueryResult, err := s.queryTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, itemIds, accountId, sourceCategory)
+	if err != nil {
+		return nil, err
+	}
+	return s.applyShimForTrendQuery(ctx, trendQueryResult, startTime)
+}
+
+func (s *Trend) queryTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdFilter []int, itemIdFilter []int, accountId null.Int, sourceCategory string,
 ) (*model.TrendQueryResult, error) {
 	trendElements, err := s.calcTrend(ctx, server, startTime, intervalLength, intervalNum, stageIdFilter, itemIdFilter, accountId, sourceCategory)
-	if err != nil {
-		return nil, err
-	}
-	return s.convertTrendElementsToTrendQueryResult(trendElements)
-}
-
-func (s *Trend) RefreshTrendElements(ctx context.Context, server string, sourceCategories []string) error {
-	maxAccumulableTimeRanges, err := s.TimeRangeService.GetMaxAccumulableTimeRangesByServer(ctx, server)
-	if err != nil {
-		return err
-	}
-
-	calcq := make([]map[string]any, 0)
-	for stageId, maxAccumulableTimeRangesForOneStage := range maxAccumulableTimeRanges {
-		itemIdsMapByTimeRange := make(map[string][]int)
-		for itemId, timeRanges := range maxAccumulableTimeRangesForOneStage {
-			sortedTimeRanges := make([]*model.TimeRange, 0)
-
-			linq.From(timeRanges).
-				SortT(func(a, b *model.TimeRange) bool {
-					return a.StartTime.Before(*b.StartTime)
-				}).
-				ToSlice(&sortedTimeRanges)
-
-			combinedTimeRange := model.TimeRange{
-				StartTime: sortedTimeRanges[0].StartTime,
-				EndTime:   sortedTimeRanges[len(sortedTimeRanges)-1].EndTime,
-			}
-
-			combinedTimeRangeKey := combinedTimeRange.String()
-			if _, ok := itemIdsMapByTimeRange[combinedTimeRangeKey]; !ok {
-				itemIdsMapByTimeRange[combinedTimeRangeKey] = make([]int, 0)
-			}
-
-			itemIdsMapByTimeRange[combinedTimeRangeKey] = append(itemIdsMapByTimeRange[combinedTimeRangeKey], itemId)
-		}
-		for rangeStr, itemIds := range itemIdsMapByTimeRange {
-			timeRange := model.TimeRangeFromString(rangeStr)
-			startTime := *timeRange.StartTime
-			endTime := *timeRange.EndTime
-
-			if endTime.After(time.Now()) {
-				endTime = time.Now()
-			}
-
-			startTime = gameday.StartTime(server, startTime)
-			if !gameday.IsStartTime(server, endTime) {
-				endTime = gameday.EndTime(server, endTime)
-			} else {
-				loc := constant.LocMap[server]
-				endTime = endTime.In(loc)
-			}
-
-			diff := int(endTime.Sub(startTime).Hours())
-			intervalNum := diff / 24
-			if diff%24 != 0 { // shouldn't happen actually
-				intervalNum++
-			}
-
-			if intervalNum > constant.DefaultIntervalNum {
-				intervalNum = constant.DefaultIntervalNum
-				startTime = endTime.Add(time.Hour * time.Duration((-1)*24*intervalNum))
-			}
-
-			calcq = append(calcq, map[string]any{
-				"stageId":     stageId,
-				"itemIds":     itemIds,
-				"startTime":   startTime,
-				"intervalNum": intervalNum,
-			})
-		}
-	}
-
-	elements, err := async.FlatMap(calcq, constant.WorkerParallelism, func(m map[string]any) ([]*model.TrendElement, error) {
-		stageId := m["stageId"].(int)
-		itemIds := m["itemIds"].([]int)
-		startTime := m["startTime"].(time.Time)
-		intervalNum := m["intervalNum"].(int)
-
-		currentBatch := make([]*model.TrendElement, 0)
-		for _, sourceCategory := range sourceCategories {
-			results, err := s.calcTrend(ctx, server, &startTime, time.Hour*24, intervalNum, []int{stageId}, itemIds, null.NewInt(0, false), sourceCategory)
-			if err != nil {
-				return nil, err
-			}
-			currentBatch = append(currentBatch, results...)
-		}
-		return currentBatch, nil
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to refresh trend elements")
-	}
-
-	if err := s.TrendElementService.BatchSaveElements(ctx, elements, server); err != nil {
-		return err
-	}
-	return cache.ShimSavedTrendResults.Delete(server)
-}
-
-func (s *Trend) getSavedTrendResults(ctx context.Context, server string, sourceCategory string) (*model.TrendQueryResult, error) {
-	trendElements, err := s.TrendElementService.GetElementsByServerAndSourceCategory(ctx, server, sourceCategory)
 	if err != nil {
 		return nil, err
 	}
@@ -397,45 +336,9 @@ func (s *Trend) convertTrendElementsToTrendQueryResult(trendElements []*model.Tr
 	return trendQueryResult, nil
 }
 
-func (s *Trend) applyShimForCustomizedTrendQuery(ctx context.Context, queryResult *model.TrendQueryResult, startTime *time.Time) (*modelv2.TrendQueryResult, error) {
-	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
-	if err != nil {
-		return nil, err
-	}
+// =========== Helpers ===========
 
-	stagesMapById, err := s.StageService.GetStagesMapById(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	results := &modelv2.TrendQueryResult{
-		Trend: make(map[string]*modelv2.StageTrend),
-	}
-	for _, stageTrend := range queryResult.Trends {
-		stage := stagesMapById[stageTrend.StageID]
-		shimStageTrend := modelv2.StageTrend{
-			Results:   make(map[string]*modelv2.OneItemTrend),
-			StartTime: startTime.UnixMilli(),
-		}
-
-		for _, itemTrend := range stageTrend.Results {
-			item := itemsMapById[itemTrend.ItemID]
-			shimStageTrend.Results[item.ArkItemID] = &modelv2.OneItemTrend{
-				Quantity: itemTrend.Quantity,
-				Times:    itemTrend.Times,
-			}
-		}
-		if len(shimStageTrend.Results) > 0 {
-			results.Trend[stage.ArkStageID] = &shimStageTrend
-		}
-	}
-	return results, nil
-}
-
-func (s *Trend) applyShimForSavedTrendQuery(ctx context.Context, server string, queryResult *model.TrendQueryResult) (*modelv2.TrendQueryResult, error) {
-	shimMinStartTime := gameday.EndTime(server, time.Now()).Add(-1 * constant.DefaultIntervalNum * 24 * time.Hour)
-	currentGameDayEndTime := gameday.EndTime(server, time.Now())
-
+func (s *Trend) applyShimForTrendQuery(ctx context.Context, queryResult *model.TrendQueryResult, startTime *time.Time) (*modelv2.TrendQueryResult, error) {
 	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
 	if err != nil {
 		return nil, err
@@ -454,58 +357,25 @@ func (s *Trend) applyShimForSavedTrendQuery(ctx context.Context, server string, 
 		shimStageTrend := modelv2.StageTrend{
 			Results: make(map[string]*modelv2.OneItemTrend),
 		}
-		var stageTrendStartTime *time.Time
-
-		// calc stage trend start time
-		for _, itemTrend := range stageTrend.Results {
-			itemStartTime := itemTrend.StartTime.Add((-1) * time.Duration(itemTrend.MinGroupID) * 24 * time.Hour)
-			// if the end time of this item is before the global trend start time (now - 60d), then we don't show it
-			dayNum := len(itemTrend.Quantity)
-			itemEndTime := itemStartTime.Add(time.Duration(dayNum) * 24 * time.Hour)
-			if itemEndTime.Before(shimMinStartTime) {
-				continue
-			}
-			// adjust stage trend start time
-			if stageTrendStartTime == nil || !stageTrendStartTime.Equal(shimMinStartTime) && itemStartTime.Before(*stageTrendStartTime) {
-				if !itemTrend.StartTime.After(shimMinStartTime) {
-					stageTrendStartTime = &shimMinStartTime
-				} else {
-					stageTrendStartTime = &itemStartTime
-				}
-			}
+		if startTime != nil {
+			shimStageTrend.StartTime = startTime.UnixMilli()
 		}
 
+		var minStartTime *time.Time
 		for _, itemTrend := range stageTrend.Results {
 			item := itemsMapById[itemTrend.ItemID]
-
-			itemStartTime := itemTrend.StartTime.Add((-1) * time.Duration(itemTrend.MinGroupID) * 24 * time.Hour)
-			dayNum := len(itemTrend.Quantity)
-			itemEndTime := itemStartTime.Add(time.Duration(dayNum) * 24 * time.Hour)
-			if itemEndTime.Before(shimMinStartTime) {
-				continue
-			}
-
-			// add 0s to the head of quantity and times arrays according to itemStartTime
-			headZeroNum := int(itemStartTime.Sub(*stageTrendStartTime).Hours() / 24)
-			if headZeroNum > 0 {
-				itemTrend.Quantity = append(make([]int, headZeroNum), itemTrend.Quantity...)
-				itemTrend.Times = append(make([]int, headZeroNum), itemTrend.Times...)
-			}
-
-			// add 0s to the tail of quantity and times arrays according to itemEndTime
-			tailZeroNum := int(currentGameDayEndTime.Sub(itemEndTime).Hours() / 24)
-			if tailZeroNum > 0 {
-				itemTrend.Quantity = append(itemTrend.Quantity, make([]int, tailZeroNum)...)
-				itemTrend.Times = append(itemTrend.Times, make([]int, tailZeroNum)...)
-			}
-
 			shimStageTrend.Results[item.ArkItemID] = &modelv2.OneItemTrend{
 				Quantity: itemTrend.Quantity,
 				Times:    itemTrend.Times,
 			}
+			if minStartTime == nil || itemTrend.StartTime.Before(*minStartTime) {
+				minStartTime = itemTrend.StartTime
+			}
+		}
+		if startTime == nil {
+			shimStageTrend.StartTime = minStartTime.UnixMilli()
 		}
 		if len(shimStageTrend.Results) > 0 {
-			shimStageTrend.StartTime = stageTrendStartTime.UnixMilli()
 			results.Trend[stage.ArkStageID] = &shimStageTrend
 		}
 	}

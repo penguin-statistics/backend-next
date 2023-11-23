@@ -67,6 +67,10 @@ func (s *Stage) GetStageByArkId(ctx context.Context, arkStageId string) (*model.
 	return dbStage, nil
 }
 
+func (s *Stage) GetStagesByZoneId(ctx context.Context, zoneId int) ([]*model.Stage, error) {
+	return s.StageRepo.GetStagesByZoneId(ctx, zoneId)
+}
+
 func (s *Stage) SearchStageByCode(ctx context.Context, code string) (*model.Stage, error) {
 	return s.StageRepo.SearchStageByCode(ctx, code)
 }
@@ -200,6 +204,7 @@ func (s *Stage) applyShim(stage *modelv2.Stage) {
 		}).
 		ToSlice(&stage.DropInfos)
 	stage.RecognitionOnly = recognitionOnlyArkItemIds
+	stage.IsGacha = stage.ExtraProcessType.String == constant.ExtraProcessTypeGachaBox
 
 	for _, i := range stage.DropInfos {
 		if i.Item != nil {

@@ -5,13 +5,15 @@ on:
   pull_request:
     branches:
       - "**"
+  workflow_dispatch:
+
 concurrency:
-  group: ${{ github.ref }}
+  group: check-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
     steps:
       - name: "Checkout"
         uses: actions/checkout@v3

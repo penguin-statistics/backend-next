@@ -1,19 +1,141 @@
 basePath: /
 definitions:
+  exusiai_dev_backend-next_internal_model_v2.Item:
+    properties:
+      alias:
+        items:
+          type: string
+        type: array
+      existence:
+        type: object
+      groupID:
+        type: string
+      itemId:
+        type: string
+      itemType:
+        type: string
+      name:
+        type: string
+      name_i18n:
+        type: object
+      pron:
+        items:
+          type: string
+        type: array
+      rarity:
+        type: integer
+      sortId:
+        type: integer
+      spriteCoord:
+        items:
+          type: integer
+        type: array
+    type: object
+  exusiai_dev_backend-next_internal_model_v2.SiteStats:
+    properties:
+      totalApCost:
+        type: integer
+      totalItemQuantities:
+        items:
+          $ref: '#/definitions/v2.TotalItemQuantity'
+        type: array
+      totalStageTimes:
+        items:
+          $ref: '#/definitions/v2.TotalStageTime'
+        type: array
+      totalStageTimes_24h:
+        items:
+          $ref: '#/definitions/v2.TotalStageTime'
+        type: array
+    type: object
+  exusiai_dev_backend-next_internal_model_v2.Stage:
+    properties:
+      apCost:
+        example: 6
+        type: integer
+      code:
+        example: 1-7
+        type: string
+      code_i18n:
+        type: object
+      dropInfos:
+        items:
+          $ref: '#/definitions/v2.DropInfo'
+        type: array
+      existence:
+        type: object
+      isGacha:
+        example: false
+        type: boolean
+      minClearTime:
+        example: 118000
+        type: integer
+      recognitionOnly:
+        items:
+          type: string
+        type: array
+      stageId:
+        example: main_01-07
+        type: string
+      stageType:
+        description: |-
+          StageType is the type of the stage
+          * MAIN - Mainline Stages
+          * SUB - Sub Stages
+          * ACTIVITY - Activity Stages
+          * DAILY - Daily Stages
+        enum:
+        - MAIN
+        - SUB
+        - ACTIVITY
+        - DAILY
+        example: MAIN
+        type: string
+      zoneId:
+        example: main_1
+        type: string
+    type: object
+  exusiai_dev_backend-next_internal_model_v2.Zone:
+    properties:
+      background:
+        type: string
+      existence:
+        type: object
+      stages:
+        items:
+          type: string
+        type: array
+      subType:
+        type: string
+      type:
+        type: string
+      zoneId:
+        type: string
+      zoneIndex:
+        type: integer
+      zoneName:
+        type: string
+      zoneName_i18n:
+        type: object
+    type: object
   model.Existence:
     properties:
       CN:
-        $ref: '#/definitions/model.ServerExistence'
+        allOf:
+        - $ref: '#/definitions/model.ServerExistence'
         description: 'CN: 国服 Mainland China Server (maintained by Hypergryph Network
           Technology Co., Ltd.)'
       JP:
-        $ref: '#/definitions/model.ServerExistence'
+        allOf:
+        - $ref: '#/definitions/model.ServerExistence'
         description: 'JP: 日服 Japan Server (maintained by Yostar Inc,.)'
       KR:
-        $ref: '#/definitions/model.ServerExistence'
+        allOf:
+        - $ref: '#/definitions/model.ServerExistence'
         description: 'KR: 韩服 Korea Server (maintained by Yostar Limited)'
       US:
-        $ref: '#/definitions/model.ServerExistence'
+        allOf:
+        - $ref: '#/definitions/model.ServerExistence'
         description: 'US: 美服/国际服 Global Server (maintained by Yostar Limited)'
     required:
     - CN
@@ -91,6 +213,8 @@ definitions:
         type: array
       server:
         type: string
+      sourceCategory:
+        type: string
       stageId:
         type: string
       start:
@@ -125,6 +249,7 @@ definitions:
         type: string
       quantity:
         maximum: 1000
+        minimum: 0
         type: integer
     required:
     - dropType
@@ -151,7 +276,7 @@ definitions:
         maxLength: 32
         type: string
     type: object
-  types.SingleReportRecallRequest:
+  types.SingularReportRecallRequest:
     properties:
       reportHash:
         example: cahbuch1eqliv7dopen0-5ejlUrfzNMXNHY6Q
@@ -159,7 +284,7 @@ definitions:
     required:
     - reportHash
     type: object
-  types.SingleReportRequest:
+  types.SingularReportRequest:
     properties:
       drops:
         items:
@@ -179,6 +304,10 @@ definitions:
       stageId:
         example: main_01-07
         type: string
+      times:
+        maximum: 6
+        minimum: 0
+        type: integer
       version:
         description: Version describes the version of the source app used to submit
           this report. Third-party API consumers should change this to their own app
@@ -206,8 +335,7 @@ definitions:
   v2.AdvancedQueryResult:
     properties:
       advanced_results:
-        items:
-          type: any
+        items: {}
         type: array
     type: object
   v2.DropInfo:
@@ -224,37 +352,6 @@ definitions:
       matrix:
         items:
           $ref: '#/definitions/v2.OneDropMatrixElement'
-        type: array
-    type: object
-  v2.Item:
-    properties:
-      alias:
-        items:
-          type: string
-        type: array
-      existence:
-        type: object
-      groupID:
-        type: string
-      itemId:
-        type: string
-      itemType:
-        type: string
-      name:
-        type: string
-      name_i18n:
-        type: object
-      pron:
-        items:
-          type: string
-        type: array
-      rarity:
-        type: integer
-      sortId:
-        type: integer
-      spriteCoord:
-        items:
-          type: integer
         type: array
     type: object
   v2.LoginResponse:
@@ -355,67 +452,6 @@ definitions:
         example: 0522ce0083000000-1wE2I9dvMFXXzBMpSCYM81rJ0T3tLrAQ
         type: string
     type: object
-  v2.SiteStats:
-    properties:
-      totalApCost:
-        type: integer
-      totalItemQuantities:
-        items:
-          $ref: '#/definitions/v2.TotalItemQuantity'
-        type: array
-      totalStageTimes:
-        items:
-          $ref: '#/definitions/v2.TotalStageTime'
-        type: array
-      totalStageTimes_24h:
-        items:
-          $ref: '#/definitions/v2.TotalStageTime'
-        type: array
-    type: object
-  v2.Stage:
-    properties:
-      apCost:
-        example: 6
-        type: integer
-      code:
-        example: 1-7
-        type: string
-      code_i18n:
-        type: object
-      dropInfos:
-        items:
-          $ref: '#/definitions/v2.DropInfo'
-        type: array
-      existence:
-        type: object
-      minClearTime:
-        example: 118000
-        type: integer
-      recognitionOnly:
-        items:
-          type: string
-        type: array
-      stageId:
-        example: main_01-07
-        type: string
-      stageType:
-        description: |-
-          StageType is the type of the stage
-          * MAIN - Mainline Stages
-          * SUB - Sub Stages
-          * ACTIVITY - Activity Stages
-          * DAILY - Daily Stages
-        enum:
-        - MAIN
-        - SUB
-        - ACTIVITY
-        - DAILY
-        example: MAIN
-        type: string
-      zoneId:
-        example: main_1
-        type: string
-    type: object
   v2.StageTrend:
     properties:
       results:
@@ -446,29 +482,6 @@ definitions:
           $ref: '#/definitions/v2.StageTrend'
         type: object
     type: object
-  v2.Zone:
-    properties:
-      background:
-        type: string
-      existence:
-        type: object
-      stages:
-        items:
-          type: string
-        type: array
-      subType:
-        type: string
-      type:
-        type: string
-      zoneId:
-        type: string
-      zoneIndex:
-        type: integer
-      zoneName:
-        type: string
-      zoneName_i18n:
-        type: object
-    type: object
 host: penguin-stats.io
 info:
   contact:
@@ -483,171 +496,13 @@ info:
   title: Penguin Statistics API
   version: 3.0.0
 paths:
-  /PenguinStats/api/v2/_private/result/matrix/{server}/{source}/{category}:
-    get:
-      parameters:
-      - description: Server; default to CN
-        enum:
-        - CN
-        - US
-        - JP
-        - KR
-        in: path
-        name: server
-        required: true
-        type: string
-      - description: Global or Personal; default to global
-        enum:
-        - global
-        - personal
-        in: path
-        name: source
-        required: true
-        type: string
-      - description: Category; default to all
-        enum:
-        - all
-        - automated
-        - manual
-        in: path
-        name: category
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/v2.DropMatrixQueryResult'
-        "500":
-          description: An unexpected error occurred
-          schema:
-            $ref: '#/definitions/pgerr.PenguinError'
-      summary: Get Drop Matrix
-      tags:
-      - Private
-  /PenguinStats/api/v2/_private/result/pattern/{server}/{source}/{category}:
-    get:
-      parameters:
-      - description: Server; default to CN
-        enum:
-        - CN
-        - US
-        - JP
-        - KR
-        in: path
-        name: server
-        required: true
-        type: string
-      - description: Global or Personal; default to global
-        enum:
-        - global
-        - personal
-        in: path
-        name: source
-        required: true
-        type: string
-      - description: Category; default to all
-        enum:
-        - all
-        - automated
-        - manual
-        in: path
-        name: category
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/v2.PatternMatrixQueryResult'
-        "500":
-          description: An unexpected error occurred
-          schema:
-            $ref: '#/definitions/pgerr.PenguinError'
-      summary: Get Pattern Matrix
-      tags:
-      - Private
-  /PenguinStats/api/v2/_private/result/trend/{server}:
-    get:
-      parameters:
-      - description: Server; default to CN
-        enum:
-        - CN
-        - US
-        - JP
-        - KR
-        in: path
-        name: server
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/v2.TrendQueryResult'
-        "500":
-          description: An unexpected error occurred
-          schema:
-            $ref: '#/definitions/pgerr.PenguinError'
-      summary: Get Trends
-      tags:
-      - Private
-  /PenguinStats/api/v2/advanced:
-    post:
-      parameters:
-      - description: Query
-        in: body
-        name: query
-        required: true
-        schema:
-          $ref: '#/definitions/types.AdvancedQueryRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: 'Drop Matrix Response: when `interval` has been left undefined.'
-          schema:
-            allOf:
-            - $ref: '#/definitions/v2.AdvancedQueryResult'
-            - properties:
-                advanced_results:
-                  items:
-                    $ref: '#/definitions/v2.DropMatrixQueryResult'
-                  type: array
-              type: object
-        "202":
-          description: 'Trend Response: when `interval` has been defined a value greater
-            than `0`. Notice that this response still responds with a status code
-            of `200`, but due to swagger limitations, to denote a different response
-            with the same status code is not possible. Therefore, a status code of
-            `202` is used, only for the purpose of workaround.'
-          schema:
-            allOf:
-            - $ref: '#/definitions/v2.AdvancedQueryResult'
-            - properties:
-                advanced_results:
-                  items:
-                    $ref: '#/definitions/v2.TrendQueryResult'
-                  type: array
-              type: object
-        "500":
-          description: An unexpected error occurred
-          schema:
-            $ref: '#/definitions/pgerr.PenguinError'
-      summary: Execute Advanced Query
-      tags:
-      - Result
   /PenguinStats/api/v2/config:
     get:
       produces:
       - application/json
       responses:
         "200":
-          description: ""
+          description: OK
         "500":
           description: An unexpected error occurred
           schema:
@@ -661,7 +516,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: ""
+          description: OK
         "500":
           description: An unexpected error occurred
           schema:
@@ -679,7 +534,7 @@ paths:
           schema:
             items:
               allOf:
-              - $ref: '#/definitions/v2.Item'
+              - $ref: '#/definitions/exusiai_dev_backend-next_internal_model_v2.Item'
               - properties:
                   existence:
                     $ref: '#/definitions/model.Existence'
@@ -709,7 +564,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/v2.Item'
+            - $ref: '#/definitions/exusiai_dev_backend-next_internal_model_v2.Item'
             - properties:
                 existence:
                   $ref: '#/definitions/model.Existence'
@@ -783,7 +638,7 @@ paths:
         name: report
         required: true
         schema:
-          $ref: '#/definitions/types.SingleReportRequest'
+          $ref: '#/definitions/types.SingularReportRequest'
       produces:
       - application/json
       responses:
@@ -817,7 +672,7 @@ paths:
         name: report
         required: true
         schema:
-          $ref: '#/definitions/types.SingleReportRecallRequest'
+          $ref: '#/definitions/types.SingularReportRecallRequest'
       produces:
       - application/json
       responses:
@@ -865,6 +720,51 @@ paths:
       summary: Bulk Submit with Frontend Recognition
       tags:
       - Report
+  /PenguinStats/api/v2/result/advanced:
+    post:
+      parameters:
+      - description: Query
+        in: body
+        name: query
+        required: true
+        schema:
+          $ref: '#/definitions/types.AdvancedQueryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'Drop Matrix Response: when `interval` has been left undefined.'
+          schema:
+            allOf:
+            - $ref: '#/definitions/v2.AdvancedQueryResult'
+            - properties:
+                advanced_results:
+                  items:
+                    $ref: '#/definitions/v2.DropMatrixQueryResult'
+                  type: array
+              type: object
+        "202":
+          description: 'Trend Response: when `interval` has been defined a value greater
+            than `0`. Notice that this response still responds with a status code
+            of `200`, but due to swagger limitations, to denote a different response
+            with the same status code is not possible. Therefore, a status code of
+            `202` is used, only for the purpose of workaround.'
+          schema:
+            allOf:
+            - $ref: '#/definitions/v2.AdvancedQueryResult'
+            - properties:
+                advanced_results:
+                  items:
+                    $ref: '#/definitions/v2.TrendQueryResult'
+                  type: array
+              type: object
+        "500":
+          description: An unexpected error occurred
+          schema:
+            $ref: '#/definitions/pgerr.PenguinError'
+      summary: Execute Advanced Query
+      tags:
+      - Result
   /PenguinStats/api/v2/result/matrix:
     get:
       parameters:
@@ -887,6 +787,14 @@ paths:
         in: query
         name: show_closed_zones
         type: boolean
+      - description: Category; default to all
+        enum:
+        - all
+        - automated
+        - manual
+        in: query
+        name: category
+        type: string
       - collectionFormat: csv
         description: Comma separated list of stage IDs to filter
         in: query
@@ -934,6 +842,10 @@ paths:
           equals to `true`, a valid PenguinID would be required to be provided (PenguinIDAuth)
         in: query
         name: is_personal
+        type: boolean
+      - description: Show all patterns; default to false
+        in: query
+        name: showAllPatterns
         type: boolean
       produces:
       - application/json
@@ -988,7 +900,7 @@ paths:
           schema:
             items:
               allOf:
-              - $ref: '#/definitions/v2.Stage'
+              - $ref: '#/definitions/exusiai_dev_backend-next_internal_model_v2.Stage'
               - properties:
                   code_i18n:
                     $ref: '#/definitions/model.I18nString'
@@ -1018,7 +930,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/v2.Stage'
+            - $ref: '#/definitions/exusiai_dev_backend-next_internal_model_v2.Stage'
             - properties:
                 code_i18n:
                   $ref: '#/definitions/model.I18nString'
@@ -1058,7 +970,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/v2.SiteStats'
+              $ref: '#/definitions/exusiai_dev_backend-next_internal_model_v2.SiteStats'
             type: array
         "500":
           description: An unexpected error occurred
@@ -1108,7 +1020,7 @@ paths:
           schema:
             items:
               allOf:
-              - $ref: '#/definitions/v2.Zone'
+              - $ref: '#/definitions/exusiai_dev_backend-next_internal_model_v2.Zone'
               - properties:
                   existence:
                     $ref: '#/definitions/model.Existence'
@@ -1138,7 +1050,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/v2.Zone'
+            - $ref: '#/definitions/exusiai_dev_backend-next_internal_model_v2.Zone'
             - properties:
                 existence:
                   $ref: '#/definitions/model.Existence'

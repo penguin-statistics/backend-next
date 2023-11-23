@@ -2,15 +2,16 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"exusiai.dev/gommon/constant"
 	"github.com/dchest/uniuri"
-	"github.com/go-redis/redis/v8"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model/types"
@@ -35,6 +36,7 @@ type Report struct {
 	ItemService            *Item
 	StageService           *Stage
 	AccountService         *Account
+	TimeRangeService       *TimeRange
 	StageRepo              *repo.Stage
 	DropInfoRepo           *repo.DropInfo
 	DropReportRepo         *repo.DropReport
@@ -44,7 +46,7 @@ type Report struct {
 	ReportVerifier         *reportverifs.ReportVerifiers
 }
 
-func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *Item, stageService *Stage, stageRepo *repo.Stage, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *Account, reportVerifier *reportverifs.ReportVerifiers) *Report {
+func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *Item, stageService *Stage, stageRepo *repo.Stage, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *Account, timeRangeService *TimeRange, reportVerifier *reportverifs.ReportVerifiers) *Report {
 	service := &Report{
 		DB:                     db,
 		Redis:                  redisClient,
@@ -52,6 +54,7 @@ func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamConte
 		ItemService:            itemService,
 		StageService:           stageService,
 		AccountService:         accountService,
+		TimeRangeService:       timeRangeService,
 		StageRepo:              stageRepo,
 		DropInfoRepo:           dropInfoRepo,
 		DropReportRepo:         dropReportRepo,
@@ -115,15 +118,37 @@ func (s *Report) PipelinePreprocessRecruitmentTags(ctx context.Context, req *typ
 	return nil
 }
 
-func (s *Report) PipelineConvertLegacySuppliesForMaa(ctx context.Context, req *types.SingularReportRequest) error {
-	if time.Now().UnixMilli() <= 1666641600000 && req.FragmentReportCommon.Source == constant.MeoAssistant {
-		for i := range req.Drops {
-			if req.Drops[i].ItemID == "randomMaterial_5" {
-				req.Drops[i].ItemID = "randomMaterial_7"
-				break
-			}
-		}
+func (s *Report) PipelinePreprocessRerunStageIdForMaa(ctx context.Context, req *types.SingularReportRequest) error {
+	if !strings.HasSuffix(req.StageID, constant.PermanentStageIdSuffix) {
+		return nil
 	}
+	if req.FragmentReportCommon.Source != constant.MeoAssistant {
+		return nil
+	}
+
+	// get internal stage id of rerun stage
+	originalArkStageId := strings.TrimSuffix(req.StageID, constant.PermanentStageIdSuffix)
+	rerunArkStageId := originalArkStageId + constant.RerunStageIdSuffix
+	rerunStage, err := s.StageService.GetStageByArkId(ctx, rerunArkStageId)
+	if err != nil {
+		if !errors.Is(err, pgerr.ErrNotFound) {
+			return err
+		}
+		return nil
+	}
+
+	// get latest time range of rerun stage
+	timeRangesMap, err := s.TimeRangeService.GetLatestTimeRangesByServer(ctx, req.Server)
+	if err != nil {
+		return err
+	}
+	timeRange, ok := timeRangesMap[rerunStage.StageID]
+	if !ok || !timeRange.Includes(time.Now()) {
+		return nil
+	}
+
+	// if current time is in the latest timerange of rerun stage, use rerun ark stage id
+	req.StageID = rerunStage.ArkStageID
 	return nil
 }
 
@@ -206,8 +231,9 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 		return "", err
 	}
 
-	// Temporarily add this pipeline to convert randomMaterial_5 to randomMaterial_7 for MAA's drop. Should be removed when the event is ended.
-	err = s.PipelineConvertLegacySuppliesForMaa(ctx.UserContext(), req)
+	// If stage id is for a perm stage and it's from MAA, we will try to see if the corresponding rerun stage is available or not.
+	// If available, we will use the rerun stage id instead. (MAA sometimes uses perm stage id for rerun stages)
+	err = s.PipelinePreprocessRerunStageIdForMaa(ctx.UserContext(), req)
 	if err != nil {
 		return "", err
 	}
@@ -218,12 +244,14 @@ func (s *Report) PreprocessAndQueueSingularReport(ctx *fiber.Ctx, req *types.Sin
 		return "", err
 	}
 
+	if req.Times == 0 {
+		req.Times = 1
+	}
 	singleReport := &types.ReportTaskSingleReport{
 		FragmentStageID: req.FragmentStageID,
 		Drops:           drops,
-		// for now, we do not support multiple report by specifying `times`
-		Times:    1,
-		Metadata: req.Metadata,
+		Times:           req.Times,
+		Metadata:        req.Metadata,
 	}
 
 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops

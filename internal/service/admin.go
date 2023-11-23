@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
 	"sort"
+	"time"
 
 	"exusiai.dev/gommon/constant"
 	"github.com/ahmetb/go-linq/v3"
@@ -10,12 +13,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
+	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/model/gamedata"
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/util"
 	"exusiai.dev/backend-next/internal/util/reportverifs"
 )
 
@@ -24,14 +29,34 @@ type Admin struct {
 	AdminRepo         *repo.Admin
 	DropReportService *DropReport
 	RejectRuleRepo    *repo.RejectRule
+	ZoneService       *Zone
+	StageService      *Stage
+	ActivityService   *Activity
+	TimeRangeService  *TimeRange
+	DropInfoService   *DropInfo
 }
 
-func NewAdmin(db *bun.DB, adminRepo *repo.Admin, dropReportService *DropReport, rejectRuleRepo *repo.RejectRule) *Admin {
+func NewAdmin(
+	db *bun.DB,
+	adminRepo *repo.Admin,
+	dropReportService *DropReport,
+	rejectRuleRepo *repo.RejectRule,
+	zoneService *Zone,
+	stageService *Stage,
+	activityService *Activity,
+	timeRangeService *TimeRange,
+	dropInfoService *DropInfo,
+) *Admin {
 	return &Admin{
 		DB:                db,
 		AdminRepo:         adminRepo,
 		DropReportService: dropReportService,
 		RejectRuleRepo:    rejectRuleRepo,
+		ZoneService:       zoneService,
+		StageService:      stageService,
+		ActivityService:   activityService,
+		TimeRangeService:  timeRangeService,
+		DropInfoService:   dropInfoService,
 	}
 }
 
@@ -125,6 +150,8 @@ func (s *Admin) SaveRenderedObjects(ctx context.Context, objects *gamedata.Rende
 			cache.TimeRanges.Delete(objects.TimeRange.Server)
 			cache.TimeRangesMap.Delete(objects.TimeRange.Server)
 			cache.MaxAccumulableTimeRanges.Delete(objects.TimeRange.Server)
+			cache.AllMaxAccumulableTimeRanges.Delete(objects.TimeRange.Server)
+			cache.LatestTimeRanges.Delete(objects.TimeRange.Server)
 		}
 
 		// stage
@@ -139,6 +166,216 @@ func (s *Admin) SaveRenderedObjects(ctx context.Context, objects *gamedata.Rende
 	}
 
 	return innerErr
+}
+
+func (s *Admin) CloneFromCN(ctx context.Context, req types.CloneFromCNRequest) error {
+	type ZoneName struct {
+		ZH string `json:"zh"`
+		EN string `json:"en"`
+		JA string `json:"ja"`
+		KO string `json:"ko"`
+	}
+
+	type ServerExistence struct {
+		Exist     bool  `json:"exist"`
+		OpenTime  int64 `json:"openTime"`
+		CloseTime int64 `json:"closeTime,omitempty"`
+	}
+
+	type Existence struct {
+		CN ServerExistence `json:"CN"`
+		US ServerExistence `json:"US"`
+		JP ServerExistence `json:"JP"`
+		KR ServerExistence `json:"KR"`
+	}
+
+	zone, err := s.ZoneService.GetZoneByArkId(ctx, req.ArkZoneID)
+	if err != nil {
+		return err
+	}
+
+	// get new zone name json
+	zoneName := ZoneName{}
+	if err := json.Unmarshal(zone.Name, &zoneName); err != nil {
+		return err
+	}
+	givenZoneName := ZoneName{}
+	if err := json.Unmarshal(req.ForeignZoneName, &givenZoneName); err != nil {
+		return err
+	}
+	givenZoneName.ZH = zoneName.ZH
+	newZoneName, err := json.Marshal(givenZoneName)
+	if err != nil {
+		return err
+	}
+	zone.Name = newZoneName
+
+	activityUS := model.Activity{
+		ActivityID: 0,
+		Name:       zone.Name,
+	}
+	activityJPKR := model.Activity{
+		ActivityID: 0,
+		Name:       zone.Name,
+	}
+
+	// convert start and end date to foreign existence
+	existence := Existence{}
+	if err := json.Unmarshal(zone.Existence, &existence); err != nil {
+		return err
+	}
+	const pattern = "2006-01-02T15:04:05-0700"
+	v := reflect.ValueOf(req.ForeignTimeRange)
+	for i := 0; i < v.NumField(); i++ {
+		server := v.Type().Field(i).Name
+		timeStruct := v.Field(i).Interface().(types.ForeignTimeRangeString)
+		start, err := time.Parse(pattern, timeStruct.Start)
+		if err != nil {
+			return err
+		}
+		var end time.Time
+		if timeStruct.End != "" {
+			end, err = time.Parse(pattern, timeStruct.End)
+			if err != nil {
+				return err
+			}
+		}
+		startMilli := util.GetTimeStampInServer(&start, server)
+		var endMilli int64
+		if timeStruct.End != "" {
+			endMilli = util.GetTimeStampInServer(&end, server)
+		}
+		ServerExistence := ServerExistence{
+			Exist:     true,
+			OpenTime:  startMilli,
+			CloseTime: endMilli,
+		}
+		existenceField := reflect.ValueOf(&existence).Elem().FieldByName(server)
+		existenceField.Set(reflect.ValueOf(ServerExistence))
+
+		startTime := time.UnixMilli(startMilli)
+		endTime := time.UnixMilli(constant.FakeEndTimeMilli)
+		if endMilli != 0 {
+			endTime = time.UnixMilli(endMilli)
+		}
+		if server == "US" {
+			activityUS.StartTime = &startTime
+			activityUS.EndTime = &endTime
+		} else if server == "JP" || server == "KR" {
+			activityJPKR.StartTime = &startTime
+			activityJPKR.EndTime = &endTime
+		}
+	}
+	newExistence, err := json.Marshal(existence)
+	if err != nil {
+		return err
+	}
+	zone.Existence = newExistence
+
+	stages, err := s.StageService.GetStagesByZoneId(ctx, zone.ZoneID)
+	if err != nil {
+		return err
+	}
+	for _, stage := range stages {
+		stage.Existence = newExistence
+	}
+
+	// handle existing and 2 new activities
+	activitiesToSave := []*model.Activity{}
+	if req.ActivityID != 0 {
+		activity, err := s.ActivityService.GetActivityById(ctx, req.ActivityID)
+		if err != nil {
+			return err
+		}
+		activity.Name = zone.Name
+
+		activityUSExistence := []byte(`{"CN": {"exist": false}, "JP": {"exist": false}, "KR": {"exist": false}, "US": {"exist": true}}`)
+		activityUS.Existence = (json.RawMessage)(activityUSExistence)
+		activityJPKRExistence := []byte(`{"CN": {"exist": false}, "JP": {"exist": true}, "KR": {"exist": true}, "US": {"exist": false}}`)
+		activityJPKR.Existence = (json.RawMessage)(activityJPKRExistence)
+
+		activitiesToSave = append(activitiesToSave, activity, &activityUS, &activityJPKR)
+	}
+
+	// handle new timeRange
+	timeRange, err := s.TimeRangeService.GetTimeRangeById(ctx, req.RangeID)
+	if err != nil {
+		return err
+	}
+	timeRangesToSave := []*model.TimeRange{}
+	for _, server := range constant.Servers {
+		if server == "CN" {
+			continue
+		}
+		var startTime time.Time
+		var endTime time.Time
+		var comment string
+		if server == "US" {
+			startTime = *activityUS.StartTime
+			endTime = *activityUS.EndTime
+			comment = "美服"
+		} else if server == "JP" || server == "KR" {
+			startTime = *activityJPKR.StartTime
+			endTime = *activityJPKR.EndTime
+			if server == "JP" {
+				comment = "日服"
+			} else if server == "KR" {
+				comment = "韩服"
+			}
+		}
+		comment += givenZoneName.ZH +
+			" " +
+			startTime.In(constant.LocMap[server]).Format("2006/01/02 15:04") +
+			" - "
+		if endTime.UnixMilli() == constant.FakeEndTimeMilli {
+			comment += "?"
+		} else {
+			comment += endTime.In(constant.LocMap[server]).Format("2006/01/02 15:04")
+		}
+		newTimeRange := &model.TimeRange{
+			RangeID:   0,
+			Name:      timeRange.Name,
+			StartTime: &startTime,
+			EndTime:   &endTime,
+			Server:    server,
+			Comment:   null.StringFrom(comment),
+		}
+		timeRangesToSave = append(timeRangesToSave, newTimeRange)
+	}
+
+	err = s.DB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		s.AdminRepo.SaveZones(ctx, tx, &([]*model.Zone{zone}))
+		if len(stages) != 0 {
+			s.AdminRepo.SaveStages(ctx, tx, &stages)
+		}
+		if len(activitiesToSave) != 0 {
+			s.AdminRepo.SaveActivities(ctx, tx, &activitiesToSave)
+		}
+		if len(timeRangesToSave) != 0 {
+			s.AdminRepo.SaveTimeRanges(ctx, tx, &timeRangesToSave)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	// handle new dropInfos
+	for _, server := range constant.Servers {
+		if server == "CN" {
+			continue
+		}
+		newTimeRange, err := s.TimeRangeService.GetTimeRangeByServerAndName(ctx, server, timeRange.Name.String)
+		if err != nil {
+			return err
+		}
+		err = s.DropInfoService.CloneDropInfosFromCN(ctx, timeRange.RangeID, newTimeRange.RangeID, server)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *Admin) GetRejectRulesReportContext(ctx context.Context, req types.RejectRulesReevaluationPreviewRequest) ([]RejectRulesReevaluationEvaluationContext, error) {
@@ -186,7 +423,7 @@ func (s *Admin) GetRejectRulesReportContext(ctx context.Context, req types.Rejec
 	for i, dropReport := range dropReports {
 		var createdAt int64
 		if dropReport.CreatedAt != nil {
-			createdAt = dropReport.CreatedAt.Unix()
+			createdAt = dropReport.CreatedAt.UnixMicro()
 		}
 
 		originalReport := dropReport.DropReport
@@ -267,7 +504,7 @@ type RejectRulesReevaluationEvaluationResultSetChangeSet []*RejectRulesReevaluat
 
 func (s RejectRulesReevaluationEvaluationResultSet) ChangeSet() RejectRulesReevaluationEvaluationResultSetChangeSet {
 	changeSet := make(RejectRulesReevaluationEvaluationResultSetChangeSet, 0, len(s))
-	for i, result := range s {
+	for _, result := range s {
 		originalReliability := result.OriginalReport.Reliability
 		toReliability := originalReliability
 		if result.EvaluationShouldRejectToReliability != nil {
@@ -278,11 +515,11 @@ func (s RejectRulesReevaluationEvaluationResultSet) ChangeSet() RejectRulesReeva
 			continue
 		}
 
-		changeSet[i] = &RejectRulesReevaluationEvaluationResultSetDiff{
+		changeSet = append(changeSet, &RejectRulesReevaluationEvaluationResultSetDiff{
 			ReportID:        result.OriginalReport.ReportID,
 			FromReliability: originalReliability,
 			ToReliability:   toReliability,
-		}
+		})
 	}
 
 	return changeSet

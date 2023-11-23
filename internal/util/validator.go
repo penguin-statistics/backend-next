@@ -5,10 +5,9 @@ import (
 	"regexp"
 	"strings"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/guregu/null.v3"
-
-	"exusiai.dev/gommon/constant"
 )
 
 var (
@@ -22,6 +21,8 @@ func NewValidator() *validator.Validate {
 	validate.RegisterValidation("caseinsensitiveoneof", caseInsensitiveOneOf)
 	validate.RegisterValidation("semverprefixed", semverPrefixed)
 	validate.RegisterValidation("arkserver", arkServer)
+	validate.RegisterValidation("sourcecategory", sourceCategory)
+	validate.RegisterCustomTypeFunc(nullIntValuer, null.Int{})
 	validate.RegisterCustomTypeFunc(nullStringValuer, null.String{})
 
 	return validate
@@ -48,6 +49,19 @@ func arkServer(fl validator.FieldLevel) bool {
 	val := fl.Field().String()
 	_, ok := constant.ServerMap[val]
 	return ok
+}
+
+func sourceCategory(fl validator.FieldLevel) bool {
+	val := fl.Field().String()
+	return val == "" || val == constant.SourceCategoryAll || val == constant.SourceCategoryAutomated || val == constant.SourceCategoryManual
+}
+
+func nullIntValuer(field reflect.Value) interface{} {
+	if valuer, ok := field.Interface().(null.Int); ok {
+		return valuer.Int64
+	}
+
+	return nil
 }
 
 func nullStringValuer(field reflect.Value) interface{} {

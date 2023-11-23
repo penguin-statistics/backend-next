@@ -51,12 +51,13 @@ func (c Dataset) aggregateMatrix(ctx *fiber.Ctx) (*modelv2.DropMatrixQueryResult
 		accountId.Valid = true
 	}
 
-	queryResult, err := c.DropMatrixService.GetMaxAccumulableDropMatrixResults(ctx.UserContext(), server, "", ctx.Params("itemId"), accountId)
-	if err != nil {
-		return nil, err
-	}
+	// TODO: disable for now, because v3 is not ready yet
+	// queryResult, err := c.DropMatrixService.GetMaxAccumulableDropMatrixResults(ctx.UserContext(), server, "", ctx.Params("itemId"), accountId)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	return queryResult, nil
+	return nil, nil
 }
 
 func (c Dataset) aggregateTrend(ctx *fiber.Ctx) (*modelv2.TrendQueryResult, error) {
@@ -65,7 +66,7 @@ func (c Dataset) aggregateTrend(ctx *fiber.Ctx) (*modelv2.TrendQueryResult, erro
 		return nil, err
 	}
 
-	result, err := c.TrendService.GetShimSavedTrendResults(ctx.UserContext(), server)
+	result, err := c.TrendService.GetShimTrend(ctx.UserContext(), server)
 	if err != nil {
 		return nil, err
 	}
@@ -78,6 +79,8 @@ func (c Dataset) aggregatePattern(ctx *fiber.Ctx) (*modelv3.PatternMatrixQueryRe
 	if err := rekuest.ValidServer(ctx, server); err != nil {
 		return nil, err
 	}
+
+	showAllPatterns := ctx.Query("show_all_patterns", "false") == "true"
 
 	isPersonal, err := strconv.ParseBool(ctx.Query("is_personal", "false"))
 	if err != nil {
@@ -94,7 +97,7 @@ func (c Dataset) aggregatePattern(ctx *fiber.Ctx) (*modelv3.PatternMatrixQueryRe
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.PatternMatrixService.GetShimLatestPatternMatrixResults(ctx.UserContext(), server, accountId, constant.SourceCategoryAll)
+	shimResult, err := c.PatternMatrixService.GetShimPatternMatrix(ctx.UserContext(), server, accountId, constant.SourceCategoryAll, showAllPatterns)
 	if err != nil {
 		return nil, err
 	}
