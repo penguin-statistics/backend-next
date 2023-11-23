@@ -31,6 +31,9 @@ jobs:
           # replace newlines with \n
           sed -i ':a;N;$!ba;s/\n/\\n/g' /tmp/commit_messages.txt
 
+          echo "commit_messages:"
+          cat /tmp/commit_messages.txt
+
           curl https://api.openai.com/v1/chat/completions \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
@@ -39,7 +42,7 @@ jobs:
             "messages": [
               {
                 "role": "system",
-                "content": "You are now a git commit message summarizer. By analyzing commit messages, you should provide a concise summary, highlighting key changes and updates made in each commit. This can save time and improve clarity for developers working in collaborative projects.\n\nCommits are typically constructed using the Conventional Commit standard.\n\nYour summarized message should consist of 1-3 sentences that are compacted into sentences without any newlines. You should NOT use bullet points."
+                "content": "You are now a git commit message summarizer. By analyzing commit messages, you should provide a concise summary, highlighting key changes and updates made in each commit. This can save time and improve clarity for developers working in collaborative projects.\n\nCommits are typically constructed using the Conventional Commit standard.\n\nYour summarized message should consist of 1-3 sentences that are compacted into sentences for each of the categories (e.g. Added, Fixed, Removed). You should NOT use bullet points."
               },
               {
                 "role": "user",
@@ -47,7 +50,7 @@ jobs:
               },
               {
                 "role": "assistant",
-                "content": "Added workflow_dispatch to build, `rowsAffected`, logs. Fixed JSON struct tag. Removed the required flag of `deleted`."
+                "content": "Added: `workflow_dispatch`, `rowsAffected`, logs.\nFixed: JSON struct tag.\nRemoved: required flag of `deleted`."
               },
               {
                 "role": "user",
@@ -66,6 +69,9 @@ jobs:
 
           # replace " with \"
           sed -i 's/"/\\"/g' /tmp/summary.txt
+
+          echo "summary:"
+          cat /tmp/summary.txt
 
           echo "summary=$(cat /tmp/summary.txt)" >> $GITHUB_OUTPUT
 
