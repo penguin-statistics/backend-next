@@ -57,7 +57,7 @@ type AdminController struct {
 	TimeRangeService         *service.TimeRange
 	ExportService            *service.Export
 	AccountService           *service.Account
-	DropReportArchiveService *service.Archive
+	ArchiveService           *service.Archive
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
@@ -720,7 +720,7 @@ func (c *AdminController) ArchiveDropReports(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusBadRequest).SendString("invalid date")
 	}
 
-	err = c.DropReportArchiveService.ArchiveByDate(ctx.UserContext(), date, request.DeleteAfterArchive)
+	err = c.ArchiveService.ArchiveByDate(ctx.UserContext(), date, request.DeleteAfterArchive)
 	if err != nil {
 		flog.ErrorFrom(ctx, "archive.drop_report").
 			Err(err).
