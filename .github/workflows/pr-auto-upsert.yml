@@ -1,0 +1,99 @@
+name: Auto Upsert Release PR
+
+on:
+  # trigger on push to dev branch
+  push:
+    branches:
+      - dev
+  # trigger on manual workflow_dispatch
+  workflow_dispatch:
+
+concurrency:
+  group: pr-upsert-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-upsert:
+    name: Upsert PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: "dev"
+
+      - id: get_summary
+        name: Get summary from GPT
+        continue-on-error: true
+        run: |
+          curl https://api.openai.com/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
+            -d '{
+            "model": "gpt-3.5-turbo",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are now a git commit message summarizer. By analyzing commit messages, you should provide a concise summary, highlighting key changes and updates made in each commit. This can save time and improve clarity for developers working in collaborative projects.\n\nCommits are typically constructed using the Conventional Commit standard.\n\nYour summarized message should consist of 1-3 sentences that are compacted into sentences without any newlines. You should NOT use bullet points."
+              },
+              {
+                "role": "user",
+                "content": "feat: remove deleted required flag\nbuild: add workflow_dispatch\nfeat: add rowsAffected & fix json struct tag\nchore: add logs"
+              },
+              {
+                "role": "assistant",
+                "content": "Added workflow_dispatch to build, `rowsAffected`, logs. Fixed JSON struct tag. Removed the required flag of `deleted`."
+              }
+            ],
+            "temperature": 1,
+            "max_tokens": 256,
+            "top_p": 1,
+            "frequency_penalty": 0.1,
+            "presence_penalty": 0.2
+          }' | jq -r '.choices[0].message.content' > /tmp/summary.txt
+
+          # replace newlines with spaces
+          sed -i ':a;N;$!ba;s/\n/ /g' /tmp/summary.txt
+
+          echo "summary=$(cat /tmp/summary.txt)" >> $GITHUB_OUTPUT
+
+      # create a PR from dev to main, with title in form: Release <semver>
+      # where, <semver> is the next version number to be released, based on the last release in git tag
+      - name: Create PR
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.PAT_FOR_RELEASE_TAGGER }}
+          script: |
+            const { data: { tag_name: lastRelease } } = await github.rest.repos.getLatestRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            })
+            const nextRelease = lastRelease.replace(/(\d+)$/, (match, p1) => Number(p1) + 1)
+            const prTitle = `Release ${nextRelease}`
+            const body = `> *This PR is automatically created by actions defined in this repository. To see the run log of this action, please click [here](/${{ github.repository }}/actions/runs/${{ github.run_id }})*\n\n---\n\n## Summary\n\n${{ steps.get_summary.outputs.summary || '(no summary)' }}`
+            const existedPR = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:dev`,
+              base: 'main'
+            })
+            if (existedPR.data.length > 0) {
+              core.info(`PR already exists: ${existedPR.data[0].html_url}. Updating body...`)
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: existedPR.data[0].number,
+                body: body
+              })
+              core.info(`PR updated: ${existedPR.data[0].html_url}`)
+              return
+            }
+            const pr = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: prTitle,
+              body: body,
+              head: context.ref,
+              base: 'main',
+              draft: true
+            })
