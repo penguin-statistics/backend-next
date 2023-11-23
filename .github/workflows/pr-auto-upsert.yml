@@ -33,9 +33,7 @@ jobs:
           # replace newlines with \n
           sed -i ':a;N;$!ba;s/\n/\\n/g' /tmp/commit_messages.txt
 
-          echo "commit messages:\n"
-          cat /tmp/commit_messages.txt
-          echo "\n"
+          echo "commit messages: $(cat /tmp/commit_messages.txt)"
 
           curl https://api.openai.com/v1/chat/completions \
             -H "Content-Type: application/json" \
@@ -73,9 +71,7 @@ jobs:
           # replace " with \"
           sed -i 's/"/\\"/g' /tmp/summary.txt
 
-          echo "summary:\n"
-          cat /tmp/summary.txt
-          echo "\n"
+          echo "summary: $(cat /tmp/summary.txt)"
 
           echo "summary=$(cat /tmp/summary.txt)" >> $GITHUB_OUTPUT
 
