@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - dev
+  # trigger on manual workflow_dispatch
+  workflow_dispatch:
 
 concurrency:
   group: pr-creator-${{ github.ref }}
