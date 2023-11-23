@@ -139,6 +139,8 @@ type ConfigSpec struct {
 	AWSSecretKey              string `required:"true" split_words:"true"`
 
 	NoArchiveDays int `split_words:"true" default:"60"`
+
+	DeleteDropReportAfterArchive bool `split_words:"true" default:"false"`
 }
 
 type Config struct {

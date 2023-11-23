@@ -720,7 +720,7 @@ func (c *AdminController) ArchiveDropReports(ctx *fiber.Ctx) error {
 		return ctx.Status(fiber.StatusBadRequest).SendString("invalid date")
 	}
 
-	err = c.DropReportArchiveService.ArchiveByDate(ctx.UserContext(), date)
+	err = c.DropReportArchiveService.ArchiveByDate(ctx.UserContext(), date, request.DeleteAfterArchive)
 	if err != nil {
 		flog.ErrorFrom(ctx, "archive.drop_report").
 			Err(err).

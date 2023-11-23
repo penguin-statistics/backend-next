@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
@@ -113,4 +114,8 @@ func (s *DropReport) GetDropReports(
 
 func (s *DropReport) GetDropReportsForArchive(ctx context.Context, cursor *model.Cursor, date time.Time, limit int) ([]*model.DropReport, model.Cursor, error) {
 	return s.DropReportRepo.GetDropReportsForArchive(ctx, cursor, date, limit)
+}
+
+func (s *DropReport) DeleteDropReportsForArchive(ctx context.Context, tx bun.Tx, date time.Time) (int64, error) {
+	return s.DropReportRepo.DeleteDropReportsForArchive(ctx, tx, date)
 }

@@ -24,10 +24,17 @@ func Command(depsFn func() CommandDeps) *cli.Command {
 				Usage:    "date to archive in GMT+8, in format of YYYY-MM-DD",
 				Required: true,
 			},
+			&cli.BoolFlag{
+				Name:     "delete-after-archive",
+				Aliases:  []string{"D"},
+				Usage:    "delete the archived drop reports and extras after archiving",
+				Required: true,
+			},
 		},
 		Action: func(ctx *cli.Context) error {
 			date := ctx.String("date")
-			return run(ctx, depsFn(), date)
+			deleteAfterArchive := ctx.Bool("delete-after-archive")
+			return run(ctx, depsFn(), date, deleteAfterArchive)
 		},
 	}
 }

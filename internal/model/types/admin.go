@@ -56,7 +56,8 @@ type CloneFromCNRequest struct {
 }
 
 type ArchiveDropReportRequest struct {
-	Date string `json:"date" validate:"required" required:"true"`
+	Date               string `json:"date" validate:"required" required:"true"`
+	DeleteAfterArchive bool   `json:"deleteAfterArchive" validate:"required" required:"true"`
 }
 
 type ForeignTimeRange struct {
