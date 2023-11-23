@@ -27,7 +27,7 @@ func (r *DropReportExtra) GetDropReportExtraById(ctx context.Context, id int) (*
 func (c *DropReportExtra) GetDropReportExtraForArchive(ctx context.Context, cursor *model.Cursor, idInclusiveStart int, idInclusiveEnd int, limit int) ([]*model.DropReportExtra, model.Cursor, error) {
 	dropReportExtras := make([]*model.DropReportExtra, 0)
 
-	query := c.DB.NewSelect().
+	query := c.db.NewSelect().
 		Model(&dropReportExtras).
 		Where("report_id >= ?", idInclusiveStart).
 		Where("report_id <= ?", idInclusiveEnd).
