@@ -102,7 +102,10 @@ jobs:
               }, res => {
                 let data = ''
                 res.on('data', chunk => data += chunk)
-                res.on('end', () => resolve(JSON.parse(data).choices[0].text))
+                res.on('end', () => {
+                  console.log(data)
+                  resolve(JSON.parse(data).choices[0].message.text)
+                })
               })
               req.on('error', reject)
               req.write(JSON.stringify({
