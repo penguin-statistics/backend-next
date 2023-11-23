@@ -304,6 +304,10 @@ definitions:
       stageId:
         example: main_01-07
         type: string
+      times:
+        maximum: 6
+        minimum: 0
+        type: integer
       version:
         description: Version describes the version of the source app used to submit
           this report. Third-party API consumers should change this to their own app

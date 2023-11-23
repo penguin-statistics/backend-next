@@ -1359,6 +1359,11 @@
                     "type": "string",
                     "example": "main_01-07"
                 },
+                "times": {
+                    "type": "integer",
+                    "maximum": 6,
+                    "minimum": 0
+                },
                 "version": {
                     "description": "Version describes the version of the source app used to submit this report. Third-party API consumers should change this to their own app version.",
                     "type": "string",
