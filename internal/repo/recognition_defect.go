@@ -9,20 +9,22 @@ import (
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
 type RecognitionDefect struct {
-	DB *bun.DB
+	db  *bun.DB
+	sel selector.S[model.RecognitionDefect]
 }
 
 func NewRecognitionDefect(db *bun.DB) *RecognitionDefect {
-	return &RecognitionDefect{DB: db}
+	return &RecognitionDefect{db: db, sel: selector.New[model.RecognitionDefect](db)}
 }
 
-func (s *RecognitionDefect) CreateDefectReportDraft(ctx context.Context, defectReport *model.RecognitionDefect) error {
+func (r *RecognitionDefect) CreateDefectReportDraft(ctx context.Context, defectReport *model.RecognitionDefect) error {
 	defectReport.DefectID = strings.ToLower(ulid.Make().String())
 
-	_, err := s.DB.NewInsert().
+	_, err := r.db.NewInsert().
 		Model(defectReport).
 		Exec(ctx)
 	if err != nil {
@@ -32,8 +34,8 @@ func (s *RecognitionDefect) CreateDefectReportDraft(ctx context.Context, defectR
 	return nil
 }
 
-func (s *RecognitionDefect) FinalizeDefectReport(ctx context.Context, defectId, imageUri string) error {
-	_, err := s.DB.NewUpdate().
+func (r *RecognitionDefect) FinalizeDefectReport(ctx context.Context, defectId, imageUri string) error {
+	_, err := r.db.NewUpdate().
 		Model((*model.RecognitionDefect)(nil)).
 		Set("image_uri = ?", imageUri).
 		Set("updated_at = ?", time.Now()).
@@ -46,33 +48,14 @@ func (s *RecognitionDefect) FinalizeDefectReport(ctx context.Context, defectId, 
 	return nil
 }
 
-func (s *RecognitionDefect) GetDefectReports(ctx context.Context, limit int, page int) ([]*model.RecognitionDefect, error) {
-	var defectReports []*model.RecognitionDefect
-
-	query := s.DB.NewSelect().
-		Model(&defectReports).
-		Order("created_at DESC").
-		Limit(limit).
-		Offset(page * limit)
-
-	err := query.Scan(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return defectReports, nil
+func (r *RecognitionDefect) GetDefectReports(ctx context.Context, limit int, page int) ([]*model.RecognitionDefect, error) {
+	return r.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Order("created_at DESC").Limit(limit).Offset(page * limit)
+	})
 }
 
-func (s *RecognitionDefect) GetDefectReport(ctx context.Context, defectId string) (*model.RecognitionDefect, error) {
-	var defectReport model.RecognitionDefect
-
-	err := s.DB.NewSelect().
-		Model(&defectReport).
-		Where("defect_id = ?", defectId).
-		Scan(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return &defectReport, nil
+func (r *RecognitionDefect) GetDefectReport(ctx context.Context, defectId string) (*model.RecognitionDefect, error) {
+	return r.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("defect_id = ?", defectId)
+	})
 }

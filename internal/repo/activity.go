@@ -8,33 +8,27 @@ import (
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
 type Activity struct {
-	DB *bun.DB
+	db  *bun.DB
+	sel selector.S[model.Activity]
 }
 
 func NewActivity(db *bun.DB) *Activity {
-	return &Activity{DB: db}
+	return &Activity{db: db, sel: selector.New[model.Activity](db)}
 }
 
-func (c *Activity) GetActivities(ctx context.Context) ([]*model.Activity, error) {
-	var activities []*model.Activity
-	err := c.DB.NewSelect().
-		Model(&activities).
-		Order("activity_id ASC").
-		Scan(ctx)
-
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return nil, err
-	}
-
-	return activities, nil
+func (r *Activity) GetActivities(ctx context.Context) ([]*model.Activity, error) {
+	return r.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Order("activity_id ASC")
+	})
 }
 
-func (c *Activity) GetActivityById(ctx context.Context, activityId int) (*model.Activity, error) {
+func (r *Activity) GetActivityById(ctx context.Context, activityId int) (*model.Activity, error) {
 	var activity model.Activity
-	err := c.DB.NewSelect().
+	err := r.db.NewSelect().
 		Model(&activity).
 		Where("activity_id = ?", activityId).
 		Scan(ctx)

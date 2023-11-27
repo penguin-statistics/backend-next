@@ -37,6 +37,7 @@ import (
 type AdminController struct {
 	fx.In
 
+	DB                       *bun.DB
 	PatternRepo              *repo.DropPattern
 	PatternElementRepo       *repo.DropPatternElement
 	RecognitionDefectRepo    *repo.RecognitionDefect
@@ -474,7 +475,7 @@ func (c *AdminController) RejectRulesReevaluationApply(ctx *fiber.Ctx) error {
 
 	changeSet := evaluation.ChangeSet()
 
-	err = c.DropReportRepo.DB.RunInTx(ctx.UserContext(), nil, func(ictx context.Context, tx bun.Tx) error {
+	err = c.DB.RunInTx(ctx.UserContext(), nil, func(ictx context.Context, tx bun.Tx) error {
 		chunks := lo.Chunk(changeSet, 100)
 		for _, changeChunk := range chunks {
 			log.Debug().

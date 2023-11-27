@@ -11,14 +11,16 @@ import (
 
 	"exusiai.dev/backend-next/internal/model"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
 type DropMatrixElement struct {
-	db *bun.DB
+	db  *bun.DB
+	sel selector.S[model.DropMatrixElement]
 }
 
 func NewDropMatrixElement(db *bun.DB) *DropMatrixElement {
-	return &DropMatrixElement{db: db}
+	return &DropMatrixElement{db: db, sel: selector.New[model.DropMatrixElement](db)}
 }
 
 func (s *DropMatrixElement) BatchSaveElements(ctx context.Context, elements []*model.DropMatrixElement, server string) error {

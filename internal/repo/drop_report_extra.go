@@ -2,44 +2,32 @@ package repo
 
 import (
 	"context"
-	"database/sql"
 
-	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model"
-	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
 type DropReportExtra struct {
-	DB *bun.DB
+	db  *bun.DB
+	sel selector.S[model.DropReportExtra]
 }
 
 func NewDropReportExtra(db *bun.DB) *DropReportExtra {
-	return &DropReportExtra{DB: db}
+	return &DropReportExtra{db: db, sel: selector.New[model.DropReportExtra](db)}
 }
 
-func (c *DropReportExtra) GetDropReportExtraById(ctx context.Context, id int) (*model.DropReportExtra, error) {
-	var dropReportExtra model.DropReportExtra
-
-	err := c.DB.NewSelect().
-		Model(&dropReportExtra).
-		Where("report_id = ?", id).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		return nil, err
-	}
-
-	return &dropReportExtra, nil
+func (r *DropReportExtra) GetDropReportExtraById(ctx context.Context, id int) (*model.DropReportExtra, error) {
+	return r.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Where("report_id = ?", id)
+	})
 }
 
 func (c *DropReportExtra) GetDropReportExtraForArchive(ctx context.Context, cursor *model.Cursor, idInclusiveStart int, idInclusiveEnd int, limit int) ([]*model.DropReportExtra, model.Cursor, error) {
 	dropReportExtras := make([]*model.DropReportExtra, 0)
 
-	query := c.DB.NewSelect().
+	query := c.db.NewSelect().
 		Model(&dropReportExtras).
 		Where("report_id >= ?", idInclusiveStart).
 		Where("report_id <= ?", idInclusiveEnd).
@@ -85,7 +73,7 @@ func (c *DropReportExtra) DeleteDropReportExtrasForArchive(ctx context.Context, 
 func (c *DropReportExtra) IsDropReportExtraMD5Exist(ctx context.Context, md5 string) bool {
 	var dropReportExtra model.DropReportExtra
 
-	count, err := c.DB.NewSelect().
+	count, err := c.db.NewSelect().
 		Model(&dropReportExtra).
 		Where("md5 = ?", md5).
 		Count(ctx)
@@ -96,7 +84,7 @@ func (c *DropReportExtra) IsDropReportExtraMD5Exist(ctx context.Context, md5 str
 	return count > 0
 }
 
-func (c *DropReportExtra) CreateDropReportExtra(ctx context.Context, tx bun.Tx, report *model.DropReportExtra) error {
+func (r *DropReportExtra) CreateDropReportExtra(ctx context.Context, tx bun.Tx, report *model.DropReportExtra) error {
 	_, err := tx.NewInsert().
 		Model(report).
 		Exec(ctx)

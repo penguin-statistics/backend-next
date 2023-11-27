@@ -7,14 +7,16 @@ import (
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
 type PatternMatrixElement struct {
-	db *bun.DB
+	db  *bun.DB
+	sel selector.S[model.PatternMatrixElement]
 }
 
 func NewPatternMatrixElement(db *bun.DB) *PatternMatrixElement {
-	return &PatternMatrixElement{db: db}
+	return &PatternMatrixElement{db: db, sel: selector.New[model.PatternMatrixElement](db)}
 }
 
 func (s *PatternMatrixElement) BatchSaveElements(ctx context.Context, elements []*model.PatternMatrixElement, server string) error {
