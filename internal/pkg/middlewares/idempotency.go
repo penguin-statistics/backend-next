@@ -38,9 +38,15 @@ type IdempotencyConfig struct {
 	Next func(c *fiber.Ctx) bool
 }
 
-type idempotencyResponse struct {
+type deprecatedIdempotencyResponse struct {
 	StatusCode int
 	Headers    map[string]string
+	Body       []byte
+}
+
+type idempotencyResponse struct {
+	StatusCode int
+	Headers    map[string][]string
 	Body       []byte
 }
 
@@ -173,7 +179,7 @@ func marshalResponseToBytes(c *fiber.Ctx, conf *IdempotencyConfig) ([]byte, erro
 	if conf.KeepResponseHeaders == nil {
 		response.Headers = c.GetRespHeaders()
 	} else {
-		response.Headers = make(map[string]string)
+		response.Headers = make(map[string][]string)
 		headers := c.GetRespHeaders()
 		for header := range headers {
 			if _, ok := conf.keepResponseHeadersMap[strings.ToLower(header)]; ok {
@@ -193,15 +199,25 @@ func marshalResponseToBytes(c *fiber.Ctx, conf *IdempotencyConfig) ([]byte, erro
 func unmarshalResponseToFiberResponse(c *fiber.Ctx, conf *IdempotencyConfig, responseBytes []byte) error {
 	var response idempotencyResponse
 	if err := msgpack.Unmarshal(responseBytes, &response); err != nil {
-		return err
+		var deprecatedResponse deprecatedIdempotencyResponse
+		if err := msgpack.Unmarshal(responseBytes, &deprecatedResponse); err != nil {
+			return err
+		}
+
+		// Deprecated response format. Convert to new format
+		response.StatusCode = deprecatedResponse.StatusCode
+		for header, values := range deprecatedResponse.Headers {
+			response.Headers[header] = []string{values}
+		}
+		response.Body = deprecatedResponse.Body
 	}
 
 	// Set status code
 	c.Status(response.StatusCode)
 
 	// Set headers
-	for header, value := range response.Headers {
-		c.Set(header, value)
+	for header, values := range response.Headers {
+		c.Append(header, values...)
 	}
 
 	// Add idempotency marker

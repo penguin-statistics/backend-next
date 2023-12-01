@@ -12,7 +12,7 @@ type Item struct {
 	Existence json.RawMessage `json:"existence" swaggertype:"object"`
 	SortID    int             `json:"sortId"`
 	Rarity    int             `json:"rarity"`
-	ItemType  string          `json:"type"`
+	Type      string          `json:"type"`
 	Group     null.String     `json:"group,omitempty" swaggertype:"string"`
 	Sprite    null.String     `json:"sprite,omitempty" swaggertype:"string"`
 	Keywords  json.RawMessage `json:"keywords,omitempty" swaggertype:"object"`
