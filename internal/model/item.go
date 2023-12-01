@@ -2,7 +2,6 @@ package model
 
 import (
 	"github.com/goccy/go-json"
-
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 )
@@ -14,6 +13,7 @@ type Item struct {
 	ItemID int `bun:",pk,autoincrement" json:"penguinItemId"`
 	// ArkItemID (itemId) is the previously used, string form ID of the item; in JSON-representation `itemId` is used as key.
 	ArkItemID string `json:"itemId"`
+	Type      string `json:"type"`
 	// Name is a map with language code as key and the name of the item in that language as value.
 	Name json.RawMessage `json:"name" swaggertype:"object"`
 	// Existence is a map with server code as key and the existence of the item in that server as value.
