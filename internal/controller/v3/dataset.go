@@ -28,7 +28,7 @@ type Dataset struct {
 
 func RegisterDataset(v3 *svr.V3, c Dataset) {
 	dataset := v3.Group("/dataset")
-	aggregated := dataset.Group("/aggregated/:source/:server")
+	aggregated := dataset.Group("/aggregated/:source/:category/:server")
 	aggregated.Get("/item/:itemId", c.AggregatedItem)
 	aggregated.Get("/stage/:stageId", c.AggregatedStage)
 }
@@ -36,6 +36,11 @@ func RegisterDataset(v3 *svr.V3, c Dataset) {
 func (c Dataset) aggregateMatrix(ctx *fiber.Ctx) (*modelv2.DropMatrixQueryResult, error) {
 	server := ctx.Params("server", "CN")
 	if err := rekuest.ValidServer(ctx, server); err != nil {
+		return nil, err
+	}
+
+	category := ctx.Params("category", "all")
+	if err := rekuest.ValidCategory(ctx, category); err != nil {
 		return nil, err
 	}
 
@@ -51,13 +56,7 @@ func (c Dataset) aggregateMatrix(ctx *fiber.Ctx) (*modelv2.DropMatrixQueryResult
 		accountId.Valid = true
 	}
 
-	// TODO: disable for now, because v3 is not ready yet
-	// queryResult, err := c.DropMatrixService.GetMaxAccumulableDropMatrixResults(ctx.UserContext(), server, "", ctx.Params("itemId"), accountId)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	return nil, nil
+	return c.DropMatrixService.GetShimDropMatrix(ctx.UserContext(), server, true, "", ctx.Params("itemId"), accountId, category)
 }
 
 func (c Dataset) aggregateTrend(ctx *fiber.Ctx) (*modelv2.TrendQueryResult, error) {
