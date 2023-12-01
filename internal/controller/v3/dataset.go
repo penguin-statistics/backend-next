@@ -3,7 +3,6 @@ package v3
 import (
 	"strconv"
 
-	"exusiai.dev/gommon/constant"
 	"github.com/gofiber/fiber/v2"
 	"github.com/jinzhu/copier"
 	"github.com/samber/lo"
@@ -56,7 +55,7 @@ func (c Dataset) aggregateMatrix(ctx *fiber.Ctx) (*modelv2.DropMatrixQueryResult
 		accountId.Valid = true
 	}
 
-	return c.DropMatrixService.GetShimDropMatrix(ctx.UserContext(), server, true, "", ctx.Params("itemId"), accountId, category)
+	return c.DropMatrixService.GetShimDropMatrix(ctx.UserContext(), server, true, "", "", accountId, category)
 }
 
 func (c Dataset) aggregateTrend(ctx *fiber.Ctx) (*modelv2.TrendQueryResult, error) {
@@ -96,7 +95,7 @@ func (c Dataset) aggregatePattern(ctx *fiber.Ctx) (*modelv3.PatternMatrixQueryRe
 		accountId.Valid = true
 	}
 
-	shimResult, err := c.PatternMatrixService.GetShimPatternMatrix(ctx.UserContext(), server, accountId, constant.SourceCategoryAll, showAllPatterns)
+	shimResult, err := c.PatternMatrixService.GetShimPatternMatrix(ctx.UserContext(), server, accountId, ctx.Params("category"), showAllPatterns)
 	if err != nil {
 		return nil, err
 	}
@@ -144,13 +143,14 @@ func (c Dataset) AggregatedItem(ctx *fiber.Ctx) error {
 
 func (c Dataset) AggregatedStage(ctx *fiber.Ctx) error {
 	aggregated := &modelv3.AggregatedStageStats{}
+	stageId := ctx.Params("stageId")
 
 	matrix, err := c.aggregateMatrix(ctx)
 	if err != nil {
 		return err
 	}
 	aggregated.Matrix = lo.Filter(matrix.Matrix, func(el *modelv2.OneDropMatrixElement, _ int) bool {
-		return el.StageID == ctx.Params("stageId")
+		return el.StageID == stageId
 	})
 
 	trend, err := c.aggregateTrend(ctx)
@@ -158,18 +158,18 @@ func (c Dataset) AggregatedStage(ctx *fiber.Ctx) error {
 		return err
 	}
 	aggregated.Trends = make(map[string]*modelv2.StageTrend)
-	for stageId, v := range trend.Trend {
-		if stageId != ctx.Params("stageId") {
+	for trendStageId, v := range trend.Trend {
+		if trendStageId != stageId {
 			continue
 		}
 		for itemId, vv := range v.Results {
-			if _, ok := aggregated.Trends[stageId]; !ok {
-				aggregated.Trends[stageId] = &modelv2.StageTrend{
+			if _, ok := aggregated.Trends[trendStageId]; !ok {
+				aggregated.Trends[trendStageId] = &modelv2.StageTrend{
 					StartTime: v.StartTime,
 					Results:   make(map[string]*modelv2.OneItemTrend),
 				}
 			}
-			aggregated.Trends[stageId].Results[itemId] = vv
+			aggregated.Trends[trendStageId].Results[itemId] = vv
 		}
 	}
 
@@ -178,7 +178,7 @@ func (c Dataset) AggregatedStage(ctx *fiber.Ctx) error {
 		return err
 	}
 	aggregated.Patterns = lo.Filter(pattern.PatternMatrix, func(el *modelv3.OnePatternMatrixElement, _ int) bool {
-		return el.StageID == ctx.Params("stageId")
+		return el.StageID == stageId
 	})
 
 	return ctx.JSON(aggregated)
