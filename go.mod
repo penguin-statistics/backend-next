@@ -41,7 +41,7 @@ require (
 	github.com/rs/zerolog v1.31.0
 	github.com/samber/lo v1.38.1
 	github.com/stretchr/testify v1.8.4
-	github.com/swaggo/swag v1.16.1
+	github.com/swaggo/swag v1.16.2
 	github.com/tidwall/gjson v1.16.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/uptrace/bun v1.1.14
