@@ -125,7 +125,8 @@ type ConfigSpec struct {
 	// We don't want to show all patterns because it will be too many. So we set a limit here (default 19)
 	PatternMatrixLimit int `split_words:"true" default:"19"`
 
-	DropReportArchiveBatchSize int `split_words:"true" default:"1000"`
+	DropReportArchiveEnabled   bool `split_words:"true" default:"false"`
+	DropReportArchiveBatchSize int  `split_words:"true" default:"1000"`
 
 	DropReportArchiveS3Bucket string `required:"true" split_words:"true"`
 	DropReportArchiveS3Region string `required:"true" split_words:"true"`
