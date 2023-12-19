@@ -18,6 +18,8 @@ import (
 
 type WorkerDeps struct {
 	fx.In
+
+	Config               *appconfig.Config
 	DropMatrixService    *service.DropMatrix
 	PatternMatrixService *service.PatternMatrix
 	TrendService         *service.Trend
@@ -127,7 +129,7 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 		}
 
 		// server == "CN": we only run archive job on a singular server
-		if server == "CN" {
+		if w.Config.DropReportArchiveEnabled && server == "CN" {
 			// Archive
 			if err = w.microtask(ctx, "archive", server, func() error {
 				err := w.ArchiveService.ArchiveByGlobalConfig(ctx)
