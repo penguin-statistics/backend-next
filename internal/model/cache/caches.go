@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"context"
 	"sync"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"exusiai.dev/backend-next/internal/model"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/cache"
-	"exusiai.dev/backend-next/internal/repo"
 )
 
 type Flusher func() error
@@ -74,18 +72,15 @@ var (
 
 	LastModifiedTime *cache.Set[time.Time]
 
-	Properties map[string]string
-
 	once sync.Once
 
 	SetMap             map[string]Flusher
 	SingularFlusherMap map[string]Flusher
 )
 
-func Initialize(propertyRepo *repo.Property) {
+func Initialize() {
 	once.Do(func() {
 		initializeCaches()
-		populateProperties(propertyRepo)
 	})
 }
 
@@ -241,16 +236,4 @@ func initializeCaches() {
 	LastModifiedTime = cache.NewSet[time.Time]("lastModifiedTime#key")
 
 	SetMap["lastModifiedTime#key"] = LastModifiedTime.Flush
-}
-
-func populateProperties(repo *repo.Property) {
-	Properties = make(map[string]string)
-	properties, err := repo.GetProperties(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
-	for _, property := range properties {
-		Properties[property.Key] = property.Value
-	}
 }
