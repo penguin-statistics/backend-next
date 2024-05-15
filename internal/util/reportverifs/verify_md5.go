@@ -3,11 +3,11 @@ package reportverifs
 import (
 	"context"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
 
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/repo"
-	"exusiai.dev/gommon/constant"
 )
 
 var ErrMD5Conflict = errors.New("report with specified md5 has already existed")

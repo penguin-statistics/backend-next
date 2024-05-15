@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"context"
 	"sync"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"exusiai.dev/backend-next/internal/model"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/cache"
-	"exusiai.dev/backend-next/internal/repo"
 )
 
 type Flusher func() error
@@ -19,6 +17,7 @@ type Flusher func() error
 var (
 	AccountByID        *cache.Set[model.Account]
 	AccountByPenguinID *cache.Set[model.Account]
+	AccountExistence   *cache.Set[int]
 
 	ItemDropSetByStageIDAndRangeID   *cache.Set[[]int]
 	ItemDropSetByStageIdAndTimeRange *cache.Set[[]int]
@@ -73,18 +72,15 @@ var (
 
 	LastModifiedTime *cache.Set[time.Time]
 
-	Properties map[string]string
-
 	once sync.Once
 
 	SetMap             map[string]Flusher
 	SingularFlusherMap map[string]Flusher
 )
 
-func Initialize(propertyRepo *repo.Property) {
+func Initialize() {
 	once.Do(func() {
 		initializeCaches()
-		populateProperties(propertyRepo)
 	})
 }
 
@@ -116,9 +112,11 @@ func initializeCaches() {
 	// account
 	AccountByID = cache.NewSet[model.Account]("account#accountId")
 	AccountByPenguinID = cache.NewSet[model.Account]("account#penguinId")
+	AccountExistence = cache.NewSet[int]("accountExistence#accountId")
 
 	SetMap["account#accountId"] = AccountByID.Flush
 	SetMap["account#penguinId"] = AccountByPenguinID.Flush
+	SetMap["accountExistence#accountId"] = AccountExistence.Flush
 
 	// drop_info
 	ItemDropSetByStageIDAndRangeID = cache.NewSet[[]int]("itemDropSet#server|stageId|rangeId")
@@ -238,16 +236,4 @@ func initializeCaches() {
 	LastModifiedTime = cache.NewSet[time.Time]("lastModifiedTime#key")
 
 	SetMap["lastModifiedTime#key"] = LastModifiedTime.Flush
-}
-
-func populateProperties(repo *repo.Property) {
-	Properties = make(map[string]string)
-	properties, err := repo.GetProperties(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
-	for _, property := range properties {
-		Properties[property.Key] = property.Value
-	}
 }
