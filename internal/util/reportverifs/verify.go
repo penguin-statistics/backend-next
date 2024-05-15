@@ -37,11 +37,7 @@ func (verifiers ReportVerifiers) Verify(ctx context.Context, reportTask *types.R
 
 			name := pipe.Name()
 
-			ctx, span := tracer.
-				Start(ctx, "reportverifs.verifier."+name)
-
 			rejection := pipe.Verify(ctx, report, reportTask)
-			span.End()
 
 			observability.ReportVerifyDuration.
 				WithLabelValues(name).
