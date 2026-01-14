@@ -19,7 +19,13 @@ func InjectValidBody[T any]() func(*fiber.Ctx) error {
 		}
 
 		if err := rekuest.ValidateStruct(ctx, dest); err != nil {
+			truncatedBody := string(ctx.Body())
+			if len(truncatedBody) > 5000 {
+				truncatedBody = truncatedBody[:5000] + "..."
+			}
+
 			flog.WarnFrom(ctx, "middlewares.inject_valid_body.validate_struct").
+				Str("http.request.body", truncatedBody).
 				Any("errors", err).
 				Msg("invalid request")
 			return pgerr.NewInvalidViolations(err)
