@@ -28,7 +28,7 @@ type SingularReportRequest struct {
 	FragmentReportCommon
 
 	Drops []ArkDrop `json:"drops" validate:"dive"`
-	Times int       `json:"times" validate:"gte=0,lte=6"`
+	Times int       `json:"times" validate:"gte=0,lte=10"`
 
 	Metadata *ReportRequestMetadata `json:"metadata" validate:"omitempty,dive"`
 }

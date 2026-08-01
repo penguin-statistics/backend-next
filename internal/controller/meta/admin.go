@@ -627,7 +627,7 @@ func (c *AdminController) ExportDropReport(ctx *fiber.Ctx) error {
 		SourceCategory string    `json:"sourceCategory" validate:"omitempty,sourcecategory"`
 		StartTime      int64     `json:"start" swaggertype:"integer"`
 		EndTime        int64     `json:"end" validate:"omitempty,gtfield=StartTime" swaggertype:"integer"`
-		Times          int       `json:"times" validate:"gte=0,lte=6"`
+		Times          int       `json:"times" validate:"gte=0,lte=10"`
 	}
 	var request exportDropReportRequest
 	if err := rekuest.ValidBody(ctx, &request); err != nil {
