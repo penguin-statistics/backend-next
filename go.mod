@@ -57,7 +57,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.16.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.16.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.16.0
-	go.opentelemetry.io/otel/sdk v1.16.0
+	go.opentelemetry.io/otel/sdk v1.43.0
 	go.uber.org/fx v1.19.2
 	golang.org/x/exp v0.0.0-20220823124025-807a23277127
 	golang.org/x/mod v0.18.0
