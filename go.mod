@@ -17,13 +17,13 @@ require (
 	github.com/dchest/uniuri v1.2.0
 	github.com/felixge/fgprof v0.9.3
 	github.com/gabstv/go-bsdiff v1.0.5
-	github.com/getsentry/sentry-go v0.22.0
+	github.com/getsentry/sentry-go v0.29.1
 	github.com/go-playground/locales v0.14.1
 	github.com/go-playground/universal-translator v0.18.1
 	github.com/go-playground/validator/v10 v10.16.0
 	github.com/go-redsync/redsync/v4 v4.9.4
 	github.com/goccy/go-json v0.10.2
-	github.com/gofiber/contrib/fibersentry v1.0.4
+	github.com/gofiber/contrib/fibersentry v1.0.8
 	github.com/gofiber/contrib/otelfiber v1.0.10
 	github.com/gofiber/fiber/v2 v2.52.13
 	github.com/gofiber/helmet/v2 v2.2.26
@@ -40,7 +40,7 @@ require (
 	github.com/rs/xid v1.5.0
 	github.com/rs/zerolog v1.31.0
 	github.com/samber/lo v1.38.1
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.10.0
 	github.com/swaggo/swag v1.16.2
 	github.com/tidwall/gjson v1.16.0
 	github.com/tidwall/sjson v1.2.5
@@ -63,7 +63,7 @@ require (
 	golang.org/x/mod v0.18.0
 	golang.org/x/sync v0.7.0
 	golang.org/x/text v0.16.0
-	google.golang.org/protobuf v1.30.0
+	google.golang.org/protobuf v1.33.0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.48.0
 	gopkg.in/guregu/null.v3 v3.5.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
@@ -150,7 +150,7 @@ require (
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
 	github.com/uptrace/opentelemetry-go-extra/otelsql v0.2.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.51.0
+	github.com/valyala/fasthttp v1.52.0
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/otel/metric v1.16.0 // indirect
