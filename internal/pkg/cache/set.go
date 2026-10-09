@@ -2,11 +2,11 @@ package cache
 
 import (
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/singleflight"
 )
 
 func NewSet[T any](prefix string) *Set[T] {
@@ -17,8 +17,9 @@ func NewSet[T any](prefix string) *Set[T] {
 }
 
 type Set[T any] struct {
-	// m is a mutex for MutexGetSet for concurrent prevention
-	m sync.Mutex
+	// g deduplicates concurrent MutexGetSet calls per key, so that
+	// only one valueFunc runs for a key while different keys run in parallel
+	g singleflight.Group
 
 	prefix string
 
@@ -73,34 +74,27 @@ func (c *Set[T]) MutexGetSet(key string, dest *T, valueFunc func() (*T, error), 
 }
 
 func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, error), expire time.Duration) error {
-	c.m.Lock()
-	defer c.m.Unlock()
-	err := c.Get(key, dest)
+	v, err, _ := c.g.Do(key, func() (any, error) {
+		var cached T
+		if err := c.Get(key, &cached); err == nil {
+			return &cached, nil
+		}
 
-	if err == nil {
-		return nil
-	}
+		value, err := valueFunc()
+		if err != nil {
+			log.Error().Err(err).Str("key", key).Msg("failed to get value from valueFunc() in MutexGetSet")
+			return nil, err
+		}
 
-	value, err := valueFunc()
+		c.Set(key, *value, expire)
+		return value, nil
+	})
 	if err != nil {
-		log.Error().Err(err).Str("key", key).Msg("failed to get value from valueFunc() in MutexGetSet")
 		return err
 	}
 
-	c.Set(key, *value, expire)
-	// if err != nil {
-	// 	log.Error().Err(err).Str("key", key).Msg("failed to set value to cache in MutexGetSet")
-	// 	return err
-	// }
-
 	// copy value to dest
-	var r reflect.Value
-	if reflect.ValueOf(value).Kind() == reflect.Ptr {
-		r = reflect.ValueOf(value).Elem()
-	} else {
-		r = reflect.ValueOf(value)
-	}
-	reflect.ValueOf(dest).Elem().Set(r)
+	*dest = *v.(*T)
 
 	return nil
 }
