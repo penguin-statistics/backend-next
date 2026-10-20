@@ -147,11 +147,12 @@ func (s *PatternMatrix) RefreshGlobalPatternMatrixCaches(ctx context.Context, se
 			s.deleteGlobalPatternMatrixCaches(server)
 		}
 	}()
+	globals, err := s.calcGlobalPatternMatrices(ctx, server, s.Config.MatrixWorkerSourceCategories)
+	if err != nil {
+		return err
+	}
 	for _, sourceCategory := range s.Config.MatrixWorkerSourceCategories {
-		global, err := s.calcGlobalPatternMatrix(ctx, server, sourceCategory)
-		if err != nil {
-			return err
-		}
+		global := globals[sourceCategory]
 		shims := make(map[bool]*modelv2.PatternMatrixQueryResult, 2)
 		for _, showAllPatterns := range []bool{true, false} {
 			result := *global
@@ -256,52 +257,61 @@ func (s *PatternMatrix) calcPatternMatrixByGivenDate(
 }
 
 func (s *PatternMatrix) calcGlobalPatternMatrix(ctx context.Context, server string, sourceCategory string) (*model.PatternMatrixQueryResult, error) {
-	finalResult := &model.PatternMatrixQueryResult{
-		PatternMatrix: make([]*model.OnePatternMatrixElement, 0),
+	results, err := s.calcGlobalPatternMatrices(ctx, server, []string{sourceCategory})
+	if err != nil {
+		return nil, err
 	}
+	return results[sourceCategory], nil
+}
 
+// calcGlobalPatternMatrices calculates the global pattern matrices of server for every source category: each stage
+// over its latest time range, from a single statement per source category.
+func (s *PatternMatrix) calcGlobalPatternMatrices(ctx context.Context, server string, sourceCategories []string) (map[string]*model.PatternMatrixQueryResult, error) {
 	latestTimeRanges, err := s.TimeRangeService.GetLatestTimeRangesByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
-	stageIdsMapByTimeRangeStr := make(map[string][]int, 0)
+	targets := make([]*model.GlobalPatternMatrixTarget, 0, len(latestTimeRanges))
 	for stageId, timeRange := range latestTimeRanges {
-		timeRangeStr := timeRange.String()
-		if _, ok := stageIdsMapByTimeRangeStr[timeRangeStr]; !ok {
-			stageIdsMapByTimeRangeStr[timeRangeStr] = make([]int, 0)
-		}
-		stageIdsMapByTimeRangeStr[timeRangeStr] = append(stageIdsMapByTimeRangeStr[timeRangeStr], stageId)
+		// as the elements had it: start and end only, at second precision
+		targets = append(targets, &model.GlobalPatternMatrixTarget{StageID: stageId, TimeRange: model.TimeRangeFromString(timeRange.String())})
 	}
-	for timeRangeStr, stageIds := range stageIdsMapByTimeRangeStr {
-		timeRange := model.TimeRangeFromString(timeRangeStr)
+	// a statement per source category, as for the global drop matrices
+	aggregates := make(map[string]*model.GlobalPatternMatrixAggregates, len(sourceCategories))
+	for _, sourceCategory := range sourceCategories {
+		categoryAggregates, err := s.PatternMatrixElementService.CalcGlobalPatternMatrixAggregates(ctx, server, targets, []string{sourceCategory})
+		if err != nil {
+			return nil, err
+		}
+		aggregates[sourceCategory] = categoryAggregates[sourceCategory]
+	}
 
-		timesResults, err := s.PatternMatrixElementService.GetAllTimesForGlobalPatternMatrixMapByStageId(ctx, server, timeRange, stageIds, sourceCategory)
-		if err != nil {
-			return nil, err
+	results := make(map[string]*model.PatternMatrixQueryResult, len(sourceCategories))
+	for _, sourceCategory := range sourceCategories {
+		aggregate := aggregates[sourceCategory]
+		result := &model.PatternMatrixQueryResult{
+			PatternMatrix: make([]*model.OnePatternMatrixElement, 0),
 		}
-		quantityResults, err := s.PatternMatrixElementService.GetAllQuantitiesForGlobalPatternMatrixMapByStageIdAndPatternId(ctx, server, timeRange, stageIds, sourceCategory)
-		if err != nil {
-			return nil, err
-		}
-		for _, stageId := range stageIds {
-			timesResult, ok := timesResults[stageId]
-			if !ok && len(quantityResults[stageId]) > 0 {
-				// the elements were rewritten (deleted, then inserted) between the two queries
-				return nil, errors.Errorf("pattern matrix of stage %d on %s changed while being read: times missing", stageId, server)
+		for _, target := range targets {
+			quantities := aggregate.QuantitiesByStageID[target.StageID]
+			times, ok := aggregate.TimesByStageID[target.StageID]
+			if !ok && len(quantities) > 0 {
+				// an element with quantity > 0 has times > 0
+				return nil, errors.Errorf("pattern matrix of stage %d on %s has quantities but no times", target.StageID, server)
 			}
-			for patternId, quantityResult := range quantityResults[stageId] {
-				onePatternMatrixElement := &model.OnePatternMatrixElement{
-					StageID:   stageId,
+			for patternId, quantity := range quantities {
+				result.PatternMatrix = append(result.PatternMatrix, &model.OnePatternMatrixElement{
+					StageID:   target.StageID,
 					PatternID: patternId,
-					TimeRange: timeRange,
-					Times:     timesResult.Times,
-					Quantity:  quantityResult.Quantity,
-				}
-				finalResult.PatternMatrix = append(finalResult.PatternMatrix, onePatternMatrixElement)
+					TimeRange: target.TimeRange,
+					Times:     times,
+					Quantity:  quantity,
+				})
 			}
 		}
+		results[sourceCategory] = result
 	}
-	return finalResult, nil
+	return results, nil
 }
 
 // =========== Personal ===========

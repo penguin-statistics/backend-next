@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
 
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/repo/selector"
@@ -40,62 +41,70 @@ func (s *PatternMatrixElement) IsExistByServerAndDayNum(ctx context.Context, ser
 	return exists, nil
 }
 
-func (s *PatternMatrixElement) GetAllTimesForGlobalPatternMatrix(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
-) ([]*model.AllTimesResultForGlobalPatternMatrix, error) {
-	subq2 := s.db.NewSelect().
-		TableExpr("pattern_matrix_elements").
-		Column("stage_id", "times", "day_num").
-		Where("server = ?", server).
-		Where("source_category = ?", sourceCategory).
-		Where("times > 0").
-		Where("stage_id IN (?)", bun.In(stageIds)).
-		Where("start_time >= timestamp with time zone ?", timeRange.StartTime.Format(time.RFC3339)).
-		Where("end_time <= timestamp with time zone ?", timeRange.EndTime.Format(time.RFC3339))
+// CalcGlobalPatternMatrixAggregates aggregates the elements of every target of server for the source categories in
+// a single scan, see model.GlobalPatternMatrixAggregates. A single statement also reads a single snapshot, unaffected
+// by a concurrent rewrite (delete, then insert) of the elements.
+func (s *PatternMatrixElement) CalcGlobalPatternMatrixAggregates(
+	ctx context.Context, server string, targets []*model.GlobalPatternMatrixTarget, sourceCategories []string,
+) (map[string]*model.GlobalPatternMatrixAggregates, error) {
+	aggregates := make(map[string]*model.GlobalPatternMatrixAggregates, len(sourceCategories))
+	for _, sourceCategory := range sourceCategories {
+		aggregates[sourceCategory] = &model.GlobalPatternMatrixAggregates{
+			TimesByStageID:      make(map[int]int),
+			QuantitiesByStageID: make(map[int]map[int]int),
+		}
+	}
+	if len(targets) == 0 || len(sourceCategories) == 0 {
+		return aggregates, nil
+	}
+	stageIds := make([]int, len(targets))
+	// compared at second precision, as the time ranges were formatted as RFC 3339 before
+	starts := make([]time.Time, len(targets))
+	ends := make([]time.Time, len(targets))
+	for i, target := range targets {
+		stageIds[i] = target.StageID
+		starts[i] = time.Unix(target.TimeRange.StartTime.Unix(), 0)
+		ends[i] = time.Unix(target.TimeRange.EndTime.Unix(), 0)
+	}
 
-	subq1 := s.db.NewSelect().
-		TableExpr("(?) AS subq2", subq2).
-		Column("stage_id").
-		ColumnExpr("MIN(times) AS times").
-		Group("stage_id", "day_num")
-
-	mainq := s.db.NewSelect().
-		TableExpr("(?) AS subq1", subq1).
-		Column("stage_id").
-		ColumnExpr("SUM(times) AS times").
-		Group("stage_id")
-
-	results := make([]*model.AllTimesResultForGlobalPatternMatrix, 0)
-	err := mainq.Scan(ctx, &results)
+	var rows []struct {
+		Kind           string `bun:"kind"`
+		SourceCategory string `bun:"source_category"`
+		StageID        int    `bun:"stage_id"`
+		PatternID      int    `bun:"pattern_id"`
+		Value          int    `bun:"value"`
+	}
+	err := s.db.NewRaw(`WITH t AS (
+			SELECT * FROM unnest(?::int[], ?::timestamptz[], ?::timestamptz[]) AS t(stage_id, start_time, end_time)
+		), e AS MATERIALIZED (
+			SELECT p.source_category, p.stage_id, p.pattern_id, p.times, p.day_num, p.quantity
+			FROM pattern_matrix_elements AS p
+			JOIN t ON p.stage_id = t.stage_id AND p.start_time >= t.start_time AND p.end_time <= t.end_time
+			WHERE p.server = ? AND p.source_category IN (?)
+		)
+		SELECT 'times' AS kind, source_category, stage_id, 0 AS pattern_id, SUM(times) AS value
+		FROM (SELECT source_category, stage_id, MIN(times) AS times FROM e WHERE times > 0 GROUP BY source_category, stage_id, day_num) AS daily
+		GROUP BY source_category, stage_id
+		UNION ALL
+		SELECT 'quantity', source_category, stage_id, pattern_id, SUM(quantity)
+		FROM e WHERE quantity > 0
+		GROUP BY source_category, stage_id, pattern_id`,
+		pgdialect.Array(stageIds), pgdialect.Array(starts), pgdialect.Array(ends), server, bun.In(sourceCategories)).
+		Scan(ctx, &rows)
 	if err != nil {
 		return nil, err
 	}
-	return results, nil
-}
 
-func (s *PatternMatrixElement) GetAllQuantitiesForGlobalPatternMatrix(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
-) ([]*model.AllQuantitiesResultForGlobalPatternMatrix, error) {
-	subq1 := s.db.NewSelect().
-		TableExpr("pattern_matrix_elements").
-		Column("stage_id", "pattern_id", "quantity").
-		Where("server = ?", server).
-		Where("source_category = ?", sourceCategory).
-		Where("quantity > 0").
-		Where("stage_id IN (?)", bun.In(stageIds)).
-		Where("start_time >= timestamp with time zone ?", timeRange.StartTime.Format(time.RFC3339)).
-		Where("end_time <= timestamp with time zone ?", timeRange.EndTime.Format(time.RFC3339))
-
-	mainq := s.db.NewSelect().
-		TableExpr("(?) AS subq1", subq1).
-		Column("stage_id", "pattern_id").
-		ColumnExpr("SUM(quantity) AS quantity").
-		Group("stage_id", "pattern_id")
-
-	results := make([]*model.AllQuantitiesResultForGlobalPatternMatrix, 0)
-	err := mainq.Scan(ctx, &results)
-	if err != nil {
-		return nil, err
+	for _, row := range rows {
+		aggregate := aggregates[row.SourceCategory]
+		if row.Kind == "times" {
+			aggregate.TimesByStageID[row.StageID] = row.Value
+			continue
+		}
+		if _, ok := aggregate.QuantitiesByStageID[row.StageID]; !ok {
+			aggregate.QuantitiesByStageID[row.StageID] = make(map[int]int)
+		}
+		aggregate.QuantitiesByStageID[row.StageID][row.PatternID] = row.Value
 	}
-	return results, nil
+	return aggregates, nil
 }

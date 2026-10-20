@@ -92,7 +92,7 @@ func calculateBlocked(c *Set[int], key string, calculated int) (release func(), 
 func TestMutexGetSetDoesNotOverwriteANewerValue(t *testing.T) {
 	c := NewSet[int]("test")
 	release, result := calculateBlocked(c, "key", 1) // calculating from data the refresh below supersedes
-	c.Set("key", 2, time.Minute)                      // the worker's refresh
+	c.Set("key", 2, time.Minute)                     // the worker's refresh
 	release()
 
 	if v := <-result; v != 2 {
