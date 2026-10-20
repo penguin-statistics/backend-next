@@ -101,8 +101,8 @@ func (s *PatternMatrix) GetShimPatternMatrix(ctx context.Context, server string,
 // Calc today's pattern matrix elements and save to DB
 // Called by worker
 func (s *PatternMatrix) RunCalcPatternMatrixJob(ctx context.Context, server string) error {
-	date := time.Now()
-	endTime := time.Now()
+	date := util.Now()
+	endTime := util.Now()
 	patternMatrixElements, err := s.calcPatternMatrixByGivenDate(ctx, server, &date, &endTime, s.Config.MatrixWorkerSourceCategories)
 	if err != nil {
 		return err

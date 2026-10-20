@@ -95,7 +95,7 @@ func (s *DropMatrix) GetShimDropMatrix(
 // Calc today's drop matrix elements and save to DB
 // Called by worker
 func (s *DropMatrix) RunCalcDropMatrixJob(ctx context.Context, server string) error {
-	date := time.Now()
+	date := util.Now()
 	endTime := time.UnixMilli(constant.FakeEndTimeMilli)
 	dropMatrixElements, err := s.calcDropMatrixByGivenDate(ctx, server, &date, &endTime, s.Config.MatrixWorkerSourceCategories)
 	if err != nil {

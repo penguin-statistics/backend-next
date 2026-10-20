@@ -239,7 +239,7 @@ func (r *DropReport) CalcTotalStageQuantityForShimSiteStats(ctx context.Context,
 			Where("dr.reliability = 0 AND dr.server = ? AND st.ark_stage_id != ?", server, constant.RecruitStageID).
 			Apply(func(sq *bun.SelectQuery) *bun.SelectQuery {
 				if isRecent24h {
-					return sq.Where("dr.created_at >= now() - interval '24 hours'")
+					return sq.Where("dr.created_at >= ?", util.Now().Add(-24*time.Hour))
 				} else {
 					return sq
 				}
