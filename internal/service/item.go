@@ -92,8 +92,9 @@ func (s *Item) GetShimItems(ctx context.Context) ([]*modelv2.Item, error) {
 	for _, i := range items {
 		s.applyShim(i)
 	}
-	cache.ShimItems.Set(items, time.Minute*5)
-	cache.LastModifiedTime.Set("[shimItems]", time.Now(), 0)
+	cache.SetLastModifiedTime("[shimItems]", items, func() {
+		cache.ShimItems.Set(items, time.Minute*5)
+	})
 	return items, nil
 }
 

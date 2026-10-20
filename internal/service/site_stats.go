@@ -102,7 +102,7 @@ func (s *SiteStats) RefreshShimSiteStats(ctx context.Context, server string) (*m
 	if err != nil {
 		return nil, err
 	}
-	cache.LastModifiedTime.Set("[shimSiteStats#server:"+server+"]", time.Now(), 0)
+	cache.SetLastModifiedTime("[shimSiteStats#server:"+server+"]", results, nil)
 	return &results, nil
 }
 
