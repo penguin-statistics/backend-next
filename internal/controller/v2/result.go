@@ -152,7 +152,7 @@ func (c *Result) GetDropMatrix(ctx *fiber.Ctx) error {
 	if accountId.Valid {
 		cachectrl.OptOut(ctx)
 	} else if useCache {
-		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones) + constant.CacheSep + constant.SourceCategoryAll
+		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones) + constant.CacheSep + sourceCategory
 		var lastModifiedTime time.Time
 		if err := cache.LastModifiedTime.Get("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
 			lastModifiedTime = time.Now()
