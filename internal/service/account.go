@@ -44,10 +44,6 @@ func (s *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (
 	return dbAccount, nil
 }
 
-func (s *Account) IsAccountExistWithId(ctx context.Context, accountId int) bool {
-	return s.AccountRepo.IsAccountExistWithId(ctx, accountId)
-}
-
 func (s *Account) GetAccountFromRequest(ctx *fiber.Ctx) (*model.Account, error) {
 	// get PenguinID from HTTP header in form of Authorization: PenguinID ########
 	penguinId := pgid.Extract(ctx)

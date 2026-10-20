@@ -16,7 +16,6 @@ type Flusher func() error
 
 var (
 	AccountByPenguinID *cache.Set[model.Account]
-	AccountExistence   *cache.Set[int]
 
 	DropInfosByServer                *cache.Set[[]*model.DropInfo]
 	ItemDropSetByStageIDAndRangeID   *cache.Set[[]int]
@@ -111,10 +110,8 @@ func initializeCaches() {
 
 	// account
 	AccountByPenguinID = cache.NewSet[model.Account]("account#penguinId")
-	AccountExistence = cache.NewSet[int]("accountExistence#accountId")
 
 	SetMap["account#penguinId"] = AccountByPenguinID.Flush
-	SetMap["accountExistence#accountId"] = AccountExistence.Flush
 
 	// drop_info
 	DropInfosByServer = cache.NewSet[[]*model.DropInfo]("dropInfos#server")
