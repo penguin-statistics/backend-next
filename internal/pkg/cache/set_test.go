@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -66,5 +67,69 @@ func TestMutexGetSetCalculatesAKeyOnce(t *testing.T) {
 	wg.Wait()
 	if n := calculations.Load(); n != 1 {
 		t.Errorf("the key was calculated %d times, want once", n)
+	}
+}
+
+// calculateBlocked starts a MutexGetSet of key whose calculation returns calculated once released, and waits until
+// it calculates.
+func calculateBlocked(c *Set[int], key string, calculated int) (release func(), result <-chan int) {
+	started := make(chan struct{})
+	unblock := make(chan struct{})
+	results := make(chan int, 1)
+	go func() {
+		var v int
+		_, _ = c.MutexGetSet(key, &v, func() (*int, error) {
+			close(started)
+			<-unblock
+			return &calculated, nil
+		}, time.Minute)
+		results <- v
+	}()
+	<-started
+	return func() { close(unblock) }, results
+}
+
+func TestMutexGetSetDoesNotOverwriteANewerValue(t *testing.T) {
+	c := NewSet[int]("test")
+	release, result := calculateBlocked(c, "key", 1) // calculating from data the refresh below supersedes
+	c.Set("key", 2, time.Minute)                      // the worker's refresh
+	release()
+
+	if v := <-result; v != 2 {
+		t.Errorf("the request got %d, want the newer 2", v)
+	}
+	var cached int
+	if err := c.Get("key", &cached); err != nil || cached != 2 {
+		t.Errorf("cached %d (%v), want the newer 2", cached, err)
+	}
+}
+
+func TestMutexGetSetDoesNotCacheAfterADelete(t *testing.T) {
+	c := NewSet[int]("test")
+	release, result := calculateBlocked(c, "key", 1)
+	if err := c.Delete("key"); err != nil {
+		t.Fatal(err)
+	}
+	release()
+
+	if v := <-result; v != 1 {
+		t.Errorf("the request got %d, want its calculation 1", v)
+	}
+	var cached int
+	if err := c.Get("key", &cached); err == nil {
+		t.Errorf("cached %d calculated before the delete", cached)
+	}
+}
+
+func TestMutexGetSetForgetsKeysNotInUse(t *testing.T) {
+	c := NewSet[int]("test")
+	for i := 0; i < 100; i++ {
+		var v int
+		if _, err := c.MutexGetSet("key"+strconv.Itoa(i), &v, func() (*int, error) { return &i, nil }, time.Minute); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(c.locks) != 0 || len(c.calculating) != 0 {
+		t.Errorf("kept %d locks and %d calculating keys", len(c.locks), len(c.calculating))
 	}
 }

@@ -11,15 +11,24 @@ import (
 
 func NewSet[T any](prefix string) *Set[T] {
 	return &Set[T]{
-		prefix: prefix + ":",
-		c:      cache.New(cache.NoExpiration, time.Minute*10),
+		prefix:      prefix + ":",
+		c:           cache.New(cache.NoExpiration, time.Minute*10),
+		locks:       make(map[string]*keyLock),
+		calculating: make(map[string]bool),
 	}
 }
 
 type Set[T any] struct {
-	// locks holds a *sync.Mutex per key, so that MutexGetSet calculates a key once at a time without making other
-	// keys wait for it
-	locks sync.Map
+	// locks holds a lock per key in use, so that MutexGetSet calculates a key once at a time without making other
+	// keys wait for it; guarded by locksMu
+	locksMu sync.Mutex
+	locks   map[string]*keyLock
+
+	// writeMu guards the writes to c and calculating. calculating holds the keys MutexGetSet is calculating, with
+	// whether they were written (or flushed) meanwhile: then the calculated value may be older than the written
+	// one, and is not published.
+	writeMu     sync.Mutex
+	calculating map[string]bool
 
 	prefix string
 
@@ -56,7 +65,16 @@ func (c *Set[T]) Set(key string, value T, expire time.Duration) {
 	if l := log.Trace(); l.Enabled() {
 		l.Str("key", key).Msg("setting value to cache")
 	}
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	c.markWrittenLocked(key)
 	c.c.Set(key, value, expire)
+}
+
+func (c *Set[T]) markWrittenLocked(key string) {
+	if _, ok := c.calculating[key]; ok {
+		c.calculating[key] = true
+	}
 }
 
 // MutexGetSet gets value from cache and writes to dest, or if the key does not exist, it executes valueFunc
@@ -73,27 +91,65 @@ func (c *Set[T]) MutexGetSet(key string, dest *T, valueFunc func() (*T, error), 
 	return true, c.slowMutexGetSet(key, dest, valueFunc, expire)
 }
 
+// keyLock is the lock of a key, removed once no MutexGetSet holds or waits for it (keys such as account ids are
+// too many to keep a lock for each).
+type keyLock struct {
+	sync.Mutex
+	users int
+}
+
+func (c *Set[T]) lockKey(key string) func() {
+	c.locksMu.Lock()
+	l, ok := c.locks[key]
+	if !ok {
+		l = &keyLock{}
+		c.locks[key] = l
+	}
+	l.users++
+	c.locksMu.Unlock()
+
+	l.Lock()
+	return func() {
+		l.Unlock()
+		c.locksMu.Lock()
+		if l.users--; l.users == 0 {
+			delete(c.locks, key)
+		}
+		c.locksMu.Unlock()
+	}
+}
+
 func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, error), expire time.Duration) error {
-	m, _ := c.locks.LoadOrStore(key, &sync.Mutex{})
-	m.(*sync.Mutex).Lock()
-	defer m.(*sync.Mutex).Unlock()
+	defer c.lockKey(key)()
 	err := c.Get(key, dest)
 
 	if err == nil {
 		return nil
 	}
 
+	// the key's lock makes this the only calculation of the key
+	c.writeMu.Lock()
+	c.calculating[c.key(key)] = false
+	c.writeMu.Unlock()
+
 	value, err := valueFunc()
+
+	// publish the value unless the key was written meanwhile (e.g. refreshed by the worker): then the value may have
+	// been calculated from older data, and the newer one is returned instead, if it is still there
+	c.writeMu.Lock()
+	published := err == nil && !c.calculating[c.key(key)]
+	delete(c.calculating, c.key(key))
+	if published {
+		c.c.Set(c.key(key), *value, expire)
+	}
+	c.writeMu.Unlock()
 	if err != nil {
 		log.Error().Err(err).Str("key", key).Msg("failed to get value from valueFunc() in MutexGetSet")
 		return err
 	}
-
-	c.Set(key, *value, expire)
-	// if err != nil {
-	// 	log.Error().Err(err).Str("key", key).Msg("failed to set value to cache in MutexGetSet")
-	// 	return err
-	// }
+	if !published && c.Get(key, dest) == nil {
+		return nil
+	}
 
 	// copy value to dest
 	var r reflect.Value
@@ -112,12 +168,20 @@ func (c *Set[T]) Delete(key string) error {
 	if l := log.Trace(); l.Enabled() {
 		l.Str("key", key).Msg("deleting value from cache")
 	}
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	c.markWrittenLocked(key)
 	c.c.Delete(key)
 
 	return nil
 }
 
 func (c *Set[T]) Flush() error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	for key := range c.calculating {
+		c.calculating[key] = true
+	}
 	c.c.Flush()
 	return nil
 }
