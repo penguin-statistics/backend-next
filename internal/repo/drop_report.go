@@ -155,6 +155,68 @@ func (r *DropReport) CalcTotalQuantityForPatternMatrix(
 	return results, nil
 }
 
+// CalcTotalQuantityForPatternMatrixBySourceCategories is CalcTotalQuantityForPatternMatrix for several source
+// categories at once: drop_reports is scanned once and every report is classified as a manual or automated source.
+// queryCtx.SourceCategory is ignored.
+func (r *DropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
+	ctx context.Context, queryCtx *model.DropReportQueryContext, sourceCategories []string,
+) (map[string][]*model.TotalQuantityResultForPatternMatrix, error) {
+	var rows []struct {
+		StageID       int  `bun:"stage_id"`
+		PatternID     int  `bun:"pattern_id"`
+		IsManual      bool `bun:"is_manual"`
+		TotalQuantity int  `bun:"total_quantity"`
+	}
+
+	subq1 := r.db.NewSelect().
+		TableExpr("drop_reports AS dr").
+		Column("dr.stage_id", "dr.pattern_id").
+		// mirrors handleSourceName: NULL source_name counts as automated
+		ColumnExpr("COALESCE(dr.source_name IN (?), false) AS is_manual", bun.In(constant.ManualSources))
+	r.handleAccountAndReliability(subq1, queryCtx.AccountID)
+	r.handleCreatedAtWithTime(subq1, queryCtx.StartTime, queryCtx.EndTime)
+	r.handleServer(subq1, queryCtx.Server)
+	r.handleStages(subq1, queryCtx.GetStageIds())
+	r.handleTimes(subq1, 1)
+
+	if err := r.db.NewSelect().
+		TableExpr("(?) AS a", subq1).
+		Column("stage_id", "pattern_id", "is_manual").
+		ColumnExpr("COUNT(*) AS total_quantity").
+		Group("stage_id", "pattern_id", "is_manual").
+		Scan(ctx, &rows); err != nil {
+		return nil, err
+	}
+
+	type key struct{ stageId, patternId int }
+	resultsBySourceCategory := make(map[string][]*model.TotalQuantityResultForPatternMatrix, len(sourceCategories))
+	for _, sourceCategory := range sourceCategories {
+		quantities := make(map[key]int)
+		keys := make([]key, 0)
+		for _, row := range rows {
+			if (sourceCategory == constant.SourceCategoryManual && !row.IsManual) ||
+				(sourceCategory == constant.SourceCategoryAutomated && row.IsManual) {
+				continue
+			}
+			k := key{row.StageID, row.PatternID}
+			if _, ok := quantities[k]; !ok {
+				keys = append(keys, k)
+			}
+			quantities[k] += row.TotalQuantity
+		}
+		results := make([]*model.TotalQuantityResultForPatternMatrix, 0, len(keys))
+		for _, k := range keys {
+			results = append(results, &model.TotalQuantityResultForPatternMatrix{
+				StageID:       k.stageId,
+				PatternID:     k.patternId,
+				TotalQuantity: quantities[k],
+			})
+		}
+		resultsBySourceCategory[sourceCategory] = results
+	}
+	return resultsBySourceCategory, nil
+}
+
 func (r *DropReport) CalcTotalQuantityForTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int, sourceCategory string,
 ) ([]*model.TotalQuantityResultForTrend, error) {

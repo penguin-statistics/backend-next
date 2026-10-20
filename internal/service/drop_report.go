@@ -72,6 +72,12 @@ func (s *DropReport) CalcTotalQuantityForPatternMatrix(
 	return s.DropReportRepo.CalcTotalQuantityForPatternMatrix(ctx, queryCtx)
 }
 
+func (s *DropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
+	ctx context.Context, queryCtx *model.DropReportQueryContext, sourceCategories []string,
+) (map[string][]*model.TotalQuantityResultForPatternMatrix, error) {
+	return s.DropReportRepo.CalcTotalQuantityForPatternMatrixBySourceCategories(ctx, queryCtx, sourceCategories)
+}
+
 func (s *DropReport) CalcTotalTimesForPatternMatrix(
 	ctx context.Context, queryCtx *model.DropReportQueryContext,
 ) ([]*model.TotalTimesResult, error) {
