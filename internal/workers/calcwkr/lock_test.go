@@ -60,7 +60,7 @@ func TestMicrotasksOfConcurrentServersKeepTheLock(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				if err := w.microtask(ctx, "lockTest", server, func() error {
+				if err := w.microtask(ctx, "lockTest", server, func(context.Context) error {
 					time.Sleep(600 * time.Millisecond)
 					return nil
 				}); err != nil {
@@ -98,7 +98,7 @@ func TestMicrotaskReturnsTheErrorAndRecordsTheDuration(t *testing.T) {
 	defer cancel()
 
 	errFailed := errors.New("failed")
-	if err := w.microtask(ctx, "microtaskTest", "CN", func() error {
+	if err := w.microtask(ctx, "microtaskTest", "CN", func(context.Context) error {
 		time.Sleep(20 * time.Millisecond)
 		return errFailed
 	}); !errors.Is(err, errFailed) {
