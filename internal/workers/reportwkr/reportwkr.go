@@ -226,36 +226,47 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 			trace.WithSpanKind(trace.SpanKindInternal))
 	defer pstSpan.End()
 
-	tx, err := w.DB.BeginTx(pstCtx, nil)
-	if err != nil {
-		return err
-	}
-	intendedCommit := false
-	defer func() {
-		if !intendedCommit {
+	// the transaction is rolled back when persist returns an error, and committed otherwise
+	err := w.DB.RunInTx(pstCtx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := w.persist(ctx, tx, reportTask, taskCreatedAt, violations); err != nil {
+			// rolled back here rather than by RunInTx, which drops the error of a failed rollback. A failed commit
+			// is not rolled back: it has already ended the transaction.
 			L.Warn().Msg("rolling back transaction due to error")
 			if err := tx.Rollback(); err != nil {
 				L.Error().Err(err).Msg("failed to rollback transaction")
 			}
+			return err
 		}
-	}()
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	observability.ReportStoredTotal.
+		WithLabelValues(observability.ReportSourceLabel(reportTask.Source)).
+		Add(float64(len(reportTask.Reports)))
 
+	return nil
+}
+
+// persist stores the reports of the task in tx.
+func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.ReportTask, taskCreatedAt time.Time, violations reportverifs.Violations) error {
 	// calculate drop pattern hash for each report
 	for idx, report := range reportTask.Reports {
 		report.Drops = reportutil.MergeDropsByItemID(report.Drops)
 
-		dropPattern, created, err := w.DropPatternRepo.GetOrCreateDropPatternFromDrops(pstCtx, tx, report.Drops)
+		dropPattern, created, err := w.DropPatternRepo.GetOrCreateDropPatternFromDrops(ctx, tx, report.Drops)
 		if err != nil {
 			return errors.Wrap(err, "failed to calculate drop pattern hash")
 		}
 		if created {
-			_, err := w.DropPatternElementRepo.CreateDropPatternElements(pstCtx, tx, dropPattern.PatternID, report.Drops)
+			_, err := w.DropPatternElementRepo.CreateDropPatternElements(ctx, tx, dropPattern.PatternID, report.Drops)
 			if err != nil {
 				return errors.Wrap(err, "failed to create drop pattern elements")
 			}
 		}
 
-		stage, err := w.StageService.GetStageByArkId(pstCtx, report.StageID)
+		stage, err := w.StageService.GetStageByArkId(ctx, report.StageID)
 		if err != nil {
 			return errors.Wrap(err, "failed to get stage")
 		}
@@ -273,7 +284,7 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 			SourceName:  reportTask.Source,
 			Version:     reportTask.Version,
 		}
-		if err = w.DropReportRepo.CreateDropReport(pstCtx, tx, dropReport); err != nil {
+		if err = w.DropReportRepo.CreateDropReport(ctx, tx, dropReport); err != nil {
 			return errors.Wrap(err, "failed to create drop report")
 		}
 
@@ -293,7 +304,7 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 
 			reportTask.IP = "127.0.0.1"
 		}
-		if err = w.DropReportExtraRepo.CreateDropReportExtra(pstCtx, tx, &model.DropReportExtra{
+		if err = w.DropReportExtraRepo.CreateDropReportExtra(ctx, tx, &model.DropReportExtra{
 			ReportID: dropReport.ReportID,
 			IP:       reportTask.IP,
 			Metadata: report.Metadata,
@@ -302,18 +313,10 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 			return errors.Wrap(err, "failed to create drop report extra")
 		}
 
-		if err := w.Redis.Set(pstCtx, constant.ReportRedisPrefix+reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
+		if err := w.Redis.Set(ctx, constant.ReportRedisPrefix+reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
 			return errors.Wrap(err, "failed to set report id in redis")
 		}
 	}
-
-	intendedCommit = true
-	if err := tx.Commit(); err != nil {
-		return errors.Wrap(err, "failed to commit transaction")
-	}
-	observability.ReportStoredTotal.
-		WithLabelValues(observability.ReportSourceLabel(reportTask.Source)).
-		Add(float64(len(reportTask.Reports)))
 
 	return nil
 }
