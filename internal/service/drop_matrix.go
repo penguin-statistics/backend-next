@@ -253,15 +253,18 @@ func (s *DropMatrix) calcDropMatrix(
 	stageTimesMap := map[int]int{}
 
 	// grouping results by stage id
-	var groupedResults []linq.Group
-	linq.From(combinedResults).
-		GroupByT(
-			func(el *model.CombinedResultForDropMatrix) int { return el.StageID },
-			func(el *model.CombinedResultForDropMatrix) *model.CombinedResultForDropMatrix { return el }).ToSlice(&groupedResults)
+	stageIds := make([]int, 0)
+	combinedResultsByStageId := make(map[int][]*model.CombinedResultForDropMatrix)
+	for _, result := range combinedResults {
+		if _, ok := combinedResultsByStageId[result.StageID]; !ok {
+			stageIds = append(stageIds, result.StageID)
+		}
+		combinedResultsByStageId[result.StageID] = append(combinedResultsByStageId[result.StageID], result)
+	}
 
+	dayNum := util.GetDayNum(queryCtx.StartTime, queryCtx.Server)
 	dropMatrixElements := make([]*model.DropMatrixElement, 0)
-	for _, el := range groupedResults {
-		stageId := el.Key.(int)
+	for _, stageId := range stageIds {
 		itemIds := (*queryCtx.StageItemFilter)[stageId]
 
 		// get all item ids which are dropped in this stage, save in dropSet
@@ -276,11 +279,19 @@ func (s *DropMatrix) calcDropMatrix(
 			if err != nil {
 				return nil, err
 			}
-			linq.From(dropInfos).
-				WhereT(func(el *model.DropInfo) bool { return el.ItemID.Valid }).
-				SelectT(func(el *model.DropInfo) int { return int(el.ItemID.Int64) }).
-				ToSlice(&dropItemIds)
-			linq.From(dropItemIds).WhereT(func(itemId int) bool { return linq.From(itemIds).Contains(itemId) }).ToSlice(&dropItemIds)
+			itemIdsSet := make(map[int]struct{}, len(itemIds))
+			for _, itemId := range itemIds {
+				itemIdsSet[itemId] = struct{}{}
+			}
+			dropItemIds = make([]int, 0, len(dropInfos))
+			for _, dropInfo := range dropInfos {
+				if !dropInfo.ItemID.Valid {
+					continue
+				}
+				if _, ok := itemIdsSet[int(dropInfo.ItemID.Int64)]; ok {
+					dropItemIds = append(dropItemIds, int(dropInfo.ItemID.Int64))
+				}
+			}
 			dropItemIdsByStageId[stageId] = dropItemIds
 		}
 		// use a fake hashset to save item ids
@@ -289,22 +300,20 @@ func (s *DropMatrix) calcDropMatrix(
 			dropSet[itemId] = struct{}{}
 		}
 
-		for _, el2 := range el.Group {
-			itemId := el2.(*model.CombinedResultForDropMatrix).ItemID
-			quantity := el2.(*model.CombinedResultForDropMatrix).Quantity
-			times := el2.(*model.CombinedResultForDropMatrix).Times
-			quantityBuckets := el2.(*model.CombinedResultForDropMatrix).QuantityBuckets
+		for _, result := range combinedResultsByStageId[stageId] {
+			itemId := result.ItemID
+			times := result.Times
 			dropMatrixElement := model.DropMatrixElement{
 				StageID:         stageId,
 				ItemID:          itemId,
-				Quantity:        quantity,
-				QuantityBuckets: quantityBuckets,
+				Quantity:        result.Quantity,
+				QuantityBuckets: result.QuantityBuckets,
 				Times:           times,
 				Server:          queryCtx.Server,
 				SourceCategory:  queryCtx.SourceCategory,
 				StartTime:       queryCtx.StartTime,
 				EndTime:         queryCtx.EndTime,
-				DayNum:          util.GetDayNum(queryCtx.StartTime, queryCtx.Server),
+				DayNum:          dayNum,
 			}
 			dropMatrixElements = append(dropMatrixElements, &dropMatrixElement)
 			delete(dropSet, itemId)        // remove existing item ids from drop set
@@ -323,7 +332,7 @@ func (s *DropMatrix) calcDropMatrix(
 				SourceCategory:  queryCtx.SourceCategory,
 				StartTime:       queryCtx.StartTime,
 				EndTime:         queryCtx.EndTime,
-				DayNum:          util.GetDayNum(queryCtx.StartTime, queryCtx.Server),
+				DayNum:          dayNum,
 			}
 			dropMatrixElements = append(dropMatrixElements, &dropMatrixElementWithZeroQuantity)
 		}
@@ -711,83 +720,45 @@ func (s *DropMatrix) combineQuantityAndTimesResults(
 ) []*model.CombinedResultForDropMatrix {
 	combinedResults := make([]*model.CombinedResultForDropMatrix, 0)
 
-	var firstGroupResults []linq.Group
-	linq.From(quantityResults).
-		GroupByT(
-			func(result *model.TotalQuantityResultForDropMatrix) int { return result.StageID },
-			func(result *model.TotalQuantityResultForDropMatrix) *model.TotalQuantityResultForDropMatrix {
-				return result
-			}).
-		ToSlice(&firstGroupResults)
 	quantityResultsMap := make(map[int]map[int]int)
-	for _, firstGroupElements := range firstGroupResults {
-		stageId := firstGroupElements.Key.(int)
-		resultsMap := make(map[int]int)
-		linq.From(firstGroupElements.Group).
-			ToMapByT(&resultsMap,
-				func(el any) int { return el.(*model.TotalQuantityResultForDropMatrix).ItemID },
-				func(el any) int { return el.(*model.TotalQuantityResultForDropMatrix).TotalQuantity })
-		quantityResultsMap[stageId] = resultsMap
-	}
-
-	var quantityUniqCountGroupResultsByStageID []linq.Group
-	linq.From(quantityUniqCountResults).
-		GroupByT(func(result *model.QuantityUniqCountResultForDropMatrix) int { return result.StageID },
-			func(result *model.QuantityUniqCountResultForDropMatrix) *model.QuantityUniqCountResultForDropMatrix {
-				return result
-			}).
-		ToSlice(&quantityUniqCountGroupResultsByStageID)
-	quantityUniqCountResultsMap := make(map[int]map[int]map[int]int)
-	for _, quantityUniqCountGroupElements := range quantityUniqCountGroupResultsByStageID {
-		stageId := quantityUniqCountGroupElements.Key.(int)
-		var quantityUniqCountGroupResultsByItemID []linq.Group
-		linq.From(quantityUniqCountGroupElements.Group).
-			GroupByT(func(result *model.QuantityUniqCountResultForDropMatrix) int { return result.ItemID },
-				func(result *model.QuantityUniqCountResultForDropMatrix) *model.QuantityUniqCountResultForDropMatrix {
-					return result
-				}).ToSlice(&quantityUniqCountGroupResultsByItemID)
-		oneItemResultsMap := make(map[int]map[int]int)
-		for _, quantityUniqCountGroupElements2 := range quantityUniqCountGroupResultsByItemID {
-			itemId := quantityUniqCountGroupElements2.Key.(int)
-			subMap := make(map[int]int)
-			linq.From(quantityUniqCountGroupElements2.Group).
-				ToMapByT(&subMap,
-					func(el any) int { return el.(*model.QuantityUniqCountResultForDropMatrix).Quantity },
-					func(el any) int { return el.(*model.QuantityUniqCountResultForDropMatrix).Count })
-			oneItemResultsMap[itemId] = subMap
+	for _, result := range quantityResults {
+		if _, ok := quantityResultsMap[result.StageID]; !ok {
+			quantityResultsMap[result.StageID] = make(map[int]int)
 		}
-		quantityUniqCountResultsMap[stageId] = oneItemResultsMap
+		quantityResultsMap[result.StageID][result.ItemID] = result.TotalQuantity
 	}
 
-	var secondGroupResults []linq.Group
-	linq.From(timesResults).
-		GroupByT(
-			func(result *model.TotalTimesResult) int { return result.StageID },
-			func(result *model.TotalTimesResult) *model.TotalTimesResult { return result }).
-		ToSlice(&secondGroupResults)
-	for _, secondGroupResults := range secondGroupResults {
-		stageId := secondGroupResults.Key.(int)
-		quantityResultsMapForOneStage := quantityResultsMap[stageId]
+	quantityUniqCountResultsMap := make(map[int]map[int]map[int]int)
+	for _, result := range quantityUniqCountResults {
+		if _, ok := quantityUniqCountResultsMap[result.StageID]; !ok {
+			quantityUniqCountResultsMap[result.StageID] = make(map[int]map[int]int)
+		}
+		if _, ok := quantityUniqCountResultsMap[result.StageID][result.ItemID]; !ok {
+			quantityUniqCountResultsMap[result.StageID][result.ItemID] = make(map[int]int)
+		}
+		quantityUniqCountResultsMap[result.StageID][result.ItemID][result.Quantity] = result.Count
+	}
+
+	for _, timesResult := range timesResults {
+		stageId := timesResult.StageID
+		times := timesResult.TotalTimes
 		quantityUniqCountResultsMapForOneStage := quantityUniqCountResultsMap[stageId]
-		for _, el := range secondGroupResults.Group {
-			times := el.(*model.TotalTimesResult).TotalTimes
-			for itemId, quantity := range quantityResultsMapForOneStage {
-				quantityBuckets := quantityUniqCountResultsMapForOneStage[itemId]
-				if !s.validateQuantityBucketsAndTimes(quantityBuckets, times) {
-					log.Warn().Msgf("quantity buckets and times are not matched for stage %d, item %d, please check drop pattern", stageId, itemId)
-				}
-				combinedResultForDropMatrix := &model.CombinedResultForDropMatrix{
-					StageID:         stageId,
-					ItemID:          itemId,
-					Quantity:        quantity,
-					QuantityBuckets: quantityBuckets,
-					Times:           times,
-				}
-				if timeRange != nil {
-					combinedResultForDropMatrix.TimeRange = timeRange
-				}
-				combinedResults = append(combinedResults, combinedResultForDropMatrix)
+		for itemId, quantity := range quantityResultsMap[stageId] {
+			quantityBuckets := quantityUniqCountResultsMapForOneStage[itemId]
+			if !s.validateQuantityBucketsAndTimes(quantityBuckets, times) {
+				log.Warn().Msgf("quantity buckets and times are not matched for stage %d, item %d, please check drop pattern", stageId, itemId)
 			}
+			combinedResultForDropMatrix := &model.CombinedResultForDropMatrix{
+				StageID:         stageId,
+				ItemID:          itemId,
+				Quantity:        quantity,
+				QuantityBuckets: quantityBuckets,
+				Times:           times,
+			}
+			if timeRange != nil {
+				combinedResultForDropMatrix.TimeRange = timeRange
+			}
+			combinedResults = append(combinedResults, combinedResultForDropMatrix)
 		}
 	}
 	return combinedResults

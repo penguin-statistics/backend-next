@@ -19,6 +19,7 @@ var (
 	AccountByPenguinID *cache.Set[model.Account]
 	AccountExistence   *cache.Set[int]
 
+	DropInfosByServer                *cache.Set[[]*model.DropInfo]
 	ItemDropSetByStageIDAndRangeID   *cache.Set[[]int]
 	ItemDropSetByStageIdAndTimeRange *cache.Set[[]int]
 
@@ -120,9 +121,11 @@ func initializeCaches() {
 	SetMap["accountExistence#accountId"] = AccountExistence.Flush
 
 	// drop_info
+	DropInfosByServer = cache.NewSet[[]*model.DropInfo]("dropInfos#server")
 	ItemDropSetByStageIDAndRangeID = cache.NewSet[[]int]("itemDropSet#server|stageId|rangeId")
 	ItemDropSetByStageIdAndTimeRange = cache.NewSet[[]int]("itemDropSet#server|stageId|startTime|endTime")
 
+	SetMap["dropInfos#server"] = DropInfosByServer.Flush
 	SetMap["itemDropSet#server|stageId|rangeId"] = ItemDropSetByStageIDAndRangeID.Flush
 	SetMap["itemDropSet#server|stageId|startTime|endTime"] = ItemDropSetByStageIdAndTimeRange.Flush
 
