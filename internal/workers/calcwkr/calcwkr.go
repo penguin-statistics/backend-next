@@ -3,6 +3,7 @@ package calcwkr
 import (
 	"context"
 	"net/http"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -142,7 +143,15 @@ func (w *Worker) globalMatrixRefresh(batchCtx context.Context, name, server stri
 		ctx, cancel := context.WithTimeout(logger.WithContext(context.Background()), w.timeout)
 		defer cancel()
 		ctx, span := tracer.Start(ctx, "calcwkr."+name, trace.WithAttributes(attribute.String("server", server)))
-		err := observeCalcDuration(name, server, func() error { return refresh(ctx, server) })
+		err := observeCalcDuration(name, server, func() (err error) {
+			// requests have the recovery of the http server, this goroutine has none: a panic would end the process
+			defer func() {
+				if r := recover(); r != nil {
+					err = errors.Errorf("panic: %v\n%s", r, debug.Stack())
+				}
+			}()
+			return refresh(ctx, server)
+		})
 		endSpan(span, err)
 		if err != nil {
 			logger.Error().Err(err).Msg("failed to refresh the global matrices: dropped them, requests recalculate them")

@@ -63,3 +63,21 @@ func TestGlobalMatrixRefreshIsOffWithoutRequestsToServe(t *testing.T) {
 	})
 	time.Sleep(50 * time.Millisecond)
 }
+
+func TestGlobalMatrixRefreshRecoversFromAPanic(t *testing.T) {
+	w := &Worker{timeout: time.Minute, refreshGlobalMatrices: true}
+	var done sync.WaitGroup
+	done.Add(2)
+	w.globalMatrixRefresh(context.Background(), "globalPatternMatrixRefresh", "CN", func(context.Context, string) error {
+		defer done.Done()
+		var timesResult *struct{ Times int }
+		_ = timesResult.Times // what an inconsistent read did
+		return nil
+	})
+	// the process survived, and refreshes go on
+	w.globalMatrixRefresh(context.Background(), "globalPatternMatrixRefresh", "US", func(context.Context, string) error {
+		done.Done()
+		return nil
+	})
+	done.Wait()
+}

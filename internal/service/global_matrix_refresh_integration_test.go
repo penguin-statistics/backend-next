@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"math/rand"
+	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"exusiai.dev/gommon/constant"
+	"github.com/samber/lo"
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
@@ -234,5 +237,48 @@ func TestGlobalMatrixRefresh(t *testing.T) {
 		if v.server != "CN" && (!dropStale || !patternStale) {
 			t.Errorf("%+v: a failed refresh of CN dropped the matrices of another server", v)
 		}
+	}
+
+	// a worker or admin rewrite of a stage's pattern elements (delete, then insert) between the refresh's times and
+	// quantities queries: the refresh fails (and drops the matrices) instead of panicking on the missing times
+	flushCaches(t)
+	setStaleGlobalMatrices()
+	mustExec(t, db, "CREATE TABLE rewritten AS SELECT * FROM pattern_matrix_elements WHERE server = 'CN' AND stage_id = 1")
+	mustExec(t, db, "DELETE FROM pattern_matrix_elements WHERE server = 'CN' AND stage_id = 1")
+	db.AddQueryHook(&afterQueryHook{once: func(event *bun.QueryEvent) bool {
+		// the times query of the time range of stage 1
+		stages := stageIdsInQuery.FindStringSubmatch(event.Query)
+		if !strings.Contains(event.Query, "pattern_matrix_elements") || !strings.Contains(event.Query, "MIN(times)") ||
+			stages == nil || !lo.Contains(strings.Split(stages[1], ", "), "1") {
+			return false
+		}
+		mustExec(t, db, "INSERT INTO pattern_matrix_elements SELECT * FROM rewritten")
+		return true
+	}})
+	if err := patternMatrix.RefreshGlobalPatternMatrixCaches(ctx, "CN"); err == nil {
+		t.Fatal("refreshing while the elements were rewritten succeeded")
+	}
+	for _, v := range globalMatrixVariants() {
+		if _, patternStale := isStale(t, v); v.server == "CN" && patternStale {
+			t.Errorf("%+v: a failed refresh kept the stale pattern matrix", v)
+		}
+	}
+}
+
+var stageIdsInQuery = regexp.MustCompile(`stage_id IN \(([^)]*)\)`)
+
+// afterQueryHook runs once once a query it matches has run.
+type afterQueryHook struct {
+	once func(event *bun.QueryEvent) bool
+	done bool
+}
+
+func (h *afterQueryHook) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	return ctx
+}
+
+func (h *afterQueryHook) AfterQuery(_ context.Context, event *bun.QueryEvent) {
+	if !h.done {
+		h.done = h.once(event)
 	}
 }
