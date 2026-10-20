@@ -69,13 +69,14 @@ func RequestHandler(fieldKey string) func(ctx *fiber.Ctx) error {
 	}
 }
 
-// RemoteAddrHandler adds the request's remote address as a field to the context's logger
-// using fieldKey as field key.
+// RemoteAddrHandler adds the request's remote network as a field to the context's logger
+// using fieldKey as field key. Only the /24 (IPv4) or /48 (IPv6) network of the client
+// address is logged, see util.TruncateIP.
 func RemoteAddrHandler(fieldKey string) func(ctx *fiber.Ctx) error {
 	return func(ctx *fiber.Ctx) error {
 		log := zerolog.Ctx(ctx.UserContext())
 		log.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str(fieldKey, util.ExtractIP(ctx))
+			return c.Str(fieldKey, util.TruncateIP(util.ExtractIP(ctx)))
 		})
 		return ctx.Next()
 	}

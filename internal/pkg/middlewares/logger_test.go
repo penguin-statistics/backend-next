@@ -28,6 +28,8 @@ func newLoggedApp(t *testing.T, buf *bytes.Buffer) (*fiber.App, *int) {
 
 	errorHandlerCalls := 0
 	app := fiber.New(fiber.Config{
+		// as in production, without the trusted proxy check
+		ProxyHeader: "X-Original-Forwarded-For",
 		ErrorHandler: func(ctx *fiber.Ctx, err error) error {
 			errorHandlerCalls++
 			return fiber.DefaultErrorHandler(ctx, err)
@@ -174,6 +176,31 @@ func TestRequestLogLevel(t *testing.T) {
 	for _, tt := range tests {
 		if got := requestLogLevel(tt.status); got != tt.want {
 			t.Errorf("requestLogLevel(%d) = %s, want %s", tt.status, got, tt.want)
+		}
+	}
+}
+
+func TestRequestLoggerTruncatesClientIP(t *testing.T) {
+	tests := []struct {
+		forwardedFor string
+		want         string
+	}{
+		{"203.0.113.77", "203.0.113.0"},
+		{"203.0.113.77, 10.0.0.1", "203.0.113.0"},
+		{"2001:db8:1234:5678::1", "2001:db8:1234::"},
+	}
+	for _, tt := range tests {
+		var buf bytes.Buffer
+		app, _ := newLoggedApp(t, &buf)
+		app.Get("/", func(ctx *fiber.Ctx) error { return ctx.SendString("ok") })
+
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("X-Original-Forwarded-For", tt.forwardedFor)
+		if _, err := app.Test(req); err != nil {
+			t.Fatal(err)
+		}
+		if got := requestLog(t, &buf)["network.client.ip"]; got != tt.want {
+			t.Errorf("X-Original-Forwarded-For %q: logged network.client.ip = %v, want %s", tt.forwardedFor, got, tt.want)
 		}
 	}
 }
