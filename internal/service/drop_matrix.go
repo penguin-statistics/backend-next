@@ -155,7 +155,8 @@ func (s *DropMatrix) UpdateDropMatrixByGivenDate(ctx context.Context, server str
 	if len(dropMatrixElements) != 0 {
 		s.DropMatrixElementService.BatchSaveElements(ctx, dropMatrixElements, server)
 	}
-	return nil
+	// the day may be one of those the site stats keep aggregated in memory
+	return cache.SiteStatsBase.Delete(server)
 }
 
 /**

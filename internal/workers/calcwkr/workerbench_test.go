@@ -47,7 +47,9 @@ const defaultNow = "2026-10-19T14:00:00Z"
 var phases = []string{"dropMatrix", "patternMatrix", "siteStats"}
 
 // longLivedCaches are caches that outlive the worker's batch interval and are kept between the two batches.
-var longLivedCaches = map[string]bool{}
+var longLivedCaches = map[string]bool{
+	"siteStatsBase#server": true, // 6 hrs
+}
 
 func TestWorkerBench(t *testing.T) {
 	var (

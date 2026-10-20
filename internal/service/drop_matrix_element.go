@@ -3,8 +3,9 @@ package service
 import (
 	"context"
 
+	"gopkg.in/guregu/null.v3"
+
 	"exusiai.dev/backend-next/internal/model"
-	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/repo"
 )
 
@@ -87,14 +88,8 @@ func (s *DropMatrixElement) GetAllQuantityBucketsForGlobalDropMatrixMapByStageId
 	return result, nil
 }
 
-func (s *DropMatrixElement) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelv2.TotalItemQuantity, error) {
-	return s.DropMatrixElementRepo.CalcTotalItemQuantityForShimSiteStats(ctx, server)
-}
-
-func (s *DropMatrixElement) CalcTotalStageQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelv2.TotalStageTime, error) {
-	return s.DropMatrixElementRepo.CalcTotalStageQuantityForShimSiteStats(ctx, server)
-}
-
-func (s *DropMatrixElement) CalcTotalSanityCostForShimSiteStats(ctx context.Context, server string) (sanity int, err error) {
-	return s.DropMatrixElementRepo.CalcTotalSanityCostForShimSiteStats(ctx, server)
+func (s *DropMatrixElement) CalcSiteStatsAggregates(
+	ctx context.Context, server string, fromDayNum, toDayNum null.Int,
+) ([]*model.SiteStatsAggregate, error) {
+	return s.DropMatrixElementRepo.CalcSiteStatsAggregates(ctx, server, fromDayNum, toDayNum)
 }
