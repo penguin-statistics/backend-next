@@ -8,6 +8,7 @@ import (
 
 	"exusiai.dev/gommon/constant"
 	"github.com/ahmetb/go-linq/v3"
+	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"gopkg.in/guregu/null.v3"
 
@@ -283,7 +284,11 @@ func (s *PatternMatrix) calcGlobalPatternMatrix(ctx context.Context, server stri
 			return nil, err
 		}
 		for _, stageId := range stageIds {
-			timesResult := timesResults[stageId]
+			timesResult, ok := timesResults[stageId]
+			if !ok && len(quantityResults[stageId]) > 0 {
+				// the elements were rewritten (deleted, then inserted) between the two queries
+				return nil, errors.Errorf("pattern matrix of stage %d on %s changed while being read: times missing", stageId, server)
+			}
 			for patternId, quantityResult := range quantityResults[stageId] {
 				onePatternMatrixElement := &model.OnePatternMatrixElement{
 					StageID:   stageId,
