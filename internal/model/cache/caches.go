@@ -48,6 +48,7 @@ var (
 	ShimActivities *cache.Singular[[]*modelv2.Activity]
 
 	ShimSiteStats *cache.Set[modelv2.SiteStats]
+	SiteStatsBase *cache.Set[model.SiteStatsBase]
 
 	Stages           *cache.Singular[[]*model.Stage]
 	StageByArkID     *cache.Set[model.Stage]
@@ -185,6 +186,9 @@ func initializeCaches() {
 	ShimSiteStats = cache.NewSet[modelv2.SiteStats]("shimSiteStats#server")
 
 	SetMap["shimSiteStats#server"] = ShimSiteStats.Flush
+
+	SiteStatsBase = cache.NewSet[model.SiteStatsBase]("siteStatsBase#server")
+	SetMap["siteStatsBase#server"] = SiteStatsBase.Flush
 
 	// stage
 	Stages = cache.NewSingular[[]*model.Stage]("stages")

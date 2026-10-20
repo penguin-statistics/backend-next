@@ -8,9 +8,9 @@ import (
 	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
+	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
-	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
@@ -159,87 +159,35 @@ func (s *DropMatrixElement) GetAllQuantityBucketsForGlobalDropMatrix(
 	return results, nil
 }
 
-func (s *DropMatrixElement) CalcTotalItemQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelv2.TotalItemQuantity, error) {
-	types := []string{constant.ItemTypeMaterial, constant.ItemTypeFurniture, constant.ItemTypeChip}
-
-	subq := s.db.NewSelect().
-		TableExpr("drop_matrix_elements").
-		Column("item_id").
-		ColumnExpr("SUM(quantity) AS total_quantity").
-		Where("server = ?", server).
-		Where("source_category = ?", constant.SourceCategoryAll).
-		Group("item_id")
-
-	mainq := s.db.NewSelect().
-		Table("items").
-		TableExpr("(?) AS subq", subq).
-		Column("ark_item_id", "total_quantity").
-		Where("subq.item_id = items.item_id").
-		Where("items.type IN (?)", bun.In(types))
-
-	results := make([]*modelv2.TotalItemQuantity, 0)
-	err := mainq.Scan(ctx, &results)
-	if err != nil {
-		return nil, err
-	}
-	return results, nil
-}
-
-func (s *DropMatrixElement) CalcTotalStageQuantityForShimSiteStats(ctx context.Context, server string) ([]*modelv2.TotalStageTime, error) {
-	results := make([]*modelv2.TotalStageTime, 0)
-	err := s.getStageTimesQuery(server, false).Scan(ctx, &results)
-	if err != nil {
-		return nil, err
-	}
-	return results, nil
-}
-
-func (s *DropMatrixElement) CalcTotalSanityCostForShimSiteStats(ctx context.Context, server string) (sanity int, err error) {
-	mainq := s.db.NewSelect().
-		TableExpr("(?) AS subq4", s.getStageTimesQuery(server, true)).
-		ColumnExpr("SUM(sanity * total_times) AS sanity")
-	mainq.Scan(ctx, &sanity)
-	return sanity, err
-}
-
-func (s *DropMatrixElement) getStageTimesQuery(server string, containsSanity bool) *bun.SelectQuery {
-	subq3 := s.db.NewSelect().
+// CalcSiteStatsAggregates aggregates the drop matrix elements of a server (source category "all") with
+// fromDayNum <= day_num < toDayNum per stage and item, see model.SiteStatsAggregate. Invalid bounds are open.
+func (s *DropMatrixElement) CalcSiteStatsAggregates(
+	ctx context.Context, server string, fromDayNum, toDayNum null.Int,
+) ([]*model.SiteStatsAggregate, error) {
+	elements := s.db.NewSelect().
 		TableExpr("drop_matrix_elements").
 		Column("stage_id", "item_id", "times", "day_num").
+		ColumnExpr("SUM(quantity) AS quantity").
 		Where("server = ?", server).
 		Where("source_category = ?", constant.SourceCategoryAll).
-		Where("times > 0")
-
-	subq2 := s.db.NewSelect().
-		TableExpr("(?) AS subq3", subq3).
-		Column("stage_id", "item_id", "times").
 		Group("stage_id", "item_id", "times", "day_num")
-
-	subq1 := s.db.NewSelect().
-		TableExpr("(?) AS subq2", subq2).
-		Column("stage_id").
-		ColumnExpr("sum(times) AS total_times").
-		Group("stage_id", "item_id")
-
-	mainq := s.db.NewSelect().
-		Table("stages").
-		TableExpr("(?) AS subq1", subq1)
-
-	if containsSanity {
-		mainq = mainq.Column("ark_stage_id", "sanity")
-	} else {
-		mainq = mainq.Column("ark_stage_id")
+	if fromDayNum.Valid {
+		elements = elements.Where("day_num >= ?", fromDayNum.Int64)
+	}
+	if toDayNum.Valid {
+		elements = elements.Where("day_num < ?", toDayNum.Int64)
 	}
 
-	mainq.ColumnExpr("max(total_times) AS total_times").
-		Where("subq1.stage_id = stages.stage_id").
-		Where("ark_stage_id != ?", "recruit").
-		Where("extra_process_type IS NULL")
-
-	if containsSanity {
-		mainq = mainq.Group("ark_stage_id", "sanity")
-	} else {
-		mainq = mainq.Group("ark_stage_id")
+	results := make([]*model.SiteStatsAggregate, 0)
+	err := s.db.NewSelect().
+		TableExpr("(?) AS g", elements).
+		Column("stage_id", "item_id").
+		ColumnExpr("SUM(times) FILTER (WHERE times > 0) AS times").
+		ColumnExpr("SUM(quantity) AS quantity").
+		Group("stage_id", "item_id").
+		Scan(ctx, &results)
+	if err != nil {
+		return nil, err
 	}
-	return mainq
+	return results, nil
 }
