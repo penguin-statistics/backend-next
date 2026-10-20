@@ -65,8 +65,10 @@ func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
 		Subjects: []string{
 			"REPORT.*",
 		},
-		Retention:  nats.WorkQueuePolicy,
-		Discard:    nats.DiscardOld,
+		Retention: nats.WorkQueuePolicy,
+		// the stream has no limits, so nothing is discarded today; if a limit is ever set, refuse new reports
+		// (the publisher answers an error) rather than silently drop queued ones
+		Discard:    nats.DiscardNew,
 		Storage:    nats.FileStorage,
 		Replicas:   1,
 		Duplicates: time.Minute * 10,
