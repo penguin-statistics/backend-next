@@ -219,8 +219,31 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 	})
 }
 
-// persist stores the reports of the task in tx.
+// persist stores the reports of the task in tx, unless they were stored already.
 func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.ReportTask, taskCreatedAt time.Time, violations reportverifs.Violations) error {
+	// A task can be delivered again while a copy is being processed, or after it was persisted but not acked. The
+	// copies wait for each other on a lock of the task, held until the end of the transaction, and skip the task if
+	// its reports were stored: every report of a task has the task's created_at (microseconds, unique per account in
+	// practice), and under READ COMMITTED the check sees what the copy that held the lock committed. The lock is keyed
+	// on the account id and the low 32 bits of created_at, so that other tasks of the account do not wait; tasks
+	// sharing a key only wait for each other, the check alone decides what is skipped. No other advisory lock is
+	// taken on the database.
+	if _, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(?, ?)", int32(reportTask.AccountID), int32(reportTask.CreatedAt)); err != nil {
+		return errors.Wrap(err, "failed to lock task")
+	}
+	var applied bool
+	if err := tx.NewRaw("SELECT EXISTS (SELECT 1 FROM drop_reports WHERE created_at = ? AND account_id = ?)",
+		taskCreatedAt, reportTask.AccountID).Scan(ctx, &applied); err != nil {
+		return errors.Wrap(err, "failed to check for stored reports")
+	}
+	if applied {
+		log.Info().
+			Str("evt.name", "reportwkr.duplicate").
+			Str("taskId", reportTask.TaskID).
+			Msg("report task already applied; skipping")
+		return nil
+	}
+
 	// calculate drop pattern hash for each report
 	for idx, report := range reportTask.Reports {
 		report.Drops = reportutil.MergeDropsByItemID(report.Drops)
