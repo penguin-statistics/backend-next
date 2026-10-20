@@ -17,7 +17,7 @@ jobs:
     name: Upsert PR
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
         with:
           ref: "dev"
           # fetch all history so that git log can get all commit messages
@@ -26,7 +26,7 @@ jobs:
       # create a PR from dev to main, with title in form: Release <semver>
       # where, <semver> is the next version number to be released, based on the last release in git tag
       - name: Upsert PR Content
-        uses: actions/github-script@v6
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.PAT_FOR_RELEASE_TAGGER }}
           script: |
