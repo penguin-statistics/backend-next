@@ -384,7 +384,8 @@ func (s *Admin) GetRejectRulesReportContext(ctx context.Context, req types.Rejec
 		bun.BaseModel `bun:"drop_reports,alias:dr"`
 
 		model.DropReport
-		model.DropReportExtra `sql:"dre"`
+		// not encoded to JSON; both embedded structs tag their ReportID "id"
+		model.DropReportExtra `sql:"dre" json:"-"`
 		ArkStageID            string `sql:"st.ark_stage_id" json:"arkStageId"`
 	}
 
