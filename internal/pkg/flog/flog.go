@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"exusiai.dev/backend-next/internal/pkg/pgid"
 	"exusiai.dev/backend-next/internal/util"
 )
 
@@ -101,16 +100,6 @@ func RefererHandler(fieldKey string) func(ctx *fiber.Ctx) error {
 		log := zerolog.Ctx(ctx.UserContext())
 		log.UpdateContext(func(c zerolog.Context) zerolog.Context {
 			return c.Bytes(fieldKey, ctx.Request().Header.Referer())
-		})
-		return ctx.Next()
-	}
-}
-
-// PenguinIDHandler adds the request's penguin id as a field to the context's logger
-func PenguinIDHandler(fieldKey string) func(ctx *fiber.Ctx) error {
-	return func(ctx *fiber.Ctx) error {
-		UpdateContext(ctx, func(c zerolog.Context) zerolog.Context {
-			return c.Str(fieldKey, pgid.Extract(ctx))
 		})
 		return ctx.Next()
 	}

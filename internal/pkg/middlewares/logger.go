@@ -1,8 +1,10 @@
 package middlewares
 
 import (
+	"strconv"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -16,7 +18,6 @@ func Logger(app *fiber.App) {
 		app,
 		injectLogger(),
 		flog.RequestIDHandler("http.request_id", "X-Penguin-Request-ID"),
-		flog.PenguinIDHandler("usr.id"),
 		flog.RemoteAddrHandler("network.client.ip"),
 		flog.MethodHandler("http.method"),
 		flog.URLHandler("http.url"),
@@ -40,8 +41,14 @@ func requestLogger() func(ctx *fiber.Ctx) error {
 		status := ctx.Response().StatusCode()
 		bytesWritten := len(ctx.Response().Body())
 
-		flog.FromFiberCtx(ctx).WithLevel(requestLogLevel(status)).
-			Str("evt.name", "http.request").
+		evt := flog.FromFiberCtx(ctx).WithLevel(requestLogLevel(status)).
+			Str("evt.name", "http.request")
+		// usr.id is the internal account id, for the routes that resolve the account into
+		// ctx.Locals (the report routes). Never log the PenguinID: it is the login credential.
+		if accountId, ok := ctx.Locals(constant.LocalsAccountIDKey).(int); ok {
+			evt = evt.Str("usr.id", strconv.Itoa(accountId))
+		}
+		evt.
 			Bytes("http.useragent", ctx.Request().Header.UserAgent()).
 			Str("http.route", route).
 			Int("http.status_code", status).
