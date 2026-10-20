@@ -1009,3 +1009,175 @@ func TestUnknownStageIsParked(t *testing.T) {
 		t.Errorf("task parked as %v, want its sequence 1 and the task as published, %v, at error level", e, published)
 	}
 }
+
+// lockedRand is a random source the handlers of several workers can share.
+type lockedRand struct {
+	mu sync.Mutex
+	r  *rand.Rand
+}
+
+func (r *lockedRand) Intn(n int) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.r.Intn(n)
+}
+
+// TestPullConsumerUnderPressure runs 2000 tasks through the consumer on PostgreSQL with a handler taking 0 to 300ms
+// and failing about 5% of the deliveries, half of them before processing and half after the commit, while the
+// consumer is stopped and started again twice, each time on a new connection as a new process would. Every task is
+// stored exactly once and the stream ends empty.
+func TestPullConsumerUnderPressure(t *testing.T) {
+	if testing.Short() {
+		t.Skip("takes about half a minute")
+	}
+	s := newTestStream(t)
+	tw := newTestWorker(t)
+	logs := captureLogs(t)
+	const published = 2000
+
+	seed := time.Now().UnixNano()
+	t.Logf("seed %d", seed)
+	rnd := &lockedRand{r: rand.New(rand.NewSource(seed))}
+
+	conf := s.consumerConfig()
+	conf.workers = 16
+	conf.taskTimeout = 5 * time.Second
+	conf.nakDelay = 100 * time.Millisecond
+	conf.maxNakDelay = time.Second
+	// errs counts the errors of process, such as a pattern created by two tasks at once
+	var handled, failedBefore, failedAfter, errs handledCounter
+	newConsumer := func() (stop func()) {
+		nc, js := s.connect(t)
+		w := newWorker(tw.WorkerDeps, conf)
+		w.NatsJS = js
+		w.handle = func(ctx context.Context, task *types.ReportTask) error {
+			select {
+			case <-time.After(time.Duration(rnd.Intn(300)) * time.Millisecond):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+			switch rnd.Intn(40) {
+			case 0:
+				failedBefore.add(task.TaskID)
+				return errors.New("injected: connection reset by peer")
+			case 1:
+				if err := w.process(ctx, task); err != nil {
+					return err
+				}
+				failedAfter.add(task.TaskID)
+				return errors.New("injected: commit outcome unknown")
+			}
+			if err := w.process(ctx, task); err != nil {
+				errs.add(err.Error())
+				return err
+			}
+			handled.add(task.TaskID)
+			return nil
+		}
+		stopWorkers := startConsumer(t, w)
+		return func() {
+			stopWorkers()
+			// as the app stops: the workers first, then the connection is drained
+			if err := nc.Drain(); err != nil {
+				t.Fatal(err)
+			}
+			for deadline := time.Now().Add(10 * time.Second); !nc.IsClosed(); time.Sleep(10 * time.Millisecond) {
+				if time.Now().After(deadline) {
+					t.Fatal("connection not drained")
+				}
+			}
+		}
+	}
+
+	// 200 accounts of 10 tasks each, the tasks of an account interleaved with the others'; each task 1 or 2 reports
+	// of random drops, so that patterns are created by tasks at once
+	createdAt := time.UnixMicro(1760600000123456)
+	drops := []types.Drop{
+		{DropType: "REGULAR", ItemID: 30012, Quantity: 2},
+		{DropType: "EXTRA", ItemID: 30012, Quantity: 1},
+		{DropType: "REGULAR", ItemID: 30013, Quantity: 1},
+		{DropType: "REGULAR", ItemID: 30062, Quantity: 1},
+		{DropType: "SPECIAL", ItemID: 30062, Quantity: 1},
+	}
+	accountId := testAccountID()
+	want := map[int64]int{} // the number of reports of each task, by created_at
+	for i := 0; i < published; i++ {
+		var reports []*types.ReportTaskSingleReport
+		for n := 1 + rnd.Intn(2); n > 0; n-- {
+			report := testReport("main_01-07", 30012)
+			report.Drops = nil
+			for _, d := range drops {
+				if rnd.Intn(2) == 0 {
+					d := d
+					report.Drops = append(report.Drops, &d)
+				}
+			}
+			reports = append(reports, report)
+		}
+		at := createdAt.Add(time.Duration(i) * time.Millisecond)
+		want[at.UnixMicro()] = len(reports)
+		task := newTestTask(t, tw, accountId+i%200, at, "203.0.113.7", reports...)
+		if _, err := s.js.Publish(s.publish, task); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	stop := newConsumer()
+	for _, restartAt := range []int{published / 3, published * 2 / 3} {
+		for deadline := time.Now().Add(time.Minute); ; time.Sleep(10 * time.Millisecond) {
+			if distinct, _, _ := handled.stats(); distinct >= restartAt {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("fewer than %d tasks handled after a minute", restartAt)
+			}
+		}
+		stop()
+		stop = newConsumer()
+	}
+	s.waitEmpty(t, conf.durable, 2*time.Minute)
+	stop()
+
+	distinct, total, _ := handled.stats()
+	_, before, _ := failedBefore.stats()
+	_, after, _ := failedAfter.stats()
+	t.Logf("%d tasks published; %d handled %d times, %d deliveries failed before processing and %d after the commit; %d copies skipped, %d failures logged; errors of process: %v",
+		published, distinct, total, before, after, logs("reportwkr.duplicate"), logs("reportwkr.failed"), errs.times)
+
+	// every task stored, each with its reports once
+	var stored []struct {
+		CreatedAt int64
+		Reports   int
+	}
+	if err := tw.DB.NewRaw(`SELECT (extract(epoch FROM created_at) * 1000000)::bigint AS created_at, count(*) AS reports
+		FROM drop_reports GROUP BY 1`).Scan(context.Background(), &stored); err != nil {
+		t.Fatal(err)
+	}
+	got := map[int64]int{}
+	reports := 0
+	for _, r := range stored {
+		got[r.CreatedAt] = r.Reports
+		reports += r.Reports
+	}
+	if !reflect.DeepEqual(got, want) {
+		wrong := 0
+		for at, n := range want {
+			if got[at] != n {
+				wrong++
+			}
+		}
+		t.Errorf("%d tasks stored, %d of the %d published not stored with their reports exactly once", len(got), wrong, published)
+	}
+	if n := countRows(t, tw.DB, "drop_report_extras"); n != reports {
+		t.Errorf("%d extras for %d reports", n, reports)
+	}
+	if ci := s.consumerInfo(t, conf.durable); ci.NumAckPending != 0 || ci.NumPending != 0 {
+		t.Errorf("%d acks pending and %d tasks pending at the end, want none", ci.NumAckPending, ci.NumPending)
+	}
+	if n := logs("reportwkr.duplicate"); n < after {
+		t.Errorf("%d copies skipped, want at least the %d tasks failed after their commit", n, after)
+	}
+	if before == 0 || after == 0 {
+		t.Error("no delivery failed before processing or after the commit; the test proves nothing")
+	}
+}
