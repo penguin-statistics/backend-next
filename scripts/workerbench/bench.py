@@ -6,8 +6,8 @@ matrix job, site stats refresh) via internal/workers/calcwkr/workerbench_test.go
 the batch through the worker itself with the clock pinned so every run does identical work.
 
 Skew control (the matrix tables are effectively a cache the worker rewrites every run):
-  * the rows the bench overwrites are backed up once into schema `workerbench`
-    (restore with --restore);
+  * the rows of the days the batch may rewrite (reported by the harness) are backed up once
+    into schema `workerbench` (restore with --restore);
   * drop_matrix_elements / pattern_matrix_elements are VACUUMed before every run so dead
     tuples from previous runs never accumulate;
   * Redis is flushed once per invocation, then a warmup run re-populates it, so measured
@@ -20,8 +20,8 @@ Noise control (shared machine, other sessions use the same cluster; no other bac
 against the cluster while measuring, since the bench's connections are recognised by its application name):
   * before each run, waits (up to WORKERBENCH_QUIET_WAIT_S) until no foreign query is
     active on the cluster;
-  * during each run records foreign_cores (CPU used by processes other than the bench and
-    the cluster) and foreign_pg (peak active foreign queries on the cluster);
+  * during the timed batch of each run records foreign_cores (CPU used by processes other
+    than the bench and the cluster) and foreign_pg (peak active foreign queries on the cluster);
   * spread = (max - min) / median across measured runs.
 A result is NOISY when any of those exceed thresholds. Reruns are budgeted (--rerun,
 default budget 10, tracked in the state dir).
@@ -177,55 +177,87 @@ def wait_quiet():
 
 
 class Monitor:
+    """Samples foreign CPU and foreign Postgres activity during the timed batch (between begin and end)."""
+
     def __init__(self, bench_pid):
         self.bench_pid = bench_pid
         self.stop = threading.Event()
+        self.timing = threading.Event()
         self.foreign_pg_peak = 0
         self.pgs = cluster_pids()
+        self.window = None
 
     def _ours(self):
         return sum(proc_jiffies(p) for p in self.pgs | {self.bench_pid})
 
+    def _snapshot(self):
+        self.pgs |= cluster_pids()
+        return time.time(), total_jiffies(), self._ours()
+
+    def begin(self):
+        self.start = self._snapshot()
+        self.timing.set()
+
+    def end(self):
+        self.timing.clear()
+        self.window = (self.start, self._snapshot())
+
     def run(self):
-        self.t0, self.total0, self.ours0 = time.time(), total_jiffies(), self._ours()
-        self.ours_last = self.ours0
         while not self.stop.wait(1.0):
-            self.pgs |= cluster_pids()
-            self.foreign_pg_peak = max(self.foreign_pg_peak, foreign_pg_active(self.bench_pid))
-            self.ours_last = self._ours()
-        self.t1, self.total1 = time.time(), total_jiffies()
+            if self.timing.is_set():
+                self.pgs |= cluster_pids()
+                self.foreign_pg_peak = max(self.foreign_pg_peak, foreign_pg_active(self.bench_pid))
 
     def result(self):
-        elapsed = max(self.t1 - self.t0, 1e-6)
-        foreign = (self.total1 - self.total0) - (self.ours_last - self.ours0)
-        return {"foreign_cores": round(max(foreign, 0) / HZ / elapsed, 2),
+        (t0, total0, ours0), (t1, total1, ours1) = self.window
+        foreign = (total1 - total0) - (ours1 - ours0)
+        return {"foreign_cores": round(max(foreign, 0) / HZ / max(t1 - t0, 1e-6), 2),
                 "foreign_pg": self.foreign_pg_peak}
 
 
 # ---------------------------------------------------------------- state / skew control
 
-def ensure_backup():
-    exists = psql("select to_regclass('workerbench.backup_meta') is not null")
-    if exists == "t":
+def batch_days(binary):
+    """(server, day_num) pairs a batch at the pinned clock may rewrite, as reported by the harness."""
+    env = dict(os.environ, WORKERBENCH_PRINT_DAYS="1")
+    r = subprocess.run([binary, "-test.run", "TestWorkerBench", "-test.count=1"],
+                       cwd=os.path.join(REPO, HARNESS_PKG), env=env, capture_output=True, text=True)
+    days = []
+    for line in r.stdout.splitlines():
+        if m := re.match(r"BENCH days server=(\w+) from=(\d+) to=(\d+)", line):
+            days += [(m[1], d) for d in range(int(m[2]), int(m[3]) + 1)]
+    if r.returncode != 0 or not days:
+        log(r.stdout + r.stderr)
+        raise SystemExit("could not get the days a batch rewrites from the harness")
+    return days
+
+
+def ensure_backup(binary):
+    """Back up the matrix rows of every day a batch may rewrite, once; --restore puts them back."""
+    days = batch_days(binary)
+    values = ", ".join(f"('{server}', {day})" for server, day in days)
+    if psql("select to_regclass('workerbench.backup_days') is not null") == "t":
+        backed_up = psql("select string_agg(server || ':' || day_num, ',' order by server, day_num) from workerbench.backup_days")
+        wanted = ",".join(f"{server}:{day}" for server, day in sorted(days))
+        if backed_up != wanted:
+            raise SystemExit(f"a backup of other days exists ({backed_up}); run --restore first")
         return
     log("backing up the matrix rows the bench overwrites into schema workerbench ...")
     psql("create schema if not exists workerbench")
     for t in MATRIX_TABLES:
-        # per-server watermark first: a correlated subquery here is a per-row index probe over ~12M rows
-        conds = []
-        for server in ("CN", "US", "JP", "KR"):
-            max_day = psql(f"select max(day_num) from {t} where server = '{server}'")
-            conds.append(f"(server = '{server}' and day_num >= {int(max_day) - 3})")
         psql(f"drop table if exists workerbench.{t}")
-        psql(f"create table workerbench.{t} as select * from {t} where {' or '.join(conds)}")
-    psql("create table workerbench.backup_meta as select now() as taken_at")
+        psql(f"create table workerbench.{t} as select * from {t} where (server::text, day_num) in ({values})")
+    # recorded last: its presence marks a complete backup, and restore uses it to also remove rows the bench
+    # added for days that had none
+    psql(f"create table workerbench.backup_days as select * from (values {values}) as d(server, day_num)")
 
 
 def restore_backup():
+    if psql("select to_regclass('workerbench.backup_days') is not null") != "t":
+        raise SystemExit("no complete backup to restore")
     for t in MATRIX_TABLES:
         psql(f"""begin;
-            delete from {t} x using (select server, min(day_num) d from workerbench.{t} group by server) b
-              where x.server = b.server and x.day_num >= b.d;
+            delete from {t} x using workerbench.backup_days d where x.server::text = d.server and x.day_num = d.day_num;
             insert into {t} select * from workerbench.{t};
             commit;""")
         log(f"restored {t}")
@@ -283,22 +315,26 @@ def run_once(binary, dump, timeout_s):
     mon = Monitor(proc.pid)
     th = threading.Thread(target=mon.run, daemon=True)
     th.start()
-    try:
-        out = proc.communicate(timeout=timeout_s)[0]
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        out = proc.communicate()[0]
-        log(f"run exceeded {timeout_s}s, killed")
-        mon.stop.set()
-        th.join()
-        return None
+    killer = threading.Timer(timeout_s, proc.kill)
+    killer.start()
+    lines = []
+    for line in proc.stdout:
+        lines.append(line)
+        if line.startswith("BENCH timed_start"):
+            mon.begin()
+        elif line.startswith("BENCH timed_end"):
+            mon.end()
+    proc.wait()
+    killer.cancel()
     mon.stop.set()
     th.join()
-    if proc.returncode != 0:
-        log("\n".join(out.splitlines()[-40:]))
+    if proc.returncode != 0 or mon.window is None:
+        log("".join(lines[-40:]))
+        if proc.returncode == -9:
+            log(f"run exceeded {timeout_s}s, killed")
         return None
     res = {"phases": {}}
-    for line in out.splitlines():
+    for line in lines:
         if m := re.match(r"BENCH phase_total=(\w+) ms=(\d+)", line):
             res["phases"][m[1]] = int(m[2])
         elif m := re.match(r"BENCH total_ms=(\d+)", line):
@@ -350,9 +386,9 @@ def main():
             log("RESULT status=env_changed reason=environment_differs_from_baseline")
             sys.exit(5)
 
-    ensure_backup()
     binary = os.path.join(STATE, "wb.test")
     build(binary)
+    ensure_backup(binary)
     dump = os.path.join(STATE, "last.dump")
     timeout_s = int(base["median_total_ms"] / 1000 * 2 + 120) if base else 3 * 3600
 

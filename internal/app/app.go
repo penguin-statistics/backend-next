@@ -21,6 +21,16 @@ import (
 )
 
 func Options(ctx appcontext.Ctx, additionalOpts ...fx.Option) []fx.Option {
+	return options(ctx, true, additionalOpts...)
+}
+
+// OptionsWithoutWorkers is Options without the background workers, for tools that run worker code themselves,
+// such as the calcwkr benchmark.
+func OptionsWithoutWorkers(ctx appcontext.Ctx, additionalOpts ...fx.Option) []fx.Option {
+	return options(ctx, false, additionalOpts...)
+}
+
+func options(ctx appcontext.Ctx, withWorkers bool, additionalOpts ...fx.Option) []fx.Option {
 	conf, err := appconfig.Parse(ctx)
 	if err != nil {
 		panic(err)
@@ -61,18 +71,24 @@ func Options(ctx appcontext.Ctx, additionalOpts ...fx.Option) []fx.Option {
 
 		// Controllers
 		controller.Module(controller.OptIncludeSwagger),
+	}
 
-		// Workers
-		fx.Invoke(calcwkr.Start),
-		fx.Invoke(reportwkr.Start),
+	if withWorkers {
+		baseOpts = append(baseOpts,
+			// Workers
+			fx.Invoke(calcwkr.Start),
+			fx.Invoke(reportwkr.Start),
+		)
+	}
 
+	baseOpts = append(baseOpts,
 		// fx Extra Options
-		fx.StartTimeout(1 * time.Second),
+		fx.StartTimeout(1*time.Second),
 		// StopTimeout is not typically needed, since we're using fiber's Shutdown(),
 		// in which fiber has its own IdleTimeout for controlling the shutdown timeout.
 		// It acts as a countermeasure in case the fiber app is not properly shutting down.
-		fx.StopTimeout(5 * time.Minute),
-	}
+		fx.StopTimeout(5*time.Minute),
+	)
 
 	return append(baseOpts, additionalOpts...)
 }
