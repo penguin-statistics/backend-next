@@ -5,6 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model/cache"
+	pkgcache "exusiai.dev/backend-next/internal/pkg/cache"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/repo"
 )
@@ -53,5 +56,31 @@ func TestGetShimStageByArkIdServesTheRequestedServer(t *testing.T) {
 
 	if _, err := s.GetShimStageByArkId(ctx, "main_99-99", "CN"); err != pgerr.ErrNotFound {
 		t.Fatalf("unknown stage: err %v, want pgerr.ErrNotFound", err)
+	}
+}
+
+func TestGetStagesDoesNotCacheAnError(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+	mustExec(t, db, "INSERT INTO stages (stage_id, ark_stage_id, zone_id, stage_type) VALUES (1, 'main_01-07', 1, 'MAIN')")
+	flushCaches(t)
+	s := NewStage(repo.NewStage(db))
+
+	mustExec(t, db, "ALTER TABLE stages RENAME TO stages_unavailable")
+	if _, err := s.GetStages(ctx); err == nil {
+		t.Fatal("GetStages succeeded without a stages table")
+	}
+	var cached []*model.Stage
+	if err := cache.Stages.Get(&cached); err != pkgcache.ErrNotFound {
+		t.Fatalf("after a failed query the stages cache holds %v (err %v), want no entry", cached, err)
+	}
+
+	mustExec(t, db, "ALTER TABLE stages_unavailable RENAME TO stages")
+	stagesMap, err := s.GetStagesMapByArkId(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stage, ok := stagesMap["main_01-07"]; !ok || stage.StageID != 1 {
+		t.Fatalf("stages map by ark id %v, want main_01-07 once the query succeeds", stagesMap)
 	}
 }
