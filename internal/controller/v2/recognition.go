@@ -41,7 +41,7 @@ type (
 	}
 	InitDefectReportRequest struct {
 		RecognitionResult json.RawMessage                    `json:"recognitionResult" validate:"dive"`
-		Environment       InitDefectReportRequestEnvironment `json:"environment" validate:"required,dive"`
+		Environment       InitDefectReportRequestEnvironment `json:"environment"`
 	}
 	InitDefectReportResponseUploadParams struct {
 		URL           string `json:"url"`
