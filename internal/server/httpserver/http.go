@@ -129,8 +129,10 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 				)),
 				tracesdk.WithSampler(
 					tracesdk.ParentBased(
-						tracesdk.TraceIDRatioBased(
-							conf.TracingSampleRate))),
+						alwaysSampleNamePrefix{
+							prefix:   "calcwkr.",
+							fallback: tracesdk.TraceIDRatioBased(conf.TracingSampleRate),
+						})),
 			},
 			tracingProviderOptions(conf)...,
 		)...,
@@ -227,4 +229,22 @@ func tracingProviderOptions(conf *appconfig.Config) []tracesdk.TracerProviderOpt
 	}
 
 	return options
+}
+
+// alwaysSampleNamePrefix samples every root span whose name has prefix, and leaves the others to fallback. Worker
+// batches are rare (every 30 minutes) but long, so a request-sized sample rate would miss most of them.
+type alwaysSampleNamePrefix struct {
+	prefix   string
+	fallback tracesdk.Sampler
+}
+
+func (s alwaysSampleNamePrefix) ShouldSample(p tracesdk.SamplingParameters) tracesdk.SamplingResult {
+	if strings.HasPrefix(p.Name, s.prefix) {
+		return tracesdk.AlwaysSample().ShouldSample(p)
+	}
+	return s.fallback.ShouldSample(p)
+}
+
+func (s alwaysSampleNamePrefix) Description() string {
+	return "AlwaysSampleNamePrefix{" + s.prefix + "," + s.fallback.Description() + "}"
 }
