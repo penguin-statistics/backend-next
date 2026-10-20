@@ -3,6 +3,8 @@ package calcwkr
 import (
 	"context"
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"exusiai.dev/gommon/constant"
@@ -48,6 +50,9 @@ type Worker struct {
 	heartbeatURL map[string]string
 
 	syncMutex *redsync.Mutex
+	// syncMutexMu serializes operations on syncMutex, which is not safe for concurrent use: the microtasks of
+	// servers calculated concurrently renew it at the same time
+	syncMutexMu sync.Mutex
 
 	WorkerDeps
 }
@@ -148,11 +153,15 @@ func (w *Worker) calcStats(ctx context.Context, server string) error {
 }
 
 func (w *Worker) lock() error {
+	w.syncMutexMu.Lock()
+	defer w.syncMutexMu.Unlock()
 	return w.syncMutex.Lock()
 }
 
 func (w *Worker) unlock() {
+	w.syncMutexMu.Lock()
 	b, err := w.syncMutex.Unlock()
+	w.syncMutexMu.Unlock()
 	if err != nil {
 		log.Error().Str("evt.name", "worker").Err(err).Msg("unlock sync mutex failed")
 	}
@@ -163,7 +172,9 @@ func (w *Worker) unlock() {
 
 func (w *Worker) extend() {
 	// extends the sync mutex to ensure lock is held for enough duration
+	w.syncMutexMu.Lock()
 	ok, err := w.syncMutex.Extend()
+	w.syncMutexMu.Unlock()
 	if err != nil {
 		log.Error().Str("evt.name", "worker.calcwkr").Err(err).Msg("failed to extend sync mutex")
 		return
@@ -230,14 +241,25 @@ func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 var serverConcurrency = 2
 
 // runForAllServers runs f for every server concurrently. Servers write disjoint rows and cache keys, so they do
-// not depend on each other; the first error cancels the servers still running and is returned.
+// not depend on each other. After an error, servers not started yet are skipped and the first error is returned;
+// servers already running are not interrupted, so none is left halfway through replacing its matrix elements.
 func runForAllServers(ctx context.Context, f func(ctx context.Context, server string) error) error {
-	eg, ctx := errgroup.WithContext(ctx)
+	var (
+		eg     errgroup.Group
+		failed atomic.Bool
+	)
 	eg.SetLimit(serverConcurrency)
 	for _, server := range constant.Servers {
 		server := server
 		eg.Go(func() error {
-			return f(ctx, server)
+			if failed.Load() {
+				return nil
+			}
+			if err := f(ctx, server); err != nil {
+				failed.Store(true)
+				return err
+			}
+			return nil
 		})
 	}
 	return eg.Wait()
