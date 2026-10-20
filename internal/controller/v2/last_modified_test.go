@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/gofiber/fiber/v2"
 
 	"exusiai.dev/backend-next/internal/model/cache"
@@ -48,6 +49,51 @@ func get(t *testing.T, app *fiber.App, target string, modifiedSince string) (*ht
 }
 
 // the stages are served from the cache, which the tests fill instead of a database
+func TestGetStagesNotModified(t *testing.T) {
+	app := newCacheTestApp(t)
+	c := &Stage{StageService: &service.Stage{}}
+	app.Get("/stages", c.GetStages)
+	server := testServer()
+	target := "/stages?server=" + server
+	stages := func(code string) []*modelv2.Stage {
+		return []*modelv2.Stage{{ArkStageID: "main_01-07", Code: code}}
+	}
+	// what GetShimStages does when it (re)calculates the stages
+	calculate := func(code string) {
+		cache.SetLastModifiedTime("[shimStages#server:"+server+"]", stages(code), func() {
+			cache.ShimStages.Set(server, stages(code), time.Hour)
+		})
+	}
+
+	calculate("1-7")
+	resp, body := get(t, app, target, "")
+	lastModified := resp.Header.Get(fiber.HeaderLastModified)
+	if resp.StatusCode != fiber.StatusOK || !strings.Contains(body, `"1-7"`) || lastModified == "" {
+		t.Fatalf("first request: status %d, Last-Modified %q, body %s", resp.StatusCode, lastModified, body)
+	}
+
+	resp, body = get(t, app, target, lastModified)
+	if resp.StatusCode != fiber.StatusNotModified || body != "" {
+		t.Fatalf("revalidation: status %d, body %q; want 304 without a body", resp.StatusCode, body)
+	}
+
+	// the stages expire and are recalculated unchanged
+	calculate("1-7")
+	if resp, _ = get(t, app, target, lastModified); resp.StatusCode != fiber.StatusNotModified {
+		t.Fatalf("revalidation after an unchanged recalculation: status %d, want 304", resp.StatusCode)
+	}
+
+	// the stages change, even in the same second
+	calculate("1-8")
+	resp, body = get(t, app, target, lastModified)
+	if resp.StatusCode != fiber.StatusOK || !strings.Contains(body, `"1-8"`) {
+		t.Fatalf("revalidation of a stale copy: status %d, body %s; want 200 with the new stages", resp.StatusCode, body)
+	}
+	if got := resp.Header.Get(fiber.HeaderLastModified); got == lastModified {
+		t.Errorf("the changed stages have the same Last-Modified %q", got)
+	}
+}
+
 func TestGetStagesWithoutLastModified(t *testing.T) {
 	app := newCacheTestApp(t)
 	c := &Stage{StageService: &service.Stage{}}
@@ -82,5 +128,28 @@ func TestGetStagesWithoutLastModified(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestGetDropMatrixNotModified(t *testing.T) {
+	app := newCacheTestApp(t)
+	c := &Result{DropMatrixService: &service.DropMatrix{}}
+	app.Get("/result/matrix", c.GetDropMatrix)
+	key := "CN" + constant.CacheSep + "false" + constant.CacheSep + constant.SourceCategoryAll
+	matrix := modelv2.DropMatrixQueryResult{Matrix: []*modelv2.OneDropMatrixElement{{StageID: "main_01-07", ItemID: "30012", Quantity: 1, Times: 2}}}
+	cache.ShimGlobalDropMatrix.Set(key, matrix, time.Hour)
+	cache.LastModifiedTime.Set("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", time.Now().Add(-time.Minute), 0)
+
+	resp, _ := get(t, app, "/result/matrix?server=CN", "")
+	lastModified := resp.Header.Get(fiber.HeaderLastModified)
+	if resp.StatusCode != fiber.StatusOK || lastModified == "" {
+		t.Fatalf("first request: status %d, Last-Modified %q", resp.StatusCode, lastModified)
+	}
+	if resp, _ = get(t, app, "/result/matrix?server=CN", lastModified); resp.StatusCode != fiber.StatusNotModified {
+		t.Fatalf("revalidation: status %d, want 304", resp.StatusCode)
+	}
+	stale := time.Now().Add(-time.Hour).UTC().Format(http.TimeFormat)
+	if resp, _ = get(t, app, "/result/matrix?server=CN", stale); resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("revalidation of a stale copy: status %d, want 200", resp.StatusCode)
 	}
 }

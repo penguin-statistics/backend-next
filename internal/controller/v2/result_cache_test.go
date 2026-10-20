@@ -2,14 +2,21 @@ package v2
 
 import (
 	"io"
+	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"exusiai.dev/gommon/constant"
 	"github.com/gofiber/fiber/v2"
 
+	"exusiai.dev/backend-next/internal/model/cache"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/pkg/pgid"
 	"exusiai.dev/backend-next/internal/server/svr"
+	"exusiai.dev/backend-next/internal/service"
 )
 
 // The /result group caches the responses to requests with itemFilter or stageFilter by URL. A route added to the
@@ -54,5 +61,33 @@ func TestResultCacheKeepsNoPersonalResponse(t *testing.T) {
 				t.Errorf("%s as %q: response for %q (cache %q)", query, penguinId, body, cacheStatus)
 			}
 		}
+	}
+}
+
+// The /result group's cache keeps no 304 Not Modified either: GetPatternMatrix ignores the filters, and answers a
+// conditional request with 304, which would be served without a body to the requests for the same URL that have no
+// copy to use
+func TestResultCacheSkipsNotModified(t *testing.T) {
+	cache.Initialize()
+	key := "CN" + constant.CacheSep + constant.SourceCategoryAll + constant.CacheSep + "false"
+	lastModifiedKey := "[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:" + key + "]"
+	t.Cleanup(func() {
+		_ = cache.ShimGlobalPatternMatrix.Delete(key)
+		_ = cache.LastModifiedTime.Delete(lastModifiedKey)
+	})
+	cache.ShimGlobalPatternMatrix.Set(key, modelv2.PatternMatrixQueryResult{PatternMatrix: []*modelv2.OnePatternMatrixElement{}}, time.Hour)
+	cache.LastModifiedTime.Set(lastModifiedKey, time.Now().Add(-time.Minute), 0)
+	app := fiber.New()
+	app.Use(middlewares.InjectI18n()) // for the validation of the query
+	RegisterResult(&svr.V2{Router: app.Group("/v2")}, Result{PatternMatrixService: &service.PatternMatrix{}})
+	target := "/v2/result/pattern?server=CN&stageFilter=main_01-07"
+
+	resp, _ := get(t, app, target, time.Now().UTC().Format(http.TimeFormat))
+	if resp.StatusCode != fiber.StatusNotModified {
+		t.Fatalf("revalidation: status %d, want 304", resp.StatusCode)
+	}
+	resp, body := get(t, app, target, "")
+	if resp.StatusCode != fiber.StatusOK || !strings.Contains(body, `"pattern_matrix"`) {
+		t.Fatalf("unconditional request: status %d, body %q; want 200 with the pattern matrix", resp.StatusCode, body)
 	}
 }
