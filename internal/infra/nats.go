@@ -9,17 +9,21 @@ import (
 	"exusiai.dev/backend-next/internal/app/appconfig"
 )
 
-func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
-	errorHandler := func(conn *nats.Conn, sub *nats.Subscription, err error) {
-		log.Error().
-			Str("evt.name", "nats.error").
-			Err(err).
-			Str("conn.url", conn.ConnectedUrlRedacted()).
-			Str("sub.subject", sub.Subject).
-			Msg("nats error")
+// natsErrorHandler logs the asynchronous errors of the connection. sub is nil for an error of the connection itself,
+// such as a slow consumer or a permission violation.
+func natsErrorHandler(conn *nats.Conn, sub *nats.Subscription, err error) {
+	ev := log.Error().
+		Str("evt.name", "nats.error").
+		Err(err).
+		Str("conn.url", conn.ConnectedUrlRedacted())
+	if sub != nil {
+		ev = ev.Str("sub.subject", sub.Subject)
 	}
+	ev.Msg("nats error")
+}
 
-	nc, err := nats.Connect(conf.NatsURL, nats.PingInterval(time.Second*20), nats.ErrorHandler(errorHandler))
+func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
+	nc, err := nats.Connect(conf.NatsURL, nats.PingInterval(time.Second*20), nats.ErrorHandler(natsErrorHandler))
 	if err != nil {
 		log.Error().Err(err).Msg("infra: nats: failed to connect to NATS")
 		return nil, nil, err
