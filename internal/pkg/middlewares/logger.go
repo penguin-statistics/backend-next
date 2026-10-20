@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"exusiai.dev/backend-next/internal/pkg/flog"
@@ -39,7 +40,8 @@ func requestLogger() func(ctx *fiber.Ctx) error {
 		status := ctx.Response().StatusCode()
 		bytesWritten := len(ctx.Response().Body())
 
-		flog.InfoFrom(ctx, "http.request").
+		flog.FromFiberCtx(ctx).WithLevel(requestLogLevel(status)).
+			Str("evt.name", "http.request").
 			Bytes("http.useragent", ctx.Request().Header.UserAgent()).
 			Str("http.route", route).
 			Int("http.status_code", status).
@@ -52,4 +54,17 @@ func requestLogger() func(ctx *fiber.Ctx) error {
 			WithLabelValues(route, ctx.Method(), observability.HTTPStatusClass(status)).
 			Observe(float64(bytesWritten))
 	})
+}
+
+// requestLogLevel maps a response status to the request log level, so that
+// server errors show up as errors: 5xx error, 4xx warn, anything else info.
+func requestLogLevel(status int) zerolog.Level {
+	switch {
+	case status >= 500:
+		return zerolog.ErrorLevel
+	case status >= 400:
+		return zerolog.WarnLevel
+	default:
+		return zerolog.InfoLevel
+	}
 }

@@ -134,8 +134,12 @@ func TestRequestLoggerLogsStatusAfterErrorHandler(t *testing.T) {
 			if resp.StatusCode != tt.status {
 				t.Errorf("response status = %d, want %d", resp.StatusCode, tt.status)
 			}
-			if got := requestLog(t, &buf)["http.status_code"]; got != float64(tt.status) {
+			entry := requestLog(t, &buf)
+			if got := entry["http.status_code"]; got != float64(tt.status) {
 				t.Errorf("logged http.status_code = %v, want %d", got, tt.status)
+			}
+			if got, want := entry["level"], requestLogLevel(tt.status).String(); got != want {
+				t.Errorf("logged level = %v, want %s", got, want)
 			}
 			// the error handler must run exactly once, not again after the chain
 			wantCalls := 0
@@ -146,5 +150,30 @@ func TestRequestLoggerLogsStatusAfterErrorHandler(t *testing.T) {
 				t.Errorf("error handler ran %d times, want %d", *errorHandlerCalls, wantCalls)
 			}
 		})
+	}
+}
+
+func TestRequestLogLevel(t *testing.T) {
+	tests := []struct {
+		status int
+		want   zerolog.Level
+	}{
+		{100, zerolog.InfoLevel},
+		{200, zerolog.InfoLevel},
+		{204, zerolog.InfoLevel},
+		{304, zerolog.InfoLevel},
+		{399, zerolog.InfoLevel},
+		{400, zerolog.WarnLevel},
+		{404, zerolog.WarnLevel},
+		{429, zerolog.WarnLevel},
+		{499, zerolog.WarnLevel},
+		{500, zerolog.ErrorLevel},
+		{503, zerolog.ErrorLevel},
+		{599, zerolog.ErrorLevel},
+	}
+	for _, tt := range tests {
+		if got := requestLogLevel(tt.status); got != tt.want {
+			t.Errorf("requestLogLevel(%d) = %s, want %s", tt.status, got, tt.want)
+		}
 	}
 }
