@@ -205,18 +205,30 @@ func (s *DropMatrix) calcDropMatrixByGivenDate(
 		}
 	}
 
+	queryCtxs := make([]*model.DropReportQueryContext, 0, len(stageIdsItemIdsMapByTimeRangeStr))
 	for timeRangeStr, stageIdsItemIdsMap := range stageIdsItemIdsMapByTimeRangeStr {
 		timeRange := model.TimeRangeFromString(timeRangeStr)
+		stageIdsItemIdsMap := stageIdsItemIdsMap
+		queryCtxs = append(queryCtxs, &model.DropReportQueryContext{
+			Server:             server,
+			StartTime:          timeRange.StartTime,
+			EndTime:            timeRange.EndTime,
+			ExcludeNonOneTimes: false,
+			StageItemFilter:    &stageIdsItemIdsMap,
+		})
+	}
+	// scan drop_reports once for every time range and source category
+	timesResults, quantityUniqCountResults, err := s.DropReportService.CalcDropMatrixForIntervalsBySourceCategories(ctx, queryCtxs, sourceCategories)
+	if err != nil {
+		return nil, err
+	}
+	for i, queryCtx := range queryCtxs {
+		dropItemIdsByStageId := make(map[int][]int)
 		for _, sourceCategory := range sourceCategories {
-			queryCtx := &model.DropReportQueryContext{
-				Server:             server,
-				StartTime:          timeRange.StartTime,
-				EndTime:            timeRange.EndTime,
-				SourceCategory:     sourceCategory,
-				ExcludeNonOneTimes: false,
-				StageItemFilter:    &stageIdsItemIdsMap,
-			}
-			res, err := s.calcDropMatrix(ctx, queryCtx)
+			categoryQueryCtx := *queryCtx
+			categoryQueryCtx.SourceCategory = sourceCategory
+			res, err := s.calcDropMatrix(ctx, &categoryQueryCtx,
+				timesResults[i][sourceCategory], quantityUniqCountResults[i][sourceCategory], dropItemIdsByStageId)
 			if err != nil {
 				return nil, err
 			}
@@ -226,16 +238,12 @@ func (s *DropMatrix) calcDropMatrixByGivenDate(
 	return dropMatrixElements, nil
 }
 
-func (s *DropMatrix) calcDropMatrix(ctx context.Context, queryCtx *model.DropReportQueryContext) ([]*model.DropMatrixElement, error) {
+// dropItemIdsByStageId caches the dropped item ids of each stage for queryCtx's time range across calls.
+func (s *DropMatrix) calcDropMatrix(
+	ctx context.Context, queryCtx *model.DropReportQueryContext, timesResults []*model.TotalTimesResult,
+	quantityUniqCountResults []*model.QuantityUniqCountResultForDropMatrix, dropItemIdsByStageId map[int][]int,
+) ([]*model.DropMatrixElement, error) {
 	var combinedResults []*model.CombinedResultForDropMatrix
-	timesResults, err := s.DropReportService.CalcTotalTimesForDropMatrix(ctx, queryCtx)
-	if err != nil {
-		return nil, err
-	}
-	quantityUniqCountResults, err := s.DropReportService.CalcQuantityUniqCount(ctx, queryCtx)
-	if err != nil {
-		return nil, err
-	}
 	quantityResults := calcTotalQuantityForDropMatrix(quantityUniqCountResults)
 
 	oneBatch := s.combineQuantityAndTimesResults(quantityResults, timesResults, quantityUniqCountResults, nil)
@@ -257,21 +265,24 @@ func (s *DropMatrix) calcDropMatrix(ctx context.Context, queryCtx *model.DropRep
 		itemIds := (*queryCtx.StageItemFilter)[stageId]
 
 		// get all item ids which are dropped in this stage, save in dropSet
-		timeRange := &model.TimeRange{
-			StartTime: queryCtx.StartTime,
-			EndTime:   queryCtx.EndTime,
+		dropItemIds, ok := dropItemIdsByStageId[stageId]
+		if !ok {
+			timeRange := &model.TimeRange{
+				StartTime: queryCtx.StartTime,
+				EndTime:   queryCtx.EndTime,
+			}
+			dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(
+				ctx, queryCtx.Server, []*model.TimeRange{timeRange}, []int{stageId}, itemIds)
+			if err != nil {
+				return nil, err
+			}
+			linq.From(dropInfos).
+				WhereT(func(el *model.DropInfo) bool { return el.ItemID.Valid }).
+				SelectT(func(el *model.DropInfo) int { return int(el.ItemID.Int64) }).
+				ToSlice(&dropItemIds)
+			linq.From(dropItemIds).WhereT(func(itemId int) bool { return linq.From(itemIds).Contains(itemId) }).ToSlice(&dropItemIds)
+			dropItemIdsByStageId[stageId] = dropItemIds
 		}
-		dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(
-			ctx, queryCtx.Server, []*model.TimeRange{timeRange}, []int{stageId}, itemIds)
-		if err != nil {
-			return nil, err
-		}
-		var dropItemIds []int
-		linq.From(dropInfos).
-			WhereT(func(el *model.DropInfo) bool { return el.ItemID.Valid }).
-			SelectT(func(el *model.DropInfo) int { return int(el.ItemID.Int64) }).
-			ToSlice(&dropItemIds)
-		linq.From(dropItemIds).WhereT(func(itemId int) bool { return linq.From(itemIds).Contains(itemId) }).ToSlice(&dropItemIds)
 		// use a fake hashset to save item ids
 		dropSet := make(map[int]struct{}, len(dropItemIds))
 		for _, itemId := range dropItemIds {

@@ -3,12 +3,14 @@ package repo
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"exusiai.dev/gommon/constant"
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
@@ -124,6 +126,186 @@ func (r *DropReport) CalcTotalTimes(
 	return results, nil
 }
 
+// CalcDropMatrixForIntervalsBySourceCategories computes what CalcTotalTimes and CalcQuantityUniqCount compute, for
+// every query context (time interval and stages) and several source categories at once, with a single scan of
+// drop_reports. Reports are counted per pattern (and classified as manual or automated sources) and per segment
+// between consecutive interval boundaries; an interval's aggregations add up the segments it covers. All query
+// contexts must share server, account and times filter; their SourceCategory is ignored. Results are returned in
+// the order of queryCtxs.
+func (r *DropReport) CalcDropMatrixForIntervalsBySourceCategories(
+	ctx context.Context, queryCtxs []*model.DropReportQueryContext, sourceCategories []string,
+) ([]map[string][]*model.TotalTimesResult, []map[string][]*model.QuantityUniqCountResultForDropMatrix, error) {
+	if len(queryCtxs) == 0 {
+		return nil, nil, nil
+	}
+
+	// interval boundaries in seconds, as handleCreatedAtWithTime compares them
+	boundarySet := make(map[int64]struct{})
+	stageIdSet := make(map[int]struct{})
+	for _, queryCtx := range queryCtxs {
+		boundarySet[queryCtx.StartTime.Unix()] = struct{}{}
+		boundarySet[queryCtx.EndTime.Unix()] = struct{}{}
+		for _, stageId := range queryCtx.GetStageIds() {
+			stageIdSet[stageId] = struct{}{}
+		}
+	}
+	boundaries := make([]int64, 0, len(boundarySet))
+	for boundary := range boundarySet {
+		boundaries = append(boundaries, boundary)
+	}
+	sort.Slice(boundaries, func(i, j int) bool { return boundaries[i] < boundaries[j] })
+	thresholds := make([]time.Time, len(boundaries))
+	segmentByBoundary := make(map[int64]int, len(boundaries))
+	for i, boundary := range boundaries {
+		thresholds[i] = time.Unix(boundary, 0)
+		// width_bucket numbers the segment starting at thresholds[i] as i+1
+		segmentByBoundary[boundary] = i + 1
+	}
+	stageIds := make([]int, 0, len(stageIdSet))
+	for stageId := range stageIdSet {
+		stageIds = append(stageIds, stageId)
+	}
+	first, last := thresholds[0], thresholds[len(thresholds)-1]
+
+	var rows []struct {
+		Kind     string `bun:"kind"`
+		StageID  int    `bun:"stage_id"`
+		ItemID   int    `bun:"item_id"`
+		Quantity int    `bun:"quantity"`
+		IsManual bool   `bun:"is_manual"`
+		Segment  int    `bun:"segment"`
+		Value    int    `bun:"value"`
+	}
+
+	// There are far fewer distinct patterns than reports (CN: ~100k vs ~1.8M a day), so patterns are only
+	// expanded into their elements after counting.
+	perPattern := r.db.NewSelect().
+		TableExpr("drop_reports AS dr").
+		Column("dr.stage_id", "dr.pattern_id").
+		ColumnExpr(isManualSourceExpr, bun.In(constant.ManualSources)).
+		ColumnExpr("width_bucket(dr.created_at, ?::timestamptz[]) AS segment", pgdialect.Array(thresholds)).
+		ColumnExpr("COUNT(*) AS count").
+		ColumnExpr("SUM(dr.times) AS times")
+	r.handleAccountAndReliability(perPattern, queryCtxs[0].AccountID)
+	if queryCtxs[0].ExcludeNonOneTimes {
+		r.handleTimes(perPattern, 1)
+	}
+	r.handleCreatedAtWithTime(perPattern, &first, &last)
+	r.handleServer(perPattern, queryCtxs[0].Server)
+	r.handleStages(perPattern, stageIds)
+	perPattern = perPattern.Group("dr.stage_id", "dr.pattern_id", "is_manual", "segment")
+
+	if err := r.db.NewRaw(`WITH a AS MATERIALIZED (?)
+		SELECT 'quantity' AS kind, a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment, SUM(a.count) AS value
+		FROM a JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = a.pattern_id
+		GROUP BY a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment
+		UNION ALL
+		SELECT 'times' AS kind, a.stage_id, 0, 0, a.is_manual, a.segment, SUM(a.times) AS value
+		FROM a
+		GROUP BY a.stage_id, a.is_manual, a.segment`, perPattern).
+		Scan(ctx, &rows); err != nil {
+		return nil, nil, err
+	}
+
+	timesResults := make([]map[string][]*model.TotalTimesResult, len(queryCtxs))
+	quantityUniqCountResults := make([]map[string][]*model.QuantityUniqCountResultForDropMatrix, len(queryCtxs))
+	for i, queryCtx := range queryCtxs {
+		fromSegment := segmentByBoundary[queryCtx.StartTime.Unix()]
+		toSegment := segmentByBoundary[queryCtx.EndTime.Unix()]
+		intervalStageIds := queryCtx.GetStageIds()
+		intervalStageIdSet := make(map[int]struct{}, len(intervalStageIds))
+		for _, stageId := range intervalStageIds {
+			intervalStageIdSet[stageId] = struct{}{}
+		}
+
+		timesRows := make([]dropMatrixTimesRow, 0)
+		quantityRows := make([]dropMatrixQuantityRow, 0)
+		for _, row := range rows {
+			if row.Segment < fromSegment || row.Segment >= toSegment {
+				continue
+			}
+			if _, ok := intervalStageIdSet[row.StageID]; len(intervalStageIds) > 0 && !ok {
+				continue
+			}
+			if row.Kind == "times" {
+				timesRows = append(timesRows, dropMatrixTimesRow{row.StageID, row.IsManual, row.Value})
+			} else {
+				quantityRows = append(quantityRows, dropMatrixQuantityRow{row.StageID, row.ItemID, row.Quantity, row.IsManual, row.Value})
+			}
+		}
+		timesResults[i], quantityUniqCountResults[i] = splitDropMatrixRowsBySourceCategories(timesRows, quantityRows, sourceCategories)
+	}
+	return timesResults, quantityUniqCountResults, nil
+}
+
+type dropMatrixTimesRow struct {
+	StageID    int
+	IsManual   bool
+	TotalTimes int
+}
+
+type dropMatrixQuantityRow struct {
+	StageID  int
+	ItemID   int
+	Quantity int
+	IsManual bool
+	Count    int
+}
+
+// splitDropMatrixRowsBySourceCategories sums classified drop matrix rows up per source category. Rows of the same
+// stage (and item and quantity) are added up, e.g. those of several segments.
+func splitDropMatrixRowsBySourceCategories(
+	timesRows []dropMatrixTimesRow, quantityRows []dropMatrixQuantityRow, sourceCategories []string,
+) (map[string][]*model.TotalTimesResult, map[string][]*model.QuantityUniqCountResultForDropMatrix) {
+	timesBySourceCategory := make(map[string][]*model.TotalTimesResult, len(sourceCategories))
+	for _, sourceCategory := range sourceCategories {
+		times := make(map[int]int)
+		stageIdsInOrder := make([]int, 0)
+		for _, row := range timesRows {
+			if !inSourceCategory(sourceCategory, row.IsManual) {
+				continue
+			}
+			if _, ok := times[row.StageID]; !ok {
+				stageIdsInOrder = append(stageIdsInOrder, row.StageID)
+			}
+			times[row.StageID] += row.TotalTimes
+		}
+		results := make([]*model.TotalTimesResult, 0, len(stageIdsInOrder))
+		for _, stageId := range stageIdsInOrder {
+			results = append(results, &model.TotalTimesResult{StageID: stageId, TotalTimes: times[stageId]})
+		}
+		timesBySourceCategory[sourceCategory] = results
+	}
+
+	type key struct{ stageId, itemId, quantity int }
+	quantityUniqCountsBySourceCategory := make(map[string][]*model.QuantityUniqCountResultForDropMatrix, len(sourceCategories))
+	for _, sourceCategory := range sourceCategories {
+		counts := make(map[key]int)
+		keys := make([]key, 0)
+		for _, row := range quantityRows {
+			if !inSourceCategory(sourceCategory, row.IsManual) {
+				continue
+			}
+			k := key{row.StageID, row.ItemID, row.Quantity}
+			if _, ok := counts[k]; !ok {
+				keys = append(keys, k)
+			}
+			counts[k] += row.Count
+		}
+		results := make([]*model.QuantityUniqCountResultForDropMatrix, 0, len(keys))
+		for _, k := range keys {
+			results = append(results, &model.QuantityUniqCountResultForDropMatrix{
+				StageID:  k.stageId,
+				ItemID:   k.itemId,
+				Quantity: k.quantity,
+				Count:    counts[k],
+			})
+		}
+		quantityUniqCountsBySourceCategory[sourceCategory] = results
+	}
+	return timesBySourceCategory, quantityUniqCountsBySourceCategory
+}
+
 func (r *DropReport) CalcTotalQuantityForPatternMatrix(
 	ctx context.Context, queryCtx *model.DropReportQueryContext,
 ) ([]*model.TotalQuantityResultForPatternMatrix, error) {
@@ -171,8 +353,7 @@ func (r *DropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
 	subq1 := r.db.NewSelect().
 		TableExpr("drop_reports AS dr").
 		Column("dr.stage_id", "dr.pattern_id").
-		// mirrors handleSourceName: NULL source_name counts as automated
-		ColumnExpr("COALESCE(dr.source_name IN (?), false) AS is_manual", bun.In(constant.ManualSources))
+		ColumnExpr(isManualSourceExpr, bun.In(constant.ManualSources))
 	r.handleAccountAndReliability(subq1, queryCtx.AccountID)
 	r.handleCreatedAtWithTime(subq1, queryCtx.StartTime, queryCtx.EndTime)
 	r.handleServer(subq1, queryCtx.Server)
@@ -194,8 +375,7 @@ func (r *DropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
 		quantities := make(map[key]int)
 		keys := make([]key, 0)
 		for _, row := range rows {
-			if (sourceCategory == constant.SourceCategoryManual && !row.IsManual) ||
-				(sourceCategory == constant.SourceCategoryAutomated && row.IsManual) {
+			if !inSourceCategory(sourceCategory, row.IsManual) {
 				continue
 			}
 			k := key{row.StageID, row.PatternID}
@@ -481,6 +661,21 @@ func (r *DropReport) handleServer(query *bun.SelectQuery, server string) {
 
 func (r *DropReport) handleTimes(query *bun.SelectQuery, times int) {
 	query = query.Where("dr.times = ?", times)
+}
+
+// isManualSourceExpr classifies a report the same way handleSourceName filters it: NULL source_name is automated.
+const isManualSourceExpr = "COALESCE(dr.source_name IN (?), false) AS is_manual"
+
+// inSourceCategory tells whether a report classified by isManualSourceExpr belongs to sourceCategory.
+func inSourceCategory(sourceCategory string, isManual bool) bool {
+	switch sourceCategory {
+	case constant.SourceCategoryManual:
+		return isManual
+	case constant.SourceCategoryAutomated:
+		return !isManual
+	default:
+		return true
+	}
 }
 
 func (r *DropReport) handleSourceName(query *bun.SelectQuery, sourceCategory string) {
