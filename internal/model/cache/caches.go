@@ -54,7 +54,6 @@ var (
 	Stages           *cache.Singular[[]*model.Stage]
 	StageByArkID     *cache.Set[model.Stage]
 	ShimStages       *cache.Set[[]*modelv2.Stage]
-	ShimStageByArkID *cache.Set[modelv2.Stage]
 	StagesMapByID    *cache.Singular[map[int]*model.Stage]
 	StagesMapByArkID *cache.Singular[map[string]*model.Stage]
 
@@ -197,14 +196,12 @@ func initializeCaches() {
 	Stages = cache.NewSingular[[]*model.Stage]("stages")
 	StageByArkID = cache.NewSet[model.Stage]("stage#arkStageId")
 	ShimStages = cache.NewSet[[]*modelv2.Stage]("shimStages#server")
-	ShimStageByArkID = cache.NewSet[modelv2.Stage]("shimStage#server|arkStageId")
 	StagesMapByID = cache.NewSingular[map[int]*model.Stage]("stagesMapById")
 	StagesMapByArkID = cache.NewSingular[map[string]*model.Stage]("stagesMapByArkId")
 
 	SingularFlusherMap["stages"] = Stages.Delete
 	SetMap["stage#arkStageId"] = StageByArkID.Flush
 	SetMap["shimStages#server"] = ShimStages.Flush
-	SetMap["shimStage#server|arkStageId"] = ShimStageByArkID.Flush
 	SingularFlusherMap["stagesMapById"] = StagesMapByID.Delete
 	SingularFlusherMap["stagesMapByArkId"] = StagesMapByArkID.Delete
 

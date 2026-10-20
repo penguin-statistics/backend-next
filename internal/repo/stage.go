@@ -7,7 +7,6 @@ import (
 
 	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
@@ -114,42 +113,6 @@ func (r *Stage) GetShimStagesForFakeTime(ctx context.Context, server string, fak
 	}
 
 	return stages, nil
-}
-
-func (r *Stage) GetShimStageByArkId(ctx context.Context, arkStageId string, server string) (*modelv2.Stage, error) {
-	var stage modelv2.Stage
-	err := r.db.NewSelect().
-		Model(&stage).
-		Relation("Zone", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.Column("ark_zone_id")
-		}).
-		Relation("DropInfos", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.
-				Relation("Item", func(sq *bun.SelectQuery) *bun.SelectQuery {
-					return sq.Column("ark_item_id")
-				}).
-				Relation("Stage", func(sq *bun.SelectQuery) *bun.SelectQuery {
-					return sq.Column("ark_stage_id")
-				}).
-				Relation("TimeRange", func(sq *bun.SelectQuery) *bun.SelectQuery {
-					return sq.Where("start_time <= ? AND end_time > ?", time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339))
-				}).
-				Where("drop_info.server = ?", server)
-		}).
-		Where("ark_stage_id = ?", arkStageId).
-		Scan(ctx)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, pgerr.ErrNotFound
-	} else if err != nil {
-		log.Error().
-			Str("stageId", arkStageId).
-			Err(err).
-			Msg("failed to get shim stage")
-		return nil, err
-	}
-
-	return &stage, nil
 }
 
 func (r *Stage) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId string) (null.String, error) {
