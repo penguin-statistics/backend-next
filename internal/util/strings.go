@@ -1,12 +1,9 @@
 package util
 
 import (
-	"regexp"
 	"strconv"
 	"strings"
 )
-
-var validIdRegex = regexp.MustCompile(`^[a-zA-Z\d\-_]+$`)
 
 func IsASCII(s string) bool {
 	for _, r := range s {
