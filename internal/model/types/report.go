@@ -30,14 +30,14 @@ type SingularReportRequest struct {
 	Drops []ArkDrop `json:"drops" validate:"dive"`
 	Times int       `json:"times" validate:"gte=0,lte=10"`
 
-	Metadata *ReportRequestMetadata `json:"metadata" validate:"omitempty,dive"`
+	Metadata *ReportRequestMetadata `json:"metadata" validate:"omitempty"`
 }
 
 type BatchDrop struct {
 	FragmentStageID
 
 	Drops    []ArkDrop             `json:"drops" validate:"dive"`
-	Metadata ReportRequestMetadata `json:"metadata" validate:"dive"`
+	Metadata ReportRequestMetadata `json:"metadata"`
 }
 
 type BatchReportRequest struct {
