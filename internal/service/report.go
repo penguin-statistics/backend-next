@@ -26,11 +26,14 @@ var (
 	ErrReportNotFound = pgerr.ErrInvalidReq.Msg("report not existed or has already been recalled")
 	ErrAccountMissing = pgerr.ErrInvalidReq.Msg("account missing")
 	ErrNatsTimeout    = errors.New("timeout waiting for NATS response")
+
+	ErrReportQueueUnavailable = pgerr.New(fiber.StatusServiceUnavailable, pgerr.CodeServiceUnavailable, "report queue is temporarily unavailable: please retry later")
 )
 
 type Report struct {
 	DB                     *bun.DB
 	Redis                  *redis.Client
+	NatsConn               *nats.Conn
 	NatsJS                 nats.JetStreamContext
 	ItemService            *Item
 	StageService           *Stage
@@ -44,10 +47,11 @@ type Report struct {
 	DropPatternElementRepo *repo.DropPatternElement
 }
 
-func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *Item, stageService *Stage, stageRepo *repo.Stage, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *Account, timeRangeService *TimeRange) *Report {
+func NewReport(db *bun.DB, redisClient *redis.Client, natsConn *nats.Conn, natsJs nats.JetStreamContext, itemService *Item, stageService *Stage, stageRepo *repo.Stage, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *Account, timeRangeService *TimeRange) *Report {
 	service := &Report{
 		DB:                     db,
 		Redis:                  redisClient,
+		NatsConn:               natsConn,
 		NatsJS:                 natsJs,
 		ItemService:            itemService,
 		StageService:           stageService,
@@ -192,6 +196,13 @@ func (s *Report) PipelineAggregateGachaboxDrops(ctx context.Context, singleRepor
 }
 
 func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.ReportTask) (taskId string, err error) {
+	// While NATS is reconnecting, a publish is buffered in the client and only sent after the reconnect, which may be
+	// long after we answered with ErrNatsTimeout and the client retried. Refuse it right away instead, so the client
+	// gets a clear 503 and no report is left in the buffer to be stored behind its back.
+	if s.NatsConn.Status() != nats.CONNECTED {
+		return "", ErrReportQueueUnavailable
+	}
+
 	taskId = s.PipelineTaskId(ctx)
 	task.TaskID = taskId
 
