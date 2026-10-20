@@ -65,6 +65,11 @@ func RegisterResult(v2 *svr.V2, c Result) {
 
 	group.Use(cachemiddleware.New(cachemiddleware.Config{
 		Next: func(c *fiber.Ctx) bool {
+			// never cache personal responses: they hold the results of the account in the Authorization header,
+			// which the key leaves out
+			if isPersonal, _ := strconv.ParseBool(c.Query("is_personal", "false")); isPersonal {
+				return true
+			}
 			// only cache requests with itemFilter and stageFilter query params
 			if c.Query("itemFilter") != "" || c.Query("stageFilter") != "" {
 				return false
