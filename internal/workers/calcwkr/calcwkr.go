@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
+	"golang.org/x/sync/errgroup"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/service"
@@ -225,14 +226,21 @@ func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 	}()
 }
 
-// runForAllServers runs f for every server, stopping at the first error.
+// serverConcurrency is how many servers a batch calculates at the same time.
+var serverConcurrency = 2
+
+// runForAllServers runs f for every server concurrently. Servers write disjoint rows and cache keys, so they do
+// not depend on each other; the first error cancels the servers still running and is returned.
 func runForAllServers(ctx context.Context, f func(ctx context.Context, server string) error) error {
+	eg, ctx := errgroup.WithContext(ctx)
+	eg.SetLimit(serverConcurrency)
 	for _, server := range constant.Servers {
-		if err := f(ctx, server); err != nil {
-			return err
-		}
+		server := server
+		eg.Go(func() error {
+			return f(ctx, server)
+		})
 	}
-	return nil
+	return eg.Wait()
 }
 
 func (w *Worker) microtask(ctx context.Context, service, server string, f func() error) error {
