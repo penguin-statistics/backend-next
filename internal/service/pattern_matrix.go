@@ -390,45 +390,23 @@ func (s *PatternMatrix) calcPatternMatrixForTimeRanges(
 func (s *PatternMatrix) combineQuantityAndTimesResults(
 	quantityResults []*model.TotalQuantityResultForPatternMatrix, timesResults []*model.TotalTimesResult,
 ) []*model.CombinedResultForDropPattern {
-	var firstGroupResults []linq.Group
 	combinedResults := make([]*model.CombinedResultForDropPattern, 0)
-	linq.From(quantityResults).
-		GroupByT(
-			func(result *model.TotalQuantityResultForPatternMatrix) int { return result.StageID },
-			func(result *model.TotalQuantityResultForPatternMatrix) *model.TotalQuantityResultForPatternMatrix {
-				return result
-			}).
-		ToSlice(&firstGroupResults)
 	quantityResultsMap := make(map[int]map[int]int)
-	for _, firstGroupElements := range firstGroupResults {
-		stageId := firstGroupElements.Key.(int)
-		resultsMap := make(map[int]int)
-		linq.From(firstGroupElements.Group).
-			ToMapByT(&resultsMap,
-				func(el any) int { return el.(*model.TotalQuantityResultForPatternMatrix).PatternID },
-				func(el any) int { return el.(*model.TotalQuantityResultForPatternMatrix).TotalQuantity })
-		quantityResultsMap[stageId] = resultsMap
+	for _, result := range quantityResults {
+		if _, ok := quantityResultsMap[result.StageID]; !ok {
+			quantityResultsMap[result.StageID] = make(map[int]int)
+		}
+		quantityResultsMap[result.StageID][result.PatternID] = result.TotalQuantity
 	}
 
-	var secondGroupResults []linq.Group
-	linq.From(timesResults).
-		GroupByT(
-			func(result *model.TotalTimesResult) int { return result.StageID },
-			func(result *model.TotalTimesResult) *model.TotalTimesResult { return result }).
-		ToSlice(&secondGroupResults)
-	for _, secondGroupResults := range secondGroupResults {
-		stageId := secondGroupResults.Key.(int)
-		quantityResultsMapForOneStage := quantityResultsMap[stageId]
-		for _, el := range secondGroupResults.Group {
-			times := el.(*model.TotalTimesResult).TotalTimes
-			for patternId, quantity := range quantityResultsMapForOneStage {
-				combinedResults = append(combinedResults, &model.CombinedResultForDropPattern{
-					StageID:   stageId,
-					PatternID: patternId,
-					Quantity:  quantity,
-					Times:     times,
-				})
-			}
+	for _, timesResult := range timesResults {
+		for patternId, quantity := range quantityResultsMap[timesResult.StageID] {
+			combinedResults = append(combinedResults, &model.CombinedResultForDropPattern{
+				StageID:   timesResult.StageID,
+				PatternID: patternId,
+				Quantity:  quantity,
+				Times:     timesResult.TotalTimes,
+			})
 		}
 	}
 	return combinedResults

@@ -48,6 +48,14 @@ func (r *DropInfo) GetDropInfosByServer(ctx context.Context, server string) ([]*
 	})
 }
 
+// GetDropInfoRangesByServer is GetDropInfosByServer filling only StageID, ItemID, RangeID and Accumulable, which is
+// all the time range calculations need; it skips decoding the jsonb columns of every drop info.
+func (r *DropInfo) GetDropInfoRangesByServer(ctx context.Context, server string) ([]*model.DropInfo, error) {
+	return r.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
+		return q.Column("stage_id", "item_id", "range_id", "accumulable").Where("server = ?", server)
+	})
+}
+
 type DropInfoQuery struct {
 	Server     string
 	ArkStageId string

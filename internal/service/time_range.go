@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"time"
 
@@ -96,7 +97,7 @@ func (s *TimeRange) GetMaxAccumulableTimeRangesByServer(ctx context.Context, ser
 		return maxAccumulableTimeRanges, nil
 	}
 
-	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
+	dropInfos, err := s.getDropInfosByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +172,7 @@ func (s *TimeRange) GetAllMaxAccumulableTimeRangesByServer(ctx context.Context, 
 		return maxAccumulableTimeRanges, nil
 	}
 
-	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
+	dropInfos, err := s.getDropInfosByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
@@ -180,36 +181,18 @@ func (s *TimeRange) GetAllMaxAccumulableTimeRangesByServer(ctx context.Context, 
 		return nil, err
 	}
 	maxAccumulableTimeRanges = make(map[int]map[int][]*model.TimeRange)
-	var groupedResults []linq.Group
-	linq.From(dropInfos).
-		WhereT(func(dropInfo *model.DropInfo) bool { return dropInfo.ItemID.Valid }).
-		GroupByT(
-			func(dropInfo *model.DropInfo) int { return dropInfo.StageID },
-			func(dropInfo *model.DropInfo) *model.DropInfo { return dropInfo },
-		).
-		ToSlice(&groupedResults)
-	for _, el := range groupedResults {
-		stageId := el.Key.(int)
-		var groupedResults2 []linq.Group
-		linq.From(el.Group).
-			GroupByT(
-				func(dropInfo any) int { return int(dropInfo.(*model.DropInfo).ItemID.Int64) },
-				func(dropInfo any) *model.DropInfo { return dropInfo.(*model.DropInfo) },
-			).
-			ToSlice(&groupedResults2)
+	for stageId, dropInfosForOneStage := range groupDropInfosWithItemByStageId(dropInfos) {
+		dropInfosByItemId := make(map[int][]*model.DropInfo)
+		for _, dropInfo := range dropInfosForOneStage {
+			itemId := int(dropInfo.ItemID.Int64)
+			dropInfosByItemId[itemId] = append(dropInfosByItemId[itemId], dropInfo)
+		}
 		maxAccumulableTimeRangesForOneStage := make(map[int][]*model.TimeRange)
-		for _, el := range groupedResults2 {
-			itemId := el.Key.(int)
-			var sortedDropInfos []*model.DropInfo
-			linq.From(el.Group).
-				DistinctByT(
-					func(dropInfo *model.DropInfo) int { return dropInfo.RangeID },
-				).
-				SortT(
-					func(a, b *model.DropInfo) bool {
-						return timeRangesMap[a.RangeID].StartTime.Before(*timeRangesMap[b.RangeID].StartTime)
-					}).
-				ToSlice(&sortedDropInfos)
+		for itemId, dropInfosForOneItem := range dropInfosByItemId {
+			sortedDropInfos := distinctDropInfosByRangeId(dropInfosForOneItem)
+			sortDropInfos(sortedDropInfos, func(a, b *model.DropInfo) bool {
+				return timeRangesMap[a.RangeID].StartTime.Before(*timeRangesMap[b.RangeID].StartTime)
+			})
 
 			timeRanges := make([]*model.TimeRange, 0)
 			for _, dropInfo := range sortedDropInfos {
@@ -255,7 +238,7 @@ func (s *TimeRange) GetLatestTimeRangesByServer(ctx context.Context, server stri
 		return results, nil
 	}
 
-	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
+	dropInfos, err := s.getDropInfosByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
@@ -263,25 +246,12 @@ func (s *TimeRange) GetLatestTimeRangesByServer(ctx context.Context, server stri
 	if err != nil {
 		return nil, err
 	}
-	var groupedResults []linq.Group
-	linq.From(dropInfos).
-		WhereT(func(dropInfo *model.DropInfo) bool { return dropInfo.ItemID.Valid }).
-		GroupByT(
-			func(dropInfo *model.DropInfo) int { return dropInfo.StageID },
-			func(dropInfo *model.DropInfo) *model.DropInfo { return dropInfo },
-		).
-		ToSlice(&groupedResults)
 	results = make(map[int]*model.TimeRange)
-	for _, el := range groupedResults {
-		stageId := el.Key.(int)
-		latestDropInfo := linq.From(el.Group).
-			Distinct().
-			SortT(
-				func(a, b *model.DropInfo) bool {
-					return timeRangesMap[a.RangeID].StartTime.After(*timeRangesMap[b.RangeID].StartTime)
-				}).
-			First().(*model.DropInfo)
-		results[stageId] = timeRangesMap[latestDropInfo.RangeID]
+	for stageId, dropInfosForOneStage := range groupDropInfosWithItemByStageId(dropInfos) {
+		sortDropInfos(dropInfosForOneStage, func(a, b *model.DropInfo) bool {
+			return timeRangesMap[a.RangeID].StartTime.After(*timeRangesMap[b.RangeID].StartTime)
+		})
+		results[stageId] = timeRangesMap[dropInfosForOneStage[0].RangeID]
 	}
 	cache.LatestTimeRanges.Set(server, results, time.Minute*5)
 	return results, nil
@@ -289,4 +259,65 @@ func (s *TimeRange) GetLatestTimeRangesByServer(ctx context.Context, server stri
 
 func (s *TimeRange) GetTimeRangeByServerAndName(ctx context.Context, server string, name string) (*model.TimeRange, error) {
 	return s.TimeRangeRepo.GetTimeRangeByServerAndName(ctx, server, name)
+}
+
+// Cache: dropInfos#server:{server}, 1 min
+// The time range calculations above all start from every drop info of a server; the stats worker runs them back
+// to back for each server, so they share one load. Only StageID, ItemID, RangeID and Accumulable are filled.
+// Callers must not modify the returned slice.
+func (s *TimeRange) getDropInfosByServer(ctx context.Context, server string) ([]*model.DropInfo, error) {
+	var dropInfos []*model.DropInfo
+	if err := cache.DropInfosByServer.Get(server, &dropInfos); err == nil {
+		return dropInfos, nil
+	}
+	dropInfos, err := s.DropInfoRepo.GetDropInfoRangesByServer(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	cache.DropInfosByServer.Set(server, dropInfos, time.Minute)
+	return dropInfos, nil
+}
+
+// The helpers below replace reflection-based go-linq pipelines on the worker's hot path. They keep go-linq's
+// semantics: group members keep their input order, DistinctBy keeps the first occurrence, and sorting uses
+// sort.Sort, so ties are resolved exactly as before.
+
+// groupDropInfosWithItemByStageId groups the drop infos that have an item by stage id into newly allocated slices.
+func groupDropInfosWithItemByStageId(dropInfos []*model.DropInfo) map[int][]*model.DropInfo {
+	grouped := make(map[int][]*model.DropInfo)
+	for _, dropInfo := range dropInfos {
+		if !dropInfo.ItemID.Valid {
+			continue
+		}
+		grouped[dropInfo.StageID] = append(grouped[dropInfo.StageID], dropInfo)
+	}
+	return grouped
+}
+
+func distinctDropInfosByRangeId(dropInfos []*model.DropInfo) []*model.DropInfo {
+	seen := make(map[int]struct{}, len(dropInfos))
+	results := make([]*model.DropInfo, 0, len(dropInfos))
+	for _, dropInfo := range dropInfos {
+		if _, ok := seen[dropInfo.RangeID]; ok {
+			continue
+		}
+		seen[dropInfo.RangeID] = struct{}{}
+		results = append(results, dropInfo)
+	}
+	return results
+}
+
+type dropInfoSorter struct {
+	dropInfos []*model.DropInfo
+	less      func(a, b *model.DropInfo) bool
+}
+
+func (s dropInfoSorter) Len() int { return len(s.dropInfos) }
+func (s dropInfoSorter) Swap(i, j int) {
+	s.dropInfos[i], s.dropInfos[j] = s.dropInfos[j], s.dropInfos[i]
+}
+func (s dropInfoSorter) Less(i, j int) bool { return s.less(s.dropInfos[i], s.dropInfos[j]) }
+
+func sortDropInfos(dropInfos []*model.DropInfo, less func(a, b *model.DropInfo) bool) {
+	sort.Sort(dropInfoSorter{dropInfos: dropInfos, less: less})
 }
