@@ -33,6 +33,36 @@ func NewDropReport(db *bun.DB) *DropReport {
 	}
 }
 
+type statementTimeoutTxKey struct{}
+
+// RunWithStatementTimeout runs fn in a transaction in which PostgreSQL cancels every statement running
+// longer than timeout. The drop report aggregations (CalcQuantityUniqCount, CalcTotalTimes, CalcTotalQuantityForTrend
+// and CalcTotalTimesForTrend) called with the context fn receives run in that transaction. pgdriver does not cancel
+// a statement on the server when its context ends, so this is what bounds the work of a statement on the server. It
+// does so only while the read timeout of the connection (see infra.Postgres) is longer than timeout: otherwise the
+// driver gives up on the statement first, and it keeps running on the server.
+func (r *DropReport) RunWithStatementTimeout(ctx context.Context, timeout time.Duration, fn func(ctx context.Context) error) error {
+	// a statement_timeout of 0 turns the timeout off
+	timeoutMillis := timeout.Milliseconds()
+	if timeoutMillis < 1 {
+		timeoutMillis = 1
+	}
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if _, err := tx.ExecContext(ctx, "SET LOCAL statement_timeout = ?", timeoutMillis); err != nil {
+			return err
+		}
+		return fn(context.WithValue(ctx, statementTimeoutTxKey{}, tx))
+	})
+}
+
+// idb returns the transaction of RunWithStatementTimeout ctx carries, or the database otherwise.
+func (r *DropReport) idb(ctx context.Context) bun.IDB {
+	if tx, ok := ctx.Value(statementTimeoutTxKey{}).(bun.Tx); ok {
+		return tx
+	}
+	return r.db
+}
+
 func (r *DropReport) CreateDropReport(ctx context.Context, tx bun.Tx, dropReport *model.DropReport) error {
 	_, err := tx.NewInsert().
 		Model(dropReport).
@@ -70,7 +100,7 @@ func (r *DropReport) CalcQuantityUniqCount(
 	r.handleServer(subq1, queryCtx.Server)
 	r.handleStages(subq1, queryCtx.GetStageIds())
 
-	mainq := r.db.NewSelect().
+	mainq := r.idb(ctx).NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("stage_id", "item_id", "quantity").
 		ColumnExpr("COUNT(*) AS count")
@@ -103,7 +133,7 @@ func (r *DropReport) CalcTotalTimes(
 		r.handleStages(subq1, stageIds)
 	}
 
-	mainq := r.db.NewSelect().
+	mainq := r.idb(ctx).NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("stage_id").
 		ColumnExpr("SUM(times) AS total_times")
@@ -419,7 +449,7 @@ func (r *DropReport) CalcTotalQuantityForTrend(
 	r.handleServer(subq1, server)
 	r.handleStagesAndItems(subq1, stageIdItemIdMap)
 
-	mainq := r.db.NewSelect().
+	mainq := r.idb(ctx).NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("group_id", "interval_start", "interval_end", "stage_id", "item_id").
 		ColumnExpr("SUM(quantity) AS total_quantity")
@@ -455,7 +485,7 @@ func (r *DropReport) CalcTotalTimesForTrend(
 	r.handleServer(subq1, server)
 	r.handleStages(subq1, stageIds)
 
-	mainq := r.db.NewSelect().
+	mainq := r.idb(ctx).NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("group_id", "interval_start", "interval_end", "stage_id").
 		ColumnExpr("SUM(times) AS total_times")

@@ -19,9 +19,19 @@ import (
 	"exusiai.dev/backend-next/internal/pkg/observability"
 )
 
+// postgresReadTimeout is the socket read timeout of a DSN that sets none (no timeout or read_timeout parameter), in
+// place of the 10 seconds of pgdriver. The statement timeout of advanced queries relies on it being longer than
+// theirs (60 seconds): a statement the driver stops waiting for keeps running on the server.
+const postgresReadTimeout = 5 * time.Minute
+
+// postgresConnector returns the connector of dsn. A timeout set by dsn takes precedence over postgresReadTimeout.
+func postgresConnector(dsn string) *pgdriver.Connector {
+	return pgdriver.NewConnector(pgdriver.WithReadTimeout(postgresReadTimeout), pgdriver.WithDSN(dsn), pgdriver.WithApplicationName("penguin-backend"))
+}
+
 func Postgres(conf *appconfig.Config) (*bun.DB, error) {
 	// Open a Postgres database.
-	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(conf.PostgresDSN), pgdriver.WithApplicationName("penguin-backend")))
+	pgdb := sql.OpenDB(postgresConnector(conf.PostgresDSN))
 
 	// Create a Bun db on top of it.
 	db := bun.NewDB(pgdb, pgdialect.New())
