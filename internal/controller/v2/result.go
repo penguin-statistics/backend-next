@@ -100,6 +100,10 @@ func RegisterResult(v2 *svr.V2, c Result) {
 			if isPersonal, _ := strconv.ParseBool(c.Query("is_personal", "false")); isPersonal {
 				return true
 			}
+			// never cache a 304 Not Modified, which would be served without a body to requests without a copy
+			if c.Response().StatusCode() != fiber.StatusOK {
+				return true
+			}
 			// only cache requests with itemFilter and stageFilter query params
 			if c.Query("itemFilter") != "" || c.Query("stageFilter") != "" {
 				return false

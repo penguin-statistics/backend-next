@@ -24,14 +24,18 @@ func lastModifiedTime(key string) time.Time {
 }
 
 // sendCacheable sends body as JSON, cacheable for 5 minutes and last modified at lastModified (see
-// lastModifiedTime). Without a last modified time, body is sent without caching headers rather than with a time that
-// could be newer than it. So is it with a last modified time later than the response's Date (a change recorded in the
-// next second, see cache.SetLastModifiedTime), which Last-Modified must not be (RFC 9110 8.8.2.1).
+// lastModifiedTime), or 304 Not Modified without a body if the client's copy is not older. Without a last modified
+// time, body is sent without caching headers rather than with a time that could be newer than it. So is it with a
+// last modified time later than the response's Date (a change recorded in the next second, see
+// cache.SetLastModifiedTime), which Last-Modified must not be (RFC 9110 8.8.2.1).
 func sendCacheable(ctx *fiber.Ctx, lastModified time.Time, body any) error {
 	if lastModified.IsZero() || !notLaterThanDate(lastModified) {
 		return ctx.JSON(body)
 	}
 	cachectrl.OptIn(ctx, lastModified)
+	if cachectrl.NotModified(ctx) {
+		return ctx.SendStatus(fiber.StatusNotModified)
+	}
 	return ctx.JSON(body)
 }
 

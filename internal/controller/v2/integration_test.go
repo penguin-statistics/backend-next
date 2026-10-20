@@ -8,18 +8,25 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"math/rand"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/gofiber/fiber/v2"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
 
+	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/repo"
 	"exusiai.dev/backend-next/internal/service"
 )
@@ -193,5 +200,83 @@ func TestGetStagesLastModifiedRecalculated(t *testing.T) {
 	}
 	if got := resp.Header.Get(fiber.HeaderLastModified); got != lastModified {
 		t.Errorf("the response recalculated during the request has Last-Modified %q, want the one read before, %q", got, lastModified)
+	}
+}
+
+// personal and filtered drop matrices are sent without Last-Modified, so never answered with 304, even when the global
+// one they are computed alongside is not modified: the client's copy is of other data. Personal ones are marked as
+// not cacheable, filtered ones carry no caching headers.
+func TestGetDropMatrixNotCacheable(t *testing.T) {
+	db := newTestDB(t)
+	app := newCacheTestApp(t)
+	t.Cleanup(func() {
+		for _, flush := range cache.SetMap {
+			_ = flush()
+		}
+		for _, flush := range cache.SingularFlusherMap {
+			_ = flush()
+		}
+	})
+	timeRange := service.NewTimeRange(repo.NewTimeRange(db), repo.NewDropInfo(db))
+	dropMatrix := service.NewDropMatrix(&appconfig.Config{}, timeRange, nil, service.NewDropInfo(repo.NewDropInfo(db), timeRange), nil,
+		service.NewStage(repo.NewStage(db)), service.NewItem(repo.NewItem(db)), nil)
+	account := service.NewAccount(nil)
+	result := &Result{DropMatrixService: dropMatrix, AccountService: account}
+	private := &Private{DropMatrixService: dropMatrix, AccountService: account}
+	app.Get("/result/matrix", result.GetDropMatrix)
+	app.Get("/_private/result/matrix/:server/:source/:category?", private.GetDropMatrix)
+
+	// the global drop matrix (with closed zones), last modified a minute ago, from which filtered ones are computed
+	cache.GlobalDropMatrix.Set("CN"+constant.CacheSep+constant.SourceCategoryAll, model.DropMatrixQueryResult{Matrix: []*model.OneDropMatrixElement{}}, time.Hour)
+	key := "CN" + constant.CacheSep + "true" + constant.CacheSep + constant.SourceCategoryAll
+	cache.ShimGlobalDropMatrix.Set(key, modelv2.DropMatrixQueryResult{Matrix: []*modelv2.OneDropMatrixElement{}}, time.Hour)
+	cache.LastModifiedTime.Set("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", time.Now().Add(-time.Minute), 0)
+	// an account without reports
+	penguinId := "T" + testServer()
+	cache.AccountByPenguinID.Set(penguinId, model.Account{AccountID: 1, PenguinID: penguinId}, time.Hour)
+
+	tests := []struct {
+		name         string
+		target       string
+		cacheable    bool
+		cacheControl string // of the 200 of a matrix that is not cacheable
+	}{
+		{"global", "/result/matrix?server=CN&show_closed_zones=true", true, ""},
+		{"global (private)", "/_private/result/matrix/CN/global", true, ""},
+		{"personal", "/result/matrix?server=CN&show_closed_zones=true&is_personal=true", false, "no-cache, no-store, must-revalidate"},
+		{"personal (private)", "/_private/result/matrix/CN/personal", false, "no-cache, no-store, must-revalidate"},
+		{"filtered", "/result/matrix?server=CN&show_closed_zones=true&stageFilter=main_01-07", false, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(fiber.MethodGet, tt.target, nil)
+			req.Header.Set(fiber.HeaderIfModifiedSince, time.Now().UTC().Format(http.TimeFormat))
+			req.Header.Set(fiber.HeaderAuthorization, constant.PenguinIDAuthorizationRealm+" "+penguinId)
+			resp, err := app.Test(req, -1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if tt.cacheable {
+				if resp.StatusCode != fiber.StatusNotModified {
+					t.Fatalf("status %d, body %s; want 304", resp.StatusCode, body)
+				}
+				return
+			}
+			if resp.StatusCode != fiber.StatusOK || !strings.Contains(string(body), `"matrix"`) {
+				t.Fatalf("status %d, body %s; want 200 with the matrix", resp.StatusCode, body)
+			}
+			if got := resp.Header.Get(fiber.HeaderLastModified); got != "" {
+				t.Errorf("Last-Modified %q, want none", got)
+			}
+			if got := resp.Header.Get(fiber.HeaderCacheControl); got != tt.cacheControl {
+				t.Errorf("Cache-Control %q, want %q", got, tt.cacheControl)
+			}
+		})
 	}
 }
