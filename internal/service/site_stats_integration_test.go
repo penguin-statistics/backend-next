@@ -2,16 +2,21 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sort"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"exusiai.dev/gommon/constant"
 	"github.com/uptrace/bun"
 
+	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+	pkgcache "exusiai.dev/backend-next/internal/pkg/cache"
 	"exusiai.dev/backend-next/internal/repo"
 	"exusiai.dev/backend-next/internal/util"
 )
@@ -254,4 +259,101 @@ func TestRefreshShimSiteStatsMatchesLegacy(t *testing.T) {
 	check("on the next day")
 
 	requireCompared(t, compared, 100)
+}
+
+// countingSiteStatsBaseGenerations counts the site stats calculations: each reads the generation once.
+type countingSiteStatsBaseGenerations struct {
+	memorySiteStatsBaseGenerations
+	gets atomic.Int32
+}
+
+func (g *countingSiteStatsBaseGenerations) Get(ctx context.Context, server string) (int64, error) {
+	g.gets.Add(1)
+	return g.memorySiteStatsBaseGenerations.Get(ctx, server)
+}
+
+func TestShimSiteStatsCache(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+	flushCaches(t)
+	now := time.Date(2026, 10, 19, 14, 0, 0, 0, time.UTC)
+	util.Now = func() time.Time { return now }
+	t.Cleanup(func() { util.Now = time.Now })
+	today := make(map[string]int)
+	for _, server := range testServers {
+		today[server] = util.GetDayNum(&now, server)
+	}
+	seedSiteStatsData(t, rand.New(rand.NewSource(1)), db, today, []int{-3, -1, 0})
+	calculations := &countingSiteStatsBaseGenerations{}
+	s := &SiteStats{
+		DropReportService:        NewDropReport(repo.NewDropReport(db)),
+		DropMatrixElementService: NewDropMatrixElement(repo.NewDropMatrixElement(db)),
+		StageService:             NewStage(repo.NewStage(db)),
+		ItemService:              NewItem(repo.NewItem(db)),
+		baseGenerations:          calculations,
+	}
+	want := legacySiteStatsLines(t, db, "CN")
+
+	// concurrent requests on an empty cache calculate the stats once
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			stats, err := s.GetShimSiteStats(ctx, "CN")
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			assertSameLines(t, "request", want, siteStatsLines(stats))
+		}()
+	}
+	wg.Wait()
+	if n := calculations.gets.Load(); n != 1 {
+		t.Errorf("concurrent requests calculated the stats %d times, want once", n)
+	}
+	var lastModified time.Time
+	if err := cache.LastModifiedTime.Get("[shimSiteStats#server:CN]", &lastModified); err != nil {
+		t.Error("no last modified time for the stats a request calculated")
+	}
+
+	// requests get the cached stats until a refresh replaces them, also while it calculates, without waiting for it
+	stale := modelv2.SiteStats{TotalSanityCost: -1}
+	cache.ShimSiteStats.Set("CN", stale, time.Hour)
+	if stats, err := s.GetShimSiteStats(ctx, "CN"); err != nil || stats.TotalSanityCost != -1 {
+		t.Fatalf("a request got %+v, %v instead of the cached stats", stats, err)
+	}
+	var refreshed *modelv2.SiteStats
+	requestWhileRefreshWaits(t, db, "drop_matrix_elements", func() (err error) {
+		refreshed, err = s.RefreshShimSiteStats(ctx, "CN")
+		return err
+	}, func() {
+		if stats, err := s.GetShimSiteStats(ctx, "CN"); err != nil || stats.TotalSanityCost != -1 {
+			t.Errorf("a request during a refresh got %+v, %v instead of the cached stats", stats, err)
+		}
+	})
+	assertSameLines(t, "refresh", want, siteStatsLines(refreshed))
+	cached, err := s.GetShimSiteStats(ctx, "CN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertSameLines(t, "refreshed cache", want, siteStatsLines(cached))
+	if n := calculations.gets.Load(); n != 2 {
+		t.Errorf("calculated the stats %d times, want twice", n)
+	}
+
+	// a failed refresh drops the cached stats, so that requests recalculate them, and only those of its server
+	cache.ShimSiteStats.Set("US", stale, time.Hour)
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err := s.RefreshShimSiteStats(cancelled, "CN"); err == nil {
+		t.Fatal("refreshing with a cancelled context succeeded")
+	}
+	var stats modelv2.SiteStats
+	if err := cache.ShimSiteStats.Get("CN", &stats); !errors.Is(err, pkgcache.ErrNotFound) {
+		t.Errorf("a failed refresh kept the cached stats: %v", err)
+	}
+	if err := cache.ShimSiteStats.Get("US", &stats); err != nil || stats.TotalSanityCost != -1 {
+		t.Errorf("a failed refresh of CN dropped the stats of another server: %v", err)
+	}
 }
