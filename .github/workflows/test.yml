@@ -32,6 +32,16 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # disposable Redis for the worker lock tests (internal/workers/calcwkr/lock_test.go)
+      redis:
+        image: redis:6.2.7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,4 +61,5 @@ jobs:
       - name: Test
         env:
           PENGUIN_TEST_POSTGRES_DSN: postgres://postgres:test@127.0.0.1:5432/postgres?sslmode=disable
+          PENGUIN_TEST_REDIS_URL: redis://127.0.0.1:6379/0
         run: go test -race -count=1 $(go list ./... | grep -v '/backend-next/test$')
