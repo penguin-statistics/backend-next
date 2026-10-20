@@ -12,7 +12,8 @@
 // (delete + re-insert, as the worker does). Use scripts/workerbench/bench.py, which backs the
 // affected rows up first and keeps the tables vacuumed between runs.
 //
-// Env: WORKERBENCH_NOW (RFC3339, default 2026-10-19T14:00:00Z), WORKERBENCH_DUMP (canonical output path).
+// Env: WORKERBENCH_NOW (RFC3339, default 2026-10-19T14:00:00Z), WORKERBENCH_DUMP (canonical output path),
+// WORKERBENCH_PRINT_DAYS (only print the days of every server a batch may rewrite).
 package calcwkr_test
 
 import (
@@ -54,7 +55,9 @@ func TestWorkerBench(t *testing.T) {
 		deps      calcwkr.WorkerDeps
 		siteStats *service.SiteStats
 	)
-	fxApp := fx.New(append(app.Options(appcontext.Declare(appcontext.EnvCLI)),
+	// no background workers: the scheduled calcwkr batch or the report consumer would write to the database
+	// during the measurement
+	fxApp := fx.New(append(app.OptionsWithoutWorkers(appcontext.Declare(appcontext.EnvCLI)),
 		fx.Populate(&db, &siteStats),
 		fx.Invoke(func(d calcwkr.WorkerDeps) { deps = d }))...)
 	if err := fxApp.Err(); err != nil {
@@ -70,6 +73,15 @@ func TestWorkerBench(t *testing.T) {
 		t.Fatal(err)
 	}
 	util.Now = func() time.Time { return now }
+
+	// the days a batch may rewrite: today, and yesterday when today has no elements yet
+	if os.Getenv("WORKERBENCH_PRINT_DAYS") != "" {
+		for _, server := range constant.Servers {
+			dayNum := util.GetDayNum(&now, server)
+			fmt.Printf("BENCH days server=%s from=%d to=%d\n", server, dayNum-1, dayNum)
+		}
+		return
+	}
 
 	ctx := context.Background()
 	worker := calcwkr.NewWorkerForBench(deps)
@@ -98,11 +110,14 @@ func TestWorkerBench(t *testing.T) {
 		}
 	}
 
+	// the driver samples foreign load between these markers
+	fmt.Println("BENCH timed_start")
 	start := time.Now()
 	if err := worker.RunStatsBatchForBench(ctx); err != nil {
 		t.Fatal(err)
 	}
 	total := time.Since(start)
+	fmt.Println("BENCH timed_end")
 
 	// per-phase durations as recorded by the worker itself
 	phaseTotals := map[string]time.Duration{}
