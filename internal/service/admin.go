@@ -152,6 +152,8 @@ func (s *Admin) SaveRenderedObjects(ctx context.Context, objects *gamedata.Rende
 			cache.MaxAccumulableTimeRanges.Delete(objects.TimeRange.Server)
 			cache.AllMaxAccumulableTimeRanges.Delete(objects.TimeRange.Server)
 			cache.LatestTimeRanges.Delete(objects.TimeRange.Server)
+			// the drop infos the time range calculations above are derived from
+			cache.DropInfosByServer.Delete(objects.TimeRange.Server)
 		}
 
 		// stage
