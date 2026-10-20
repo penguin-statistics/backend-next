@@ -9,7 +9,6 @@ import (
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
-	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/cachectrl"
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
@@ -52,6 +51,12 @@ func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
+	var lastModified time.Time
+	if !accountId.Valid {
+		key := server + constant.CacheSep + "true" + constant.CacheSep + category
+		lastModified = lastModifiedTime("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:" + key + "]")
+	}
+
 	shimResult, err := c.DropMatrixService.GetShimDropMatrix(ctx.UserContext(), server, true, "", "", accountId, category)
 	if err != nil {
 		return err
@@ -59,16 +64,9 @@ func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 
 	if accountId.Valid {
 		cachectrl.OptOut(ctx)
-	} else {
-		key := server + constant.CacheSep + "true" + constant.CacheSep + category
-		var lastModifiedTime time.Time
-		if err := cache.LastModifiedTime.Get("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
-			lastModifiedTime = time.Now()
-		}
-		cachectrl.OptIn(ctx, lastModifiedTime)
+		return ctx.JSON(shimResult)
 	}
-
-	return ctx.JSON(shimResult)
+	return sendCacheable(ctx, lastModified, shimResult)
 }
 
 func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
@@ -87,6 +85,12 @@ func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
+	var lastModified time.Time
+	if !accountId.Valid {
+		key := server + constant.CacheSep + category + constant.CacheSep + strconv.FormatBool(showAllPatterns)
+		lastModified = lastModifiedTime("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:" + key + "]")
+	}
+
 	shimResult, err := c.PatternMatrixService.GetShimPatternMatrix(ctx.UserContext(), server, accountId, category, showAllPatterns)
 	if err != nil {
 		return err
@@ -94,30 +98,18 @@ func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 
 	if accountId.Valid {
 		cachectrl.OptOut(ctx)
-	} else {
-		key := server + constant.CacheSep + category + constant.CacheSep + strconv.FormatBool(showAllPatterns)
-		var lastModifiedTime time.Time
-		if err := cache.LastModifiedTime.Get("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:"+key+"]", &lastModifiedTime); err != nil {
-			lastModifiedTime = time.Now()
-		}
-		cachectrl.OptIn(ctx, lastModifiedTime)
+		return ctx.JSON(shimResult)
 	}
-
-	return ctx.JSON(shimResult)
+	return sendCacheable(ctx, lastModified, shimResult)
 }
 
 func (c *Private) GetTrends(ctx *fiber.Ctx) error {
 	server := ctx.Params("server")
+	lastModified := lastModifiedTime("[shimTrend#server:" + server + "]")
 	shimResult, err := c.TrendService.GetShimTrend(ctx.UserContext(), server)
 	if err != nil {
 		return err
 	}
 
-	var lastModifiedTime time.Time
-	if err := cache.LastModifiedTime.Get("[shimTrend#server:"+server+"]", &lastModifiedTime); err != nil {
-		lastModifiedTime = time.Now()
-	}
-	cachectrl.OptIn(ctx, lastModifiedTime)
-
-	return ctx.JSON(shimResult)
+	return sendCacheable(ctx, lastModified, shimResult)
 }

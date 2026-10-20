@@ -14,7 +14,6 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
-	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/model/types"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/cachectrl"
@@ -143,24 +142,26 @@ func (c *Result) GetDropMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
+	useCache := !accountId.Valid && stageFilterStr == "" && itemFilterStr == ""
+	var lastModified time.Time
+	if useCache {
+		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones) + constant.CacheSep + sourceCategory
+		lastModified = lastModifiedTime("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:" + key + "]")
+	}
+
 	shimQueryResult, err := c.DropMatrixService.GetShimDropMatrix(ctx.UserContext(), server, showClosedZones, stageFilterStr, itemFilterStr, accountId, sourceCategory)
 	if err != nil {
 		return err
 	}
 
-	useCache := stageFilterStr == "" && itemFilterStr == ""
 	if accountId.Valid {
 		cachectrl.OptOut(ctx)
-	} else if useCache {
-		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones) + constant.CacheSep + sourceCategory
-		var lastModifiedTime time.Time
-		if err := cache.LastModifiedTime.Get("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
-			lastModifiedTime = time.Now()
-		}
-		cachectrl.OptIn(ctx, lastModifiedTime)
+		return ctx.JSON(shimQueryResult)
 	}
-
-	return ctx.JSON(shimQueryResult)
+	if !useCache {
+		return ctx.JSON(shimQueryResult)
+	}
+	return sendCacheable(ctx, lastModified, shimQueryResult)
 }
 
 //	@Summary	Get Pattern Matrix
@@ -196,6 +197,12 @@ func (c *Result) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
+	var lastModified time.Time
+	if !accountId.Valid {
+		key := server + constant.CacheSep + constant.SourceCategoryAll + constant.CacheSep + strconv.FormatBool(showAllPatterns)
+		lastModified = lastModifiedTime("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:" + key + "]")
+	}
+
 	shimResult, err := c.PatternMatrixService.GetShimPatternMatrix(ctx.UserContext(), server, accountId, constant.SourceCategoryAll, showAllPatterns)
 	if err != nil {
 		return err
@@ -203,16 +210,9 @@ func (c *Result) GetPatternMatrix(ctx *fiber.Ctx) error {
 
 	if accountId.Valid {
 		cachectrl.OptOut(ctx)
-	} else {
-		key := server + constant.CacheSep + constant.SourceCategoryAll + constant.CacheSep + strconv.FormatBool(showAllPatterns)
-		var lastModifiedTime time.Time
-		if err := cache.LastModifiedTime.Get("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:"+key+"]", &lastModifiedTime); err != nil {
-			lastModifiedTime = time.Now()
-		}
-		cachectrl.OptIn(ctx, lastModifiedTime)
+		return ctx.JSON(shimResult)
 	}
-
-	return ctx.JSON(shimResult)
+	return sendCacheable(ctx, lastModified, shimResult)
 }
 
 //	@Summary	Get Trends
@@ -228,18 +228,13 @@ func (c *Result) GetTrends(ctx *fiber.Ctx) error {
 		return err
 	}
 
+	lastModified := lastModifiedTime("[shimTrend#server:" + server + "]")
 	shimResult, err := c.TrendService.GetShimTrend(ctx.UserContext(), server)
 	if err != nil {
 		return err
 	}
 
-	var lastModifiedTime time.Time
-	if err := cache.LastModifiedTime.Get("[shimTrend#server:"+server+"]", &lastModifiedTime); err != nil {
-		lastModifiedTime = time.Now()
-	}
-	cachectrl.OptIn(ctx, lastModifiedTime)
-
-	return ctx.JSON(shimResult)
+	return sendCacheable(ctx, lastModified, shimResult)
 }
 
 //	@Summary	Execute Advanced Query

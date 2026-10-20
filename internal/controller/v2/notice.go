@@ -1,13 +1,9 @@
 package v2
 
 import (
-	"time"
-
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"exusiai.dev/backend-next/internal/model/cache"
-	"exusiai.dev/backend-next/internal/pkg/cachectrl"
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
 )
@@ -29,14 +25,10 @@ func RegisterNotice(v2 *svr.V2, c Notice) {
 //	@Failure	500	{object}	pgerr.PenguinError	"An unexpected error occurred"
 //	@Router		/PenguinStats/api/v2/notice [GET]
 func (c *Notice) GetNotices(ctx *fiber.Ctx) error {
+	lastModified := lastModifiedTime("[notices]")
 	notices, err := c.NoticeService.GetNotices(ctx.UserContext())
 	if err != nil {
 		return err
 	}
-	var lastModifiedTime time.Time
-	if err := cache.LastModifiedTime.Get("[notices]", &lastModifiedTime); err != nil {
-		lastModifiedTime = time.Now()
-	}
-	cachectrl.OptIn(ctx, lastModifiedTime)
-	return ctx.JSON(notices)
+	return sendCacheable(ctx, lastModified, notices)
 }
