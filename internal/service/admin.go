@@ -147,13 +147,7 @@ func (s *Admin) SaveRenderedObjects(ctx context.Context, objects *gamedata.Rende
 
 		// timerange
 		if objects.TimeRange != nil {
-			cache.TimeRanges.Delete(objects.TimeRange.Server)
-			cache.TimeRangesMap.Delete(objects.TimeRange.Server)
-			cache.MaxAccumulableTimeRanges.Delete(objects.TimeRange.Server)
-			cache.AllMaxAccumulableTimeRanges.Delete(objects.TimeRange.Server)
-			cache.LatestTimeRanges.Delete(objects.TimeRange.Server)
-			// the drop infos the time range calculations above are derived from
-			cache.DropInfosByServer.Delete(objects.TimeRange.Server)
+			invalidateTimeRangeCaches(objects.TimeRange.Server)
 		}
 
 		// stage
@@ -658,4 +652,15 @@ func (s *Admin) EvaluateRejectRules(ctx context.Context, evaluationContexts []Re
 		Msg("evaluated reject rule")
 
 	return evaluationResults, nil
+}
+
+// invalidateTimeRangeCaches drops every cached time range calculation of a server, and the drop infos they are
+// derived from.
+func invalidateTimeRangeCaches(server string) {
+	cache.TimeRanges.Delete(server)
+	cache.TimeRangesMap.Delete(server)
+	cache.MaxAccumulableTimeRanges.Delete(server)
+	cache.AllMaxAccumulableTimeRanges.Delete(server)
+	cache.LatestTimeRanges.Delete(server)
+	cache.DropInfosByServer.Delete(server)
 }
