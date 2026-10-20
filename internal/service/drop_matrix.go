@@ -28,6 +28,7 @@ type DropMatrix struct {
 	DropMatrixElementService *DropMatrixElement
 	StageService             *Stage
 	ItemService              *Item
+	SiteStatsService         *SiteStats
 }
 
 func NewDropMatrix(
@@ -38,6 +39,7 @@ func NewDropMatrix(
 	dropMatrixElementService *DropMatrixElement,
 	stageService *Stage,
 	itemService *Item,
+	siteStatsService *SiteStats,
 ) *DropMatrix {
 	return &DropMatrix{
 		Config:                   config,
@@ -47,6 +49,7 @@ func NewDropMatrix(
 		DropMatrixElementService: dropMatrixElementService,
 		StageService:             stageService,
 		ItemService:              itemService,
+		SiteStatsService:         siteStatsService,
 	}
 }
 
@@ -156,7 +159,7 @@ func (s *DropMatrix) UpdateDropMatrixByGivenDate(ctx context.Context, server str
 		s.DropMatrixElementService.BatchSaveElements(ctx, dropMatrixElements, server)
 	}
 	// the day may be one of those the site stats keep aggregated in memory
-	return cache.SiteStatsBase.Delete(server)
+	return s.SiteStatsService.InvalidateSiteStatsBase(ctx, server)
 }
 
 /**
