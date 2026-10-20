@@ -142,10 +142,16 @@ func (r *DropReport) CalcDropMatrixForIntervalsBySourceCategories(
 	// interval boundaries in seconds, as handleCreatedAtWithTime compares them
 	boundarySet := make(map[int64]struct{})
 	stageIdSet := make(map[int]struct{})
+	// an interval without stage filter needs every stage
+	allStages := false
 	for _, queryCtx := range queryCtxs {
 		boundarySet[queryCtx.StartTime.Unix()] = struct{}{}
 		boundarySet[queryCtx.EndTime.Unix()] = struct{}{}
-		for _, stageId := range queryCtx.GetStageIds() {
+		intervalStageIds := queryCtx.GetStageIds()
+		if len(intervalStageIds) == 0 {
+			allStages = true
+		}
+		for _, stageId := range intervalStageIds {
 			stageIdSet[stageId] = struct{}{}
 		}
 	}
@@ -162,8 +168,10 @@ func (r *DropReport) CalcDropMatrixForIntervalsBySourceCategories(
 		segmentByBoundary[boundary] = i + 1
 	}
 	stageIds := make([]int, 0, len(stageIdSet))
-	for stageId := range stageIdSet {
-		stageIds = append(stageIds, stageId)
+	if !allStages {
+		for stageId := range stageIdSet {
+			stageIds = append(stageIds, stageId)
+		}
 	}
 	first, last := thresholds[0], thresholds[len(thresholds)-1]
 

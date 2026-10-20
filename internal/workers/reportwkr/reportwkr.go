@@ -130,9 +130,11 @@ func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
 	}
 
 	start := time.Now()
-	defer observability.ReportConsumeDuration.
-		WithLabelValues().
-		Observe(time.Since(start).Seconds())
+	defer func() {
+		observability.ReportConsumeDuration.
+			WithLabelValues().
+			Observe(time.Since(start).Seconds())
+	}()
 
 	metadata, err := msg.Metadata()
 	if err != nil {
