@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-redsync/redsync/v4"
 	redsyncredis "github.com/go-redsync/redsync/v4/redis"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -32,13 +31,15 @@ func (lockedConn) PTTL(string) (time.Duration, error) { return time.Minute, nil 
 func (lockedConn) Close() error                       { return nil }
 
 func TestMicrotaskTracesItsWorkUnderTheCallersSpan(t *testing.T) {
+	// the package tracer delegates to the first global provider only, so swap the tracer itself
 	recorder := tracetest.NewSpanRecorder()
-	previous := otel.GetTracerProvider()
-	otel.SetTracerProvider(tracesdk.NewTracerProvider(tracesdk.WithSpanProcessor(recorder)))
-	t.Cleanup(func() { otel.SetTracerProvider(previous) })
+	provider := tracesdk.NewTracerProvider(tracesdk.WithSpanProcessor(recorder))
+	previous := tracer
+	tracer = provider.Tracer("calcwkr")
+	t.Cleanup(func() { tracer = previous })
 
 	w := &Worker{syncMutex: redsync.New(lockedPool{}).NewMutex("mutex:calcwkr:test")}
-	ctx, parent := otel.Tracer("test").Start(context.Background(), "calcwkr.server")
+	ctx, parent := provider.Tracer("test").Start(context.Background(), "calcwkr.server")
 
 	var jobSpan trace.SpanContext
 	if err := w.microtask(ctx, "dropMatrix", "CN", func(ctx context.Context) error {
