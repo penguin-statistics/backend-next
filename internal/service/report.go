@@ -355,12 +355,16 @@ func (s *Report) RecallSingularReport(ctx context.Context, req *types.SingularRe
 		return err
 	}
 
-	err = s.DropReportRepo.DeleteDropReport(ctx, reportId)
+	rowsAffected, err := s.DropReportRepo.DeleteDropReport(ctx, reportId)
 	if err != nil {
 		return err
 	}
+	if rowsAffected == 0 {
+		// the key names no stored report: tell the client, and leave the key as it is
+		return ErrReportNotFound
+	}
 
-	s.Redis.Del(ctx, req.ReportHash)
+	s.Redis.Del(ctx, constant.ReportRedisPrefix+req.ReportHash)
 
 	return nil
 }
