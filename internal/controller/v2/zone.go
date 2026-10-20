@@ -1,14 +1,10 @@
 package v2
 
 import (
-	"time"
-
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
-	"exusiai.dev/backend-next/internal/pkg/cachectrl"
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
 )
@@ -33,16 +29,12 @@ func RegisterZone(v2 *svr.V2, c Zone) {
 //	@Failure	500	{object}	pgerr.PenguinError	"An unexpected error occurred"
 //	@Router		/PenguinStats/api/v2/zones [GET]
 func (c *Zone) GetZones(ctx *fiber.Ctx) error {
+	lastModified := lastModifiedTime("[shimZones]")
 	zones, err := c.ZoneService.GetShimZones(ctx.UserContext())
 	if err != nil {
 		return err
 	}
-	var lastModifiedTime time.Time
-	if err := cache.LastModifiedTime.Get("[shimZones]", &lastModifiedTime); err != nil {
-		lastModifiedTime = time.Now()
-	}
-	cachectrl.OptIn(ctx, lastModifiedTime)
-	return ctx.JSON(zones)
+	return sendCacheable(ctx, lastModified, zones)
 }
 
 //	@Summary	Get a Zone with ID

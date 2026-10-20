@@ -1,14 +1,10 @@
 package v2
 
 import (
-	"time"
-
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
-	"exusiai.dev/backend-next/internal/pkg/cachectrl"
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
 )
@@ -30,15 +26,11 @@ func RegisterEventPeriod(v2 *svr.V2, c EventPeriod) {
 //	@Failure	500	{object}	pgerr.PenguinError	"An unexpected error occurred"
 //	@Router		/PenguinStats/api/v2/period [GET]
 func (c *EventPeriod) GetEventPeriods(ctx *fiber.Ctx) (err error) {
+	lastModified := lastModifiedTime("[shimActivities]")
 	var activities []*modelv2.Activity
 	activities, err = c.ActivityService.GetShimActivities(ctx.UserContext())
 	if err != nil {
 		return err
 	}
-	var lastModifiedTime time.Time
-	if err := cache.LastModifiedTime.Get("[shimActivities]", &lastModifiedTime); err != nil {
-		lastModifiedTime = time.Now()
-	}
-	cachectrl.OptIn(ctx, lastModifiedTime)
-	return ctx.JSON(activities)
+	return sendCacheable(ctx, lastModified, activities)
 }

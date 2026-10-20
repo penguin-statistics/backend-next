@@ -1,14 +1,10 @@
 package v2
 
 import (
-	"time"
-
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
-	"exusiai.dev/backend-next/internal/pkg/cachectrl"
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
@@ -40,16 +36,11 @@ func (c *SiteStats) GetSiteStats(ctx *fiber.Ctx) error {
 		return err
 	}
 
+	lastModified := lastModifiedTime("[shimSiteStats#server:" + server + "]")
 	siteStats, err := c.SiteStatsService.GetShimSiteStats(ctx.UserContext(), server)
 	if err != nil {
 		return err
 	}
 
-	var lastModifiedTime time.Time
-	if err := cache.LastModifiedTime.Get("[shimSiteStats#server:"+server+"]", &lastModifiedTime); err != nil {
-		lastModifiedTime = time.Now()
-	}
-	cachectrl.OptIn(ctx, lastModifiedTime)
-
-	return ctx.JSON(siteStats)
+	return sendCacheable(ctx, lastModified, siteStats)
 }

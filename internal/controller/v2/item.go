@@ -1,14 +1,10 @@
 package v2
 
 import (
-	"time"
-
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
-	"exusiai.dev/backend-next/internal/pkg/cachectrl"
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
 )
@@ -33,16 +29,12 @@ func RegisterItem(v2 *svr.V2, c Item) {
 //	@Failure	500	{object}	pgerr.PenguinError	"An unexpected error occurred"
 //	@Router		/PenguinStats/api/v2/items [GET]
 func (c *Item) GetItems(ctx *fiber.Ctx) error {
+	lastModified := lastModifiedTime("[shimItems]")
 	items, err := c.ItemService.GetShimItems(ctx.UserContext())
 	if err != nil {
 		return err
 	}
-	var lastModifiedTime time.Time
-	if err := cache.LastModifiedTime.Get("[shimItems]", &lastModifiedTime); err != nil {
-		lastModifiedTime = time.Now()
-	}
-	cachectrl.OptIn(ctx, lastModifiedTime)
-	return ctx.JSON(items)
+	return sendCacheable(ctx, lastModified, items)
 }
 
 //	@Summary	Get an Item with ID
