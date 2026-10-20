@@ -41,12 +41,8 @@ func (c *Meta) BinInfo(ctx *fiber.Ctx) error {
 	})
 }
 
+// Health is the readiness probe. It answers 200 whenever the process serves HTTP, even while a dependency is down
+// (they are shared by all replicas), and reports the state of the dependencies in the body.
 func (c *Meta) Health(ctx *fiber.Ctx) error {
-	if err := c.HealthService.Ping(ctx.UserContext()); err != nil {
-		return err
-	}
-
-	return ctx.JSON(fiber.Map{
-		"status": "ok",
-	})
+	return ctx.JSON(c.HealthService.Check(ctx.UserContext()))
 }
