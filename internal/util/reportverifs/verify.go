@@ -19,9 +19,8 @@ type Verifier interface {
 
 type ReportVerifiers []Verifier
 
-func NewReportVerifier(userVerifier *UserVerifier, dropVerifier *DropVerifier, md5Verifier *MD5Verifier, rejectRuleVerifier *RejectRuleVerifier) *ReportVerifiers {
+func NewReportVerifier(dropVerifier *DropVerifier, md5Verifier *MD5Verifier, rejectRuleVerifier *RejectRuleVerifier) *ReportVerifiers {
 	return &ReportVerifiers{
-		userVerifier,
 		md5Verifier,
 		dropVerifier,
 		rejectRuleVerifier,
