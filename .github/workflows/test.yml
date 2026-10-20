@@ -52,6 +52,13 @@ jobs:
           # the toolchain the Dockerfile builds with
           go-version: "1.24.5"
 
+      # disposable NATS with JetStream for the report consumer tests (internal/workers/reportwkr/*_nats_test.go); not a
+      # service container, as those cannot pass the server its -js flag
+      - name: Start NATS
+        run: |
+          docker run -d --name nats -p 4222:4222 nats:2.10-alpine -js
+          timeout 30 sh -c 'until nc -z 127.0.0.1 4222; do sleep 1; done'
+
       - name: Vet
         run: |
           go vet ./...
@@ -62,4 +69,5 @@ jobs:
         env:
           PENGUIN_TEST_POSTGRES_DSN: postgres://postgres:test@127.0.0.1:5432/postgres?sslmode=disable
           PENGUIN_TEST_REDIS_URL: redis://127.0.0.1:6379/0
+          PENGUIN_TEST_NATS_URL: nats://127.0.0.1:4222
         run: go test -race -count=1 $(go list ./... | grep -v '/backend-next/test$')
