@@ -326,3 +326,60 @@ func TestLegacyStormWithIdempotentProcess(t *testing.T) {
 		t.Errorf("%d extras stored, want %d", n, published+1)
 	}
 }
+
+// TestCommitThenCrashBeforeAck processes a task and stops before acking it, as a process dying between the commit
+// and the Ack: the server delivers the message again after AckWait, and that copy is skipped and acked.
+func TestCommitThenCrashBeforeAck(t *testing.T) {
+	s := newTestStream(t)
+	w := newTestWorker(t)
+	duplicates := captureLogs(t)
+
+	// the consumer is reduced to fetching and acking by hand, to stop between the commit and the Ack
+	sub, err := s.js.PullSubscribe(s.subject, "crash", nats.AckWait(500*time.Millisecond))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = sub.Unsubscribe() })
+	fetch := func() *nats.Msg {
+		t.Helper()
+		msgs, err := sub.Fetch(1, nats.MaxWait(5*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return msgs[0]
+	}
+
+	task := newTestTask(t, w, testAccountID(), time.UnixMicro(1760600000123456), "203.0.113.7", testReport("main_01-07", 30012))
+	if _, err := s.js.Publish(s.publish, task); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := processTask(t, w, fetch().Data); err != nil {
+		t.Fatal(err)
+	}
+	// the process dies here: no Ack, no Nak
+
+	msg := fetch()
+	if md, err := msg.Metadata(); err != nil {
+		t.Fatal(err)
+	} else if md.NumDelivered != 2 {
+		t.Errorf("delivered %d times, want 2", md.NumDelivered)
+	}
+	if err := processTask(t, w, msg.Data); err != nil {
+		t.Fatal(err)
+	}
+	if err := msg.AckSync(); err != nil {
+		t.Fatal(err)
+	}
+
+	s.waitEmpty(t, "crash", 5*time.Second)
+	if n := duplicates("reportwkr.duplicate"); n != 1 {
+		t.Errorf("%d copies skipped, want 1", n)
+	}
+	if n := countRows(t, w.DB, "drop_reports"); n != 1 {
+		t.Errorf("%d reports stored, want 1", n)
+	}
+	if n := countRows(t, w.DB, "drop_report_extras"); n != 1 {
+		t.Errorf("%d extras stored, want 1", n)
+	}
+}
