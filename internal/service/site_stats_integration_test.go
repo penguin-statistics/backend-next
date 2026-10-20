@@ -1,0 +1,257 @@
+package service
+
+import (
+	"context"
+	"fmt"
+	"math/rand"
+	"sort"
+	"testing"
+	"time"
+
+	"exusiai.dev/gommon/constant"
+	"github.com/uptrace/bun"
+
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+	"exusiai.dev/backend-next/internal/repo"
+	"exusiai.dev/backend-next/internal/util"
+)
+
+// The site stats queries of v3.14.18, which aggregated every drop matrix element of a server on each refresh.
+
+func legacyCalcTotalItemQuantityForShimSiteStats(ctx context.Context, db *bun.DB, server string) ([]*modelv2.TotalItemQuantity, error) {
+	types := []string{constant.ItemTypeMaterial, constant.ItemTypeFurniture, constant.ItemTypeChip}
+
+	subq := db.NewSelect().
+		TableExpr("drop_matrix_elements").
+		Column("item_id").
+		ColumnExpr("SUM(quantity) AS total_quantity").
+		Where("server = ?", server).
+		Where("source_category = ?", constant.SourceCategoryAll).
+		Group("item_id")
+
+	mainq := db.NewSelect().
+		Table("items").
+		TableExpr("(?) AS subq", subq).
+		Column("ark_item_id", "total_quantity").
+		Where("subq.item_id = items.item_id").
+		Where("items.type IN (?)", bun.In(types))
+
+	results := make([]*modelv2.TotalItemQuantity, 0)
+	err := mainq.Scan(ctx, &results)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func legacyCalcTotalStageQuantityForShimSiteStats(ctx context.Context, db *bun.DB, server string) ([]*modelv2.TotalStageTime, error) {
+	results := make([]*modelv2.TotalStageTime, 0)
+	err := legacyGetStageTimesQuery(db, server, false).Scan(ctx, &results)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func legacyCalcTotalSanityCostForShimSiteStats(ctx context.Context, db *bun.DB, server string) (sanity int, err error) {
+	mainq := db.NewSelect().
+		TableExpr("(?) AS subq4", legacyGetStageTimesQuery(db, server, true)).
+		ColumnExpr("SUM(sanity * total_times) AS sanity")
+	mainq.Scan(ctx, &sanity)
+	return sanity, err
+}
+
+func legacyGetStageTimesQuery(db *bun.DB, server string, containsSanity bool) *bun.SelectQuery {
+	subq3 := db.NewSelect().
+		TableExpr("drop_matrix_elements").
+		Column("stage_id", "item_id", "times", "day_num").
+		Where("server = ?", server).
+		Where("source_category = ?", constant.SourceCategoryAll).
+		Where("times > 0")
+
+	subq2 := db.NewSelect().
+		TableExpr("(?) AS subq3", subq3).
+		Column("stage_id", "item_id", "times").
+		Group("stage_id", "item_id", "times", "day_num")
+
+	subq1 := db.NewSelect().
+		TableExpr("(?) AS subq2", subq2).
+		Column("stage_id").
+		ColumnExpr("sum(times) AS total_times").
+		Group("stage_id", "item_id")
+
+	mainq := db.NewSelect().
+		Table("stages").
+		TableExpr("(?) AS subq1", subq1)
+
+	if containsSanity {
+		mainq = mainq.Column("ark_stage_id", "sanity")
+	} else {
+		mainq = mainq.Column("ark_stage_id")
+	}
+
+	mainq.ColumnExpr("max(total_times) AS total_times").
+		Where("subq1.stage_id = stages.stage_id").
+		Where("ark_stage_id != ?", "recruit").
+		Where("extra_process_type IS NULL")
+
+	if containsSanity {
+		mainq = mainq.Group("ark_stage_id", "sanity")
+	} else {
+		mainq = mainq.Group("ark_stage_id")
+	}
+	return mainq
+}
+
+// seedSiteStatsData inserts stages (a recruit stage, a gacha box stage, one without sanity), items of the counted
+// and other types, and drop matrix elements of every server and source category on the days at dayOffsets from today.
+func seedSiteStatsData(t *testing.T, r *rand.Rand, db *bun.DB, today map[string]int, dayOffsets []int) {
+	t.Helper()
+	for stageId := 1; stageId <= 8; stageId++ {
+		arkStageId := fmt.Sprintf("main_%02d", stageId)
+		var extraProcessType, sanity interface{} = nil, 6 + stageId
+		switch stageId {
+		case 1:
+			arkStageId = constant.RecruitStageID
+		case 2:
+			extraProcessType = "GACHABOX"
+		case 3:
+			sanity = nil
+		}
+		mustExec(t, db, "INSERT INTO stages (stage_id, ark_stage_id, zone_id, stage_type, extra_process_type, sanity) VALUES (?, ?, 1, 'MAIN', ?, ?)",
+			stageId, arkStageId, extraProcessType, sanity)
+	}
+	itemTypes := []string{constant.ItemTypeMaterial, constant.ItemTypeFurniture, constant.ItemTypeChip, "CARD_EXP", "ACTIVITY_ITEM"}
+	for itemId := 10; itemId <= 19; itemId++ {
+		mustExec(t, db, "INSERT INTO items (item_id, ark_item_id, type) VALUES (?, ?, ?)", itemId, fmt.Sprintf("ark_%d", itemId), itemTypes[itemId%len(itemTypes)])
+	}
+	for _, dayOffset := range dayOffsets {
+		insertSiteStatsDay(t, r, db, today, dayOffset)
+	}
+}
+
+// insertSiteStatsDay inserts the drop matrix elements of the day at dayOffset from today (day numbers differ between
+// servers): per stage and time range one times value shared by the stage's items, as the worker writes them,
+// including times = 0 elements.
+func insertSiteStatsDay(t *testing.T, r *rand.Rand, db *bun.DB, today map[string]int, dayOffset int) {
+	t.Helper()
+	for _, server := range testServers {
+		dayNum := today[server] + dayOffset
+		for stageId := 1; stageId <= 8; stageId++ {
+			if r.Intn(5) == 0 {
+				continue
+			}
+			for timeRange := 0; timeRange < 1+r.Intn(2); timeRange++ {
+				times := r.Intn(5) * 7
+				for itemId := 10; itemId <= 19; itemId++ {
+					if r.Intn(2) == 0 {
+						continue
+					}
+					for _, sourceCategory := range []string{constant.SourceCategoryAll, constant.SourceCategoryManual, constant.SourceCategoryAutomated} {
+						mustExec(t, db, `INSERT INTO drop_matrix_elements (stage_id, item_id, quantity, times, server, source_category, day_num)
+							VALUES (?, ?, ?, ?, ?, ?, ?)`, stageId, itemId, r.Intn(40), times, server, sourceCategory, dayNum)
+					}
+				}
+			}
+		}
+	}
+}
+
+func siteStatsLines(stats *modelv2.SiteStats) []string {
+	lines := []string{fmt.Sprintf("sanity|%d", stats.TotalSanityCost)}
+	for _, stageTime := range stats.TotalStageTimes {
+		lines = append(lines, fmt.Sprintf("stage|%s|%d", stageTime.StageID, stageTime.Times))
+	}
+	for _, itemQuantity := range stats.TotalItemQuantities {
+		lines = append(lines, fmt.Sprintf("item|%s|%d", itemQuantity.ItemID, itemQuantity.Quantity))
+	}
+	sort.Strings(lines)
+	return lines
+}
+
+func legacySiteStatsLines(t *testing.T, db *bun.DB, server string) []string {
+	t.Helper()
+	ctx := context.Background()
+	stageTimes, err := legacyCalcTotalStageQuantityForShimSiteStats(ctx, db, server)
+	if err != nil {
+		t.Fatal(err)
+	}
+	itemQuantities, err := legacyCalcTotalItemQuantityForShimSiteStats(ctx, db, server)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sanity, err := legacyCalcTotalSanityCostForShimSiteStats(ctx, db, server)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return siteStatsLines(&modelv2.SiteStats{TotalStageTimes: stageTimes, TotalItemQuantities: itemQuantities, TotalSanityCost: sanity})
+}
+
+func TestRefreshShimSiteStatsMatchesLegacy(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+	r := rand.New(rand.NewSource(1))
+	flushCaches(t)
+
+	now := time.Date(2026, 10, 19, 14, 0, 0, 0, time.UTC)
+	util.Now = func() time.Time { return now }
+	t.Cleanup(func() { util.Now = time.Now })
+	today := make(map[string]int)
+	for _, server := range testServers {
+		today[server] = util.GetDayNum(&now, server)
+	}
+	seedSiteStatsData(t, r, db, today, []int{-6, -3, -2, -1, 0})
+
+	generations := &memorySiteStatsBaseGenerations{}
+	s := &SiteStats{
+		DropReportService:        NewDropReport(repo.NewDropReport(db)),
+		DropMatrixElementService: NewDropMatrixElement(repo.NewDropMatrixElement(db)),
+		StageService:             NewStage(repo.NewStage(db)),
+		ItemService:              NewItem(repo.NewItem(db)),
+		baseGenerations:          generations,
+	}
+	compared := 0
+	check := func(what string) {
+		t.Helper()
+		for _, server := range testServers {
+			stats, err := s.RefreshShimSiteStats(ctx, server)
+			if err != nil {
+				t.Fatal(err)
+			}
+			compared += assertSameLines(t, what+" "+server, legacySiteStatsLines(t, db, server), siteStatsLines(stats))
+			cached, err := s.GetShimSiteStats(ctx, server)
+			if err != nil {
+				t.Fatal(err)
+			}
+			compared += assertSameLines(t, what+" "+server+" cached", siteStatsLines(stats), siteStatsLines(cached))
+		}
+	}
+
+	check("first refresh")
+	// a batch rewrites today and yesterday; the base of the days before is reused
+	for _, server := range testServers {
+		mustExec(t, db, "DELETE FROM drop_matrix_elements WHERE server = ? AND day_num >= ?", server, today[server]-1)
+	}
+	insertSiteStatsDay(t, r, db, today, -1)
+	insertSiteStatsDay(t, r, db, today, 0)
+	check("after a batch")
+
+	// an admin recalculation of a past day invalidates the base
+	for _, server := range testServers {
+		mustExec(t, db, "DELETE FROM drop_matrix_elements WHERE server = ? AND day_num = ?", server, today[server]-3)
+	}
+	insertSiteStatsDay(t, r, db, today, -3)
+	for _, server := range testServers {
+		if err := s.InvalidateSiteStatsBase(ctx, server); err != nil {
+			t.Fatal(err)
+		}
+	}
+	check("after a recalculation of a past day")
+
+	// the next day: the day before yesterday moves into the base
+	now = now.Add(24 * time.Hour)
+	insertSiteStatsDay(t, r, db, today, 1)
+	check("on the next day")
+
+	requireCompared(t, compared, 100)
+}
