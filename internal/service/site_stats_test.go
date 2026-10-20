@@ -1,12 +1,15 @@
 package service
 
 import (
+	"context"
+	"sync"
 	"testing"
 
 	"exusiai.dev/gommon/constant"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model/cache"
 )
 
 func TestMergeSiteStatsAggregates(t *testing.T) {
@@ -91,5 +94,94 @@ func TestCalcItemQuantitiesForShimSiteStats(t *testing.T) {
 	want := map[string]int{"30012": 10, "furni": 0}
 	if len(got) != len(want) || got["30012"] != 10 || got["furni"] != 0 {
 		t.Errorf("got item quantities %v, want %v", got, want)
+	}
+}
+
+// memorySiteStatsBaseGenerations stands in for the generations shared through Redis.
+type memorySiteStatsBaseGenerations struct {
+	mu          sync.Mutex
+	generations map[string]int64
+}
+
+func (g *memorySiteStatsBaseGenerations) Get(_ context.Context, server string) (int64, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.generations[server], nil
+}
+
+func (g *memorySiteStatsBaseGenerations) Incr(_ context.Context, server string) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.generations == nil {
+		g.generations = make(map[string]int64)
+	}
+	g.generations[server]++
+	return nil
+}
+
+func aggregatesWithTimes(times int64) []*model.SiteStatsAggregate {
+	return []*model.SiteStatsAggregate{{StageID: 1, ItemID: 10, Times: null.IntFrom(times)}}
+}
+
+func TestSiteStatsBaseIsNotReusedAfterARecalculationDuringItsRebuild(t *testing.T) {
+	cache.Initialize()
+	cache.SiteStatsBase.Flush()
+	ctx := context.Background()
+	s := &SiteStats{baseGenerations: &memorySiteStatsBaseGenerations{}}
+
+	// a rebuild reads the old rows, then an admin recalculation rewrites them and invalidates before the rebuild
+	// publishes its result
+	got, err := s.loadSiteStatsBase(ctx, "CN", 100, func() ([]*model.SiteStatsAggregate, error) {
+		old := aggregatesWithTimes(1)
+		if err := s.InvalidateSiteStatsBase(ctx, "CN"); err != nil {
+			t.Fatal(err)
+		}
+		return old, nil
+	})
+	if err != nil || got[0].Times.Int64 != 1 {
+		t.Fatalf("rebuild: got %v, %v", got, err)
+	}
+
+	// the next refresh must not reuse what the overlapped rebuild published
+	got, err = s.loadSiteStatsBase(ctx, "CN", 100, func() ([]*model.SiteStatsAggregate, error) {
+		return aggregatesWithTimes(2), nil
+	})
+	if err != nil || got[0].Times.Int64 != 2 {
+		t.Fatalf("refresh after the recalculation: got times %d, want 2 (%v)", got[0].Times.Int64, err)
+	}
+}
+
+func TestSiteStatsBaseIsInvalidatedAcrossProcesses(t *testing.T) {
+	cache.Initialize()
+	cache.SiteStatsBase.Flush()
+	ctx := context.Background()
+	shared := &memorySiteStatsBaseGenerations{}
+	worker := &SiteStats{baseGenerations: shared}
+
+	if _, err := worker.loadSiteStatsBase(ctx, "CN", 100, func() ([]*model.SiteStatsAggregate, error) {
+		return aggregatesWithTimes(1), nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// reused while nothing changed
+	calculated := false
+	if _, err := worker.loadSiteStatsBase(ctx, "CN", 100, func() ([]*model.SiteStatsAggregate, error) {
+		calculated = true
+		return aggregatesWithTimes(1), nil
+	}); err != nil || calculated {
+		t.Fatalf("base was recalculated without an invalidation (%v)", err)
+	}
+
+	// another process recalculates a past day: it cannot reach the worker's in-memory cache, only the shared
+	// generation
+	if err := shared.Incr(ctx, "CN"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := worker.loadSiteStatsBase(ctx, "CN", 100, func() ([]*model.SiteStatsAggregate, error) {
+		return aggregatesWithTimes(2), nil
+	})
+	if err != nil || got[0].Times.Int64 != 2 {
+		t.Fatalf("worker after another process's recalculation: got times %d, want 2 (%v)", got[0].Times.Int64, err)
 	}
 }

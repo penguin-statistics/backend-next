@@ -38,8 +38,9 @@ func (a *SiteStatsAggregate) Add(other *SiteStatsAggregate) {
 	a.Quantity += other.Quantity
 }
 
-// SiteStatsBase holds the site stats aggregates of every day before BeforeDayNum.
+// SiteStatsBase holds the site stats aggregates of every day before BeforeDayNum, as of invalidation Generation.
 type SiteStatsBase struct {
 	BeforeDayNum int
+	Generation   int64
 	Aggregates   []*SiteStatsAggregate
 }

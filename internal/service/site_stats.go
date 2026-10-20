@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"exusiai.dev/gommon/constant"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/guregu/null.v3"
 
@@ -19,6 +21,8 @@ type SiteStats struct {
 	DropMatrixElementService *DropMatrixElement
 	StageService             *Stage
 	ItemService              *Item
+
+	baseGenerations siteStatsBaseGenerations
 }
 
 func NewSiteStats(
@@ -26,12 +30,14 @@ func NewSiteStats(
 	dropMatrixElementService *DropMatrixElement,
 	stageService *Stage,
 	itemService *Item,
+	redisClient *redis.Client,
 ) *SiteStats {
 	return &SiteStats{
 		DropReportService:        dropReportService,
 		DropMatrixElementService: dropMatrixElementService,
 		StageService:             stageService,
 		ItemService:              itemService,
+		baseGenerations:          redisSiteStatsBaseGenerations{redisClient},
 	}
 }
 
@@ -100,20 +106,70 @@ func (s *SiteStats) RefreshShimSiteStats(ctx context.Context, server string) (*m
 	return &results, nil
 }
 
-// Cache: siteStatsBase#server:{server}, 6 hrs, recalculated when the day changes
+// Cache: siteStatsBase#server:{server}, 6 hrs, recalculated when the day changes or the base is invalidated
 // getSiteStatsBaseAggregates returns the site stats aggregates of every day before beforeDayNum. Those days are
-// only rewritten by an admin recalculation, which drops this cache.
+// only rewritten by an admin recalculation, which calls InvalidateSiteStatsBase.
 func (s *SiteStats) getSiteStatsBaseAggregates(ctx context.Context, server string, beforeDayNum int) ([]*model.SiteStatsAggregate, error) {
-	var base model.SiteStatsBase
-	if err := cache.SiteStatsBase.Get(server, &base); err == nil && base.BeforeDayNum == beforeDayNum {
-		return base.Aggregates, nil
-	}
-	aggregates, err := s.DropMatrixElementService.CalcSiteStatsAggregates(ctx, server, null.Int{}, null.IntFrom(int64(beforeDayNum)))
+	return s.loadSiteStatsBase(ctx, server, beforeDayNum, func() ([]*model.SiteStatsAggregate, error) {
+		return s.DropMatrixElementService.CalcSiteStatsAggregates(ctx, server, null.Int{}, null.IntFrom(int64(beforeDayNum)))
+	})
+}
+
+func (s *SiteStats) loadSiteStatsBase(
+	ctx context.Context, server string, beforeDayNum int, calc func() ([]*model.SiteStatsAggregate, error),
+) ([]*model.SiteStatsAggregate, error) {
+	// read the generation before calculating: if past days are rewritten meanwhile, the base is cached under an
+	// outdated generation and not reused
+	generation, err := s.baseGenerations.Get(ctx, server)
 	if err != nil {
 		return nil, err
 	}
-	cache.SiteStatsBase.Set(server, model.SiteStatsBase{BeforeDayNum: beforeDayNum, Aggregates: aggregates}, 6*time.Hour)
+	var base model.SiteStatsBase
+	if err := cache.SiteStatsBase.Get(server, &base); err == nil && base.BeforeDayNum == beforeDayNum && base.Generation == generation {
+		return base.Aggregates, nil
+	}
+	aggregates, err := calc()
+	if err != nil {
+		return nil, err
+	}
+	cache.SiteStatsBase.Set(server, model.SiteStatsBase{BeforeDayNum: beforeDayNum, Generation: generation, Aggregates: aggregates}, 6*time.Hour)
 	return aggregates, nil
+}
+
+// InvalidateSiteStatsBase must be called after drop matrix elements of a past day of a server have been rewritten:
+// every process, including those calculating a base right now, then recalculates its base.
+func (s *SiteStats) InvalidateSiteStatsBase(ctx context.Context, server string) error {
+	if err := s.baseGenerations.Incr(ctx, server); err != nil {
+		return err
+	}
+	return cache.SiteStatsBase.Delete(server)
+}
+
+// siteStatsBaseGenerations counts the invalidations of the site stats base of every server, shared by all
+// processes.
+type siteStatsBaseGenerations interface {
+	Get(ctx context.Context, server string) (int64, error)
+	Incr(ctx context.Context, server string) error
+}
+
+type redisSiteStatsBaseGenerations struct {
+	client *redis.Client
+}
+
+func siteStatsBaseGenerationKey(server string) string {
+	return "siteStatsBase:generation:" + server
+}
+
+func (g redisSiteStatsBaseGenerations) Get(ctx context.Context, server string) (int64, error) {
+	generation, err := g.client.Get(ctx, siteStatsBaseGenerationKey(server)).Int64()
+	if errors.Is(err, redis.Nil) {
+		return 0, nil
+	}
+	return generation, err
+}
+
+func (g redisSiteStatsBaseGenerations) Incr(ctx context.Context, server string) error {
+	return g.client.Incr(ctx, siteStatsBaseGenerationKey(server)).Err()
 }
 
 // mergeSiteStatsAggregates adds up aggregates of disjoint day ranges per stage and item, without modifying them.
