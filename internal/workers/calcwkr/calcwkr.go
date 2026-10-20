@@ -101,46 +101,49 @@ func (w *Worker) checkConfig() {
 }
 
 func (w *Worker) doMainCalc(sourceCategories []string) {
-	w.task(context.Background(), WorkerCalcTypeStatsCalc, func(ctx context.Context, server string) error {
-		var err error
+	w.task(context.Background(), WorkerCalcTypeStatsCalc, w.calcStats)
+}
 
-		// DropMatrixService
-		if err = w.microtask(ctx, "dropMatrix", server, func() error {
-			return w.DropMatrixService.RunCalcDropMatrixJob(ctx, server)
+// calcStats runs every stats calculation of a single server.
+func (w *Worker) calcStats(ctx context.Context, server string) error {
+	var err error
+
+	// DropMatrixService
+	if err = w.microtask(ctx, "dropMatrix", server, func() error {
+		return w.DropMatrixService.RunCalcDropMatrixJob(ctx, server)
+	}); err != nil {
+		return err
+	}
+	time.Sleep(w.sep)
+
+	// PatternMatrixService
+	if err = w.microtask(ctx, "patternMatrix", server, func() error {
+		return w.PatternMatrixService.RunCalcPatternMatrixJob(ctx, server)
+	}); err != nil {
+		return err
+	}
+	time.Sleep(w.sep)
+
+	// SiteStatsService
+	if err = w.microtask(ctx, "siteStats", server, func() error {
+		_, err := w.SiteStatsService.RefreshShimSiteStats(ctx, server)
+		return err
+	}); err != nil {
+		return err
+	}
+
+	// server == "CN": we only run archive job on a singular server
+	if w.Config.DropReportArchiveEnabled && server == "CN" {
+		// Archive
+		if err = w.microtask(ctx, "archive", server, func() error {
+			err := w.ArchiveService.ArchiveByGlobalConfig(ctx)
+			return err
 		}); err != nil {
 			return err
 		}
-		time.Sleep(w.sep)
+	}
 
-		// PatternMatrixService
-		if err = w.microtask(ctx, "patternMatrix", server, func() error {
-			return w.PatternMatrixService.RunCalcPatternMatrixJob(ctx, server)
-		}); err != nil {
-			return err
-		}
-		time.Sleep(w.sep)
-
-		// SiteStatsService
-		if err = w.microtask(ctx, "siteStats", server, func() error {
-			_, err := w.SiteStatsService.RefreshShimSiteStats(ctx, server)
-			return err
-		}); err != nil {
-			return err
-		}
-
-		// server == "CN": we only run archive job on a singular server
-		if w.Config.DropReportArchiveEnabled && server == "CN" {
-			// Archive
-			if err = w.microtask(ctx, "archive", server, func() error {
-				err := w.ArchiveService.ArchiveByGlobalConfig(ctx)
-				return err
-			}); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
+	return nil
 }
 
 func (w *Worker) lock() error {
@@ -198,14 +201,7 @@ func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 
 				errChan := make(chan error)
 				go func() {
-					for _, server := range constant.Servers {
-						err := f(ctx, server)
-						if err != nil {
-							errChan <- err
-							return
-						}
-					}
-					errChan <- nil
+					errChan <- runForAllServers(ctx, f)
 				}()
 
 				select {
@@ -227,6 +223,16 @@ func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 			}()
 		}
 	}()
+}
+
+// runForAllServers runs f for every server, stopping at the first error.
+func runForAllServers(ctx context.Context, f func(ctx context.Context, server string) error) error {
+	for _, server := range constant.Servers {
+		if err := f(ctx, server); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (w *Worker) microtask(ctx context.Context, service, server string, f func() error) error {

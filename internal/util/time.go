@@ -6,6 +6,10 @@ import (
 	"exusiai.dev/gommon/constant"
 )
 
+// Now is the clock used by the stats calculation jobs. Overridden only by the workerbench harness
+// to make worker runs reproducible.
+var Now = time.Now
+
 // floor to 12am of the day of the given time and given server
 func GetDayStartTime(t *time.Time, server string) int64 {
 	loc := constant.LocMap[server]
