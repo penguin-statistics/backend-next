@@ -45,15 +45,7 @@ func NewTrend(
 // Called by frontend, only for global
 func (s *Trend) GetShimTrend(ctx context.Context, server string) (*modelv2.TrendQueryResult, error) {
 	valueFunc := func() (*modelv2.TrendQueryResult, error) {
-		queryResult, err := s.calcTrendFromDropMatrixElements(ctx, server)
-		if err != nil {
-			return nil, err
-		}
-		slowShimResult, err := s.applyShimForTrendQuery(ctx, queryResult, nil)
-		if err != nil {
-			return nil, err
-		}
-		return slowShimResult, nil
+		return s.calcShimTrend(ctx, server)
 	}
 
 	var shimResult modelv2.TrendQueryResult
@@ -63,6 +55,30 @@ func (s *Trend) GetShimTrend(ctx context.Context, server string) (*modelv2.Trend
 		return nil, err
 	}
 	return &shimResult, nil
+}
+
+// RefreshShimTrend recalculates the trend of server from the drop matrix elements and replaces the cached one.
+// Requests keep getting the previous one in the meantime instead of waiting for a recalculation. If the
+// recalculation fails, the cached one is dropped. The trend is cached while its last modified time is recorded, as
+// a request's calculation is (see cache.SetLastModifiedTime).
+func (s *Trend) RefreshShimTrend(ctx context.Context, server string) error {
+	shimResult, err := s.calcShimTrend(ctx, server)
+	if err != nil {
+		cache.ShimTrend.Delete(server)
+		return err
+	}
+	cache.SetLastModifiedTime("[shimTrend#server:"+server+"]", *shimResult, func() {
+		cache.ShimTrend.Set(server, *shimResult, 24*time.Hour)
+	})
+	return nil
+}
+
+func (s *Trend) calcShimTrend(ctx context.Context, server string) (*modelv2.TrendQueryResult, error) {
+	queryResult, err := s.calcTrendFromDropMatrixElements(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	return s.applyShimForTrendQuery(ctx, queryResult, nil)
 }
 
 func (s *Trend) calcTrendFromDropMatrixElements(ctx context.Context, server string) (*model.TrendQueryResult, error) {
