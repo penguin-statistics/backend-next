@@ -143,8 +143,10 @@ func (c *Result) GetDropMatrix(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	useCache := !accountId.Valid && stageFilterStr == "" && itemFilterStr == ""
-	if useCache {
+	useCache := stageFilterStr == "" && itemFilterStr == ""
+	if accountId.Valid {
+		cachectrl.OptOut(ctx)
+	} else if useCache {
 		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones) + constant.CacheSep + constant.SourceCategoryAll
 		var lastModifiedTime time.Time
 		if err := cache.LastModifiedTime.Get("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", &lastModifiedTime); err != nil {
@@ -194,7 +196,9 @@ func (c *Result) GetPatternMatrix(ctx *fiber.Ctx) error {
 		return err
 	}
 
-	if !accountId.Valid {
+	if accountId.Valid {
+		cachectrl.OptOut(ctx)
+	} else {
 		key := server + constant.CacheSep + constant.SourceCategoryAll + constant.CacheSep + strconv.FormatBool(showAllPatterns)
 		var lastModifiedTime time.Time
 		if err := cache.LastModifiedTime.Get("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:"+key+"]", &lastModifiedTime); err != nil {
