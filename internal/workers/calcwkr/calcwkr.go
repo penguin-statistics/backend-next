@@ -12,12 +12,20 @@ import (
 	"github.com/go-redsync/redsync/v4"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 	"golang.org/x/sync/errgroup"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/service"
 )
+
+// tracer traces every batch: calcwkr.batch > calcwkr.server > calcwkr.<microtask>, with the database queries of a
+// microtask below it. Spans named calcwkr.* are always sampled (see httpserver).
+var tracer = otel.Tracer("calcwkr")
 
 type WorkerDeps struct {
 	fx.In
@@ -111,11 +119,12 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 }
 
 // calcStats runs every stats calculation of a single server.
-func (w *Worker) calcStats(ctx context.Context, server string) error {
-	var err error
+func (w *Worker) calcStats(ctx context.Context, server string) (err error) {
+	ctx, span := tracer.Start(ctx, "calcwkr.server", trace.WithAttributes(attribute.String("server", server)))
+	defer func() { endSpan(span, err) }()
 
 	// DropMatrixService
-	if err = w.microtask(ctx, "dropMatrix", server, func() error {
+	if err = w.microtask(ctx, "dropMatrix", server, func(ctx context.Context) error {
 		return w.DropMatrixService.RunCalcDropMatrixJob(ctx, server)
 	}); err != nil {
 		return err
@@ -123,7 +132,7 @@ func (w *Worker) calcStats(ctx context.Context, server string) error {
 	time.Sleep(w.sep)
 
 	// PatternMatrixService
-	if err = w.microtask(ctx, "patternMatrix", server, func() error {
+	if err = w.microtask(ctx, "patternMatrix", server, func(ctx context.Context) error {
 		return w.PatternMatrixService.RunCalcPatternMatrixJob(ctx, server)
 	}); err != nil {
 		return err
@@ -131,7 +140,7 @@ func (w *Worker) calcStats(ctx context.Context, server string) error {
 	time.Sleep(w.sep)
 
 	// SiteStatsService
-	if err = w.microtask(ctx, "siteStats", server, func() error {
+	if err = w.microtask(ctx, "siteStats", server, func(ctx context.Context) error {
 		_, err := w.SiteStatsService.RefreshShimSiteStats(ctx, server)
 		return err
 	}); err != nil {
@@ -141,7 +150,7 @@ func (w *Worker) calcStats(ctx context.Context, server string) error {
 	// server == "CN": we only run archive job on a singular server
 	if w.Config.DropReportArchiveEnabled && server == "CN" {
 		// Archive
-		if err = w.microtask(ctx, "archive", server, func() error {
+		if err = w.microtask(ctx, "archive", server, func(ctx context.Context) error {
 			err := w.ArchiveService.ArchiveByGlobalConfig(ctx)
 			return err
 		}); err != nil {
@@ -202,26 +211,33 @@ func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 			log.Ctx(parentCtx).Info().Int("count", w.count).Msg("successfully acquired limiter lock")
 
 			ctx, cancel := context.WithTimeout(parentCtx, w.timeout)
+			ctx, span := tracer.Start(ctx, "calcwkr.batch", trace.WithAttributes(
+				attribute.String("type", string(typ)), attribute.Int("count", w.count)))
 
 			func() {
+				var batchErr error
 				defer func() {
+					endSpan(span, batchErr)
 					w.count++
 					cancel()
 					w.unlock()
 					time.Sleep(w.interval)
 				}()
 
-				errChan := make(chan error)
+				// buffered: after a timeout nobody receives, and the goroutine must not leak
+				errChan := make(chan error, 1)
 				go func() {
 					errChan <- runForAllServers(ctx, f)
 				}()
 
 				select {
 				case <-ctx.Done():
+					batchErr = ctx.Err()
 					log.Ctx(ctx).Error().Int("count", w.count).Err(ctx.Err()).Msg("worker timeout reached")
 					return
 				case err := <-errChan:
 					if err != nil {
+						batchErr = err
 						log.Ctx(ctx).Error().Int("count", w.count).Err(err).Msg("worker unexpected error occurred while running batch")
 						return
 					}
@@ -265,7 +281,10 @@ func runForAllServers(ctx context.Context, f func(ctx context.Context, server st
 	return eg.Wait()
 }
 
-func (w *Worker) microtask(ctx context.Context, service, server string, f func() error) error {
+func (w *Worker) microtask(ctx context.Context, service, server string, f func(ctx context.Context) error) (err error) {
+	ctx, span := tracer.Start(ctx, "calcwkr."+service, trace.WithAttributes(attribute.String("server", server)))
+	defer func() { endSpan(span, err) }()
+
 	mutexNotifierTicker := time.NewTicker(time.Second * 10)
 	defer func() {
 		mutexNotifierTicker.Stop()
@@ -284,7 +303,7 @@ func (w *Worker) microtask(ctx context.Context, service, server string, f func()
 	}()
 
 	log.Ctx(ctx).Info().Str("evt.name", "worker.calcwkr."+service).Str("server", server).Msg("worker microtask started calculating")
-	if err := observeCalcDuration(service, server, f); err != nil {
+	if err := observeCalcDuration(service, server, func() error { return f(ctx) }); err != nil {
 		log.Ctx(ctx).Error().Str("evt.name", "worker.calcwkr."+service).Str("server", server).Err(err).Msg("worker microtask failed")
 		return err
 	}
@@ -330,4 +349,15 @@ func (w *Worker) heartbeat(typ WorkerCalcType) {
 
 func (w *Worker) Count() int {
 	return w.count
+}
+
+// endSpan ends span with the status of the work it covered.
+func endSpan(span trace.Span, err error) {
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	} else {
+		span.SetStatus(codes.Ok, "")
+	}
+	span.End()
 }
