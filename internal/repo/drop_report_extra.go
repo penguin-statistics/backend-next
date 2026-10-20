@@ -70,21 +70,6 @@ func (c *DropReportExtra) DeleteDropReportExtrasForArchive(ctx context.Context, 
 	return r.RowsAffected()
 }
 
-func (c *DropReportExtra) IsDropReportExtraMD5Exist(ctx context.Context, md5 string) bool {
-	var dropReportExtra model.DropReportExtra
-
-	err := c.db.NewSelect().
-		Model(&dropReportExtra).
-		Where("md5 = ?", md5).
-		Limit(1).
-		Scan(ctx)
-	if err != nil {
-		return false
-	}
-
-	return true
-}
-
 func (r *DropReportExtra) CreateDropReportExtra(ctx context.Context, tx bun.Tx, report *model.DropReportExtra) error {
 	_, err := tx.NewInsert().
 		Model(report).
