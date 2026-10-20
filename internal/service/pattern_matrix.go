@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"time"
 
@@ -131,18 +132,52 @@ func (s *PatternMatrix) RunCalcPatternMatrixJob(ctx context.Context, server stri
 		}
 	}
 
+	// the global pattern matrices are replaced by RefreshGlobalPatternMatrixCaches, not dropped: requests keep
+	// getting the previous ones while new ones are calculated
+	return nil
+}
+
+// RefreshGlobalPatternMatrixCaches recalculates the global pattern matrices of server and replaces the cached ones
+// (for every source category, with all and with the top patterns). Requests keep getting the previous ones in the
+// meantime instead of all waiting for a recalculation. If the recalculation fails, the cached ones are dropped.
+func (s *PatternMatrix) RefreshGlobalPatternMatrixCaches(ctx context.Context, server string) (err error) {
+	defer func() {
+		if err != nil {
+			s.deleteGlobalPatternMatrixCaches(server)
+		}
+	}()
 	for _, sourceCategory := range s.Config.MatrixWorkerSourceCategories {
+		global, err := s.calcGlobalPatternMatrix(ctx, server, sourceCategory)
+		if err != nil {
+			return err
+		}
+		shims := make(map[bool]*modelv2.PatternMatrixQueryResult, 2)
 		for _, showAllPatterns := range []bool{true, false} {
-			key := server + constant.CacheSep + sourceCategory + constant.CacheSep + strconv.FormatBool(showAllPatterns)
-			if err := cache.ShimGlobalPatternMatrix.Delete(key); err != nil {
-				return err
+			result := *global
+			if !showAllPatterns {
+				if result.PatternMatrix, err = s.interceptPatternMatrixResults(global.PatternMatrix, s.Config.PatternMatrixLimit); err != nil {
+					return err
+				}
 			}
-			if err := cache.ShimGlobalPatternMatrix.Delete(key); err != nil {
+			if shims[showAllPatterns], err = s.applyShimForPatternMatrixQuery(ctx, &result); err != nil {
 				return err
 			}
 		}
+		for showAllPatterns, shim := range shims {
+			key := server + constant.CacheSep + sourceCategory + constant.CacheSep + strconv.FormatBool(showAllPatterns)
+			cache.ShimGlobalPatternMatrix.Set(key, *shim, 24*time.Hour)
+			cache.LastModifiedTime.Set("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:"+key+"]", time.Now(), 0)
+		}
 	}
 	return nil
+}
+
+func (s *PatternMatrix) deleteGlobalPatternMatrixCaches(server string) {
+	for _, sourceCategory := range s.Config.MatrixWorkerSourceCategories {
+		for _, showAllPatterns := range []string{"true", "false"} {
+			cache.ShimGlobalPatternMatrix.Delete(server + constant.CacheSep + sourceCategory + constant.CacheSep + showAllPatterns)
+		}
+	}
 }
 
 // Update pattern matrix elements for a given date (entire day)
@@ -539,9 +574,15 @@ func (s *PatternMatrix) interceptPatternMatrixResults(onePatternMatrixElements [
 		}
 		elementsMapByStageId[onePatternMatrixElement.StageID] = append(elementsMapByStageId[onePatternMatrixElement.StageID], onePatternMatrixElement)
 	}
-	// sort all elements by times desc, and limit the number of elements
+	// keep the most frequent patterns of each stage: by quantity (times is the stage's, the same for all its patterns),
+	// then by pattern id, so that the same patterns are kept every time
 	for stageId, elements := range elementsMapByStageId {
-		linq.From(elements).OrderByDescendingT(func(el *model.OnePatternMatrixElement) int { return el.Times }).ToSlice(&elements)
+		sort.Slice(elements, func(i, j int) bool {
+			if elements[i].Quantity != elements[j].Quantity {
+				return elements[i].Quantity > elements[j].Quantity
+			}
+			return elements[i].PatternID < elements[j].PatternID
+		})
 		if len(elements) > limit {
 			elementsMapByStageId[stageId] = elements[:limit]
 		}

@@ -17,8 +17,9 @@ func NewSet[T any](prefix string) *Set[T] {
 }
 
 type Set[T any] struct {
-	// m is a mutex for MutexGetSet for concurrent prevention
-	m sync.Mutex
+	// locks holds a *sync.Mutex per key, so that MutexGetSet calculates a key once at a time without making other
+	// keys wait for it
+	locks sync.Map
 
 	prefix string
 
@@ -73,8 +74,9 @@ func (c *Set[T]) MutexGetSet(key string, dest *T, valueFunc func() (*T, error), 
 }
 
 func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, error), expire time.Duration) error {
-	c.m.Lock()
-	defer c.m.Unlock()
+	m, _ := c.locks.LoadOrStore(key, &sync.Mutex{})
+	m.(*sync.Mutex).Lock()
+	defer m.(*sync.Mutex).Unlock()
 	err := c.Get(key, dest)
 
 	if err == nil {
