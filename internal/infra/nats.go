@@ -23,7 +23,13 @@ func natsErrorHandler(conn *nats.Conn, sub *nats.Subscription, err error) {
 }
 
 func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
-	nc, err := nats.Connect(conf.NatsURL, nats.PingInterval(time.Second*20), nats.ErrorHandler(natsErrorHandler))
+	nc, err := nats.Connect(conf.NatsURL,
+		nats.PingInterval(time.Second*20),
+		// keep reconnecting however long NATS is down: by default the client gives up after 60 attempts (about 2
+		// minutes), and the process then neither publishes nor consumes reports until it is restarted
+		nats.MaxReconnects(-1),
+		nats.ErrorHandler(natsErrorHandler),
+	)
 	if err != nil {
 		log.Error().Err(err).Msg("infra: nats: failed to connect to NATS")
 		return nil, nil, err
