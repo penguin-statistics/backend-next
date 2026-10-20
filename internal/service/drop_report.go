@@ -31,10 +31,31 @@ func (s *DropReport) CalcQuantityUniqCount(
 	if err != nil {
 		return nil, err
 	}
-	if queryCtx.StageItemFilter == nil {
-		return results, nil
+	return filterQuantityUniqCountResultsByItems(queryCtx, results), nil
+}
+
+func (s *DropReport) CalcDropMatrixForIntervalsBySourceCategories(
+	ctx context.Context, queryCtxs []*model.DropReportQueryContext, sourceCategories []string,
+) ([]map[string][]*model.TotalTimesResult, []map[string][]*model.QuantityUniqCountResultForDropMatrix, error) {
+	timesResults, quantityUniqCountResults, err := s.DropReportRepo.CalcDropMatrixForIntervalsBySourceCategories(ctx, queryCtxs, sourceCategories)
+	if err != nil {
+		return nil, nil, err
 	}
-	// filter the results by stageIdItemId map, because in repo layer we only filter by stageId
+	for i, quantityUniqCountsBySourceCategory := range quantityUniqCountResults {
+		for sourceCategory, results := range quantityUniqCountsBySourceCategory {
+			quantityUniqCountsBySourceCategory[sourceCategory] = filterQuantityUniqCountResultsByItems(queryCtxs[i], results)
+		}
+	}
+	return timesResults, quantityUniqCountResults, nil
+}
+
+// filter the results by stageIdItemId map, because in repo layer we only filter by stageId
+func filterQuantityUniqCountResultsByItems(
+	queryCtx *model.DropReportQueryContext, results []*model.QuantityUniqCountResultForDropMatrix,
+) []*model.QuantityUniqCountResultForDropMatrix {
+	if queryCtx.StageItemFilter == nil {
+		return results
+	}
 	filteredResults := make([]*model.QuantityUniqCountResultForDropMatrix, 0)
 	resultsMapByStageId := make(map[int][]*model.QuantityUniqCountResultForDropMatrix)
 	for _, result := range results {
@@ -55,7 +76,7 @@ func (s *DropReport) CalcQuantityUniqCount(
 			}
 		}
 	}
-	return filteredResults, nil
+	return filteredResults
 }
 
 func (s *DropReport) CalcTotalTimesForDropMatrix(
