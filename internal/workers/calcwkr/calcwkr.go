@@ -62,6 +62,10 @@ type Worker struct {
 	// servers calculated concurrently renew it at the same time
 	syncMutexMu sync.Mutex
 
+	// refreshMu runs the global matrix refreshes one at a time, as requests calculated them before, to not load the
+	// database with those of every server at once while the batch still calculates others
+	refreshMu sync.Mutex
+
 	WorkerDeps
 }
 
@@ -115,7 +119,43 @@ func (w *Worker) checkConfig() {
 }
 
 func (w *Worker) doMainCalc(sourceCategories []string) {
-	w.task(context.Background(), WorkerCalcTypeStatsCalc, w.calcStats)
+	w.task(context.Background(), WorkerCalcTypeStatsCalc, func(ctx context.Context, server string) error {
+		if err := w.calcStats(ctx, server); err != nil {
+			return err
+		}
+		w.refreshGlobalMatricesAsync(ctx, server)
+		return nil
+	})
+}
+
+// refreshGlobalMatricesAsync replaces the cached global matrices of server with ones calculated from the matrix
+// elements just saved. It runs outside of the batch, which holds the worker lock, and of its timeout; requests get
+// the previous matrices until then.
+func (w *Worker) refreshGlobalMatricesAsync(batchCtx context.Context, server string) {
+	logger := log.Ctx(batchCtx).With().Str("evt.name", "worker.calcwkr.globalMatrixRefresh").Str("server", server).Logger()
+	go func() {
+		w.refreshMu.Lock()
+		defer w.refreshMu.Unlock()
+
+		ctx, cancel := context.WithTimeout(logger.WithContext(context.Background()), w.timeout)
+		defer cancel()
+		ctx, span := tracer.Start(ctx, "calcwkr.globalMatrixRefresh", trace.WithAttributes(attribute.String("server", server)))
+		err := observeCalcDuration("globalMatrixRefresh", server, func() error {
+			// a failed drop matrix refresh does not keep the pattern matrices stale
+			dropMatrixErr := w.DropMatrixService.RefreshGlobalDropMatrixCaches(ctx, server)
+			patternMatrixErr := w.PatternMatrixService.RefreshGlobalPatternMatrixCaches(ctx, server)
+			if dropMatrixErr != nil {
+				return dropMatrixErr
+			}
+			return patternMatrixErr
+		})
+		endSpan(span, err)
+		if err != nil {
+			logger.Error().Err(err).Msg("failed to refresh the global matrices: dropped them, requests recalculate them")
+			return
+		}
+		logger.Info().Msg("refreshed the global matrices")
+	}()
 }
 
 // calcStats runs every stats calculation of a single server.
