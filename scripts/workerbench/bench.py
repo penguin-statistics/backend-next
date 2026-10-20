@@ -74,7 +74,8 @@ def psql(sql, db=PG_DB, check=True):
     r = subprocess.run(
         ["sudo", "-n", "-u", "postgres", "psql", "-p", PG_PORT, "-d", db, "-v", "ON_ERROR_STOP=1",
          "-tAc", sql],
-        capture_output=True, text=True, cwd="/tmp",
+        # run from / so the postgres user can enter the working directory
+        capture_output=True, text=True, cwd="/",
     )
     if check and r.returncode != 0:
         raise RuntimeError(f"psql failed: {sql[:120]}: {r.stderr.strip()}")
