@@ -1,3 +1,4 @@
+-- Superseded: dropped again by 20261020_drop_matrix_elements_site_stats_idx_drop.sql.
 -- Site stats (calcwkr siteStats microtask) aggregates every drop_matrix_elements row of a server for
 -- source_category = 'all'. This covering index lets those aggregations run as index-only scans in
 -- (stage_id, item_id) order instead of fetching ~4M heap rows (CN) and spilling a hash aggregate.
