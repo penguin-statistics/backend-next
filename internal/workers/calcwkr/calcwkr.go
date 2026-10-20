@@ -62,6 +62,8 @@ type Worker struct {
 	// servers calculated concurrently renew it at the same time
 	syncMutexMu sync.Mutex
 
+	// refreshGlobalMatrices tells whether a batch refreshes the cached global matrices (see globalMatrixRefresh)
+	refreshGlobalMatrices bool
 	// refreshMu runs the global matrix refreshes one at a time, as requests calculated them before, to not load the
 	// database with those of every server at once while the batch still calculates others
 	refreshMu sync.Mutex
@@ -94,8 +96,10 @@ func Start(conf *appconfig.Config, deps WorkerDeps) {
 			interval:     conf.WorkerInterval,
 			timeout:      conf.WorkerTimeout,
 			heartbeatURL: conf.WorkerHeartbeatURL,
-			syncMutex:    deps.RedSync.NewMutex("mutex:calcwkr", redsync.WithExpiry(30*time.Second), redsync.WithTries(2)),
-			WorkerDeps:   deps,
+			// the worker of a process serving requests
+			refreshGlobalMatrices: true,
+			syncMutex:             deps.RedSync.NewMutex("mutex:calcwkr", redsync.WithExpiry(30*time.Second), redsync.WithTries(2)),
+			WorkerDeps:            deps,
 		}
 		w.checkConfig()
 		w.doMainCalc(conf.MatrixWorkerSourceCategories)
@@ -119,36 +123,26 @@ func (w *Worker) checkConfig() {
 }
 
 func (w *Worker) doMainCalc(sourceCategories []string) {
-	w.task(context.Background(), WorkerCalcTypeStatsCalc, func(ctx context.Context, server string) error {
-		if err := w.calcStats(ctx, server); err != nil {
-			return err
-		}
-		w.refreshGlobalMatricesAsync(ctx, server)
-		return nil
-	})
+	w.task(context.Background(), WorkerCalcTypeStatsCalc, w.calcStats)
 }
 
-// refreshGlobalMatricesAsync replaces the cached global matrices of server with ones calculated from the matrix
-// elements just saved. It runs outside of the batch, which holds the worker lock, and of its timeout; requests get
-// the previous matrices until then.
-func (w *Worker) refreshGlobalMatricesAsync(batchCtx context.Context, server string) {
-	logger := log.Ctx(batchCtx).With().Str("evt.name", "worker.calcwkr.globalMatrixRefresh").Str("server", server).Logger()
+// globalMatrixRefresh replaces the cached global matrices of server with ones calculated from the matrix elements
+// a job just saved, by refresh, right after the job: the jobs no longer drop them, so a later failure of the batch
+// must not keep them stale. It runs in the background, outside of the batch, which holds the worker lock, and of its
+// timeout; requests get the previous matrices until then.
+func (w *Worker) globalMatrixRefresh(batchCtx context.Context, name, server string, refresh func(ctx context.Context, server string) error) {
+	if !w.refreshGlobalMatrices {
+		return
+	}
+	logger := log.Ctx(batchCtx).With().Str("evt.name", "worker.calcwkr."+name).Str("server", server).Logger()
 	go func() {
 		w.refreshMu.Lock()
 		defer w.refreshMu.Unlock()
 
 		ctx, cancel := context.WithTimeout(logger.WithContext(context.Background()), w.timeout)
 		defer cancel()
-		ctx, span := tracer.Start(ctx, "calcwkr.globalMatrixRefresh", trace.WithAttributes(attribute.String("server", server)))
-		err := observeCalcDuration("globalMatrixRefresh", server, func() error {
-			// a failed drop matrix refresh does not keep the pattern matrices stale
-			dropMatrixErr := w.DropMatrixService.RefreshGlobalDropMatrixCaches(ctx, server)
-			patternMatrixErr := w.PatternMatrixService.RefreshGlobalPatternMatrixCaches(ctx, server)
-			if dropMatrixErr != nil {
-				return dropMatrixErr
-			}
-			return patternMatrixErr
-		})
+		ctx, span := tracer.Start(ctx, "calcwkr."+name, trace.WithAttributes(attribute.String("server", server)))
+		err := observeCalcDuration(name, server, func() error { return refresh(ctx, server) })
 		endSpan(span, err)
 		if err != nil {
 			logger.Error().Err(err).Msg("failed to refresh the global matrices: dropped them, requests recalculate them")
@@ -169,6 +163,7 @@ func (w *Worker) calcStats(ctx context.Context, server string) (err error) {
 	}); err != nil {
 		return err
 	}
+	w.globalMatrixRefresh(ctx, "globalDropMatrixRefresh", server, w.DropMatrixService.RefreshGlobalDropMatrixCaches)
 	time.Sleep(w.sep)
 
 	// PatternMatrixService
@@ -177,6 +172,7 @@ func (w *Worker) calcStats(ctx context.Context, server string) (err error) {
 	}); err != nil {
 		return err
 	}
+	w.globalMatrixRefresh(ctx, "globalPatternMatrixRefresh", server, w.PatternMatrixService.RefreshGlobalPatternMatrixCaches)
 	time.Sleep(w.sep)
 
 	// SiteStatsService
