@@ -2,8 +2,8 @@ package reportwkr
 
 import (
 	"context"
-	"runtime"
 	"strconv"
+	"sync"
 	"time"
 
 	"exusiai.dev/gommon/constant"
@@ -20,7 +20,6 @@ import (
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
-	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/pkg/jetstream"
@@ -46,62 +45,208 @@ type WorkerDeps struct {
 	ReportVerifier         *reportverifs.ReportVerifiers
 }
 
+// consumerConfig is the configuration of the report consumer. Tests run it on streams of their own, with the times
+// scaled down.
+type consumerConfig struct {
+	stream  string
+	durable string
+	// legacyDurable is the push consumer of the previous versions, deleted on startup
+	legacyDurable string
+	subject       string
+	workers       int
+	// ackWait is how long the server waits for the outcome of a delivered task before it delivers the task again. It
+	// is far longer than taskTimeout, so that a task is delivered again only when its worker is gone.
+	ackWait       time.Duration
+	maxAckPending int
+	taskTimeout   time.Duration
+	// fetchWait is how long a worker waits for a task before checking whether it is stopped
+	fetchWait time.Duration
+}
+
+var defaultConsumerConfig = consumerConfig{
+	stream:        "penguin-reports",
+	durable:       "penguin-reports-pull",
+	legacyDurable: "penguin-reports",
+	subject:       "REPORT.*",
+	workers:       4, // the cores of the production node, as runtime.NumCPU() was
+	ackWait:       time.Minute,
+	maxAckPending: 64,
+	taskTimeout:   time.Second * 10,
+	fetchWait:     time.Second * 2,
+}
+
 type Worker struct {
-	// count is the number of workers
-	count int
-
 	WorkerDeps
+
+	conf consumerConfig
+	// handle processes a task: process, or a stand-in in tests
+	handle func(ctx context.Context, reportTask *types.ReportTask) error
+
+	// subs holds a subscription to the durable per worker
+	subs     []*nats.Subscription
+	stopping chan struct{}
+	wg       sync.WaitGroup
 }
 
-func Start(conf *appconfig.Config, deps WorkerDeps) {
-	ch := make(chan error)
-	// handle & dump errors from workers
-	go func() {
-		for {
-			err := <-ch
-			if err != nil {
-				log.Error().Err(err).Msg("report worker error")
-			}
-		}
-	}()
-	// works like a consumer factory
-	reportWorkers := &Worker{
-		count:      0,
+func newWorker(deps WorkerDeps, conf consumerConfig) *Worker {
+	w := &Worker{
 		WorkerDeps: deps,
+		conf:       conf,
+		stopping:   make(chan struct{}),
 	}
-	// spawn workers
-	// maybe we should specify the number of worker in appconfig.Config ?
-	for i := 0; i < runtime.NumCPU(); i++ {
-		go func() {
-			err := reportWorkers.Consumer(context.Background(), ch)
-			if err != nil {
-				ch <- err
-			}
-		}()
-		// update current worker count
-		reportWorkers.count += 1
-	}
+	w.handle = w.process
+	return w
 }
 
-func (w *Worker) Consumer(ctx context.Context, ch chan error) error {
-	msgChan := make(chan *nats.Msg, 512)
-
-	_, err := w.NatsJS.ChanQueueSubscribe("REPORT.*", "penguin-reports", msgChan, nats.AckWait(time.Second*10), nats.MaxAckPending(128))
-	if err != nil {
-		log.Err(err).Msg("failed to subscribe to REPORT.*")
+// Start sets the report consumer up, failing the startup if it cannot, and runs its workers while the app runs.
+func Start(lc fx.Lifecycle, deps WorkerDeps) error {
+	w := newWorker(deps, defaultConsumerConfig)
+	if err := w.subscribe(); err != nil {
 		return err
 	}
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			w.start()
+			return nil
+		},
+		OnStop: w.stop,
+	})
+	return nil
+}
 
+// subscribe sets the consumer up and binds a subscription of each worker to it.
+func (w *Worker) subscribe() error {
+	if err := w.setUpConsumer(); err != nil {
+		return err
+	}
+	return w.bind()
+}
+
+// setUpConsumer deletes the push consumer of the previous versions, then creates the durable pull consumer of the
+// report tasks, or updates the one that exists to the configuration.
+func (w *Worker) setUpConsumer() error {
+	c := w.conf
+	// The push consumer of the previous versions, which a pod of the previous version may still consume during the
+	// rollout. A work queue stream allows a single consumer per subject, so it is deleted before the pull consumer is
+	// created. The pull consumer has a name of its own so that the acks of the old pod, addressed to the consumer by
+	// name, go to no consumer: the tasks the old pod holds stay in the stream and are delivered again to the pull
+	// consumer, and persist skips those the old pod stored. Under the same name, an ack of the old pod would remove a
+	// task the pull consumer is still processing, and some server versions (2.10.17 to 2.10.25) would move the pull
+	// consumer past every task the old pod holds and never acks, which would then never be delivered.
+	_, err := w.NatsJS.ConsumerInfo(c.stream, c.legacyDurable)
+	switch {
+	case errors.Is(err, nats.ErrConsumerNotFound):
+	case err != nil:
+		return errors.Wrap(err, "failed to get legacy report consumer")
+	default:
+		log.Warn().
+			Str("evt.name", "reportwkr.consumer.migrate").
+			Str("consumer", c.legacyDurable).
+			Msg("deleting the push consumer of a previous version")
+		if err := w.NatsJS.DeleteConsumer(c.stream, c.legacyDurable); err != nil && !errors.Is(err, nats.ErrConsumerNotFound) {
+			return errors.Wrap(err, "failed to delete legacy report consumer")
+		}
+	}
+
+	info, err := w.NatsJS.ConsumerInfo(c.stream, c.durable)
+	switch {
+	case errors.Is(err, nats.ErrConsumerNotFound):
+		return w.addConsumer()
+	case err != nil:
+		return errors.Wrap(err, "failed to get report consumer")
+	case info.Config.AckWait != c.ackWait || info.Config.MaxAckPending != c.maxAckPending:
+		cfg := info.Config
+		cfg.AckWait = c.ackWait
+		cfg.MaxAckPending = c.maxAckPending
+		if _, err := w.NatsJS.UpdateConsumer(c.stream, &cfg); err != nil {
+			return errors.Wrap(err, "failed to update report consumer")
+		}
+	}
+	return nil
+}
+
+// bind binds a subscription of each worker to the durable, which must exist. Bind: the library did not create the
+// durable, so unsubscribing or draining never deletes it, and a durable deleted meanwhile fails the startup instead of
+// being created again with the defaults of the library.
+func (w *Worker) bind() error {
+	c := w.conf
+	for i := 0; i < c.workers; i++ {
+		sub, err := w.NatsJS.PullSubscribe(c.subject, c.durable, nats.Bind(c.stream, c.durable))
+		if err != nil {
+			return errors.Wrap(err, "failed to subscribe to report consumer")
+		}
+		w.subs = append(w.subs, sub)
+	}
+	return nil
+}
+
+func (w *Worker) addConsumer() error {
+	c := w.conf
+	_, err := w.NatsJS.AddConsumer(c.stream, &nats.ConsumerConfig{
+		Durable:       c.durable,
+		DeliverPolicy: nats.DeliverAllPolicy,
+		AckPolicy:     nats.AckExplicitPolicy,
+		AckWait:       c.ackWait,
+		MaxAckPending: c.maxAckPending,
+		FilterSubject: c.subject,
+	})
+	return errors.Wrap(err, "failed to create report consumer")
+}
+
+// start runs a worker per subscription.
+func (w *Worker) start() {
+	for _, sub := range w.subs {
+		w.wg.Add(1)
+		go w.consume(sub)
+	}
+}
+
+// stop stops the workers from fetching tasks, and waits until ctx ends for the tasks in progress, which finish on
+// their own context.
+func (w *Worker) stop(ctx context.Context) error {
+	close(w.stopping)
+	done := make(chan struct{})
+	go func() {
+		w.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// consume fetches and ingests tasks one at a time until the worker is stopped. The server delivers a task only when
+// a worker asks for one, so no task waits in the client while its AckWait runs.
+func (w *Worker) consume(sub *nats.Subscription) {
+	defer w.wg.Done()
 	for {
 		select {
-		case msg := <-msgChan:
-			err = w.ingestPreprocess(ctx, msg)
-			if err != nil {
-				log.Err(err).Msg("failed to ingest preprocess")
-				ch <- err
+		case <-w.stopping:
+			return
+		default:
+		}
+
+		msgs, err := sub.Fetch(1, nats.MaxWait(w.conf.fetchWait))
+		if errors.Is(err, nats.ErrTimeout) {
+			// no task queued
+			continue
+		}
+		if err != nil {
+			log.Error().Err(err).Str("evt.name", "reportwkr.fetch.failed").Msg("failed to fetch report task")
+			// such as while reconnecting: wait a little before trying again
+			select {
+			case <-w.stopping:
+				return
+			case <-time.After(w.conf.fetchWait):
 			}
-		case <-ctx.Done():
-			return ctx.Err()
+			continue
+		}
+
+		if err := w.ingestPreprocess(context.Background(), msgs[0]); err != nil {
+			log.Err(err).Msg("failed to ingest preprocess")
 		}
 	}
 }
@@ -113,16 +258,8 @@ func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
 		}
 	}()
 
-	taskCtx, cancelTask := context.WithTimeout(ctx, time.Second*10)
+	taskCtx, cancelTask := context.WithTimeout(ctx, w.conf.taskTimeout)
 	defer cancelTask()
-
-	inprogressInformer := time.AfterFunc(time.Second*5, func() {
-		err := msg.InProgress()
-		if err != nil {
-			log.Error().Err(err).Msg("failed to set msg InProgress")
-		}
-	})
-	defer inprogressInformer.Stop()
 
 	reportTask := &types.ReportTask{}
 	if err := json.Unmarshal(msg.Data, reportTask); err != nil {
@@ -153,7 +290,7 @@ func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
 				semconv.MessagingMessagePayloadSizeBytesKey.Int(len(msg.Data)),
 			))
 
-	err = w.process(taskCtx, reportTask)
+	err = w.handle(taskCtx, reportTask)
 	if err != nil {
 		log.Error().
 			Err(err).
