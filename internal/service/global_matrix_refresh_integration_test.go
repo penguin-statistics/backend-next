@@ -4,11 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand"
-	"regexp"
 	"sort"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	pkgcache "exusiai.dev/backend-next/internal/pkg/cache"
@@ -137,7 +137,10 @@ func isStale(t *testing.T, v globalMatrixVariant) (dropStale, patternStale bool)
 	return dropStale, patternStale
 }
 
-func TestGlobalMatrixRefresh(t *testing.T) {
+// newGlobalMatrixTestData seeds matrix data, stages and items, and runs the worker's jobs over the seeded days
+// (checking that a batch keeps the cached global matrices).
+func newGlobalMatrixTestData(t *testing.T) (*bun.DB, *DropMatrix, *PatternMatrix) {
+	t.Helper()
 	db := newTestDB(t)
 	ctx := context.Background()
 	mustExec(t, db, `CREATE TABLE pattern_matrix_elements (
@@ -173,6 +176,12 @@ func TestGlobalMatrixRefresh(t *testing.T) {
 			}
 		}
 	}
+	return db, dropMatrix, patternMatrix
+}
+
+func TestGlobalMatrixRefresh(t *testing.T) {
+	db, dropMatrix, patternMatrix := newGlobalMatrixTestData(t)
+	ctx := context.Background()
 
 	// what requests calculate from an empty cache
 	flushCaches(t)
@@ -239,46 +248,92 @@ func TestGlobalMatrixRefresh(t *testing.T) {
 		}
 	}
 
-	// a worker or admin rewrite of a stage's pattern elements (delete, then insert) between the refresh's times and
-	// quantities queries: the refresh fails (and drops the matrices) instead of panicking on the missing times
-	flushCaches(t)
-	setStaleGlobalMatrices()
+	// a worker or admin rewrite of a stage's pattern elements (delete, then insert) in progress: the single statement
+	// reads one state consistently, without the stage while it is deleted
+	before, err := patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories)
+	if err != nil {
+		t.Fatal(err)
+	}
 	mustExec(t, db, "CREATE TABLE rewritten AS SELECT * FROM pattern_matrix_elements WHERE server = 'CN' AND stage_id = 1")
 	mustExec(t, db, "DELETE FROM pattern_matrix_elements WHERE server = 'CN' AND stage_id = 1")
-	db.AddQueryHook(&afterQueryHook{once: func(event *bun.QueryEvent) bool {
-		// the times query of the time range of stage 1
-		stages := stageIdsInQuery.FindStringSubmatch(event.Query)
-		if !strings.Contains(event.Query, "pattern_matrix_elements") || !strings.Contains(event.Query, "MIN(times)") ||
-			stages == nil || !lo.Contains(strings.Split(stages[1], ", "), "1") {
-			return false
+	during, err := patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, db, "INSERT INTO pattern_matrix_elements SELECT * FROM rewritten")
+	after, err := patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withoutStage1 := func(elements []*model.OnePatternMatrixElement) []*model.OnePatternMatrixElement {
+		return lo.Filter(elements, func(el *model.OnePatternMatrixElement, _ int) bool { return el.StageID != 1 })
+	}
+	for _, sourceCategory := range allSourceCategories {
+		if len(withoutStage1(before[sourceCategory].PatternMatrix)) == len(before[sourceCategory].PatternMatrix) {
+			t.Fatalf("%s: stage 1 has no pattern matrix to rewrite", sourceCategory)
 		}
-		mustExec(t, db, "INSERT INTO pattern_matrix_elements SELECT * FROM rewritten")
-		return true
-	}})
-	if err := patternMatrix.RefreshGlobalPatternMatrixCaches(ctx, "CN"); err == nil {
-		t.Fatal("refreshing while the elements were rewritten succeeded")
-	}
-	for _, v := range globalMatrixVariants() {
-		if _, patternStale := isStale(t, v); v.server == "CN" && patternStale {
-			t.Errorf("%+v: a failed refresh kept the stale pattern matrix", v)
+		if canonicalJSON(t, during[sourceCategory].PatternMatrix) != canonicalJSON(t, withoutStage1(before[sourceCategory].PatternMatrix)) {
+			t.Errorf("%s: during the rewrite, got other than the matrix without stage 1", sourceCategory)
+		}
+		if canonicalJSON(t, after[sourceCategory].PatternMatrix) != canonicalJSON(t, before[sourceCategory].PatternMatrix) {
+			t.Errorf("%s: after the rewrite, got other than before", sourceCategory)
 		}
 	}
 }
 
-var stageIdsInQuery = regexp.MustCompile(`stage_id IN \(([^)]*)\)`)
+func TestGlobalMatricesMatchLegacy(t *testing.T) {
+	db, dropMatrix, patternMatrix := newGlobalMatrixTestData(t)
+	ctx := context.Background()
+	compared := 0
+	for _, server := range testServers {
+		drops, err := dropMatrix.calcGlobalDropMatrices(ctx, server, allSourceCategories)
+		if err != nil {
+			t.Fatal(err)
+		}
+		patterns, err := patternMatrix.calcGlobalPatternMatrices(ctx, server, allSourceCategories)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, sourceCategory := range allSourceCategories {
+			what := server + " " + sourceCategory
+			wantDrop, err := legacyCalcGlobalDropMatrix(ctx, db, dropMatrix, server, sourceCategory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			compared += assertSameLines(t, what+" drop", globalDropMatrixLines(wantDrop), globalDropMatrixLines(drops[sourceCategory]))
+			wantPattern, err := legacyCalcGlobalPatternMatrix(ctx, db, patternMatrix, server, sourceCategory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			compared += assertSameLines(t, what+" pattern", globalPatternMatrixLines(wantPattern), globalPatternMatrixLines(patterns[sourceCategory]))
 
-// afterQueryHook runs once once a query it matches has run.
-type afterQueryHook struct {
-	once func(event *bun.QueryEvent) bool
-	done bool
-}
-
-func (h *afterQueryHook) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
-	return ctx
-}
-
-func (h *afterQueryHook) AfterQuery(_ context.Context, event *bun.QueryEvent) {
-	if !h.done {
-		h.done = h.once(event)
+			// a request calculates the matrix of a single source category
+			single, err := dropMatrix.calcGlobalDropMatrixUncached(ctx, server, sourceCategory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertSameLines(t, what+" drop of a single category", globalDropMatrixLines(wantDrop), globalDropMatrixLines(single))
+		}
 	}
+	requireCompared(t, compared, 100)
+}
+
+func globalDropMatrixLines(result *model.DropMatrixQueryResult) []string {
+	lines := make([]string, 0, len(result.Matrix))
+	for _, el := range result.Matrix {
+		lines = append(lines, fmt.Sprintf("%d|%d|%d|%d|%v|%s|%s", el.StageID, el.ItemID, el.Times, el.Quantity, el.StdDev,
+			el.TimeRange.StartTime.UTC().Format(time.RFC3339Nano), el.TimeRange.EndTime.UTC().Format(time.RFC3339Nano)))
+	}
+	sort.Strings(lines) // the order of the elements is not significant
+	return lines
+}
+
+func globalPatternMatrixLines(result *model.PatternMatrixQueryResult) []string {
+	lines := make([]string, 0, len(result.PatternMatrix))
+	for _, el := range result.PatternMatrix {
+		lines = append(lines, fmt.Sprintf("%d|%d|%d|%d|%s|%s", el.StageID, el.PatternID, el.Times, el.Quantity,
+			el.TimeRange.StartTime.UTC().Format(time.RFC3339Nano), el.TimeRange.EndTime.UTC().Format(time.RFC3339Nano)))
+	}
+	sort.Strings(lines) // the order of the elements is not significant
+	return lines
 }

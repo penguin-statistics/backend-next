@@ -37,55 +37,10 @@ func (s *DropMatrixElement) IsExistByServerAndDayNum(ctx context.Context, server
 	return s.DropMatrixElementRepo.IsExistByServerAndDayNum(ctx, server, dayNum)
 }
 
-func (s *DropMatrixElement) GetAllTimesForGlobalDropMatrixMapByStageIdAndItemId(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
-) (map[int]map[int]*model.AllTimesResultForGlobalDropMatrix, error) {
-	allTimes, err := s.DropMatrixElementRepo.GetAllTimesForGlobalDropMatrix(ctx, server, timeRange, stageIds, sourceCategory)
-	if err != nil {
-		return nil, err
-	}
-	result := make(map[int]map[int]*model.AllTimesResultForGlobalDropMatrix)
-	for _, v := range allTimes {
-		if _, ok := result[v.StageID]; !ok {
-			result[v.StageID] = make(map[int]*model.AllTimesResultForGlobalDropMatrix)
-		}
-		result[v.StageID][v.ItemID] = v
-	}
-	return result, nil
-}
-
-func (s *DropMatrixElement) GetAllQuantitiesForGlobalDropMatrixMapByStageIdAndItemId(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
-) (map[int]map[int]*model.AllQuantitiesResultForGlobalDropMatrix, error) {
-	allQuantities, err := s.DropMatrixElementRepo.GetAllQuantitiesForGlobalDropMatrix(ctx, server, timeRange, stageIds, sourceCategory)
-	if err != nil {
-		return nil, err
-	}
-	result := make(map[int]map[int]*model.AllQuantitiesResultForGlobalDropMatrix)
-	for _, v := range allQuantities {
-		if _, ok := result[v.StageID]; !ok {
-			result[v.StageID] = make(map[int]*model.AllQuantitiesResultForGlobalDropMatrix)
-		}
-		result[v.StageID][v.ItemID] = v
-	}
-	return result, nil
-}
-
-func (s *DropMatrixElement) GetAllQuantityBucketsForGlobalDropMatrixMapByStageIdAndItemId(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
-) (map[int]map[int]*model.AllQuantityBucketsResultForGlobalDropMatrix, error) {
-	allQuantityBuckets, err := s.DropMatrixElementRepo.GetAllQuantityBucketsForGlobalDropMatrix(ctx, server, timeRange, stageIds, sourceCategory)
-	if err != nil {
-		return nil, err
-	}
-	result := make(map[int]map[int]*model.AllQuantityBucketsResultForGlobalDropMatrix)
-	for _, v := range allQuantityBuckets {
-		if _, ok := result[v.StageID]; !ok {
-			result[v.StageID] = make(map[int]*model.AllQuantityBucketsResultForGlobalDropMatrix)
-		}
-		result[v.StageID][v.ItemID] = v
-	}
-	return result, nil
+func (s *DropMatrixElement) CalcGlobalDropMatrixAggregates(
+	ctx context.Context, server string, targets []*model.GlobalDropMatrixTarget, sourceCategories []string,
+) (map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate, error) {
+	return s.DropMatrixElementRepo.CalcGlobalDropMatrixAggregates(ctx, server, targets, sourceCategories)
 }
 
 func (s *DropMatrixElement) CalcSiteStatsAggregates(

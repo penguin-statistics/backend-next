@@ -2,24 +2,6 @@ package model
 
 import "gopkg.in/guregu/null.v3"
 
-type AllTimesResultForGlobalDropMatrix struct {
-	StageID int `json:"stageId" bun:"stage_id"`
-	ItemID  int `json:"itemId" bun:"item_id"`
-	Times   int `json:"times" bun:"times"`
-}
-
-type AllQuantitiesResultForGlobalDropMatrix struct {
-	StageID  int `json:"stageId" bun:"stage_id"`
-	ItemID   int `json:"itemId" bun:"item_id"`
-	Quantity int `json:"quantity" bun:"quantity"`
-}
-
-type AllQuantityBucketsResultForGlobalDropMatrix struct {
-	StageID         int         `json:"stageId" bun:"stage_id"`
-	ItemID          int         `json:"itemId" bun:"item_id"`
-	QuantityBuckets map[int]int `json:"quantityBuckets" bun:"type:jsonb"`
-}
-
 // SiteStatsAggregate is the per stage and item aggregation of drop matrix elements behind the site stats.
 // Aggregates of disjoint day ranges add up (see Add).
 type SiteStatsAggregate struct {
@@ -43,4 +25,27 @@ type SiteStatsBase struct {
 	BeforeDayNum int
 	Generation   int64
 	Aggregates   []*SiteStatsAggregate
+}
+
+// GlobalDropMatrixTarget is a stage and item of a global drop matrix, with the time range its elements are aggregated
+// over (the elements within it).
+type GlobalDropMatrixTarget struct {
+	StageID   int
+	ItemID    int
+	TimeRange *TimeRange
+}
+
+type GlobalDropMatrixKey struct {
+	SourceCategory string
+	StageID        int
+	ItemID         int
+}
+
+// GlobalDropMatrixAggregate aggregates the elements of a target in a source category. Times sums times over the
+// distinct (times, day_num) of the elements with times > 0; Quantity and QuantityBuckets sum those with quantity > 0.
+// A part no element counts for is invalid (empty for the buckets).
+type GlobalDropMatrixAggregate struct {
+	Times           null.Int
+	Quantity        null.Int
+	QuantityBuckets map[int]int
 }

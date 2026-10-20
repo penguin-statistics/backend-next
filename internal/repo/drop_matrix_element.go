@@ -8,6 +8,7 @@ import (
 	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
@@ -66,97 +67,79 @@ func (s *DropMatrixElement) IsExistByServerAndDayNum(ctx context.Context, server
 	return exists, nil
 }
 
-func (s *DropMatrixElement) GetAllTimesForGlobalDropMatrix(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
-) ([]*model.AllTimesResultForGlobalDropMatrix, error) {
-	subq2 := s.db.NewSelect().
-		TableExpr("drop_matrix_elements").
-		Column("stage_id", "item_id", "times", "day_num").
-		Where("server = ?", server).
-		Where("source_category = ?", sourceCategory).
-		Where("times > 0").
-		Where("stage_id IN (?)", bun.In(stageIds)).
-		Where("start_time >= timestamp with time zone ?", timeRange.StartTime.Format(time.RFC3339)).
-		Where("end_time <= timestamp with time zone ?", timeRange.EndTime.Format(time.RFC3339))
+// CalcGlobalDropMatrixAggregates aggregates the elements of every target of server for the source categories in a
+// single scan, see model.GlobalDropMatrixAggregate. A single statement also reads a single snapshot, unaffected by a
+// concurrent rewrite (delete, then insert) of the elements.
+func (s *DropMatrixElement) CalcGlobalDropMatrixAggregates(
+	ctx context.Context, server string, targets []*model.GlobalDropMatrixTarget, sourceCategories []string,
+) (map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate, error) {
+	aggregates := make(map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate)
+	if len(targets) == 0 || len(sourceCategories) == 0 {
+		return aggregates, nil
+	}
+	stageIds := make([]int, len(targets))
+	itemIds := make([]int, len(targets))
+	// compared at second precision, as the time ranges were formatted as RFC 3339 before
+	starts := make([]time.Time, len(targets))
+	ends := make([]time.Time, len(targets))
+	for i, target := range targets {
+		stageIds[i], itemIds[i] = target.StageID, target.ItemID
+		starts[i] = time.Unix(target.TimeRange.StartTime.Unix(), 0)
+		ends[i] = time.Unix(target.TimeRange.EndTime.Unix(), 0)
+	}
 
-	subq1 := s.db.NewSelect().
-		TableExpr("(?) AS subq2", subq2).
-		Column("stage_id", "item_id", "times").
-		Group("stage_id", "item_id", "times", "day_num")
-
-	mainq := s.db.NewSelect().
-		TableExpr("(?) AS subq1", subq1).
-		Column("stage_id", "item_id").
-		ColumnExpr("SUM(times) AS times").
-		Group("stage_id", "item_id")
-
-	results := make([]*model.AllTimesResultForGlobalDropMatrix, 0)
-	err := mainq.Scan(ctx, &results)
+	var rows []struct {
+		Kind           string `bun:"kind"`
+		SourceCategory string `bun:"source_category"`
+		StageID        int    `bun:"stage_id"`
+		ItemID         int    `bun:"item_id"`
+		Key            int    `bun:"key"`
+		Value          int64  `bun:"value"`
+	}
+	err := s.db.NewRaw(`WITH t AS (
+			SELECT * FROM unnest(?::int[], ?::int[], ?::timestamptz[], ?::timestamptz[]) AS t(stage_id, item_id, start_time, end_time)
+		), e AS MATERIALIZED (
+			SELECT d.source_category, d.stage_id, d.item_id, d.times, d.day_num, d.quantity, d.quantity_buckets
+			FROM drop_matrix_elements AS d
+			JOIN t ON d.stage_id = t.stage_id AND d.item_id = t.item_id AND d.start_time >= t.start_time AND d.end_time <= t.end_time
+			WHERE d.server = ? AND d.source_category IN (?)
+		)
+		SELECT 'times' AS kind, source_category, stage_id, item_id, 0 AS key, SUM(times) AS value
+		FROM (SELECT DISTINCT source_category, stage_id, item_id, times, day_num FROM e WHERE times > 0) AS distinct_times
+		GROUP BY source_category, stage_id, item_id
+		UNION ALL
+		SELECT 'quantity', source_category, stage_id, item_id, 0, SUM(quantity)
+		FROM e WHERE quantity > 0
+		GROUP BY source_category, stage_id, item_id
+		UNION ALL
+		SELECT 'bucket', source_category, stage_id, item_id, b.key::int, SUM(b.value::numeric)::bigint
+		FROM e, jsonb_each_text(e.quantity_buckets) AS b
+		WHERE quantity > 0
+		GROUP BY source_category, stage_id, item_id, b.key`,
+		pgdialect.Array(stageIds), pgdialect.Array(itemIds), pgdialect.Array(starts), pgdialect.Array(ends),
+		server, bun.In(sourceCategories)).
+		Scan(ctx, &rows)
 	if err != nil {
 		return nil, err
 	}
-	return results, nil
-}
 
-func (s *DropMatrixElement) GetAllQuantitiesForGlobalDropMatrix(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
-) ([]*model.AllQuantitiesResultForGlobalDropMatrix, error) {
-	subq1 := s.db.NewSelect().
-		TableExpr("drop_matrix_elements").
-		Column("stage_id", "item_id", "quantity").
-		Where("server = ?", server).
-		Where("source_category = ?", sourceCategory).
-		Where("quantity > 0").
-		Where("stage_id IN (?)", bun.In(stageIds)).
-		Where("start_time >= timestamp with time zone ?", timeRange.StartTime.Format(time.RFC3339)).
-		Where("end_time <= timestamp with time zone ?", timeRange.EndTime.Format(time.RFC3339))
-
-	mainq := s.db.NewSelect().
-		TableExpr("(?) AS subq1", subq1).
-		Column("stage_id", "item_id").
-		ColumnExpr("SUM(quantity) AS quantity").
-		Group("stage_id", "item_id")
-
-	results := make([]*model.AllQuantitiesResultForGlobalDropMatrix, 0)
-	err := mainq.Scan(ctx, &results)
-	if err != nil {
-		return nil, err
+	for _, row := range rows {
+		key := model.GlobalDropMatrixKey{SourceCategory: row.SourceCategory, StageID: row.StageID, ItemID: row.ItemID}
+		aggregate, ok := aggregates[key]
+		if !ok {
+			aggregate = &model.GlobalDropMatrixAggregate{QuantityBuckets: make(map[int]int)}
+			aggregates[key] = aggregate
+		}
+		switch row.Kind {
+		case "times":
+			aggregate.Times = null.IntFrom(row.Value)
+		case "quantity":
+			aggregate.Quantity = null.IntFrom(row.Value)
+		case "bucket":
+			aggregate.QuantityBuckets[row.Key] = int(row.Value)
+		}
 	}
-	return results, nil
-}
-
-func (s *DropMatrixElement) GetAllQuantityBucketsForGlobalDropMatrix(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
-) ([]*model.AllQuantityBucketsResultForGlobalDropMatrix, error) {
-	subq2 := s.db.NewSelect().
-		TableExpr("drop_matrix_elements").
-		Column("stage_id", "item_id", "quantity_buckets").
-		Where("server = ?", server).
-		Where("source_category = ?", sourceCategory).
-		Where("quantity > 0").
-		Where("stage_id IN (?)", bun.In(stageIds)).
-		Where("start_time >= timestamp with time zone ?", timeRange.StartTime.Format(time.RFC3339)).
-		Where("end_time <= timestamp with time zone ?", timeRange.EndTime.Format(time.RFC3339))
-
-	subq1 := s.db.NewSelect().
-		TableExpr("(?) AS subq2", subq2).
-		TableExpr("jsonb_each_text(quantity_buckets)").
-		Column("stage_id", "item_id", "key").
-		ColumnExpr("sum(value::numeric) val").
-		Group("stage_id", "item_id", "key")
-
-	mainq := s.db.NewSelect().
-		TableExpr("(?) AS subq1", subq1).
-		Column("stage_id", "item_id").
-		ColumnExpr("json_object_agg(key, val) AS quantity_buckets").
-		Group("stage_id", "item_id")
-
-	results := make([]*model.AllQuantityBucketsResultForGlobalDropMatrix, 0)
-	err := mainq.Scan(ctx, &results)
-	if err != nil {
-		return nil, err
-	}
-	return results, nil
+	return aggregates, nil
 }
 
 // CalcSiteStatsAggregates aggregates the drop matrix elements of a server (source category "all") with

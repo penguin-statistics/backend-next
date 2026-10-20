@@ -29,33 +29,8 @@ func (s *PatternMatrixElement) IsExistByServerAndDayNum(ctx context.Context, ser
 	return s.PatternMatrixElementRepo.IsExistByServerAndDayNum(ctx, server, dayNum)
 }
 
-func (s *PatternMatrixElement) GetAllTimesForGlobalPatternMatrixMapByStageId(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
-) (map[int]*model.AllTimesResultForGlobalPatternMatrix, error) {
-	allTimes, err := s.PatternMatrixElementRepo.GetAllTimesForGlobalPatternMatrix(ctx, server, timeRange, stageIds, sourceCategory)
-	if err != nil {
-		return nil, err
-	}
-	result := make(map[int]*model.AllTimesResultForGlobalPatternMatrix)
-	for _, v := range allTimes {
-		result[v.StageID] = v
-	}
-	return result, nil
-}
-
-func (s *PatternMatrixElement) GetAllQuantitiesForGlobalPatternMatrixMapByStageIdAndPatternId(
-	ctx context.Context, server string, timeRange *model.TimeRange, stageIds []int, sourceCategory string,
-) (map[int]map[int]*model.AllQuantitiesResultForGlobalPatternMatrix, error) {
-	allQuantities, err := s.PatternMatrixElementRepo.GetAllQuantitiesForGlobalPatternMatrix(ctx, server, timeRange, stageIds, sourceCategory)
-	if err != nil {
-		return nil, err
-	}
-	result := make(map[int]map[int]*model.AllQuantitiesResultForGlobalPatternMatrix)
-	for _, v := range allQuantities {
-		if _, ok := result[v.StageID]; !ok {
-			result[v.StageID] = make(map[int]*model.AllQuantitiesResultForGlobalPatternMatrix)
-		}
-		result[v.StageID][v.PatternID] = v
-	}
-	return result, nil
+func (s *PatternMatrixElement) CalcGlobalPatternMatrixAggregates(
+	ctx context.Context, server string, targets []*model.GlobalPatternMatrixTarget, sourceCategories []string,
+) (map[string]*model.GlobalPatternMatrixAggregates, error) {
+	return s.PatternMatrixElementRepo.CalcGlobalPatternMatrixAggregates(ctx, server, targets, sourceCategories)
 }
