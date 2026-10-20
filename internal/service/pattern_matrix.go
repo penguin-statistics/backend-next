@@ -183,8 +183,11 @@ func (s *PatternMatrix) calcPatternMatrixByGivenDate(
 	if err != nil {
 		return nil, err
 	}
+	// Many ranges intersect the given day in the very same interval (usually the whole day), so stages are
+	// grouped by intersection and every interval is calculated with a single query.
 	stageIdsMap := s.getStageIdsMapByTimeRange(allTimeRanges)
-	elements := make([]*model.PatternMatrixElement, 0)
+	intersections := make(map[string]*model.TimeRange)
+	stageIdsByIntersection := make(map[string][]int)
 	for rangeId, stageIds := range stageIdsMap {
 		timeRange := timeRangesMap[rangeId]
 		intersection := util.GetIntersection(timeRange, timeRangeGiven)
@@ -200,13 +203,18 @@ func (s *PatternMatrix) calcPatternMatrixByGivenDate(
 		if len(stageIds) == 0 {
 			continue
 		}
-		for _, sourceCategory := range sourceCategories {
-			currentBatch, err := s.calcPatternMatrixForTimeRanges(ctx, server, []*model.TimeRange{intersection}, stageIds, null.NewInt(0, false), sourceCategory)
-			if err != nil {
-				return nil, err
-			}
-			elements = append(elements, currentBatch...)
+		key := intersection.String()
+		intersections[key] = intersection
+		stageIdsByIntersection[key] = append(stageIdsByIntersection[key], stageIds...)
+	}
+
+	elements := make([]*model.PatternMatrixElement, 0)
+	for key, stageIds := range stageIdsByIntersection {
+		currentBatch, err := s.calcPatternMatrixForTimeRanges(ctx, server, []*model.TimeRange{intersections[key]}, stageIds, null.NewInt(0, false), sourceCategories)
+		if err != nil {
+			return nil, err
 		}
+		elements = append(elements, currentBatch...)
 	}
 	return elements, nil
 }
@@ -293,7 +301,7 @@ func (s *PatternMatrix) getLatestPatternMatrixElements(ctx context.Context, serv
 		}
 
 		timeRanges := []*model.TimeRange{timeRangesMap[rangeId]}
-		currentBatch, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, stageIds, accountId, sourceCategory)
+		currentBatch, err := s.calcPatternMatrixForTimeRanges(ctx, server, timeRanges, stageIds, accountId, []string{sourceCategory})
 		if err != nil {
 			return nil, err
 		}
@@ -326,9 +334,10 @@ func (s *PatternMatrix) convertPatternMatrixElementsToDropPatternQueryResult(ctx
 
 // =========== Helpers ===========
 
-// Called by both global and personal
+// Called by both global and personal. Elements are returned grouped by time range, then by source category
+// in the given order.
 func (s *PatternMatrix) calcPatternMatrixForTimeRanges(
-	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, accountId null.Int, sourceCategory string,
+	ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, accountId null.Int, sourceCategories []string,
 ) ([]*model.PatternMatrixElement, error) {
 	results := make([]*model.PatternMatrixElement, 0)
 
@@ -349,31 +358,30 @@ func (s *PatternMatrix) calcPatternMatrixForTimeRanges(
 			EndTime:            timeRange.EndTime,
 			AccountID:          accountId,
 			StageItemFilter:    &stageItemFilter,
-			SourceCategory:     sourceCategory,
 			ExcludeNonOneTimes: true,
 		}
-		quantityResults, err := s.DropReportService.CalcTotalQuantityForPatternMatrix(ctx, queryCtx)
+		quantityResultsBySourceCategory, err := s.DropReportService.CalcTotalQuantityForPatternMatrixBySourceCategories(ctx, queryCtx, sourceCategories)
 		if err != nil {
 			return nil, err
 		}
-		timesResults, err := s.DropReportService.CalcTotalTimesForPatternMatrix(ctx, queryCtx)
-		if err != nil {
-			return nil, err
-		}
-		combinedResults := s.combineQuantityAndTimesResults(quantityResults, timesResults)
-		for _, result := range combinedResults {
-			results = append(results, &model.PatternMatrixElement{
-				StageID:        result.StageID,
-				PatternID:      result.PatternID,
-				StartTime:      queryCtx.StartTime,
-				EndTime:        queryCtx.EndTime,
-				DayNum:         util.GetDayNum(queryCtx.StartTime, queryCtx.Server),
-				Quantity:       result.Quantity,
-				Times:          result.Times,
-				Server:         server,
-				SourceCategory: sourceCategory,
-				RangeID:        timeRange.RangeID,
-			})
+		for _, sourceCategory := range sourceCategories {
+			quantityResults := quantityResultsBySourceCategory[sourceCategory]
+			timesResults := calcTotalTimesFromPatternQuantities(quantityResults)
+			combinedResults := s.combineQuantityAndTimesResults(quantityResults, timesResults)
+			for _, result := range combinedResults {
+				results = append(results, &model.PatternMatrixElement{
+					StageID:        result.StageID,
+					PatternID:      result.PatternID,
+					StartTime:      queryCtx.StartTime,
+					EndTime:        queryCtx.EndTime,
+					DayNum:         util.GetDayNum(queryCtx.StartTime, queryCtx.Server),
+					Quantity:       result.Quantity,
+					Times:          result.Times,
+					Server:         server,
+					SourceCategory: sourceCategory,
+					RangeID:        timeRange.RangeID,
+				})
+			}
 		}
 	}
 	return results, nil
@@ -424,6 +432,24 @@ func (s *PatternMatrix) combineQuantityAndTimesResults(
 		}
 	}
 	return combinedResults
+}
+
+// Pattern quantities only count reports with times = 1, so a stage's total times is the sum of its
+// pattern counts; this saves a second scan of drop_reports with the very same filters.
+func calcTotalTimesFromPatternQuantities(quantityResults []*model.TotalQuantityResultForPatternMatrix) []*model.TotalTimesResult {
+	timesByStageId := make(map[int]int)
+	stageIds := make([]int, 0)
+	for _, result := range quantityResults {
+		if _, ok := timesByStageId[result.StageID]; !ok {
+			stageIds = append(stageIds, result.StageID)
+		}
+		timesByStageId[result.StageID] += result.TotalQuantity
+	}
+	results := make([]*model.TotalTimesResult, 0, len(stageIds))
+	for _, stageId := range stageIds {
+		results = append(results, &model.TotalTimesResult{StageID: stageId, TotalTimes: timesByStageId[stageId]})
+	}
+	return results
 }
 
 func (s *PatternMatrix) getStageIdsMapByTimeRange(timeRangesMap map[int]*model.TimeRange) map[int][]int {
