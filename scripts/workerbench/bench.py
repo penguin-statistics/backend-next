@@ -261,6 +261,9 @@ def restore_backup():
             insert into {t} select * from workerbench.{t};
             commit;""")
         log(f"restored {t}")
+    # the backup has served its purpose; a later run, possibly pinned to other days, takes a new one
+    psql("drop schema workerbench cascade")
+    log("dropped the backup")
 
 
 def vacuum_matrix_tables():
