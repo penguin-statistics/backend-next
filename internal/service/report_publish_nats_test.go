@@ -42,7 +42,7 @@ func newTestPublisher(t *testing.T) (s *Report, nc *nats.Conn, prefix string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &Report{NatsJS: js}, nc, "P" + strconv.FormatUint(rand.Uint64(), 36)
+	return &Report{NatsConn: nc, NatsJS: js}, nc, "P" + strconv.FormatUint(rand.Uint64(), 36)
 }
 
 // addTestStream creates a stream of the subjects prefix.*, like penguin-reports in production, deleted after the test.
