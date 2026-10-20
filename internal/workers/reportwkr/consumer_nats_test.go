@@ -18,7 +18,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/goccy/go-json"
 	"github.com/nats-io/nats.go"
+
+	"exusiai.dev/backend-next/internal/model/types"
 )
 
 // testStream is a work queue stream of a test, like penguin-reports in production.
@@ -231,5 +234,95 @@ func TestLegacyPushConsumerRedeliversQueuedMessages(t *testing.T) {
 	}
 	if maxRedelivered == 0 {
 		t.Error("the server redelivered no message")
+	}
+}
+
+// slowReportInserts makes every insert into drop_reports take 250ms, inside the transaction and so holding the lock
+// of the task: the slow database of 2026-10-16.
+const slowReportInserts = `
+CREATE FUNCTION slow_report_insert() RETURNS trigger AS $$
+BEGIN
+	PERFORM pg_sleep(0.25);
+	RETURN NEW;
+END $$ LANGUAGE plpgsql;
+CREATE TRIGGER slow_report_insert BEFORE INSERT ON drop_reports FOR EACH ROW EXECUTE FUNCTION slow_report_insert();
+`
+
+// TestLegacyStormWithIdempotentProcess runs the reproduction of TestLegacyPushConsumerRedeliversQueuedMessages with
+// process as the handler, on PostgreSQL: the copies are processed again, but each task is stored once.
+func TestLegacyStormWithIdempotentProcess(t *testing.T) {
+	s := newTestStream(t)
+	w := newTestWorker(t)
+	// a task stored beforehand creates the pattern, as in production almost every pattern exists: tasks of different
+	// accounts creating a pattern at once conflict on its hash, and the legacy consumer drops the losers
+	if err := processTask(t, w, newTestTask(t, w, testAccountID(), time.UnixMicro(1760600000000000), "203.0.113.7", testReport("main_01-07", 30012))); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.DB.ExecContext(context.Background(), slowReportInserts); err != nil {
+		t.Fatal(err)
+	}
+	duplicates := captureLogs(t)
+	const published = 128
+
+	var handled handledCounter
+	var failed handledCounter
+	stop := startLegacyConsumer(t, s, "legacy", func(ctx context.Context, msg *nats.Msg) error {
+		task := &types.ReportTask{}
+		if err := json.Unmarshal(msg.Data, task); err != nil {
+			return err
+		}
+		if err := w.process(ctx, task); err != nil {
+			failed.add(err.Error())
+			return err
+		}
+		handled.add(task.TaskID)
+		return nil
+	})
+
+	// 4 tasks per account in a row, as an account's backlog is: they are handled at once by the 4 workers
+	accountId := testAccountID()
+	createdAt := time.UnixMicro(1760600000123456)
+	for i := 0; i < published; i++ {
+		task := newTestTask(t, w, accountId+i/4, createdAt.Add(time.Duration(i)*time.Millisecond), "203.0.113.7", testReport("main_01-07", 30012))
+		if _, err := s.js.Publish(s.publish, task); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	s.waitEmpty(t, "legacy", time.Minute)
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if _, _, repeated := handled.stats(); repeated > 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	stop()
+
+	distinct, total, repeated := handled.stats()
+	t.Logf("%d tasks published, %d handled %d times, %d of them more than once", published, distinct, total, repeated)
+	if _, errs, _ := failed.stats(); errs > 0 {
+		t.Errorf("%d handlings failed: %v", errs, failed.times)
+	}
+	if repeated == 0 {
+		t.Fatal("no task was handled more than once; the test proves nothing")
+	}
+	if distinct != published {
+		t.Errorf("%d distinct tasks handled, want %d", distinct, published)
+	}
+	if n := duplicates("reportwkr.duplicate"); n != total-distinct {
+		t.Errorf("%d copies skipped, want %d", n, total-distinct)
+	}
+
+	var reports, tasks int
+	if err := w.DB.NewRaw("SELECT count(*), count(DISTINCT (account_id, created_at)) FROM drop_reports WHERE created_at >= ?", createdAt).
+		Scan(context.Background(), &reports, &tasks); err != nil {
+		t.Fatal(err)
+	}
+	if reports != published || tasks != published {
+		t.Errorf("%d reports of %d tasks stored, want %d of %d", reports, tasks, published, published)
+	}
+	if n := countRows(t, w.DB, "drop_report_extras"); n != published+1 {
+		t.Errorf("%d extras stored, want %d", n, published+1)
 	}
 }
