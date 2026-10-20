@@ -41,68 +41,76 @@ func NewSiteStats(
 	}
 }
 
-// Cache: shimSiteStats#server:{server}, 24hrs
+// Cache: shimSiteStats#server:{server}, 24hrs, records last modified time
 func (s *SiteStats) GetShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
-	var results modelv2.SiteStats
-	err := cache.ShimSiteStats.Get(server, &results)
-	if err == nil {
-		return &results, nil
-	}
-
-	return s.RefreshShimSiteStats(ctx, server)
-}
-
-func (s *SiteStats) RefreshShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
 	valueFunc := func() (*modelv2.SiteStats, error) {
-		// the aggregations are independent; run them concurrently
-		var (
-			stats            modelv2.SiteStats
-			baseAggregates   []*model.SiteStatsAggregate
-			recentAggregates []*model.SiteStatsAggregate
-			stagesMap        map[int]*model.Stage
-			itemsMap         map[int]*model.Item
-			eg               errgroup.Group
-		)
-		// only yesterday and today change between worker batches, the days before are aggregated once
-		now := util.Now()
-		recentFromDayNum := util.GetDayNum(&now, server) - 1
-		eg.Go(func() (err error) {
-			baseAggregates, err = s.getSiteStatsBaseAggregates(ctx, server, recentFromDayNum)
-			return err
-		})
-		eg.Go(func() (err error) {
-			recentAggregates, err = s.DropMatrixElementService.CalcSiteStatsAggregates(ctx, server, null.IntFrom(int64(recentFromDayNum)), null.Int{})
-			return err
-		})
-		eg.Go(func() error {
-			stageTimes24h, err := s.DropReportService.CalcTotalStageQuantityForShimSiteStats(ctx, server, true)
-			stats.TotalStageTimes24H = stageTimes24h
-			return err
-		})
-		eg.Go(func() (err error) {
-			stagesMap, err = s.StageService.GetStagesMapById(ctx)
-			return err
-		})
-		eg.Go(func() (err error) {
-			itemsMap, err = s.ItemService.GetItemsMapById(ctx)
-			return err
-		})
-		if err := eg.Wait(); err != nil {
-			return nil, err
-		}
-		aggregates := mergeSiteStatsAggregates(baseAggregates, recentAggregates)
-		stats.TotalStageTimes, stats.TotalSanityCost = calcStageTimesForShimSiteStats(aggregates, stagesMap)
-		stats.TotalItemQuantities = calcItemQuantitiesForShimSiteStats(aggregates, itemsMap)
-		return &stats, nil
+		return s.calcShimSiteStats(ctx, server)
 	}
 
 	var results modelv2.SiteStats
-	cache.ShimSiteStats.Delete(server)
 	publish := cache.PublishingLastModifiedTime[modelv2.SiteStats]("[shimSiteStats#server:" + server + "]")
 	if _, err := cache.ShimSiteStats.MutexGetSetPublishing(server, &results, valueFunc, 24*time.Hour, publish); err != nil {
 		return nil, err
 	}
 	return &results, nil
+}
+
+// RefreshShimSiteStats recalculates the site stats of server and replaces the cached ones. Requests keep getting the
+// previous ones in the meantime instead of waiting for a recalculation. If the recalculation fails, the cached ones
+// are dropped.
+func (s *SiteStats) RefreshShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
+	results, err := s.calcShimSiteStats(ctx, server)
+	if err != nil {
+		cache.ShimSiteStats.Delete(server)
+		return nil, err
+	}
+	cache.SetLastModifiedTime("[shimSiteStats#server:"+server+"]", *results, func() {
+		cache.ShimSiteStats.Set(server, *results, 24*time.Hour)
+	})
+	return results, nil
+}
+
+func (s *SiteStats) calcShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
+	// the aggregations are independent; run them concurrently
+	var (
+		stats            modelv2.SiteStats
+		baseAggregates   []*model.SiteStatsAggregate
+		recentAggregates []*model.SiteStatsAggregate
+		stagesMap        map[int]*model.Stage
+		itemsMap         map[int]*model.Item
+		eg               errgroup.Group
+	)
+	// only yesterday and today change between worker batches, the days before are aggregated once
+	now := util.Now()
+	recentFromDayNum := util.GetDayNum(&now, server) - 1
+	eg.Go(func() (err error) {
+		baseAggregates, err = s.getSiteStatsBaseAggregates(ctx, server, recentFromDayNum)
+		return err
+	})
+	eg.Go(func() (err error) {
+		recentAggregates, err = s.DropMatrixElementService.CalcSiteStatsAggregates(ctx, server, null.IntFrom(int64(recentFromDayNum)), null.Int{})
+		return err
+	})
+	eg.Go(func() error {
+		stageTimes24h, err := s.DropReportService.CalcTotalStageQuantityForShimSiteStats(ctx, server, true)
+		stats.TotalStageTimes24H = stageTimes24h
+		return err
+	})
+	eg.Go(func() (err error) {
+		stagesMap, err = s.StageService.GetStagesMapById(ctx)
+		return err
+	})
+	eg.Go(func() (err error) {
+		itemsMap, err = s.ItemService.GetItemsMapById(ctx)
+		return err
+	})
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+	aggregates := mergeSiteStatsAggregates(baseAggregates, recentAggregates)
+	stats.TotalStageTimes, stats.TotalSanityCost = calcStageTimesForShimSiteStats(aggregates, stagesMap)
+	stats.TotalItemQuantities = calcItemQuantitiesForShimSiteStats(aggregates, itemsMap)
+	return &stats, nil
 }
 
 // Cache: siteStatsBase#server:{server}, 6 hrs, recalculated when the day changes or the base is invalidated
