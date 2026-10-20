@@ -127,10 +127,10 @@ func (w *Worker) doMainCalc(sourceCategories []string) {
 	w.task(context.Background(), WorkerCalcTypeStatsCalc, w.calcStats)
 }
 
-// globalMatrixRefresh replaces the cached global matrices of server with ones calculated from the matrix elements
-// a job just saved, by refresh, right after the job: the jobs no longer drop them, so a later failure of the batch
-// must not keep them stale. It runs in the background, outside of the batch, which holds the worker lock, and of its
-// timeout; requests get the previous matrices until then.
+// globalMatrixRefresh replaces the cached global matrices (or trend) of server with ones calculated from the matrix
+// elements a job just saved, by refresh, right after the job: the jobs no longer drop them, so a later failure of the
+// batch must not keep them stale. It runs in the background, outside of the batch, which holds the worker lock, and of
+// its timeout; requests get the previous matrices until then.
 func (w *Worker) globalMatrixRefresh(batchCtx context.Context, name, server string, refresh func(ctx context.Context, server string) error) {
 	if !w.refreshGlobalMatrices {
 		return
@@ -154,10 +154,10 @@ func (w *Worker) globalMatrixRefresh(batchCtx context.Context, name, server stri
 		})
 		endSpan(span, err)
 		if err != nil {
-			logger.Error().Err(err).Msg("failed to refresh the global matrices: dropped them, requests recalculate them")
+			logger.Error().Err(err).Msg("failed to refresh the cached global results: dropped them, requests recalculate them")
 			return
 		}
-		logger.Info().Msg("refreshed the global matrices")
+		logger.Info().Msg("refreshed the cached global results")
 	}()
 }
 
@@ -173,6 +173,8 @@ func (w *Worker) calcStats(ctx context.Context, server string) (err error) {
 		return err
 	}
 	w.globalMatrixRefresh(ctx, "globalDropMatrixRefresh", server, w.DropMatrixService.RefreshGlobalDropMatrixCaches)
+	// the trend is calculated from the drop matrix elements the job saved
+	w.globalMatrixRefresh(ctx, "shimTrendRefresh", server, w.TrendService.RefreshShimTrend)
 	time.Sleep(w.sep)
 
 	// PatternMatrixService
