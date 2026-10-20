@@ -9,6 +9,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model/cache"
 )
 
 // randomDropInfos generates drop infos with many duplicate ranges and equal start times, so that sorting and
@@ -94,5 +95,33 @@ func TestSortDropInfosDoesNotTouchInput(t *testing.T) {
 		if before[i] != dropInfos[i] {
 			t.Fatalf("the (cached) input slice was modified at %d", i)
 		}
+	}
+}
+
+func TestInvalidateTimeRangeCachesDropsTheSharedDropInfos(t *testing.T) {
+	cache.Initialize()
+	// warm every cache a time range calculation reads, as a calculation within the last minute would have
+	cache.DropInfosByServer.Set("CN", []*model.DropInfo{{StageID: 1}}, time.Minute)
+	cache.DropInfosByServer.Set("US", []*model.DropInfo{{StageID: 2}}, time.Minute)
+	cache.LatestTimeRanges.Set("CN", map[int]*model.TimeRange{}, time.Minute)
+	cache.AllMaxAccumulableTimeRanges.Set("CN", map[int]map[int][]*model.TimeRange{}, time.Minute)
+
+	// metadata of CN saved
+	invalidateTimeRangeCaches("CN")
+
+	var dropInfos []*model.DropInfo
+	if err := cache.DropInfosByServer.Get("CN", &dropInfos); err == nil {
+		t.Error("the drop infos of CN are still cached: the next calculation would rebuild time ranges from them")
+	}
+	var latest map[int]*model.TimeRange
+	if err := cache.LatestTimeRanges.Get("CN", &latest); err == nil {
+		t.Error("the latest time ranges of CN are still cached")
+	}
+	var allMax map[int]map[int][]*model.TimeRange
+	if err := cache.AllMaxAccumulableTimeRanges.Get("CN", &allMax); err == nil {
+		t.Error("the max accumulable time ranges of CN are still cached")
+	}
+	if err := cache.DropInfosByServer.Get("US", &dropInfos); err != nil {
+		t.Error("the drop infos of another server were dropped")
 	}
 }
