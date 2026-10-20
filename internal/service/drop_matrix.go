@@ -85,7 +85,7 @@ func (s *DropMatrix) GetShimDropMatrix(
 		if err != nil {
 			return nil, err
 		} else if calculated {
-			cache.LastModifiedTime.Set("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", time.Now(), 0)
+			cache.SetLastModifiedTime("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", results, nil)
 		}
 	} else {
 		return valueFunc()
@@ -370,8 +370,9 @@ func (s *DropMatrix) RefreshGlobalDropMatrixCaches(ctx context.Context, server s
 		cache.GlobalDropMatrix.Set(server+constant.CacheSep+sourceCategory, *global, 24*time.Hour)
 		for showClosedZones, shim := range shims {
 			key := server + constant.CacheSep + strconv.FormatBool(showClosedZones) + constant.CacheSep + sourceCategory
-			cache.ShimGlobalDropMatrix.Set(key, *shim, 24*time.Hour)
-			cache.LastModifiedTime.Set("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", time.Now(), 0)
+			cache.SetLastModifiedTime("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", *shim, func() {
+				cache.ShimGlobalDropMatrix.Set(key, *shim, 24*time.Hour)
+			})
 		}
 	}
 	return nil

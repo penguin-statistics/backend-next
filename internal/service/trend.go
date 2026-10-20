@@ -62,7 +62,7 @@ func (s *Trend) GetShimTrend(ctx context.Context, server string) (*modelv2.Trend
 	if err != nil {
 		return nil, err
 	} else if calculated {
-		cache.LastModifiedTime.Set("[shimTrend#server:"+key+"]", time.Now(), 0)
+		cache.SetLastModifiedTime("[shimTrend#server:"+key+"]", shimResult, nil)
 	}
 	return &shimResult, nil
 }

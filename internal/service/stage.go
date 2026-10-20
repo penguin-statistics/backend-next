@@ -93,8 +93,9 @@ func (s *Stage) GetShimStages(ctx context.Context, server string) ([]*modelv2.St
 	for _, i := range stages {
 		s.applyShim(i)
 	}
-	cache.ShimStages.Set(server, stages, time.Minute*5)
-	cache.LastModifiedTime.Set("[shimStages#server:"+server+"]", time.Now(), 0)
+	cache.SetLastModifiedTime("[shimStages#server:"+server+"]", stages, func() {
+		cache.ShimStages.Set(server, stages, time.Minute*5)
+	})
 	return stages, nil
 }
 

@@ -90,7 +90,7 @@ func (s *PatternMatrix) GetShimPatternMatrix(ctx context.Context, server string,
 		if err != nil {
 			return nil, err
 		} else if calculated {
-			cache.LastModifiedTime.Set("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:"+key+"]", time.Now(), 0)
+			cache.SetLastModifiedTime("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:"+key+"]", results, nil)
 		}
 		return &results, nil
 	} else {
@@ -167,8 +167,9 @@ func (s *PatternMatrix) RefreshGlobalPatternMatrixCaches(ctx context.Context, se
 		}
 		for showAllPatterns, shim := range shims {
 			key := server + constant.CacheSep + sourceCategory + constant.CacheSep + strconv.FormatBool(showAllPatterns)
-			cache.ShimGlobalPatternMatrix.Set(key, *shim, 24*time.Hour)
-			cache.LastModifiedTime.Set("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:"+key+"]", time.Now(), 0)
+			cache.SetLastModifiedTime("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:"+key+"]", *shim, func() {
+				cache.ShimGlobalPatternMatrix.Set(key, *shim, 24*time.Hour)
+			})
 		}
 	}
 	return nil
