@@ -1,9 +1,11 @@
 package infra
 
 import (
+	"context"
 	"math/rand"
 	"os"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -73,5 +75,48 @@ func TestEnsureStream(t *testing.T) {
 	t.Cleanup(func() { _ = js.DeleteStream(other.Name) })
 	if err := ensureStream(js, other); err == nil {
 		t.Error("stream overlapping another one created without an error")
+	}
+}
+
+// TestDrainNATS checks that a drain delivers the messages a subscription holds before the connection is closed. It
+// is skipped unless PENGUIN_TEST_NATS_URL is set.
+func TestDrainNATS(t *testing.T) {
+	url := os.Getenv("PENGUIN_TEST_NATS_URL")
+	if url == "" {
+		t.Skip("PENGUIN_TEST_NATS_URL is not set")
+	}
+	nc, err := nats.Connect(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(nc.Close)
+
+	subject := "T" + strconv.FormatUint(rand.Uint64(), 36)
+	var handled atomic.Int32
+	if _, err := nc.Subscribe(subject, func(*nats.Msg) {
+		time.Sleep(10 * time.Millisecond)
+		handled.Add(1)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 20; i++ {
+		if err := nc.Publish(subject, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := nc.Flush(); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := drainNATS(ctx, nc); err != nil {
+		t.Fatal(err)
+	}
+	if !nc.IsClosed() {
+		t.Error("connection not closed after the drain")
+	}
+	if n := handled.Load(); n != 20 {
+		t.Errorf("%d messages handled before the close, want 20", n)
 	}
 }
