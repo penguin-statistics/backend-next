@@ -40,13 +40,18 @@ func (r *DropReport) CreateDropReport(ctx context.Context, tx bun.Tx, dropReport
 	return err
 }
 
-func (r *DropReport) DeleteDropReport(ctx context.Context, reportId int) error {
-	_, err := r.db.NewUpdate().
+// DeleteDropReport marks the report as recalled (reliability -1) and returns the number of rows affected: 0 when the
+// report does not exist.
+func (r *DropReport) DeleteDropReport(ctx context.Context, reportId int) (int64, error) {
+	res, err := r.db.NewUpdate().
 		Model((*model.DropReport)(nil)).
 		Set("reliability = ?", -1).
 		Where("report_id = ?", reportId).
 		Exec(ctx)
-	return err
+	if err != nil {
+		return -1, err
+	}
+	return res.RowsAffected()
 }
 
 func (r *DropReport) UpdateDropReportReliability(ctx context.Context, tx bun.Tx, reportId int, reliability int) error {
