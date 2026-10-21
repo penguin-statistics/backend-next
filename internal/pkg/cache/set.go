@@ -163,8 +163,10 @@ func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, erro
 	}
 
 	// publish the value unless the key was written meanwhile (e.g. refreshed by the worker): then the value may have
-	// been calculated from older data, and the newer one is returned instead, if it is still there
-	var called, published, returned bool
+	// been calculated from older data, and the newer one is returned instead, if it is still there. Which value is
+	// returned is decided, and the newer one copied to dest, along with publishing: a later read could miss the newer
+	// value (deleted meanwhile) after publish was told it is the one returned.
+	var called, returned bool
 	cacheValue := func() bool {
 		c.writeMu.Lock()
 		defer c.writeMu.Unlock()
@@ -172,20 +174,18 @@ func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, erro
 			return returned
 		}
 		called = true
-		published = !c.calculating[c.key(key)]
+		published := !c.calculating[c.key(key)]
 		delete(c.calculating, c.key(key))
 		if published {
 			c.c.Set(c.key(key), *value, expire)
 		}
-		_, cached := c.c.Get(c.key(key))
-		returned = published || !cached
+		returned = published || c.get(key, dest) != nil
 		return returned
 	}
 	if publish != nil {
 		publish(value, cacheValue)
 	}
-	cacheValue() // if publish did not
-	if !published && c.get(key, dest) == nil {
+	if !cacheValue() { // if publish did not call it
 		return nil
 	}
 

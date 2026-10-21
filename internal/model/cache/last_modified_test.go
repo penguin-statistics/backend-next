@@ -172,6 +172,25 @@ func TestPublishingLastModifiedTime(t *testing.T) {
 		t.Error("the value recorded is not the one cached, 2")
 	}
 
+	// the same, the refreshed value being deleted (by a failed refresh) after publication: the request still gets the
+	// one recorded
+	if err := set.Delete("key"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := set.MutexGetSetPublishing("key", &got, func() (*int, error) {
+		refresh(2)
+		one := 1
+		return &one, nil
+	}, time.Minute, func(value *int, cacheValue func() bool) {
+		publish(value, cacheValue)
+		_ = set.Delete("key")
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if digest, _ := recordedDigest(key); got != 2 || digest != digestOf(t, 2) {
+		t.Errorf("the request got %d, want the value recorded, 2", got)
+	}
+
 	// the worker refreshes it back as 1: a change, recorded in a later second
 	refreshed := lastModified()
 	refresh(1)
