@@ -29,5 +29,7 @@ func Redis(conf *appconfig.Config) (*redis.Client, error) {
 		return nil, ping.Err()
 	}
 
+	registerMetrics("redis", metricsRegisterer, newRedisPoolCollector(client))
+
 	return client, nil
 }
