@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -160,4 +162,114 @@ func TestSEODataWarmsOnlyMissingMatrices(t *testing.T) {
 	// with every matrix cached, nothing is calculated: the nil service is never called
 	d := &SEOData{matrices: make(map[string]*seoMatrixMemo)}
 	d.warmMatrices(context.Background())
+}
+
+func TestSEODataRecalculatesMissingMatrices(t *testing.T) {
+	cache.Initialize()
+	servers := []string{"CN", "US", "JP", "KR"}
+	for _, server := range servers {
+		key := server + "|true|all"
+		t.Cleanup(func() { _ = cache.ShimGlobalDropMatrix.Delete(key) })
+	}
+
+	var calls []string
+	failCN := true
+	d := &SEOData{matrices: make(map[string]*seoMatrixMemo)}
+	d.calcMatrix = func(_ context.Context, server string) error {
+		calls = append(calls, server)
+		if server == "CN" && failCN {
+			return errors.New("transient")
+		}
+		cache.ShimGlobalDropMatrix.Set(server+"|true|all", modelv2.DropMatrixQueryResult{}, time.Hour)
+		return nil
+	}
+	pass := func(want ...string) {
+		t.Helper()
+		calls = nil
+		d.warmMatrices(context.Background())
+		if len(calls) != len(want) {
+			t.Fatalf("calculated %v, want %v", calls, want)
+		}
+		for i := range want {
+			if calls[i] != want[i] {
+				t.Fatalf("calculated %v, want %v", calls, want)
+			}
+		}
+	}
+
+	pass(servers...)
+	// the failed server is calculated again in the next pass, the others are left cached
+	failCN = false
+	pass("CN")
+	pass()
+	// a cached matrix that expired or was dropped is calculated again
+	_ = cache.ShimGlobalDropMatrix.Delete("JP|true|all")
+	pass("JP")
+}
+
+func TestSEODataWarmsAtMostOncePerIntervalAndNeverTwiceAtOnce(t *testing.T) {
+	cache.Initialize()
+	t.Cleanup(func() { _ = cache.ShimGlobalDropMatrix.Delete("CN|true|all") })
+
+	var (
+		mu      sync.Mutex
+		passes  int
+		release = make(chan struct{})
+		done    = make(chan struct{}, 4)
+	)
+	d := &SEOData{matrices: make(map[string]*seoMatrixMemo)}
+	d.calcMatrix = func(_ context.Context, server string) error {
+		if server == "CN" {
+			mu.Lock()
+			passes++
+			mu.Unlock()
+			<-release
+			done <- struct{}{}
+		}
+		return errors.New("not cached")
+	}
+	count := func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return passes
+	}
+	waitIdle := func() {
+		t.Helper()
+		deadline := time.Now().Add(5 * time.Second)
+		for d.warming.Load() {
+			if time.Now().After(deadline) {
+				t.Fatal("the pass did not end")
+			}
+			time.Sleep(time.Millisecond)
+		}
+	}
+
+	start := time.Date(2026, 10, 21, 0, 0, 0, 0, time.UTC)
+	ctx := context.Background()
+	d.maybeWarm(ctx, start)
+	for count() == 0 {
+		time.Sleep(time.Millisecond)
+	}
+	// a pass that is still running is not overlapped, even after the interval
+	d.maybeWarm(ctx, start.Add(2*seoWarmInterval))
+	close(release)
+	<-done
+	waitIdle()
+	if got := count(); got != 1 {
+		t.Fatalf("passes = %d, want 1", got)
+	}
+	// within the interval after the last pass started, no pass starts
+	d.lastWarm = start
+	d.maybeWarm(ctx, start.Add(seoWarmInterval-time.Second))
+	waitIdle()
+	if got := count(); got != 1 {
+		t.Fatalf("passes = %d within the interval, want 1", got)
+	}
+	// after it, the missing matrix is calculated again
+	d.maybeWarm(ctx, start.Add(seoWarmInterval))
+	<-done
+	waitIdle()
+	if got := count(); got != 2 {
+		t.Fatalf("passes = %d after the interval, want 2", got)
+	}
 }

@@ -28,8 +28,13 @@ const SEOSourceCategory = constant.SourceCategoryAll
 // SEOCatalogRefreshInterval is how often SEOData reloads the items, stages and zones.
 const SEOCatalogRefreshInterval = time.Minute
 
-// seoWarmTimeout bounds the calculation of the matrix of a server at start
+// seoWarmTimeout bounds the calculation of the matrix of a server
 const seoWarmTimeout = 10 * time.Minute
+
+// seoWarmInterval is how often SEOData calculates the matrices that are not cached: after a start, after a failed
+// calculation, and after a cached matrix expired or was dropped by a failed refresh, which the worker redoes only in
+// the process that holds its lock
+const seoWarmInterval = 5 * time.Minute
 
 // SEOData is the data of the server-rendered stats pages. It never waits for the database: the items, stages and
 // zones are reloaded in the background, and the matrix is the cached global matrix of the frontend, which the calc
@@ -46,6 +51,13 @@ type SEOData struct {
 
 	matricesMu sync.Mutex
 	matrices   map[string]*seoMatrixMemo
+
+	// calcMatrix calculates and caches the matrix of a server; nil calculates it with dropMatrixService
+	calcMatrix func(ctx context.Context, server string) error
+	// warming is set while a pass of warmMatrices runs
+	warming atomic.Bool
+	// lastWarm is when the last pass of warmMatrices started; only maybeWarm reads and writes it
+	lastWarm time.Time
 }
 
 func NewSEOData(lc fx.Lifecycle, conf *appconfig.Config, itemService *Item, stageService *Stage, zoneService *Zone, dropMatrixService *DropMatrix) *SEOData {
@@ -75,16 +87,14 @@ func NewSEOData(lc fx.Lifecycle, conf *appconfig.Config, itemService *Item, stag
 func (d *SEOData) run(ctx context.Context) {
 	ticker := time.NewTicker(SEOCatalogRefreshInterval)
 	defer ticker.Stop()
-	warmed := false
 	for {
 		if err := d.RefreshCatalog(ctx); err != nil && ctx.Err() == nil {
 			log.Warn().
 				Str("evt.name", "seo.catalog.refresh_failed").
 				Err(err).
 				Msg("failed to reload the items, stages and zones of the stats pages; keeping the ones at hand")
-		} else if err == nil && !warmed {
-			warmed = true
-			go d.warmMatrices(ctx)
+		} else if err == nil {
+			d.maybeWarm(ctx, time.Now())
 		}
 		select {
 		case <-ctx.Done():
@@ -94,10 +104,33 @@ func (d *SEOData) run(ctx context.Context) {
 	}
 }
 
-// warmMatrices calculates the cached matrix of each server that is not cached yet, one server at a time, the way
-// the first visit to the app does: after a start the pages of items and stages are 503s until then, and the worker
-// refreshes the matrices only in the process that holds its lock.
+// maybeWarm starts a pass of warmMatrices in the background, unless one runs or the last one started less than
+// seoWarmInterval before now. It is not safe for concurrent use.
+func (d *SEOData) maybeWarm(ctx context.Context, now time.Time) {
+	if !d.lastWarm.IsZero() && now.Sub(d.lastWarm) < seoWarmInterval {
+		return
+	}
+	if !d.warming.CompareAndSwap(false, true) {
+		return
+	}
+	d.lastWarm = now
+	go func() {
+		defer d.warming.Store(false)
+		d.warmMatrices(ctx)
+	}()
+}
+
+// warmMatrices calculates the cached matrix of each server that is not cached, one server at a time, the way a
+// visit to the app does: the pages of items and stages are 503s until then, after a start, a failed calculation or
+// the expiry of the cached matrix, and the worker refreshes the matrices only in the process that holds its lock.
 func (d *SEOData) warmMatrices(ctx context.Context) {
+	calc := d.calcMatrix
+	if calc == nil {
+		calc = func(ctx context.Context, server string) error {
+			_, err := d.dropMatrixService.GetShimDropMatrix(ctx, server, true, "", "", null.Int{}, SEOSourceCategory)
+			return err
+		}
+	}
 	for _, server := range constant.Servers {
 		if ctx.Err() != nil {
 			return
@@ -107,7 +140,7 @@ func (d *SEOData) warmMatrices(ctx context.Context) {
 		}
 		start := time.Now()
 		wctx, cancel := context.WithTimeout(ctx, seoWarmTimeout)
-		_, err := d.dropMatrixService.GetShimDropMatrix(wctx, server, true, "", "", null.Int{}, SEOSourceCategory)
+		err := calc(wctx, server)
 		cancel()
 		if err != nil {
 			if ctx.Err() == nil {
@@ -115,7 +148,7 @@ func (d *SEOData) warmMatrices(ctx context.Context) {
 					Str("evt.name", "seo.matrix.warm_failed").
 					Err(err).
 					Str("server", server).
-					Msg("failed to calculate the matrix of the stats pages at start; the first visit to the app calculates it")
+					Msg("failed to calculate the matrix of the stats pages; retrying in the next pass, or a visit to the app calculates it")
 			}
 			continue
 		}
@@ -123,7 +156,7 @@ func (d *SEOData) warmMatrices(ctx context.Context) {
 			Str("evt.name", "seo.matrix.warmed").
 			Str("server", server).
 			Dur("duration", time.Since(start)).
-			Msg("calculated the matrix of the stats pages at start")
+			Msg("calculated the matrix of the stats pages")
 	}
 }
 
