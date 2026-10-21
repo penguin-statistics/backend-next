@@ -214,31 +214,53 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 	defer pstSpan.End()
 
 	// the transaction is rolled back when persist returns an error, and committed otherwise
-	return w.DB.RunInTx(pstCtx, nil, func(ctx context.Context, tx bun.Tx) error {
-		return w.persist(ctx, tx, reportTask, taskCreatedAt, violations)
+	var reportId int
+	err := w.DB.RunInTx(pstCtx, nil, func(ctx context.Context, tx bun.Tx) (err error) {
+		reportId, err = w.persist(ctx, tx, reportTask, taskCreatedAt, violations)
+		return err
 	})
+	if err != nil {
+		return err
+	}
+
+	// The recall key holds the last report of the task (only singular reports are recalled), set once it is
+	// committed so that a recall cannot come before the report exists. Best-effort: the task is stored, so this must
+	// not fail it.
+	if reportId != 0 {
+		if err := w.Redis.Set(pstCtx, constant.ReportRedisPrefix+reportTask.TaskID, reportId, time.Hour*24).Err(); err != nil {
+			log.Warn().
+				Err(err).
+				Str("evt.name", "reportwkr.recall.unset").
+				Str("taskId", reportTask.TaskID).
+				Msg("failed to set report id in redis; the report cannot be recalled")
+		}
+	}
+
+	return nil
 }
 
-// persist stores the reports of the task in tx.
-func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.ReportTask, taskCreatedAt time.Time, violations reportverifs.Violations) error {
+// persist stores the reports of the task in tx, and returns the id of the last report of the task (0 if it has
+// none).
+func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.ReportTask, taskCreatedAt time.Time, violations reportverifs.Violations) (int, error) {
+	var reportId int
 	// calculate drop pattern hash for each report
 	for idx, report := range reportTask.Reports {
 		report.Drops = reportutil.MergeDropsByItemID(report.Drops)
 
 		dropPattern, created, err := w.DropPatternRepo.GetOrCreateDropPatternFromDrops(ctx, tx, report.Drops)
 		if err != nil {
-			return errors.Wrap(err, "failed to calculate drop pattern hash")
+			return 0, errors.Wrap(err, "failed to calculate drop pattern hash")
 		}
 		if created {
 			_, err := w.DropPatternElementRepo.CreateDropPatternElements(ctx, tx, dropPattern.PatternID, report.Drops)
 			if err != nil {
-				return errors.Wrap(err, "failed to create drop pattern elements")
+				return 0, errors.Wrap(err, "failed to create drop pattern elements")
 			}
 		}
 
 		stage, err := w.StageService.GetStageByArkId(ctx, report.StageID)
 		if err != nil {
-			return errors.Wrap(err, "failed to get stage")
+			return 0, errors.Wrap(err, "failed to get stage")
 		}
 
 		reliability := violations.Reliability(idx)
@@ -255,7 +277,7 @@ func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.Repor
 			Version:     reportTask.Version,
 		}
 		if err = w.DropReportRepo.CreateDropReport(ctx, tx, dropReport); err != nil {
-			return errors.Wrap(err, "failed to create drop report")
+			return 0, errors.Wrap(err, "failed to create drop report")
 		}
 
 		observability.ReportReliability.WithLabelValues(strconv.Itoa(reliability), reportTask.Source).Inc()
@@ -280,13 +302,11 @@ func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.Repor
 			Metadata: report.Metadata,
 			MD5:      null.NewString(md5, md5 != ""),
 		}); err != nil {
-			return errors.Wrap(err, "failed to create drop report extra")
+			return 0, errors.Wrap(err, "failed to create drop report extra")
 		}
 
-		if err := w.Redis.Set(ctx, constant.ReportRedisPrefix+reportTask.TaskID, dropReport.ReportID, time.Hour*24).Err(); err != nil {
-			return errors.Wrap(err, "failed to set report id in redis")
-		}
+		reportId = dropReport.ReportID
 	}
 
-	return nil
+	return reportId, nil
 }

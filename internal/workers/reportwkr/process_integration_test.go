@@ -5,6 +5,7 @@ package reportwkr
 // and internal/workers/calcwkr/lock_test.go. Every test works in a schema of its own, which it drops afterwards.
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -12,12 +13,16 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"exusiai.dev/gommon/constant"
 	"github.com/goccy/go-json"
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
@@ -289,4 +294,96 @@ func TestProcessStoresReports(t *testing.T) {
 	})
 	assertRecallKey(t, w, taskID(t, batch), "2")
 	assertRecallKey(t, w, taskID(t, singular), "3")
+}
+
+func countRows(t *testing.T, db bun.IDB, table string) int {
+	t.Helper()
+	var n int
+	if err := db.NewRaw("SELECT count(*) FROM "+table).Scan(context.Background(), &n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// lockedBuffer is a buffer the loggers of several goroutines can write to.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+// captureLogs sends the global logger to a buffer until the end of the test, and returns a function counting the
+// entries logged with the given evt.name.
+func captureLogs(t *testing.T) (count func(evtName string) int) {
+	t.Helper()
+	var b lockedBuffer
+	prev := log.Logger
+	log.Logger = zerolog.New(&b)
+	t.Cleanup(func() { log.Logger = prev })
+	return func(evtName string) int {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		return strings.Count(b.buf.String(), `"evt.name":"`+evtName+`"`)
+	}
+}
+
+func testAccountID() int {
+	return rand.Intn(1<<30) + 1
+}
+
+func testReport(stageId string, itemId int) *types.ReportTaskSingleReport {
+	return &types.ReportTaskSingleReport{
+		FragmentStageID: types.FragmentStageID{StageID: stageId},
+		Drops:           []*types.Drop{{DropType: "REGULAR", ItemID: itemId, Quantity: 1}},
+		Times:           1,
+	}
+}
+
+// TestProcessKeepsTaskWhenRedisFails checks that the recall key is best-effort: the reports are committed before it
+// is set, and a failure to set it does not fail the stored task.
+func TestProcessKeepsTaskWhenRedisFails(t *testing.T) {
+	w := newTestWorker(t)
+	unset := captureLogs(t)
+	w.Redis = redis.NewClient(&redis.Options{Addr: "127.0.0.1:1", MaxRetries: -1}) // nothing listens there
+	t.Cleanup(func() { w.Redis.Close() })
+	task := newTestTask(t, w, testAccountID(), time.UnixMicro(1760600000123456), "203.0.113.7", testReport("main_01-07", 30012))
+
+	if err := processTask(t, w, task); err != nil {
+		t.Fatal(err)
+	}
+
+	if n := countRows(t, w.DB, "drop_reports"); n != 1 {
+		t.Errorf("%d reports stored, want 1", n)
+	}
+	if n := unset("reportwkr.recall.unset"); n != 1 {
+		t.Errorf("%d failures to set the recall key logged, want 1", n)
+	}
+}
+
+// TestProcessRollsBackWithoutRecallKey fails a batch task on its second report: the first one is rolled back, so the
+// task must leave no recall key naming it.
+func TestProcessRollsBackWithoutRecallKey(t *testing.T) {
+	w := newTestWorker(t)
+	task := newTestTask(t, w, testAccountID(), time.UnixMicro(1760600000123456), "203.0.113.7",
+		testReport("main_01-07", 30012), testReport("no_such_stage", 30013))
+
+	if err := processTask(t, w, task); err == nil {
+		t.Fatal("a task with an unknown stage was processed")
+	}
+
+	if n := countRows(t, w.DB, "drop_reports"); n != 0 {
+		t.Errorf("%d reports stored, want 0", n)
+	}
+	n, err := w.Redis.Exists(context.Background(), constant.ReportRedisPrefix+taskID(t, task)).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Error("recall key set for a rolled back task")
+	}
 }
