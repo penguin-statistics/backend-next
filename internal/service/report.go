@@ -204,26 +204,25 @@ func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.Re
 		return "", err
 	}
 
+	// Wait for the stream to store the task. An asynchronous publish leaks the ack of a task given up on, and once
+	// such acks reach the limit of pending ones, every publish stalls.
 	start := time.Now()
-	pub, err := s.NatsJS.PublishAsync(subject, reportTaskJsonBytes)
-	if err != nil {
-		observeReportPublish(start, "error")
-		return "", err
-	}
-
-	select {
-	case err := <-pub.Err():
-		observeReportPublish(start, "error")
-		return "", err
-	case <-pub.Ok():
+	pubCtx, cancel := context.WithTimeout(ctx.UserContext(), natsPublishTimeout)
+	defer cancel()
+	_, err = s.NatsJS.Publish(subject, reportTaskJsonBytes, nats.Context(pubCtx))
+	switch {
+	case err == nil:
 		observeReportPublish(start, "ok")
 		return taskId, nil
-	case <-ctx.UserContext().Done():
+	case ctx.UserContext().Err() != nil:
 		observeReportPublish(start, "ctx_cancelled")
 		return "", ctx.UserContext().Err()
-	case <-time.After(natsPublishTimeout):
+	case errors.Is(err, context.DeadlineExceeded):
 		observeReportPublish(start, "timeout")
 		return "", ErrNatsTimeout
+	default:
+		observeReportPublish(start, "error")
+		return "", err
 	}
 }
 

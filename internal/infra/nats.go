@@ -103,7 +103,7 @@ func NATS(lc fx.Lifecycle, conf *appconfig.Config) (*nats.Conn, nats.JetStreamCo
 		return nil, nil, err
 	}
 
-	js, err := nc.JetStream(nats.PublishAsyncMaxPending(2 << 11))
+	js, err := nc.JetStream()
 	if err != nil {
 		log.Error().Err(err).Msg("infra: nats: failed to initialize NATS JetStream")
 		return nil, nil, err
