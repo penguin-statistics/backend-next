@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -17,15 +18,23 @@ type DropReport struct {
 	DropReportRepo *repo.DropReport
 	// ColdDropReportRepo, when not nil, serves the archived part of the time ranges of the drop matrix, of the
 	// pattern matrix and of the customized trend (see CalcDropMatrixForIntervalsBySourceCategories,
-	// CalcTotalQuantityForPatternMatrixBySourceCategories and CalcTotalQuantityForTrend).
+	// CalcTotalQuantityForPatternMatrixBySourceCategories and CalcTotalQuantityForTrend). In shadow mode
+	// (ColdstoreShadowEnabled), those answer from PostgreSQL alone and compare the split results in the background.
 	ColdDropReportRepo *repo.ColdDropReport
+
+	// shadow is not nil in shadow mode
+	shadow *coldShadow
 }
 
 func NewDropReport(dropReportRepo *repo.DropReport, coldDropReportRepo *repo.ColdDropReport) *DropReport {
-	return &DropReport{
+	s := &DropReport{
 		DropReportRepo:     dropReportRepo,
 		ColdDropReportRepo: coldDropReportRepo,
 	}
+	if coldDropReportRepo != nil && coldDropReportRepo.Shadow().Enabled {
+		s.shadow = newColdShadow(coldDropReportRepo.Shadow(), dropReportRepo.RunWithStatementTimeout)
+	}
+	return s
 }
 
 // RunWithStatementTimeout runs fn with a context in which PostgreSQL cancels the drop report aggregations still running
@@ -75,10 +84,32 @@ func (s *DropReport) calcDropMatrixForIntervals(
 	if len(cold.queryCtxs) == 0 {
 		return s.DropReportRepo.CalcDropMatrixForIntervalsBySourceCategories(ctx, queryCtxs, sourceCategories)
 	}
+	if s.shadow != nil {
+		shadowCtxs, shadowCategories := cloneQueryContexts(queryCtxs), slices.Clone(sourceCategories)
+		cold, hot := splitQueryContexts(view, shadowCtxs)
+		results, err := runShadow(ctx, s.shadow, newDropMatrixShadowQuery("drop_matrix", view.HotBoundary(), queryCtxs, sourceCategories),
+			func(ctx context.Context) (dropMatrixResults, error) {
+				times, quantities, err := s.DropReportRepo.CalcDropMatrixForIntervalsBySourceCategories(ctx, queryCtxs, sourceCategories)
+				return dropMatrixResults{times, quantities}, err
+			},
+			func(ctx context.Context) (dropMatrixResults, error) {
+				times, quantities, err := s.calcDropMatrixSplit(ctx, view, len(shadowCtxs), cold, hot, shadowCategories)
+				return dropMatrixResults{times, quantities}, err
+			},
+			dropMatrixShadowCounts)
+		return results.times, results.quantities, err
+	}
+	return s.calcDropMatrixSplit(ctx, view, len(queryCtxs), cold, hot, sourceCategories)
+}
 
-	timesResults := make([]map[string][]*model.TotalTimesResult, len(queryCtxs))
-	quantityUniqCountResults := make([]map[string][]*model.QuantityUniqCountResultForDropMatrix, len(queryCtxs))
-	for i := range queryCtxs {
+// calcDropMatrixSplit adds up the drop matrix of the cold and hot parts of n intervals, split at the hot boundary of
+// view.
+func (s *DropReport) calcDropMatrixSplit(
+	ctx context.Context, view *coldstore.View, n int, cold, hot splitQueryContextsPart, sourceCategories []string,
+) ([]map[string][]*model.TotalTimesResult, []map[string][]*model.QuantityUniqCountResultForDropMatrix, error) {
+	timesResults := make([]map[string][]*model.TotalTimesResult, n)
+	quantityUniqCountResults := make([]map[string][]*model.QuantityUniqCountResultForDropMatrix, n)
+	for i := 0; i < n; i++ {
 		timesResults[i] = make(map[string][]*model.TotalTimesResult, len(sourceCategories))
 		quantityUniqCountResults[i] = make(map[string][]*model.QuantityUniqCountResultForDropMatrix, len(sourceCategories))
 		for _, sourceCategory := range sourceCategories {
@@ -234,7 +265,26 @@ func (s *DropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
 	if len(cold.queryCtxs) == 0 {
 		return s.DropReportRepo.CalcTotalQuantityForPatternMatrixBySourceCategories(ctx, queryCtx, sourceCategories)
 	}
+	if s.shadow != nil {
+		shadowCategories := slices.Clone(sourceCategories)
+		cold, hot := splitQueryContexts(view, cloneQueryContexts([]*model.DropReportQueryContext{queryCtx}))
+		return runShadow(ctx, s.shadow, newDropMatrixShadowQuery("pattern_matrix", view.HotBoundary(), []*model.DropReportQueryContext{queryCtx}, sourceCategories),
+			func(ctx context.Context) (map[string][]*model.TotalQuantityResultForPatternMatrix, error) {
+				return s.DropReportRepo.CalcTotalQuantityForPatternMatrixBySourceCategories(ctx, queryCtx, sourceCategories)
+			},
+			func(ctx context.Context) (map[string][]*model.TotalQuantityResultForPatternMatrix, error) {
+				return s.calcPatternMatrixSplit(ctx, view, cold, hot, shadowCategories)
+			},
+			patternMatrixShadowCounts)
+	}
+	return s.calcPatternMatrixSplit(ctx, view, cold, hot, sourceCategories)
+}
 
+// calcPatternMatrixSplit adds up the pattern matrix of the cold and hot parts of an interval, split at the hot
+// boundary of view.
+func (s *DropReport) calcPatternMatrixSplit(
+	ctx context.Context, view *coldstore.View, cold, hot splitQueryContextsPart, sourceCategories []string,
+) (map[string][]*model.TotalQuantityResultForPatternMatrix, error) {
 	results, err := s.ColdDropReportRepo.CalcTotalQuantityForPatternMatrixBySourceCategories(ctx, view, cold.queryCtxs[0], sourceCategories)
 	if err != nil {
 		return nil, err
@@ -294,7 +344,25 @@ func (s *DropReport) CalcTotalQuantityForTrend(
 	if !ok {
 		return s.DropReportRepo.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIdItemIdMap, accountId, sourceCategory)
 	}
+	if s.shadow != nil {
+		shadowStart, shadowMap := *startTime, cloneStageIdItemIdMap(stageIdItemIdMap)
+		return runShadow(ctx, s.shadow, newTrendShadowQuery("trend_quantity", view.HotBoundary(), server, *startTime, intervalLength, intervalNum, cold, hot, accountId.Valid, len(stageIdItemIdMap), sourceCategory),
+			func(ctx context.Context) ([]*model.TotalQuantityResultForTrend, error) {
+				return s.DropReportRepo.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIdItemIdMap, accountId, sourceCategory)
+			},
+			func(ctx context.Context) ([]*model.TotalQuantityResultForTrend, error) {
+				return s.calcTrendQuantitySplit(ctx, view, cold, hot, server, &shadowStart, intervalLength, intervalNum, shadowMap, accountId, sourceCategory)
+			},
+			trendQuantityShadowCounts)
+	}
+	return s.calcTrendQuantitySplit(ctx, view, cold, hot, server, startTime, intervalLength, intervalNum, stageIdItemIdMap, accountId, sourceCategory)
+}
 
+// calcTrendQuantitySplit adds up the trend quantities of the cold and hot parts of a trend, split at the hot boundary
+// of view.
+func (s *DropReport) calcTrendQuantitySplit(
+	ctx context.Context, view *coldstore.View, cold, hot coldstore.TimeRange, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int, sourceCategory string,
+) ([]*model.TotalQuantityResultForTrend, error) {
 	results, err := s.ColdDropReportRepo.CalcTotalQuantityForTrend(ctx, view, cold.Start, cold.End, server, startTime, intervalLength, intervalNum, stageIdItemIdMap, accountId, sourceCategory)
 	if err != nil {
 		return nil, err
@@ -321,7 +389,24 @@ func (s *DropReport) CalcTotalTimesForTrend(
 	if !ok {
 		return s.DropReportRepo.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, accountId, sourceCategory)
 	}
+	if s.shadow != nil {
+		shadowStart, shadowStageIds := *startTime, slices.Clone(stageIds)
+		return runShadow(ctx, s.shadow, newTrendShadowQuery("trend_times", view.HotBoundary(), server, *startTime, intervalLength, intervalNum, cold, hot, accountId.Valid, len(stageIds), sourceCategory),
+			func(ctx context.Context) ([]*model.TotalTimesResultForTrend, error) {
+				return s.DropReportRepo.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, accountId, sourceCategory)
+			},
+			func(ctx context.Context) ([]*model.TotalTimesResultForTrend, error) {
+				return s.calcTrendTimesSplit(ctx, view, cold, hot, server, &shadowStart, intervalLength, intervalNum, shadowStageIds, accountId, sourceCategory)
+			},
+			trendTimesShadowCounts)
+	}
+	return s.calcTrendTimesSplit(ctx, view, cold, hot, server, startTime, intervalLength, intervalNum, stageIds, accountId, sourceCategory)
+}
 
+// calcTrendTimesSplit adds up the trend times of the cold and hot parts of a trend, split at the hot boundary of view.
+func (s *DropReport) calcTrendTimesSplit(
+	ctx context.Context, view *coldstore.View, cold, hot coldstore.TimeRange, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId null.Int, sourceCategory string,
+) ([]*model.TotalTimesResultForTrend, error) {
 	results, err := s.ColdDropReportRepo.CalcTotalTimesForTrend(ctx, view, cold.Start, cold.End, server, startTime, intervalLength, intervalNum, stageIds, accountId, sourceCategory)
 	if err != nil {
 		return nil, err

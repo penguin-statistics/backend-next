@@ -29,6 +29,10 @@ func TestColdstoreSettings(t *testing.T) {
 	if defaults.ColdstoreQueriesEnabled {
 		t.Error("cold storage queries enabled by default")
 	}
+	if defaults.ColdstoreShadowEnabled || defaults.ColdstoreShadowTimeout != 30*time.Second || defaults.ColdstoreShadowMaxInFlight != 2 {
+		t.Errorf("ColdstoreShadowEnabled = %v, ColdstoreShadowTimeout = %v, ColdstoreShadowMaxInFlight = %d, want false, 30s, 2",
+			defaults.ColdstoreShadowEnabled, defaults.ColdstoreShadowTimeout, defaults.ColdstoreShadowMaxInFlight)
+	}
 	if defaults.ColdstoreThreads != 2 || defaults.ColdstoreMemoryLimit != "1GB" {
 		t.Errorf("ColdstoreThreads = %d, ColdstoreMemoryLimit = %q, want 2, 1GB", defaults.ColdstoreThreads, defaults.ColdstoreMemoryLimit)
 	}

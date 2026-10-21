@@ -22,17 +22,42 @@ import (
 // two up.
 type ColdDropReport struct {
 	reader *coldstore.Reader
+	shadow ColdShadowSettings
 }
 
-// NewColdDropReport returns nil unless ColdstoreQueriesEnabled: the queries then read PostgreSQL alone.
+// ColdShadowSettings are the settings of shadow mode (ColdstoreShadowEnabled): callers answer from PostgreSQL alone
+// and compare the split results in the background.
+type ColdShadowSettings struct {
+	Enabled     bool
+	Timeout     time.Duration
+	MaxInFlight int
+}
+
+// NewColdDropReport returns nil unless ColdstoreQueriesEnabled or ColdstoreShadowEnabled: the queries then read
+// PostgreSQL alone.
 func NewColdDropReport(conf *appconfig.Config, reader *coldstore.Reader) (*ColdDropReport, error) {
-	if !conf.ColdstoreQueriesEnabled {
+	if !conf.ColdstoreQueriesEnabled && !conf.ColdstoreShadowEnabled {
 		return nil, nil
 	}
-	if reader == nil {
-		return nil, errors.New("PENGUIN_V3_COLDSTORE_QUERIES_ENABLED requires PENGUIN_V3_COLDSTORE_ENABLED")
+	if conf.ColdstoreQueriesEnabled && conf.ColdstoreShadowEnabled {
+		return nil, errors.New("PENGUIN_V3_COLDSTORE_QUERIES_ENABLED and PENGUIN_V3_COLDSTORE_SHADOW_ENABLED exclude each other: shadow mode answers from PostgreSQL alone")
 	}
-	return &ColdDropReport{reader: reader}, nil
+	if reader == nil {
+		return nil, errors.New("PENGUIN_V3_COLDSTORE_QUERIES_ENABLED and PENGUIN_V3_COLDSTORE_SHADOW_ENABLED require PENGUIN_V3_COLDSTORE_ENABLED")
+	}
+	r := &ColdDropReport{reader: reader}
+	if conf.ColdstoreShadowEnabled {
+		if conf.ColdstoreShadowTimeout <= 0 || conf.ColdstoreShadowMaxInFlight <= 0 {
+			return nil, errors.New("PENGUIN_V3_COLDSTORE_SHADOW_TIMEOUT and PENGUIN_V3_COLDSTORE_SHADOW_MAX_IN_FLIGHT must be positive")
+		}
+		r.shadow = ColdShadowSettings{Enabled: true, Timeout: conf.ColdstoreShadowTimeout, MaxInFlight: conf.ColdstoreShadowMaxInFlight}
+	}
+	return r, nil
+}
+
+// Shadow returns the settings of shadow mode; Enabled is false unless ColdstoreShadowEnabled.
+func (r *ColdDropReport) Shadow() ColdShadowSettings {
+	return r.shadow
 }
 
 // View returns the current view of the cold storage. Take the split of a time range and the files of a query from
