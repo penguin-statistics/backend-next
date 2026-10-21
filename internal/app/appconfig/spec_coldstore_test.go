@@ -2,6 +2,7 @@ package appconfig
 
 import (
 	"testing"
+	"time"
 
 	"github.com/kelseyhightower/envconfig"
 
@@ -20,6 +21,16 @@ func TestColdstoreSettings(t *testing.T) {
 	}
 	if defaults.ColdstoreExtensionDirectory != duckdbx.ImageExtensionDirectory {
 		t.Errorf("ColdstoreExtensionDirectory = %q, want the image's %q", defaults.ColdstoreExtensionDirectory, duckdbx.ImageExtensionDirectory)
+	}
+	// the reader is off unless enabled, with the limits of #752
+	if defaults.ColdstoreEnabled || defaults.ColdstoreDirectory != "" || defaults.ColdstoreTempDirectory != "" {
+		t.Errorf("cold storage reader enabled by default: %v %q %q", defaults.ColdstoreEnabled, defaults.ColdstoreDirectory, defaults.ColdstoreTempDirectory)
+	}
+	if defaults.ColdstoreThreads != 2 || defaults.ColdstoreMemoryLimit != "1GB" {
+		t.Errorf("ColdstoreThreads = %d, ColdstoreMemoryLimit = %q, want 2, 1GB", defaults.ColdstoreThreads, defaults.ColdstoreMemoryLimit)
+	}
+	if defaults.ColdstoreReloadInterval != time.Minute || defaults.ColdstoreIntegrityCheckInterval != 7*24*time.Hour {
+		t.Errorf("ColdstoreReloadInterval = %v, ColdstoreIntegrityCheckInterval = %v", defaults.ColdstoreReloadInterval, defaults.ColdstoreIntegrityCheckInterval)
 	}
 
 	t.Setenv("PENGUIN_V3_COLDSTORE_EXTENSION_DIRECTORY", "/tmp/ext")

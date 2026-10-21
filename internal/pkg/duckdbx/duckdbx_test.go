@@ -1,6 +1,7 @@
 package duckdbx
 
 import (
+	"context"
 	"database/sql"
 	"os"
 	"path/filepath"
@@ -134,5 +135,104 @@ func TestLoadPostgres(t *testing.T) {
 	}
 	if got := queryString(t, db, "SELECT x::VARCHAR FROM postgres_query('pg', 'SELECT 42 AS x')"); got != "42" {
 		t.Errorf("postgres_query = %q, want 42", got)
+	}
+}
+
+func TestAllowedDirectoriesLockTheDatabaseDown(t *testing.T) {
+	dir := t.TempDir()
+	allowed := filepath.Join(dir, "coldstore")
+	tmp := filepath.Join(dir, "tmp")
+	if err := os.MkdirAll(allowed, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// written before the lockdown, by another database
+	w := open(t, Config{})
+	inside, outside := filepath.Join(allowed, "x.parquet"), filepath.Join(dir, "coldstore-other.parquet")
+	for _, f := range []string{inside, outside} {
+		if _, err := w.Exec(`COPY (SELECT 42 AS x) TO '` + f + `' (FORMAT parquet)`); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	db := open(t, Config{
+		Threads:              2,
+		MemoryLimit:          "64MB",
+		TempDirectory:        tmp,
+		TimeZone:             "UTC",
+		ParquetMetadataCache: true,
+		AllowedDirectories:   []string{allowed},
+	})
+	db.SetMaxOpenConns(4)
+	// the settings are global: check them on several connections of the pool
+	ctx := context.Background()
+	for i := 0; i < 3; i++ {
+		conn, err := db.Conn(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+		for name, want := range map[string]string{
+			"enable_external_access":       "false",
+			"lock_configuration":           "true",
+			"autoinstall_known_extensions": "false",
+			"autoload_known_extensions":    "false",
+			"parquet_metadata_cache":       "true",
+			"TimeZone":                     "UTC",
+			"allowed_directories":          "[" + allowed + "/, " + tmp + "/]",
+		} {
+			var got string
+			if err := conn.QueryRowContext(ctx, "SELECT current_setting($1)::VARCHAR", name).Scan(&got); err != nil {
+				t.Fatal(err)
+			}
+			if got != want {
+				t.Errorf("connection %d: %s = %q, want %q", i, name, got, want)
+			}
+		}
+	}
+
+	if got := queryString(t, db, "SELECT x::VARCHAR FROM read_parquet(['"+inside+"'])"); got != "42" {
+		t.Errorf("read inside = %q, want 42", got)
+	}
+	// a sort that spills to the temp directory still works
+	if got := queryString(t, db, "SELECT count(*)::VARCHAR FROM (SELECT md5(range::VARCHAR) AS m FROM range(2000000) ORDER BY m)"); got != "2000000" {
+		t.Errorf("sort = %q", got)
+	}
+
+	refused := []string{
+		// a sibling that shares the directory's name as a prefix
+		"SELECT * FROM read_parquet(['" + outside + "'])",
+		"SELECT * FROM read_parquet(['s3://penguin-coldstore/coldstore/v1/manifest.json'])",
+		"SELECT * FROM read_parquet(['http://127.0.0.1:1/x.parquet'])",
+		"SELECT * FROM read_parquet(['https://example.com/x.parquet'])",
+		"SELECT * FROM read_csv(['/etc/passwd'])",
+		"COPY (SELECT 1) TO '" + filepath.Join(dir, "out.csv") + "'",
+		"INSTALL httpfs",
+		"LOAD httpfs",
+		"SET enable_external_access = true",
+		"SET GLOBAL enable_external_access = true",
+		"SET allowed_directories = ['/']",
+		"SET lock_configuration = false",
+		"RESET enable_external_access",
+		"ATTACH '" + filepath.Join(dir, "other.duckdb") + "' AS other",
+	}
+	for _, q := range refused {
+		if _, err := db.Exec(q); err == nil {
+			t.Errorf("%s succeeded, want it refused", q)
+		}
+	}
+	if got := queryString(t, db, "SELECT current_setting('enable_external_access')::VARCHAR"); got != "false" {
+		t.Errorf("enable_external_access = %q after the attempts, want false", got)
+	}
+}
+
+func TestAllowedDirectoriesMustBeAbsolute(t *testing.T) {
+	for _, cfg := range []Config{
+		{AllowedDirectories: []string{"coldstore"}},
+		{AllowedDirectories: []string{"/coldstore"}, TempDirectory: "tmp"},
+	} {
+		if db, err := Open(cfg); err == nil {
+			_ = db.Close()
+			t.Errorf("Open(%+v) succeeded, want error", cfg)
+		}
 	}
 }

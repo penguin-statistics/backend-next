@@ -132,6 +132,10 @@ func ReadManifest(name string) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
+	return parseManifest(b, name)
+}
+
+func parseManifest(b []byte, name string) (*Manifest, error) {
 	m := NewManifest()
 	if err := json.Unmarshal(b, m); err != nil {
 		return nil, errors.Wrapf(err, "coldstore: parse %s", name)
@@ -227,7 +231,9 @@ func lockManifest(name string) (func(), error) {
 
 // BuildManifest indexes the files of a cold storage directory without writing to it: every month with a
 // drop_reports file (all four files are required) and the dimension files present. The statistics are computed
-// from the files, so a verification against PostgreSQL (Verify) is what ties them to the source.
+// from the files, so a verification against PostgreSQL (Verify) is what ties them to the source. Like OpenReader
+// (CheckLocalFiles), it refuses a file that is itself a symbolic link; the directory and its subdirectories may be
+// links (see Manifest).
 func BuildManifest(ctx context.Context, opts Options, dir string) (*Manifest, error) {
 	months, err := listMonths(dir)
 	if err != nil {
@@ -388,7 +394,10 @@ func buildManifest(ctx context.Context, opts Options, dir string, months []strin
 		m.PutMonth(*e)
 		log.Info().Str("month", key).Int64("rows", e.Rows).Dur("took", time.Since(started)).Msg("coldstore: indexed month")
 	}
-	if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(DropPatternElementsFile))); err == nil {
+	if _, err := os.Lstat(filepath.Join(dir, filepath.FromSlash(DropPatternElementsFile))); err == nil {
+		if err := checkIndexable(dir, DropPatternElementsFile); err != nil {
+			return nil, err
+		}
 		fe, err := describeExisting(dir, DropPatternElementsFile)
 		if err != nil {
 			return nil, err
@@ -407,8 +416,8 @@ func (j *job) indexMonth(ctx context.Context, dir, key string) (*MonthEntry, err
 	files := monthFiles{}
 	for _, kind := range Kinds {
 		files[kind] = filepath.Join(dir, filepath.FromSlash(FilePath(kind, key)))
-		if _, err := os.Stat(files[kind]); err != nil {
-			return nil, errors.Wrap(err, "coldstore: missing file")
+		if err := checkIndexable(dir, FilePath(kind, key)); err != nil {
+			return nil, err
 		}
 		kvMonth, err := j.kvMetadata(ctx, files[kind], "month")
 		if err != nil {
@@ -460,6 +469,19 @@ func (j *job) indexMonth(ctx context.Context, dir, key string) (*MonthEntry, err
 			cnt, times, stats.ReliableRows, stats.ReliableTimes)
 	}
 	return e, nil
+}
+
+// checkIndexable checks that a file BuildManifest indexes is in dir and, as CheckLocalFiles requires, not itself a
+// symbolic link (its directory may be one), so that OpenReader serves every manifest BuildManifest writes.
+func checkIndexable(dir, path string) error {
+	st, err := os.Lstat(filepath.Join(dir, filepath.FromSlash(path)))
+	if err != nil {
+		return errors.Wrap(err, "coldstore: missing file")
+	}
+	if st.Mode()&os.ModeSymlink != 0 {
+		return errors.New("coldstore: " + symlinkProblem(path))
+	}
+	return nil
 }
 
 // kvMetadata returns a key-value metadata entry of a Parquet file, or "" if it has none.

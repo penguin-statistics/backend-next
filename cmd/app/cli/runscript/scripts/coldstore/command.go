@@ -1,6 +1,6 @@
-// Package script_coldstore exports, verifies, indexes and patches the cold storage of the drop reports (#752), and
-// checks it against the production database. See internal/coldstore for the layout of the files, and
-// docs/coldstore.md for how the commands are used.
+// Package script_coldstore exports, verifies, indexes and patches the cold storage of the drop reports (#752),
+// checks it against the production database, and restores the local copy from the backup bucket. See
+// internal/coldstore for the layout of the files, and docs/coldstore.md for how the commands are used.
 package script_coldstore
 
 import (
@@ -229,5 +229,6 @@ func Commands(depsFn func() CommandDeps) []*cli.Command {
 				return runProdCheck(ctx, depsFn())
 			},
 		},
+		pullCommand(),
 	}
 }
