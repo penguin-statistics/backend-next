@@ -21,6 +21,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/pkg/observability"
 	"exusiai.dev/backend-next/internal/service"
 )
 
@@ -143,16 +144,26 @@ func (w *Worker) globalMatrixRefresh(batchCtx context.Context, name, server stri
 		ctx, cancel := context.WithTimeout(logger.WithContext(context.Background()), w.timeout)
 		defer cancel()
 		ctx, span := tracer.Start(ctx, "calcwkr."+name, trace.WithAttributes(attribute.String("server", server)))
-		err := observeCalcDuration(name, server, func() (err error) {
+		var panicked bool
+		dur, err := observeCalcDuration(name, server, func() (err error) {
 			// requests have the recovery of the http server, this goroutine has none: a panic would end the process
 			defer func() {
 				if r := recover(); r != nil {
+					panicked = true
 					err = errors.Errorf("panic: %v\n%s", r, debug.Stack())
 				}
 			}()
 			return refresh(ctx, server)
 		})
 		endSpan(span, err)
+		outcome := "ok"
+		if panicked {
+			outcome = "panic"
+		} else if err != nil {
+			outcome = "error"
+		}
+		observability.WorkerRefreshDuration.WithLabelValues(name, server).Observe(dur.Seconds())
+		observability.WorkerRefreshes.WithLabelValues(name, server, outcome).Inc()
 		if err != nil {
 			logger.Error().Err(err).Msg("failed to refresh the global matrices: dropped them, requests recalculate them")
 			return
@@ -247,54 +258,71 @@ func (w *Worker) task(ctx context.Context, typ WorkerCalcType, f func(ctx contex
 		time.Sleep(time.Second * 3)
 
 		for {
-			log.Ctx(parentCtx).Info().Int("count", w.count).Msg("worker batch timer fired. acquiring limiter lock...")
-			if err := w.lock(); err != nil {
-				log.Ctx(parentCtx).Warn().Err(err).Msg("failed to acquire lock, perhaps the resource is currently busy. sleeping for 30 seconds and trying again...")
-				time.Sleep(time.Second * 30)
-				continue
-			}
-			log.Ctx(parentCtx).Info().Int("count", w.count).Msg("successfully acquired limiter lock")
-
-			ctx, cancel := context.WithTimeout(parentCtx, w.timeout)
-			ctx, span := tracer.Start(ctx, "calcwkr.batch", trace.WithAttributes(
-				attribute.String("type", string(typ)), attribute.Int("count", w.count)))
-
-			func() {
-				var batchErr error
-				defer func() {
-					endSpan(span, batchErr)
-					w.count++
-					cancel()
-					w.unlock()
-					time.Sleep(w.interval)
-				}()
-
-				// buffered: after a timeout nobody receives, and the goroutine must not leak
-				errChan := make(chan error, 1)
-				go func() {
-					errChan <- runForAllServers(ctx, f)
-				}()
-
-				select {
-				case <-ctx.Done():
-					batchErr = ctx.Err()
-					log.Ctx(ctx).Error().Int("count", w.count).Err(ctx.Err()).Msg("worker timeout reached")
-					return
-				case err := <-errChan:
-					if err != nil {
-						batchErr = err
-						log.Ctx(ctx).Error().Int("count", w.count).Err(err).Msg("worker unexpected error occurred while running batch")
-						return
-					}
-				}
-
-				log.Ctx(ctx).Info().Int("count", w.count).Msg("worker batch finished")
-
-				go func() {
-					w.heartbeat(typ)
-				}()
-			}()
+			w.batch(parentCtx, typ, f)
 		}
+	}()
+}
+
+// lockRetryDelay is how long a worker that did not acquire the lock waits before trying again.
+var lockRetryDelay = 30 * time.Second
+
+// batch runs f for every server once, holding the worker lock, then waits for the interval; or, when another worker
+// holds the lock, waits for lockRetryDelay.
+func (w *Worker) batch(parentCtx context.Context, typ WorkerCalcType, f func(ctx context.Context, server string) error) {
+	log.Ctx(parentCtx).Info().Int("count", w.count).Msg("worker batch timer fired. acquiring limiter lock...")
+	if err := w.lock(); err != nil {
+		observability.WorkerCalcBatches.WithLabelValues("lock_not_acquired").Inc()
+		log.Ctx(parentCtx).Warn().Err(err).Msg("failed to acquire lock, perhaps the resource is currently busy. sleeping for 30 seconds and trying again...")
+		time.Sleep(lockRetryDelay)
+		return
+	}
+	log.Ctx(parentCtx).Info().Int("count", w.count).Msg("successfully acquired limiter lock")
+
+	ctx, cancel := context.WithTimeout(parentCtx, w.timeout)
+	ctx, span := tracer.Start(ctx, "calcwkr.batch", trace.WithAttributes(
+		attribute.String("type", string(typ)), attribute.Int("count", w.count)))
+
+	start := time.Now()
+	outcome := "ok"
+	var batchErr error
+	defer func() {
+		observability.WorkerCalcBatchDuration.Observe(time.Since(start).Seconds())
+		observability.WorkerCalcBatches.WithLabelValues(outcome).Inc()
+		endSpan(span, batchErr)
+		w.count++
+		cancel()
+		w.unlock()
+		time.Sleep(w.interval)
+	}()
+
+	// buffered: after a timeout nobody receives, and the goroutine must not leak
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- runForAllServers(ctx, f)
+	}()
+
+	select {
+	case <-ctx.Done():
+		outcome, batchErr = "timeout", ctx.Err()
+		log.Ctx(ctx).Error().Int("count", w.count).Err(ctx.Err()).Msg("worker timeout reached")
+		return
+	case err := <-errChan:
+		if err != nil {
+			outcome, batchErr = "error", err
+			// a calculation that honours the cancellation returns ctx.Err() when the deadline passes, and this case
+			// can win the select over ctx.Done(): count it as the timeout it is
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				outcome = "timeout"
+			}
+			log.Ctx(ctx).Error().Int("count", w.count).Err(err).Msg("worker unexpected error occurred while running batch")
+			return
+		}
+	}
+
+	log.Ctx(ctx).Info().Int("count", w.count).Msg("worker batch finished")
+
+	go func() {
+		w.heartbeat(typ)
 	}()
 }
 
@@ -348,7 +376,9 @@ func (w *Worker) microtask(ctx context.Context, service, server string, f func(c
 	}()
 
 	log.Ctx(ctx).Info().Str("evt.name", "worker.calcwkr."+service).Str("server", server).Msg("worker microtask started calculating")
-	if err := observeCalcDuration(service, server, func() error { return f(ctx) }); err != nil {
+	dur, err := observeCalcDuration(service, server, func() error { return f(ctx) })
+	observability.WorkerCalcPhaseDuration.WithLabelValues(service, server).Observe(dur.Seconds())
+	if err != nil {
 		log.Ctx(ctx).Error().Str("evt.name", "worker.calcwkr."+service).Str("server", server).Err(err).Msg("worker microtask failed")
 		return err
 	}
