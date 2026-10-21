@@ -55,8 +55,8 @@ func TestAdjustDropInfosByTimesTypeBounds(t *testing.T) {
 		times      int
 		extraUpper int
 	}{
-		// each time gives at most 2 kinds of EXTRA items, and the stage has 8
-		{0, 2}, {1, 2}, {2, 4}, {3, 6}, {4, 8}, {5, 8}, {6, 8}, {10, 8},
+		// each time gives item 1 and at most 1 other kind of EXTRA items, and the stage has 8
+		{0, 2}, {1, 2}, {2, 3}, {3, 4}, {4, 5}, {5, 6}, {6, 7}, {7, 8}, {10, 8},
 	} {
 		itemDropInfos, typeDropInfos := main0107DropInfos()
 		adjustDropInfosByTimes(itemDropInfos, typeDropInfos, c.times)
@@ -73,31 +73,55 @@ func TestAdjustDropInfosByTimesTypeBounds(t *testing.T) {
 	}
 }
 
-// TestAdjustDropInfosByTimesNeverLower checks that the upper bound of a drop type is never lower than the one of
-// max(oldUpper, min(times, itemTypeCount)), which the verification had before: no report it accepted is rejected.
+// TestAdjustDropInfosByTimesNeverLower checks, over a grid of upper bounds, item counts, guaranteed items (lower bound
+// above 0) and times, that the upper bound of a drop type is never lower than max(oldUpper, min(times, itemTypeCount)),
+// which the verification had before: no report it accepted is rejected. It is the same for times 0 and 1, and above it
+// for times above 1 only by the kinds that times times can give: guaranteed + times * (oldUpper - guaranteed), at most
+// itemTypeCount.
 func TestAdjustDropInfosByTimesNeverLower(t *testing.T) {
 	for oldUpper := 0; oldUpper <= 4; oldUpper++ {
 		for itemTypeCount := 0; itemTypeCount <= 8; itemTypeCount++ {
-			for times := 0; times <= 10; times++ {
-				var itemDropInfos []*model.DropInfo
-				for i := 0; i < itemTypeCount; i++ {
-					itemDropInfos = append(itemDropInfos, &model.DropInfo{DropType: "EXTRA", ItemID: null.IntFrom(int64(i + 1)), Bounds: &model.Bounds{Upper: 1}})
-				}
-				typeDropInfo := &model.DropInfo{DropType: "EXTRA", Bounds: &model.Bounds{Lower: 0, Upper: oldUpper}}
-				adjustDropInfosByTimes(itemDropInfos, []*model.DropInfo{typeDropInfo}, times)
+			for guaranteed := 0; guaranteed <= itemTypeCount; guaranteed++ {
+				for times := 0; times <= 10; times++ {
+					var itemDropInfos []*model.DropInfo
+					for i := 0; i < itemTypeCount; i++ {
+						lower := 0
+						if i < guaranteed {
+							lower = 1
+						}
+						itemDropInfos = append(itemDropInfos, &model.DropInfo{DropType: "EXTRA", ItemID: null.IntFrom(int64(i + 1)), Bounds: &model.Bounds{Lower: lower, Upper: 1}})
+					}
+					typeDropInfo := &model.DropInfo{DropType: "EXTRA", Bounds: &model.Bounds{Lower: 0, Upper: oldUpper}}
+					adjustDropInfosByTimes(itemDropInfos, []*model.DropInfo{typeDropInfo}, times)
+					got := typeDropInfo.Bounds.Upper
 
-				before := times
-				if itemTypeCount < before {
-					before = itemTypeCount
-				}
-				if oldUpper > before {
-					before = oldUpper
-				}
-				if typeDropInfo.Bounds.Upper < before {
-					t.Errorf("upper %d, %d items, times %d: upper bound %d, below %d", oldUpper, itemTypeCount, times, typeDropInfo.Bounds.Upper, before)
-				}
-				if times == 1 && typeDropInfo.Bounds.Upper != before {
-					t.Errorf("upper %d, %d items, times 1: upper bound %d, want %d as before", oldUpper, itemTypeCount, typeDropInfo.Bounds.Upper, before)
+					before := times
+					if itemTypeCount < before {
+						before = itemTypeCount
+					}
+					if oldUpper > before {
+						before = oldUpper
+					}
+					want := before
+					if times > 1 {
+						possible := guaranteed + times*(oldUpper-guaranteed)
+						if itemTypeCount < possible {
+							possible = itemTypeCount
+						}
+						if possible > want {
+							want = possible
+						}
+					}
+
+					if got < before {
+						t.Errorf("upper %d, %d items, %d guaranteed, times %d: upper bound %d, below %d", oldUpper, itemTypeCount, guaranteed, times, got, before)
+					}
+					if times <= 1 && got != before {
+						t.Errorf("upper %d, %d items, %d guaranteed, times %d: upper bound %d, want %d as before", oldUpper, itemTypeCount, guaranteed, times, got, before)
+					}
+					if got != want {
+						t.Errorf("upper %d, %d items, %d guaranteed, times %d: upper bound %d, want %d", oldUpper, itemTypeCount, guaranteed, times, got, want)
+					}
 				}
 			}
 		}
@@ -105,8 +129,8 @@ func TestAdjustDropInfosByTimesNeverLower(t *testing.T) {
 }
 
 // TestVerifyDropsMultipleTimes checks main_01-07 for times 1 to 6: every count of EXTRA kinds a run can give, 1 to
-// times + 1 (item 1 and one other per time), passes; times 1 still rejects the counts it cannot give, and times 2 and 3
-// reject one kind above their upper bound of 2 * times.
+// times + 1 (item 1 and one other per time), passes; times 1 still rejects the counts it cannot give, and times 2 to 6
+// reject times + 2 kinds, one above what they can give (#580: 4 kinds at times 2).
 func TestVerifyDropsMultipleTimes(t *testing.T) {
 	verify := func(report *types.ReportTaskSingleReport) []error {
 		itemDropInfos, typeDropInfos := main0107DropInfos()
@@ -124,8 +148,8 @@ func TestVerifyDropsMultipleTimes(t *testing.T) {
 
 	for _, c := range []struct{ times, kinds int }{
 		{1, 0}, {1, 3}, {1, 4}, {1, 8},
-		// the stage has 8 EXTRA items, so from times 4 on no count is above the upper bound
-		{2, 5}, {3, 7},
+		// the stage has 8 EXTRA items, so from times 7 on no count is above the upper bound
+		{2, 4}, {3, 5}, {4, 6}, {5, 7}, {6, 8},
 	} {
 		errs := verify(main0107Report(c.times, c.kinds))
 		if !lo.SomeBy(errs, func(err error) bool { return errors.Is(err, ErrInvalidDropType) }) {
