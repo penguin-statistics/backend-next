@@ -293,3 +293,71 @@ func TestSourceRunStopsWithContext(t *testing.T) {
 		t.Errorf("%d fetches, want Run to fetch every TTL", u.hits.Load())
 	}
 }
+
+func TestSourceDoesNotFollowRedirects(t *testing.T) {
+	elsewhere := httptest.NewServer(&upstream{status: 200, contentType: "text/html", body: shellV2})
+	t.Cleanup(elsewhere.Close)
+	u := &upstream{status: 200, contentType: "text/html", body: shellV1}
+	s, c := newSource(t, u)
+	if sh := mustGet(t, s); !strings.Contains(string(sh.Raw()), "v1") {
+		t.Fatal("first copy not fetched")
+	}
+	redirect := httptest.NewServer(http.RedirectHandler(elsewhere.URL+"/", http.StatusFound))
+	t.Cleanup(redirect.Close)
+	s.conf.URL = redirect.URL + "/"
+	c.advance(time.Hour)
+	if err := s.Refresh(context.Background()); err == nil || !strings.Contains(err.Error(), "not followed") {
+		t.Fatalf("Refresh: %v, want the redirect refused", err)
+	}
+	if sh := mustGet(t, s); !strings.Contains(string(sh.Raw()), "v1") {
+		t.Error("the copy at hand was replaced by the redirect target")
+	}
+}
+
+func TestSourceIgnoresProxyEnvironment(t *testing.T) {
+	t.Setenv("HTTP_PROXY", "http://127.0.0.1:1")
+	t.Setenv("http_proxy", "http://127.0.0.1:1")
+	u := &upstream{status: 200, contentType: "text/html", body: shellV1}
+	srv := httptest.NewServer(u)
+	t.Cleanup(srv.Close)
+	// httptest listens on 127.0.0.1, which ProxyFromEnvironment never proxies: check the transport instead
+	s := New(Config{URL: srv.URL + "/"})
+	if tr, ok := s.conf.Client.Transport.(*http.Transport); !ok || tr.Proxy != nil {
+		t.Error("the default client uses a proxy from the environment")
+	}
+	if _, err := s.Get(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestNewAppliesDefaults(t *testing.T) {
+	for _, d := range []time.Duration{0, -time.Second} {
+		conf := New(Config{URL: "http://frontend/", TTL: d, Timeout: d}).Config()
+		if conf.TTL != DefaultTTL || conf.Timeout != DefaultTimeout || conf.Client.Timeout != DefaultTimeout {
+			t.Errorf("TTL and Timeout %v: got %v, %v", d, conf.TTL, conf.Timeout)
+		}
+	}
+	// Run with a TTL of 0 used to panic in NewTicker
+	s := New(Config{URL: "http://127.0.0.1:1/", TTL: 0, Timeout: 50 * time.Millisecond})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { s.Run(ctx); close(done) }()
+	cancel()
+	<-done
+}
+
+func TestValidateURL(t *testing.T) {
+	for raw, ok := range map[string]bool{
+		"http://frontend-rollout.default.svc.cluster.local/": true,
+		"https://penguin-stats.io/index.html":                true,
+		"":                                                   false,
+		"frontend-rollout/":                                  false,
+		"file:///etc/passwd":                                 false,
+		"ftp://frontend/":                                    false,
+		"http:///index.html":                                 false,
+	} {
+		if err := ValidateURL(raw); (err == nil) != ok {
+			t.Errorf("ValidateURL(%q) = %v", raw, err)
+		}
+	}
+}
