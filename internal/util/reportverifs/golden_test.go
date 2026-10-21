@@ -160,14 +160,44 @@ func (f *goldenFixture) task(i int) *types.ReportTask {
 	return task
 }
 
+// acceptedSince580 are the tasks of the fixture, by creation time, whose one report production rejected (6) and the
+// verification accepts (0) since #580: main_01-07 on CN by MAA, times above 1, with exactly times + 1 kinds of EXTRA
+// items (item 1 every time, and another one each time). The upper bound of the drop type was times then.
+var acceptedSince580 = map[int64]struct{}{
+	1792442045923410: {}, // times 2, 3 kinds of EXTRA items
+	1792442087171325: {}, // times 3, 4 kinds
+	1792442691974785: {}, // times 2, 3 kinds
+	1792442770717793: {}, // times 2, 3 kinds
+	1792442980676064: {}, // times 2, 3 kinds
+	1792443237162180: {}, // times 2, 3 kinds
+	1792443293505065: {}, // times 2, 3 kinds
+	1792443469399203: {}, // times 2, 3 kinds
+	1792443582307508: {}, // times 2, 3 kinds
+	1792443680911074: {}, // times 2, 3 kinds
+	1792444005907837: {}, // times 2, 3 kinds
+	1792444055595097: {}, // times 2, 3 kinds
+	1792444231823050: {}, // times 2, 3 kinds
+	1792444262877090: {}, // times 2, 3 kinds
+	1792444296838620: {}, // times 4, 5 kinds
+	1792444317484411: {}, // times 2, 3 kinds
+	1792444411856978: {}, // times 2, 3 kinds
+	1792444441852630: {}, // times 2, 3 kinds
+	1792444498974912: {}, // times 4, 5 kinds
+	1792444680651388: {}, // times 2, 3 kinds
+	1792444884750042: {}, // times 2, 3 kinds
+	1792446076522142: {}, // times 2, 3 kinds
+	1792446163818001: {}, // times 2, 3 kinds
+}
+
 // TestReliabilityGolden verifies the report tasks of the fixture, and checks that each report gets the reliability
-// stored for it in production.
+// stored for it in production, except the reports in acceptedSince580, which now get 0.
 func TestReliabilityGolden(t *testing.T) {
 	db, f := loadGolden(t)
 	v := &Verifier{DropInfoRepo: repo.NewDropInfo(db), RejectRuleRepo: repo.NewRejectRule(db)}
 	ctx := context.Background()
 
 	counts := map[int]int{}
+	accepted := 0
 	for i, ft := range f.Tasks {
 		task := f.task(i)
 		for idx, report := range task.Reports {
@@ -176,14 +206,25 @@ func TestReliabilityGolden(t *testing.T) {
 				t.Fatal(err)
 			}
 			counts[got]++
-			if stored := ft.Reports[idx].Reliability; got != stored {
-				t.Errorf("task %d (created at %d), report %d: reliability %d, stored %d", i, ft.CreatedAt, idx, got, stored)
+			want := ft.Reports[idx].Reliability
+			if _, ok := acceptedSince580[ft.CreatedAt]; ok {
+				if want != 6 {
+					t.Errorf("task %d (created at %d), report %d: stored %d, not 6", i, ft.CreatedAt, idx, want)
+				}
+				want = 0
+				accepted++
+			}
+			if got != want {
+				t.Errorf("task %d (created at %d), report %d: reliability %d, want %d", i, ft.CreatedAt, idx, got, want)
 			}
 			// the messages equalled the pipeline's while it existed: here, a rejected report has one
 			if (message != "") != (got != 0) {
 				t.Errorf("task %d (created at %d), report %d: reliability %d with message %q", i, ft.CreatedAt, idx, got, message)
 			}
 		}
+	}
+	if accepted != len(acceptedSince580) {
+		t.Errorf("%d reports of acceptedSince580 verified, want %d", accepted, len(acceptedSince580))
 	}
 	t.Logf("%d tasks verified; reports by reliability: %v", len(f.Tasks), counts)
 }

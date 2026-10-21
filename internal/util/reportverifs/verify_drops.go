@@ -100,15 +100,18 @@ func adjustDropInfosByTimes(itemDropInfos []*model.DropInfo, typeDropInfos []*mo
 
 	for _, dropInfo := range typeDropInfos {
 		// The lower bound remains the same, because no matter how many times you play, you can always get at least as many types as the lower bound
-		// For upper bound, if times < item_type_count_for_this_drop_type, it means it's impossible to get each type at least once, so we adjust upper bound to be max(oldUpper, times)
-		// if times > item_type_count_for_this_drop_type, it means you are able to get each type at lease once, so we adjust upper bound to be max(oldUpper, item_type_count_for_this_drop_type)
-		// newUpper = max(oldUpper, min(times, item_type_count_for_this_drop_type))
-		minBetweenTimesAndItemTypeCount := times
-		if dropTypeItemTypeCountMap[dropInfo.DropType] < minBetweenTimesAndItemTypeCount {
-			minBetweenTimesAndItemTypeCount = dropTypeItemTypeCountMap[dropInfo.DropType]
+		// For upper bound, each time can give up to oldUpper types, so newUpper = max(oldUpper, min(max(oldUpper, 1) * times, item_type_count_for_this_drop_type))
+		// max(oldUpper, 1) keeps one type per time for an oldUpper of 0, so the bound is never lower than the old max(oldUpper, min(times, item_type_count_for_this_drop_type))
+		upper := dropInfo.Bounds.Upper
+		if upper < 1 {
+			upper = 1
 		}
-		if minBetweenTimesAndItemTypeCount > dropInfo.Bounds.Upper {
-			dropInfo.Bounds.Upper = minBetweenTimesAndItemTypeCount
+		upper *= times
+		if dropTypeItemTypeCountMap[dropInfo.DropType] < upper {
+			upper = dropTypeItemTypeCountMap[dropInfo.DropType]
+		}
+		if upper > dropInfo.Bounds.Upper {
+			dropInfo.Bounds.Upper = upper
 		}
 		if dropInfo.Bounds.Exceptions != nil {
 			dropInfo.Bounds.Exceptions = nil
