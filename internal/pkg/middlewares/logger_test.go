@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/rs/zerolog"
@@ -201,6 +203,42 @@ func TestRequestLoggerTruncatesClientIP(t *testing.T) {
 		}
 		if got := requestLog(t, &buf)["network.client.ip"]; got != tt.want {
 			t.Errorf("X-Original-Forwarded-For %q: logged network.client.ip = %v, want %s", tt.forwardedFor, got, tt.want)
+		}
+	}
+}
+
+func TestRequestLoggerLogsAccountIDNotPenguinID(t *testing.T) {
+	const penguinId = "87654321"
+
+	var buf bytes.Buffer
+	app, _ := newLoggedApp(t, &buf)
+	app.Get("/anonymous", func(ctx *fiber.Ctx) error { return ctx.SendString("ok") })
+	app.Get("/account", func(ctx *fiber.Ctx) error {
+		// as Report.MiddlewareGetOrCreateAccount does
+		ctx.Locals(constant.LocalsAccountIDKey, 4242)
+		return ctx.SendString("ok")
+	})
+
+	tests := []struct {
+		path string
+		want any
+	}{
+		{"/anonymous", nil},
+		{"/account", "4242"},
+	}
+	for _, tt := range tests {
+		buf.Reset()
+		req := httptest.NewRequest("GET", tt.path, nil)
+		req.Header.Set(fiber.HeaderAuthorization, constant.PenguinIDAuthorizationRealm+penguinId)
+		req.AddCookie(&http.Cookie{Name: constant.PenguinIDCookieKey, Value: penguinId})
+		if _, err := app.Test(req); err != nil {
+			t.Fatal(err)
+		}
+		if got := requestLog(t, &buf)["usr.id"]; got != tt.want {
+			t.Errorf("%s: logged usr.id = %v, want %v", tt.path, got, tt.want)
+		}
+		if strings.Contains(buf.String(), penguinId) {
+			t.Errorf("%s: PenguinID logged: %s", tt.path, buf.String())
 		}
 	}
 }
