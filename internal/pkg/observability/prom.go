@@ -104,6 +104,37 @@ var (
 		Help:    "Size of HTTP response bodies in bytes by matched route, method and status class",
 		Buckets: prometheus.ExponentialBuckets(1024, 8, 5),
 	}, []string{"route", "method", "status_class"})
+	// WorkerCalcBatchDuration and WorkerCalcBatches cover the batches of the calc worker. outcome is one of ok,
+	// error, timeout and lock_not_acquired; a batch that did not acquire the lock has no duration.
+	WorkerCalcBatchDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    prometheus.BuildFQName(ServiceName, "worker", "calc_batch_duration_seconds"),
+		Help:    "Duration of calc worker batches in seconds",
+		Buckets: prometheus.ExponentialBuckets(5, 2, 8),
+	})
+	WorkerCalcBatches = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "worker", "calc_batches_total"),
+		Help: "Calc worker batches by outcome",
+	}, []string{"outcome"})
+	// WorkerCalcPhaseDuration covers the microtasks of a batch for a server: phase is one of dropMatrix,
+	// patternMatrix, siteStats and archive. The top bucket, 512s, sits close to the 10 minute default timeout of a
+	// batch.
+	WorkerCalcPhaseDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    prometheus.BuildFQName(ServiceName, "worker", "calc_phase_duration_seconds"),
+		Help:    "Duration of calc worker phases in seconds",
+		Buckets: prometheus.ExponentialBuckets(0.5, 2, 11),
+	}, []string{"phase", "server"})
+	// WorkerRefreshDuration and WorkerRefreshes cover the background refreshes of the global matrices that follow
+	// the phases: refresh is one of globalDropMatrixRefresh and globalPatternMatrixRefresh, outcome one of ok, error
+	// and panic. The top bucket, 1024s, is past the 10 minute default timeout of a refresh.
+	WorkerRefreshDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    prometheus.BuildFQName(ServiceName, "worker", "refresh_duration_seconds"),
+		Help:    "Duration of background global matrix refreshes in seconds",
+		Buckets: prometheus.ExponentialBuckets(0.25, 2, 13),
+	}, []string{"refresh", "server"})
+	WorkerRefreshes = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "worker", "refreshes_total"),
+		Help: "Background global matrix refreshes by outcome",
+	}, []string{"refresh", "server", "outcome"})
 )
 
 // ReportSubjectLabel bounds the subject label of the report metrics to the subjects reports are published to.
