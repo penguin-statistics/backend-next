@@ -31,7 +31,6 @@ import (
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/repo"
 	"exusiai.dev/backend-next/internal/service"
-	"exusiai.dev/backend-next/internal/util/reportverifs"
 )
 
 // testSchema is the subset of the production schema the report worker writes and reads. The drop infos fit the drops of
@@ -170,7 +169,7 @@ func newTestWorker(t *testing.T) *Worker {
 		t.Fatal(err)
 	}
 
-	return &Worker{WorkerDeps: WorkerDeps{
+	return newWorker(WorkerDeps{
 		DB:                     db,
 		Redis:                  rdb,
 		StageService:           service.NewStage(repo.NewStage(db)),
@@ -178,11 +177,9 @@ func newTestWorker(t *testing.T) *Worker {
 		DropPatternRepo:        repo.NewDropPattern(db),
 		DropReportExtraRepo:    repo.NewDropReportExtra(db),
 		DropPatternElementRepo: repo.NewDropPatternElement(db),
-		ReportVerifier: reportverifs.NewReportVerifier(
-			reportverifs.NewDropVerifier(repo.NewDropInfo(db)),
-			reportverifs.NewRejectRuleVerifier(repo.NewRejectRule(db)),
-		),
-	}}
+		DropInfoRepo:           repo.NewDropInfo(db),
+		RejectRuleRepo:         repo.NewRejectRule(db),
+	}, defaultConsumerConfig)
 }
 
 // newTestTask returns a task of the account created at createdAt, encoded as it is published, with a task id of its
@@ -473,5 +470,22 @@ func TestProcessStoresReliabilities(t *testing.T) {
 	}
 	if want := []int{0, 6, 300, 6}; !reflect.DeepEqual(reliabilities, want) {
 		t.Errorf("reliabilities %v stored, want %v", reliabilities, want)
+	}
+}
+
+// TestProcessFailsWhenVerificationFails processes a task while the reject rules cannot be read: the task fails, to be
+// retried, rather than being stored with a reliability the verification did not decide.
+func TestProcessFailsWhenVerificationFails(t *testing.T) {
+	w := newTestWorker(t)
+	if _, err := w.DB.ExecContext(context.Background(), "ALTER TABLE reject_rules RENAME TO reject_rules_gone"); err != nil {
+		t.Fatal(err)
+	}
+	task := newTestTask(t, w, 42, time.UnixMicro(1760600000123456), "203.0.113.7", testReport("main_01-07", 30012))
+
+	if err := processTask(t, w, task); err == nil {
+		t.Fatal("processed without the reject rules")
+	}
+	if n := countRows(t, w.DB, "drop_reports"); n != 0 {
+		t.Errorf("%d reports stored, want 0", n)
 	}
 }

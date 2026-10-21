@@ -47,7 +47,8 @@ type WorkerDeps struct {
 	DropPatternRepo        *repo.DropPattern
 	DropReportExtraRepo    *repo.DropReportExtra
 	DropPatternElementRepo *repo.DropPatternElement
-	ReportVerifier         *reportverifs.ReportVerifiers
+	DropInfoRepo           *repo.DropInfo
+	RejectRuleRepo         *repo.RejectRule
 }
 
 // consumerConfig is the configuration of the report consumer. Tests run it on streams of their own, with the times
@@ -106,7 +107,8 @@ const (
 type Worker struct {
 	WorkerDeps
 
-	conf consumerConfig
+	conf     consumerConfig
+	verifier reportverifs.Verifier
 	// handle processes a task: process, or a stand-in in tests
 	handle func(ctx context.Context, reportTask *types.ReportTask) error
 
@@ -120,6 +122,7 @@ func newWorker(deps WorkerDeps, conf consumerConfig) *Worker {
 	w := &Worker{
 		WorkerDeps: deps,
 		conf:       conf,
+		verifier:   reportverifs.Verifier{DropInfoRepo: deps.DropInfoRepo, RejectRuleRepo: deps.RejectRuleRepo},
 		stopping:   make(chan struct{}),
 	}
 	w.handle = w.process
@@ -611,11 +614,22 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 		Start(ctx, "reportwkr.process.Verify",
 			trace.WithSpanKind(trace.SpanKindInternal))
 
-	violations := w.ReportVerifier.Verify(verifyCtx, reportTask)
-	if len(violations) > 0 {
+	// verified before persisting: persist merges the drops of each report by item, in place
+	reliabilities := make([]int, len(reportTask.Reports))
+	rejected := false
+	for idx, report := range reportTask.Reports {
+		reliability, err := w.verifier.Reliability(verifyCtx, reportTask, report)
+		if err != nil {
+			verifySpan.End()
+			return errors.Wrap(err, "failed to verify report")
+		}
+		reliabilities[idx] = reliability
+		rejected = rejected || reliability != 0
+	}
+	if rejected {
 		L.Warn().
 			Str("evt.name", "reportwkr.violations").
-			Stringer("violations", violations).
+			Ints("reliabilities", reliabilities).
 			Msg("report task verification failed on some or all reports")
 	}
 
@@ -629,7 +643,7 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 	// the transaction is rolled back when persist returns an error, and committed otherwise
 	var reportId int
 	err := w.DB.RunInTx(pstCtx, nil, func(ctx context.Context, tx bun.Tx) (err error) {
-		reportId, err = w.persist(ctx, tx, reportTask, taskCreatedAt, violations)
+		reportId, err = w.persist(ctx, tx, reportTask, taskCreatedAt, reliabilities)
 		if err != nil {
 			// rolled back here rather than by RunInTx, which drops the error of a failed rollback. A failed commit
 			// is not rolled back: it has already ended the transaction. Neither has a transaction database/sql
@@ -664,9 +678,9 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 	return nil
 }
 
-// persist stores the reports of the task in tx, and returns the id of the last report of the task (0 if it has
-// none).
-func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.ReportTask, taskCreatedAt time.Time, violations reportverifs.Violations) (int, error) {
+// persist stores the reports of the task in tx with their reliabilities, and returns the id of the last report of
+// the task (0 if it has none).
+func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.ReportTask, taskCreatedAt time.Time, reliabilities []int) (int, error) {
 	var reportId int
 	// calculate drop pattern hash for each report
 	for idx, report := range reportTask.Reports {
@@ -689,7 +703,7 @@ func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.Repor
 			return 0, errors.Wrap(err, "failed to get stage")
 		}
 
-		reliability := violations.Reliability(idx)
+		reliability := reliabilities[idx]
 
 		dropReport := &model.DropReport{
 			StageID:     stage.StageID,
