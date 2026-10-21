@@ -3,9 +3,7 @@ package reportverifs
 import (
 	"context"
 	"fmt"
-	"strings"
 
-	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
@@ -23,36 +21,17 @@ var (
 	ErrUnknownDropInfoTuple = errors.New("unknown drop type + item id tuple")
 )
 
-type DropVerifier struct {
-	DropInfoRepo *repo.DropInfo
-}
-
-// ensure DropVerifier conforms to Verifier
-var _ Verifier = (*DropVerifier)(nil)
-
-func NewDropVerifier(dropInfoRepo *repo.DropInfo) *DropVerifier {
-	return &DropVerifier{
-		DropInfoRepo: dropInfoRepo,
-	}
-}
-
-func (d *DropVerifier) Name() string {
-	return "drop"
-}
-
-func (d *DropVerifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) *Rejection {
-	itemDropInfos, typeDropInfos, err := d.DropInfoRepo.GetForCurrentTimeRangeWithDropTypes(ctx, &repo.DropInfoQuery{
+// verifyDrops returns how the drops of the report do not fit the drop infos of its stage, if they do not.
+func (v *Verifier) verifyDrops(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) ([]error, error) {
+	itemDropInfos, typeDropInfos, err := v.DropInfoRepo.GetForCurrentTimeRangeWithDropTypes(ctx, &repo.DropInfoQuery{
 		Server:     reportTask.Server,
 		ArkStageId: report.StageID,
 	})
 	if err != nil {
-		return &Rejection{
-			Reliability: constant.ViolationReliabilityDrop,
-			Message:     err.Error(),
-		}
+		return nil, errors.Wrap(err, "failed to get drop infos")
 	}
 
-	d.adjustDropInfosByTimes(itemDropInfos, typeDropInfos, report.Times)
+	adjustDropInfosByTimes(itemDropInfos, typeDropInfos, report.Times)
 
 	if l := log.Trace(); l.Enabled() {
 		l.Interface("itemDropInfos", itemDropInfos).
@@ -62,33 +41,18 @@ func (d *DropVerifier) Verify(ctx context.Context, report *types.ReportTaskSingl
 
 	var errs []error
 
-	if innerErrs := d.verifyDropType(report, typeDropInfos); innerErrs != nil {
+	if innerErrs := verifyDropType(report, typeDropInfos); innerErrs != nil {
 		errs = append(errs, innerErrs...)
 	}
 
-	if innerErrs := d.verifyDropItem(report, itemDropInfos); innerErrs != nil {
+	if innerErrs := verifyDropItem(report, itemDropInfos); innerErrs != nil {
 		errs = append(errs, innerErrs...)
 	}
 
-	if len(errs) > 0 {
-		var b strings.Builder
-		for i, err := range errs {
-			b.WriteString(err.Error())
-			if i < len(errs)-1 {
-				b.WriteString(", ")
-			}
-		}
-
-		return &Rejection{
-			Reliability: constant.ViolationReliabilityDrop,
-			Message:     b.String(),
-		}
-	}
-
-	return nil
+	return errs, nil
 }
 
-func (d *DropVerifier) verifyDropType(report *types.ReportTaskSingleReport, dropInfos []*model.DropInfo) (errs []error) {
+func verifyDropType(report *types.ReportTaskSingleReport, dropInfos []*model.DropInfo) (errs []error) {
 	grouped := lo.GroupBy(report.Drops, func(drop *types.Drop) string {
 		return drop.DropType
 	})
@@ -120,7 +84,7 @@ func (d *DropVerifier) verifyDropType(report *types.ReportTaskSingleReport, drop
 	return errs
 }
 
-func (d *DropVerifier) adjustDropInfosByTimes(itemDropInfos []*model.DropInfo, typeDropInfos []*model.DropInfo, times int) {
+func adjustDropInfosByTimes(itemDropInfos []*model.DropInfo, typeDropInfos []*model.DropInfo, times int) {
 	dropTypeItemTypeCountMap := make(map[string]int)
 
 	for _, dropInfo := range itemDropInfos {
@@ -162,7 +126,7 @@ type DropInfoTuple struct {
  * Check 1: iterate drops, check if any item is not in dropInfos
  * Check 2: iterate dropInfos, check if quantity is within bounds
  */
-func (d *DropVerifier) verifyDropItem(report *types.ReportTaskSingleReport, dropInfos []*model.DropInfo) (errs []error) {
+func verifyDropItem(report *types.ReportTaskSingleReport, dropInfos []*model.DropInfo) (errs []error) {
 	dropInfoSetFromDropInfos := make(map[DropInfoTuple]struct{})
 	for _, dropInfo := range dropInfos {
 		tuple := DropInfoTuple{

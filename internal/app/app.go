@@ -15,7 +15,6 @@ import (
 	"exusiai.dev/backend-next/internal/repo"
 	"exusiai.dev/backend-next/internal/server"
 	"exusiai.dev/backend-next/internal/service"
-	"exusiai.dev/backend-next/internal/util/reportverifs"
 	"exusiai.dev/backend-next/internal/workers/calcwkr"
 	"exusiai.dev/backend-next/internal/workers/reportwkr"
 )
@@ -53,9 +52,6 @@ func options(ctx appcontext.Ctx, withWorkers bool, additionalOpts ...fx.Option) 
 
 		// Servers
 		server.Module(),
-
-		// Verifiers
-		reportverifs.Module(),
 
 		// Repositories
 		repo.Module(),

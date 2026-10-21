@@ -31,10 +31,11 @@ import (
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/repo"
 	"exusiai.dev/backend-next/internal/service"
-	"exusiai.dev/backend-next/internal/util/reportverifs"
 )
 
-// testSchema is the subset of the production schema the report worker writes and reads.
+// testSchema is the subset of the production schema the report worker writes and reads. The drop infos fit the drops of
+// the tests, but the REGULAR 30012 of main_01-07 only before the drops of a report are merged by item: merged with an
+// EXTRA 30012, it would be over its upper bound. The reject rule rejects the reports of 7 times.
 const testSchema = `
 CREATE TYPE server AS ENUM ('CN', 'US', 'JP', 'KR');
 CREATE TABLE drop_reports (
@@ -81,10 +82,47 @@ CREATE TABLE stages (
 	min_clear_time integer
 );
 INSERT INTO stages (ark_stage_id, zone_id, stage_type) VALUES ('main_01-07', 1, 'MAIN'), ('main_04-04', 4, 'MAIN');
+CREATE TABLE items (
+	item_id serial PRIMARY KEY
+);
+CREATE TABLE time_ranges (
+	range_id bigserial PRIMARY KEY,
+	start_time timestamp with time zone NOT NULL,
+	end_time timestamp with time zone NOT NULL,
+	server server NOT NULL
+);
+INSERT INTO time_ranges (start_time, end_time, server) VALUES ('-infinity', 'infinity', 'CN');
+CREATE TABLE drop_infos (
+	drop_id bigserial PRIMARY KEY,
+	server server NOT NULL,
+	stage_id integer NOT NULL,
+	item_id integer,
+	drop_type text NOT NULL,
+	range_id bigint NOT NULL,
+	bounds jsonb,
+	accumulable boolean NOT NULL,
+	extras jsonb
+);
+INSERT INTO drop_infos (server, stage_id, item_id, drop_type, range_id, bounds, accumulable) VALUES
+	('CN', 1, 30012, 'REGULAR', 1, '{"lower": 0, "upper": 2}', true),
+	('CN', 1, 30012, 'EXTRA', 1, '{"lower": 0, "upper": 1}', true),
+	('CN', 1, 30013, 'REGULAR', 1, '{"lower": 0, "upper": 1}', true),
+	('CN', 1, 30062, 'REGULAR', 1, '{"lower": 0, "upper": 1}', true),
+	('CN', 1, 30062, 'SPECIAL', 1, '{"lower": 0, "upper": 1}', true),
+	('CN', 2, 30013, 'REGULAR', 1, '{"lower": 0, "upper": 1}', true);
+CREATE TABLE reject_rules (
+	rule_id serial PRIMARY KEY,
+	created_at timestamp with time zone DEFAULT now() NOT NULL,
+	updated_at timestamp with time zone,
+	status integer DEFAULT 1,
+	expr text NOT NULL,
+	with_reliability integer NOT NULL
+);
+INSERT INTO reject_rules (expr, with_reliability) VALUES ('Report.Times == 7', 300);
 `
 
 // newTestWorker returns a worker persisting to a fresh schema on PENGUIN_TEST_POSTGRES_DSN holding testSchema, and
-// setting the recall keys on PENGUIN_TEST_REDIS_URL. Reports are not verified: all get reliability 0.
+// setting the recall keys on PENGUIN_TEST_REDIS_URL.
 func newTestWorker(t *testing.T) *Worker {
 	t.Helper()
 	dsn := os.Getenv("PENGUIN_TEST_POSTGRES_DSN")
@@ -131,7 +169,7 @@ func newTestWorker(t *testing.T) *Worker {
 		t.Fatal(err)
 	}
 
-	return &Worker{WorkerDeps: WorkerDeps{
+	return newWorker(WorkerDeps{
 		DB:                     db,
 		Redis:                  rdb,
 		StageService:           service.NewStage(repo.NewStage(db)),
@@ -139,8 +177,9 @@ func newTestWorker(t *testing.T) *Worker {
 		DropPatternRepo:        repo.NewDropPattern(db),
 		DropReportExtraRepo:    repo.NewDropReportExtra(db),
 		DropPatternElementRepo: repo.NewDropPatternElement(db),
-		ReportVerifier:         &reportverifs.ReportVerifiers{},
-	}}
+		DropInfoRepo:           repo.NewDropInfo(db),
+		RejectRuleRepo:         repo.NewRejectRule(db),
+	}, defaultConsumerConfig)
 }
 
 // newTestTask returns a task of the account created at createdAt, encoded as it is published, with a task id of its
@@ -407,4 +446,62 @@ func TestProcessStoresReportWithoutDrops(t *testing.T) {
 	})
 	assertRows(t, w.DB, dumpDropPatterns, []string{"1|2d06800538d394c2|"})
 	assertRows(t, w.DB, dumpDropPatternElements, []string{})
+}
+
+// TestProcessStoresReliabilities stores the reliability the verification gives each report of a task: 0 for drops
+// that fit the drop infos, 6 for drops that do not, and the reliability of the reject rule a report matches. The drop
+// check comes first: a report failing both gets 6. The rejection is logged with why each rejected report was rejected
+// (violations) and the reliabilities.
+func TestProcessStoresReliabilities(t *testing.T) {
+	w := newTestWorker(t)
+	var logs lockedBuffer
+	prev := log.Logger
+	log.Logger = zerolog.New(&logs)
+	t.Cleanup(func() { log.Logger = prev })
+	rejected := testReport("main_04-04", 30013)
+	rejected.Times = 7
+	both := testReport("main_01-07", 99999)
+	both.Times = 7
+	task := newTestTask(t, w, 42, time.UnixMicro(1760600000123456), "203.0.113.7",
+		testReport("main_01-07", 30012), testReport("main_01-07", 99999), rejected, both)
+
+	if err := processTask(t, w, task); err != nil {
+		t.Fatal(err)
+	}
+
+	var reliabilities []int
+	if err := w.DB.NewRaw("SELECT reliability FROM drop_reports ORDER BY report_id").Scan(context.Background(), &reliabilities); err != nil {
+		t.Fatal(err)
+	}
+	if want := []int{0, 6, 300, 6}; !reflect.DeepEqual(reliabilities, want) {
+		t.Errorf("reliabilities %v stored, want %v", reliabilities, want)
+	}
+	rejections := logEntries(t, &logs, "reportwkr.violations")
+	if len(rejections) != 1 {
+		t.Fatalf("%d rejections logged, want 1", len(rejections))
+	}
+	violations, _ := rejections[0]["violations"].(string)
+	if n := strings.Count(violations, "; ") + 1; n != 3 || !strings.Contains(violations, "reject rule") {
+		t.Errorf("violations %q logged, want the messages of the 3 rejected reports, one of a reject rule", violations)
+	}
+	if got, want := fmt.Sprint(rejections[0]["reliabilities"]), "[0 6 300 6]"; got != want {
+		t.Errorf("reliabilities %s logged, want %s", got, want)
+	}
+}
+
+// TestProcessFailsWhenVerificationFails processes a task while the reject rules cannot be read: the task fails, to be
+// retried, rather than being stored with a reliability the verification did not decide.
+func TestProcessFailsWhenVerificationFails(t *testing.T) {
+	w := newTestWorker(t)
+	if _, err := w.DB.ExecContext(context.Background(), "ALTER TABLE reject_rules RENAME TO reject_rules_gone"); err != nil {
+		t.Fatal(err)
+	}
+	task := newTestTask(t, w, 42, time.UnixMicro(1760600000123456), "203.0.113.7", testReport("main_01-07", 30012))
+
+	if err := processTask(t, w, task); err == nil {
+		t.Fatal("processed without the reject rules")
+	}
+	if n := countRows(t, w.DB, "drop_reports"); n != 0 {
+		t.Errorf("%d reports stored, want 0", n)
+	}
 }

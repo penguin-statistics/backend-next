@@ -12,27 +12,9 @@ import (
 	"golang.org/x/mod/semver"
 
 	"exusiai.dev/backend-next/internal/model/types"
-	"exusiai.dev/backend-next/internal/repo"
 )
 
 var ErrExprMatched = errors.New("reject expr matched")
-
-type RejectRuleVerifier struct {
-	RejectRuleRepo *repo.RejectRule
-}
-
-// ensure RejectRuleVerifier conforms to Verifier
-var _ Verifier = (*RejectRuleVerifier)(nil)
-
-func NewRejectRuleVerifier(rejectRuleRepo *repo.RejectRule) *RejectRuleVerifier {
-	return &RejectRuleVerifier{
-		RejectRuleRepo: rejectRuleRepo,
-	}
-}
-
-func (d *RejectRuleVerifier) Name() string {
-	return "reject_rule"
-}
 
 type ReportContext struct {
 	Report *types.ReportTaskSingleReport
@@ -43,13 +25,12 @@ func (ReportContext) SemVerCompare(a, b string) int {
 	return semver.Compare(a, b)
 }
 
-func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) *Rejection {
-	rejectRules, err := d.RejectRuleRepo.GetAllActiveRejectRules(ctx)
+// rejectRuleReliability returns the reliability of the first active reject rule the report matches, by rule id, with
+// the message "reject rule <id> matched", or 0 if it matches none. A rule whose reliability is out of range, or that fails to evaluate, is skipped.
+func (v *Verifier) rejectRuleReliability(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) (int, string, error) {
+	rejectRules, err := v.RejectRuleRepo.GetAllActiveRejectRules(ctx)
 	if err != nil {
-		return &Rejection{
-			Reliability: constant.ViolationReliabilityRejectRuleUnexpected,
-			Message:     err.Error(),
-		}
+		return 0, "", errors.Wrap(err, "failed to get reject rules")
 	}
 
 	reportContext := ReportContext{
@@ -86,7 +67,7 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 			continue
 		}
 
-		shouldReject := d.resultHandler(result)
+		shouldReject := resultHandler(result)
 
 		if shouldReject {
 			log.Warn().
@@ -97,10 +78,7 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 				Bool("verifier.evaluation.should_reject", shouldReject).
 				Msg("reject rule matched, rejecting using specified reliability value")
 
-			return &Rejection{
-				Reliability: rejectRule.WithReliability,
-				Message:     fmt.Sprintf("reject rule %d matched", rejectRule.RuleID),
-			}
+			return rejectRule.WithReliability, fmt.Sprintf("reject rule %d matched", rejectRule.RuleID), nil
 		} else {
 			if l := log.Trace(); l.Enabled() {
 				l.Interface("context", reportContext).
@@ -110,10 +88,10 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 		}
 	}
 
-	return nil
+	return 0, "", nil
 }
 
-func (d *RejectRuleVerifier) resultHandler(result any) bool {
+func resultHandler(result any) bool {
 	switch r := result.(type) {
 	case bool:
 		return r
