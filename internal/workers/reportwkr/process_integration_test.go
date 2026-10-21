@@ -5,6 +5,7 @@ package reportwkr
 // and internal/workers/calcwkr/lock_test.go. Every test works in a schema of its own, which it drops afterwards.
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -12,12 +13,16 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"exusiai.dev/gommon/constant"
 	"github.com/goccy/go-json"
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
@@ -289,4 +294,273 @@ func TestProcessStoresReports(t *testing.T) {
 	})
 	assertRecallKey(t, w, taskID(t, batch), "2")
 	assertRecallKey(t, w, taskID(t, singular), "3")
+}
+
+func countRows(t *testing.T, db bun.IDB, table string) int {
+	t.Helper()
+	var n int
+	if err := db.NewRaw("SELECT count(*) FROM "+table).Scan(context.Background(), &n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// lockedBuffer is a buffer the loggers of several goroutines can write to.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+// captureLogs sends the global logger to a buffer until the end of the test, and returns a function counting the
+// entries logged with the given evt.name.
+func captureLogs(t *testing.T) (count func(evtName string) int) {
+	t.Helper()
+	var b lockedBuffer
+	prev := log.Logger
+	log.Logger = zerolog.New(&b)
+	t.Cleanup(func() { log.Logger = prev })
+	return func(evtName string) int {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		return strings.Count(b.buf.String(), `"evt.name":"`+evtName+`"`)
+	}
+}
+
+func testAccountID() int {
+	return rand.Intn(1<<30) + 1
+}
+
+func testReport(stageId string, itemId int) *types.ReportTaskSingleReport {
+	return &types.ReportTaskSingleReport{
+		FragmentStageID: types.FragmentStageID{StageID: stageId},
+		Drops:           []*types.Drop{{DropType: "REGULAR", ItemID: itemId, Quantity: 1}},
+		Times:           1,
+	}
+}
+
+func TestProcessIsIdempotentSequential(t *testing.T) {
+	w := newTestWorker(t)
+	duplicates := captureLogs(t)
+	task := newTestTask(t, w, testAccountID(), time.UnixMicro(1760600000123456), "203.0.113.7", testReport("main_01-07", 30012))
+
+	if err := processTask(t, w, task); err != nil {
+		t.Fatal(err)
+	}
+	reports, extras := dumpRows(t, w.DB, dumpDropReports), dumpRows(t, w.DB, dumpDropReportExtras)
+	if err := processTask(t, w, task); err != nil {
+		t.Fatal(err)
+	}
+
+	assertRows(t, w.DB, dumpDropReports, reports)
+	assertRows(t, w.DB, dumpDropReportExtras, extras)
+	if len(reports) != 1 || len(extras) != 1 {
+		t.Errorf("%d reports and %d extras stored, want 1 and 1", len(reports), len(extras))
+	}
+	if n := duplicates("reportwkr.duplicate"); n != 1 {
+		t.Errorf("%d copies skipped, want 1", n)
+	}
+	assertRecallKey(t, w, taskID(t, task), "1")
+}
+
+// TestProcessIsIdempotentConcurrent processes 8 copies of a task at once, as the push consumer did on 2026-10-16.
+func TestProcessIsIdempotentConcurrent(t *testing.T) {
+	w := newTestWorker(t)
+	// a task of another account creates the pattern first, as in production almost every pattern exists
+	if err := processTask(t, w, newTestTask(t, w, testAccountID(), time.UnixMicro(1760600000000000), "203.0.113.7", testReport("main_01-07", 30012))); err != nil {
+		t.Fatal(err)
+	}
+	duplicates := captureLogs(t)
+	task := newTestTask(t, w, testAccountID(), time.UnixMicro(1760600000123456), "203.0.113.7", testReport("main_01-07", 30012))
+
+	const copies = 8
+	start := make(chan struct{})
+	errs := make(chan error, copies)
+	var wg sync.WaitGroup
+	for i := 0; i < copies; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			errs <- processTask(t, w, task)
+		}()
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Error(err)
+		}
+	}
+
+	if n := countRows(t, w.DB, "drop_reports"); n != 2 {
+		t.Errorf("%d reports stored, want 2", n)
+	}
+	if n := countRows(t, w.DB, "drop_report_extras"); n != 2 {
+		t.Errorf("%d extras stored, want 2", n)
+	}
+	if n := duplicates("reportwkr.duplicate"); n != copies-1 {
+		t.Errorf("%d copies skipped, want %d", n, copies-1)
+	}
+}
+
+// failFirstExtra makes the first insert into drop_report_extras fail after 2s, holding its transaction (and the
+// lock of the account) meanwhile. A sequence counts the inserts, as it is not rolled back with the transaction.
+const failFirstExtra = `
+CREATE SEQUENCE extra_inserts;
+CREATE FUNCTION fail_first_extra() RETURNS trigger AS $$
+BEGIN
+	IF nextval('extra_inserts') = 1 THEN
+		PERFORM pg_sleep(2);
+		RAISE EXCEPTION 'injected failure';
+	END IF;
+	RETURN NEW;
+END $$ LANGUAGE plpgsql;
+CREATE TRIGGER fail_first_extra BEFORE INSERT ON drop_report_extras FOR EACH ROW EXECUTE FUNCTION fail_first_extra();
+`
+
+// waitAdvisoryLock waits until the lock of a task of the account is held (granted) or waited for (not granted).
+func waitAdvisoryLock(t *testing.T, db bun.IDB, accountId int, granted bool) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		var n int
+		if err := db.NewRaw(`SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND classid = ? AND objsubid = 2
+			AND database = (SELECT oid FROM pg_database WHERE datname = current_database()) AND granted = ?`,
+			accountId, granted).Scan(context.Background(), &n); err != nil {
+			t.Fatal(err)
+		}
+		if n > 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("advisory lock of account %d (granted: %t) not found", accountId, granted)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// TestProcessFirstCopyRollsBack fails the copy holding the lock after it inserted its report: the copy waiting for it
+// must then find nothing stored and persist the task.
+func TestProcessFirstCopyRollsBack(t *testing.T) {
+	w := newTestWorker(t)
+	duplicates := captureLogs(t)
+	if _, err := w.DB.ExecContext(context.Background(), failFirstExtra); err != nil {
+		t.Fatal(err)
+	}
+	accountId := testAccountID()
+	task := newTestTask(t, w, accountId, time.UnixMicro(1760600000123456), "203.0.113.7", testReport("main_01-07", 30012))
+
+	first, second := make(chan error, 1), make(chan error, 1)
+	go func() { first <- processTask(t, w, task) }()
+	waitAdvisoryLock(t, w.DB, accountId, true)
+	go func() { second <- processTask(t, w, task) }()
+	waitAdvisoryLock(t, w.DB, accountId, false)
+
+	if err := <-first; err == nil || !strings.Contains(err.Error(), "injected failure") {
+		t.Errorf("first copy: got %v, want the injected failure", err)
+	}
+	if err := <-second; err != nil {
+		t.Errorf("second copy: %v", err)
+	}
+	if n := countRows(t, w.DB, "drop_reports"); n != 1 {
+		t.Errorf("%d reports stored, want 1", n)
+	}
+	if n := countRows(t, w.DB, "drop_report_extras"); n != 1 {
+		t.Errorf("%d extras stored, want 1", n)
+	}
+	if n := duplicates("reportwkr.duplicate"); n != 0 {
+		t.Errorf("%d copies skipped, want 0", n)
+	}
+}
+
+func TestBatchTaskAppliedOnce(t *testing.T) {
+	w := newTestWorker(t)
+	task := newTestTask(t, w, testAccountID(), time.UnixMicro(1760600000123456), "203.0.113.7",
+		testReport("main_01-07", 30012), testReport("main_04-04", 30013), testReport("main_01-07", 30062))
+
+	for i := 0; i < 2; i++ {
+		if err := processTask(t, w, task); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if n := countRows(t, w.DB, "drop_reports"); n != 3 {
+		t.Errorf("%d reports stored, want 3", n)
+	}
+	if n := countRows(t, w.DB, "drop_report_extras"); n != 3 {
+		t.Errorf("%d extras stored, want 3", n)
+	}
+}
+
+// TestTaskOfAccountDoesNotWait processes a task while another task of the same account is being persisted: the lock
+// is taken per task, so it does not wait for the other one.
+func TestTaskOfAccountDoesNotWait(t *testing.T) {
+	w := newTestWorker(t)
+	ctx := context.Background()
+	accountId := testAccountID()
+	createdAt := time.UnixMicro(1760600000123456)
+	// different items, so that the tasks do not wait for each other on a new pattern either
+	inProgress := &types.ReportTask{}
+	if err := json.Unmarshal(newTestTask(t, w, accountId, createdAt, "203.0.113.7", testReport("main_01-07", 30012)), inProgress); err != nil {
+		t.Fatal(err)
+	}
+	other := &types.ReportTask{}
+	if err := json.Unmarshal(newTestTask(t, w, accountId, createdAt.Add(time.Microsecond), "203.0.113.7", testReport("main_01-07", 30013)), other); err != nil {
+		t.Fatal(err)
+	}
+
+	// the task in progress holds its lock until tx ends
+	tx, err := w.DB.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if err := w.persist(ctx, tx, inProgress, createdAt, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	otherCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	if err := w.process(otherCtx, other); err != nil {
+		t.Fatalf("other task of the account: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	if n := countRows(t, w.DB, "drop_reports"); n != 2 {
+		t.Errorf("%d reports stored, want 2", n)
+	}
+}
+
+// TestDistinctTasksSameAccount checks that tasks of an account are told apart by their created_at alone.
+func TestDistinctTasksSameAccount(t *testing.T) {
+	w := newTestWorker(t)
+	duplicates := captureLogs(t)
+	accountId := testAccountID()
+	createdAt := time.UnixMicro(1760600000123456)
+	tasks := [][]byte{
+		newTestTask(t, w, accountId, createdAt, "203.0.113.7", testReport("main_01-07", 30012)),
+		newTestTask(t, w, accountId, createdAt.Add(time.Microsecond), "203.0.113.7", testReport("main_01-07", 30012)),
+	}
+
+	for _, task := range tasks {
+		if err := processTask(t, w, task); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if n := countRows(t, w.DB, "drop_reports"); n != 2 {
+		t.Errorf("%d reports stored, want 2", n)
+	}
+	if n := duplicates("reportwkr.duplicate"); n != 0 {
+		t.Errorf("%d copies skipped, want 0", n)
+	}
 }
