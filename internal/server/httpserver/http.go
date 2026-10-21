@@ -14,6 +14,7 @@ import (
 	"github.com/gofiber/contrib/fibersentry"
 	"github.com/gofiber/contrib/otelfiber"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"github.com/gofiber/fiber/v2/middleware/recover"
@@ -83,6 +84,12 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 	middlewares.Logger(app)
 	// then we need an extra middleware to extract it and repopulate it into ctx.Locals
 	app.Use(middlewares.RequestID())
+
+	// Compress responses, as neither ingress-nginx nor cloudflared does. It wraps the handlers and the /result
+	// response cache, so the cache keeps uncompressed bodies; BestSpeed as every response is compressed again.
+	app.Use(compress.New(compress.Config{
+		Level: compress.LevelBestSpeed,
+	}))
 
 	app.Use(func(c *fiber.Ctx) error {
 		// Use custom error handler to return customized error responses
