@@ -83,6 +83,8 @@ func TestBatchRecordsItsOutcomeAndDuration(t *testing.T) {
 		{"ok", lockedPool{}, func(context.Context, string) error { return nil }, 200 * time.Millisecond, 1},
 		{"error", lockedPool{}, func(context.Context, string) error { return errFailed }, 0, 1},
 		{"timeout", lockedPool{}, func(context.Context, string) error { <-release; return nil }, 0, 1},
+		// a calculation that returns once its context is done is a timeout too, whichever case of the select wins
+		{"timeout", lockedPool{}, func(ctx context.Context, _ string) error { <-ctx.Done(); return ctx.Err() }, 0, 1},
 		{"lock_not_acquired", busyPool{}, func(context.Context, string) error {
 			t.Error("ran a batch without the lock")
 			return nil

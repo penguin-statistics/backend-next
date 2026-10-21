@@ -309,6 +309,11 @@ func (w *Worker) batch(parentCtx context.Context, typ WorkerCalcType, f func(ctx
 	case err := <-errChan:
 		if err != nil {
 			outcome, batchErr = "error", err
+			// a calculation that honours the cancellation returns ctx.Err() when the deadline passes, and this case
+			// can win the select over ctx.Done(): count it as the timeout it is
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				outcome = "timeout"
+			}
 			log.Ctx(ctx).Error().Int("count", w.count).Err(err).Msg("worker unexpected error occurred while running batch")
 			return
 		}
