@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -145,5 +146,51 @@ func TestDrainNATS(t *testing.T) {
 	}
 	if n := handled.Load(); n != 20 {
 		t.Errorf("%d messages handled before the close, want 20", n)
+	}
+}
+
+// TestDrainNATSReportsTimeout drains a connection whose subscription is stuck in its handler past the drain timeout:
+// the client closes the connection all the same, and drainNATS returns the timeout instead of success, the error still
+// reaching the error handler of the connection.
+func TestDrainNATSReportsTimeout(t *testing.T) {
+	url := os.Getenv("PENGUIN_TEST_NATS_URL")
+	if url == "" {
+		t.Skip("PENGUIN_TEST_NATS_URL is not set")
+	}
+	var logged atomic.Int32
+	nc, err := nats.Connect(url,
+		nats.DrainTimeout(50*time.Millisecond),
+		nats.ErrorHandler(func(*nats.Conn, *nats.Subscription, error) { logged.Add(1) }),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(nc.Close)
+
+	subject := "T" + strconv.FormatUint(rand.Uint64(), 36)
+	stuck, release := make(chan struct{}), make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	if _, err := nc.Subscribe(subject, func(*nats.Msg) {
+		close(stuck)
+		<-release
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := nc.Publish(subject, nil); err != nil {
+		t.Fatal(err)
+	}
+	<-stuck
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = drainNATS(ctx, nc)
+	if !errors.Is(err, nats.ErrDrainTimeout) {
+		t.Errorf("drainNATS returned %v, want %v", err, nats.ErrDrainTimeout)
+	}
+	if !nc.IsClosed() {
+		t.Error("connection not closed after the drain")
+	}
+	if logged.Load() == 0 {
+		t.Error("the drain timeout did not reach the error handler of the connection")
 	}
 }
