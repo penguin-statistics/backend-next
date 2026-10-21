@@ -379,7 +379,8 @@ func (c *Result) runAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery, de
 	if timeout <= 0 {
 		return nil, ErrAdvancedQueryTimeout
 	}
-	lookupCtx, cancel := context.WithDeadline(ctx.UserContext(), deadline.Add(advancedQueryLookupGrace))
+	lookupDeadline := deadline.Add(advancedQueryLookupGrace)
+	lookupCtx, cancel := context.WithDeadline(ctx.UserContext(), lookupDeadline)
 	defer cancel()
 	var result any
 	err := c.DropReportService.RunWithStatementTimeout(lookupCtx, timeout, func(qctx context.Context) (err error) {
@@ -387,7 +388,9 @@ func (c *Result) runAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery, de
 		return err
 	})
 	if err != nil {
-		if lookupCtx.Err() == context.DeadlineExceeded {
+		// pgdriver reads with the deadline of the context as the deadline of the socket, which can end the read
+		// before the context itself is done: the time tells whether a query failed because the deadline passed
+		if !time.Now().Before(lookupDeadline) {
 			return nil, ErrAdvancedQueryTimeout
 		}
 		return nil, err
