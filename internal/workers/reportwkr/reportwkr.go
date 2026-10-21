@@ -190,8 +190,18 @@ func newWorker(deps WorkerDeps, conf consumerConfig) *Worker {
 }
 
 // Start checks that the database has the report schema of the configuration and sets the report consumer up, failing
-// the startup if either fails, and runs its workers while the app runs.
+// the startup if either fails, and runs its workers while the app runs. It does nothing when the report worker is
+// disabled.
 func Start(lc fx.Lifecycle, conf *appconfig.Config, deps WorkerDeps) error {
+	if !conf.ReportWorkerEnabled {
+		// the report tasks wait in the stream until a report worker runs again: see
+		// appconfig.ConfigSpec.ReportWorkerEnabled
+		log.Info().
+			Str("evt.name", "worker.reportwkr.disabled").
+			Msg("report worker is disabled due to configuration: report tasks stay in NATS until it is enabled")
+		return nil
+	}
+
 	w := newWorker(deps, defaultConsumerConfig)
 	w.reportSchemaV2 = conf.ReportSchemaV2Enabled
 	if err := w.checkReportSchema(context.Background()); err != nil {
