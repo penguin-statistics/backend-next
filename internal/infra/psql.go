@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
@@ -14,6 +16,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/pkg/observability"
 )
 
 func Postgres(conf *appconfig.Config) (*bun.DB, error) {
@@ -41,6 +44,11 @@ func Postgres(conf *appconfig.Config) (*bun.DB, error) {
 	pgdb.SetMaxIdleConns(conf.PostgresMaxIdleConns)
 	pgdb.SetConnMaxLifetime(conf.PostgresConnMaxLifeTime)
 	pgdb.SetConnMaxIdleTime(conf.PostgresConnMaxIdleTime)
+
+	// export the pool stats (open, in use, idle, waits, closed by limit) as penguinbackend_go_sql_*
+	registerMetrics("postgres",
+		prometheus.WrapRegistererWithPrefix(observability.ServiceName+"_", metricsRegisterer),
+		collectors.NewDBStatsCollector(pgdb, "penguin-postgres"))
 
 	return db, nil
 }
