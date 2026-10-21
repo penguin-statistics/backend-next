@@ -21,8 +21,8 @@ type RejectRuleVerifier struct {
 	RejectRuleRepo *repo.RejectRule
 }
 
-// ensure RejectRuleVerifier conforms to Verifier
-var _ Verifier = (*RejectRuleVerifier)(nil)
+// ensure RejectRuleVerifier conforms to pipelineVerifier
+var _ pipelineVerifier = (*RejectRuleVerifier)(nil)
 
 func NewRejectRuleVerifier(rejectRuleRepo *repo.RejectRule) *RejectRuleVerifier {
 	return &RejectRuleVerifier{
@@ -86,7 +86,7 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 			continue
 		}
 
-		shouldReject := d.resultHandler(result)
+		shouldReject := resultHandler(result)
 
 		if shouldReject {
 			log.Warn().
@@ -113,7 +113,73 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 	return nil
 }
 
-func (d *RejectRuleVerifier) resultHandler(result any) bool {
+// rejectRuleReliability returns the reliability of the first active reject rule the report matches, by rule id, or 0
+// if it matches none. A rule whose reliability is out of range, or that fails to evaluate, is skipped.
+func (v *Verifier) rejectRuleReliability(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) (int, error) {
+	rejectRules, err := v.RejectRuleRepo.GetAllActiveRejectRules(ctx)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get reject rules")
+	}
+
+	reportContext := ReportContext{
+		Report: report,
+		Task:   reportTask,
+	}
+
+	start := time.Now()
+	defer func() {
+		if l := log.Trace(); l.Enabled() {
+			l.Dur("duration", time.Since(start)).
+				Msg("reject rule(s) evaluated")
+		}
+	}()
+
+	for _, rejectRule := range rejectRules {
+		if rejectRule.WithReliability < constant.ViolationReliabilityRejectRuleRangeLeast ||
+			rejectRule.WithReliability >= constant.ViolationReliabilityRejectRuleRangeMost {
+			log.Error().
+				Int("ruleId", rejectRule.RuleID).
+				Msgf("reject rule with reliability %d is out of range [%d, %d)", rejectRule.WithReliability, constant.ViolationReliabilityRejectRuleRangeLeast, constant.ViolationReliabilityRejectRuleRangeMost)
+
+			continue
+		}
+
+		result, err := expr.Eval(rejectRule.Expr, reportContext)
+		if err != nil {
+			log.Error().
+				Str("evt.name", "verifier.reject_rule.expr_eval_error").
+				Interface("context", reportContext).
+				Int("ruleId", rejectRule.RuleID).
+				Err(err).
+				Msgf("failed to evaluate reject rule %d", rejectRule.RuleID)
+			continue
+		}
+
+		shouldReject := resultHandler(result)
+
+		if shouldReject {
+			log.Warn().
+				Str("evt.name", "verifier.reject_rule.rejected").
+				Interface("context", reportContext).
+				Int("reject_rule.rule_id", rejectRule.RuleID).
+				Int("reject_rule.with_reliability", rejectRule.WithReliability).
+				Bool("verifier.evaluation.should_reject", shouldReject).
+				Msg("reject rule matched, rejecting using specified reliability value")
+
+			return rejectRule.WithReliability, nil
+		} else {
+			if l := log.Trace(); l.Enabled() {
+				l.Interface("context", reportContext).
+					Int("ruleId", rejectRule.RuleID).
+					Msgf("reject rule verification passed")
+			}
+		}
+	}
+
+	return 0, nil
+}
+
+func resultHandler(result any) bool {
 	switch r := result.(type) {
 	case bool:
 		return r
