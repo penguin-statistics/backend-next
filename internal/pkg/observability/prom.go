@@ -64,6 +64,20 @@ var (
 		Name: prometheus.BuildFQName(ServiceName, "nats", "async_errors_total"),
 		Help: "Number of asynchronous errors reported by the NATS connection",
 	})
+	// the cache label is the name a cache is constructed with (a constant per cache instance), so it stays bounded
+	CacheLookups = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "cache", "lookups_total"),
+		Help: "Cache lookups by result: hit (served from cache) or miss (not found, or calculated by MutexGetSet)",
+	}, []string{"cache", "result"})
+	CacheCalcDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    prometheus.BuildFQName(ServiceName, "cache", "calc_duration_seconds"),
+		Help:    "Duration of the value calculation of MutexGetSet on a miss in seconds",
+		Buckets: prometheus.ExponentialBuckets(0.001, 4, 7),
+	}, []string{"cache"})
+	CacheWrites = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "cache", "writes_total"),
+		Help: "Cache Set, Delete and Flush calls",
+	}, []string{"cache", "op"})
 )
 
 // ReportSubjectLabel bounds the subject label of the report metrics to the subjects reports are published to.

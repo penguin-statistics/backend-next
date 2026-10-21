@@ -11,6 +11,7 @@ import (
 func NewSet[T any](prefix string) *Set[T] {
 	return &Set[T]{
 		prefix:      prefix + ":",
+		metrics:     newMetrics(prefix),
 		c:           cache.New(cache.NoExpiration, time.Minute*10),
 		locks:       make(map[string]*keyLock),
 		calculating: make(map[string]bool),
@@ -29,7 +30,8 @@ type Set[T any] struct {
 	writeMu     sync.Mutex
 	calculating map[string]bool
 
-	prefix string
+	prefix  string
+	metrics metrics
 
 	c *cache.Cache
 }
@@ -39,6 +41,13 @@ func (c *Set[T]) key(key string) string {
 }
 
 func (c *Set[T]) Get(key string, dest *T) error {
+	err := c.get(key, dest)
+	c.metrics.lookup(err == nil)
+	return err
+}
+
+// get is Get without the lookup metric, for the lookups of MutexGetSet, which counts a lookup once
+func (c *Set[T]) get(key string, dest *T) error {
 	key = c.key(key)
 	result, ok := c.c.Get(key)
 	if !ok {
@@ -58,6 +67,7 @@ func (c *Set[T]) Set(key string, value T, expire time.Duration) {
 	if l := log.Trace(); l.Enabled() {
 		l.Str("key", key).Msg("setting value to cache")
 	}
+	c.metrics.write("set")
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 	c.markWrittenLocked(key)
@@ -75,8 +85,9 @@ func (c *Set[T]) markWrittenLocked(key string) {
 // writes value to dest.
 // The first return value means whether the value is got from cache or not. True means calculated; False means got from cache.
 func (c *Set[T]) MutexGetSet(key string, dest *T, valueFunc func() (*T, error), expire time.Duration) (bool, error) {
-	err := c.Get(key, dest)
+	err := c.get(key, dest)
 	if err == nil {
+		c.metrics.lookup(true)
 		return false, nil
 	}
 	// onwards, cache key does not exist
@@ -114,18 +125,22 @@ func (c *Set[T]) lockKey(key string) func() {
 
 func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, error), expire time.Duration) error {
 	defer c.lockKey(key)()
-	err := c.Get(key, dest)
+	err := c.get(key, dest)
 
 	if err == nil {
+		c.metrics.lookup(true)
 		return nil
 	}
+	c.metrics.lookup(false)
 
 	// the key's lock makes this the only calculation of the key
 	c.writeMu.Lock()
 	c.calculating[c.key(key)] = false
 	c.writeMu.Unlock()
 
+	start := time.Now()
 	value, err := valueFunc()
+	c.metrics.calculated(start)
 
 	// publish the value unless the key was written meanwhile (e.g. refreshed by the worker): then the value may have
 	// been calculated from older data, and the newer one is returned instead, if it is still there
@@ -140,7 +155,7 @@ func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, erro
 		log.Error().Err(err).Str("key", key).Msg("failed to get value from valueFunc() in MutexGetSet")
 		return err
 	}
-	if !published && c.Get(key, dest) == nil {
+	if !published && c.get(key, dest) == nil {
 		return nil
 	}
 
@@ -153,6 +168,7 @@ func (c *Set[T]) Delete(key string) error {
 	if l := log.Trace(); l.Enabled() {
 		l.Str("key", key).Msg("deleting value from cache")
 	}
+	c.metrics.write("delete")
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 	c.markWrittenLocked(key)
@@ -162,6 +178,7 @@ func (c *Set[T]) Delete(key string) error {
 }
 
 func (c *Set[T]) Flush() error {
+	c.metrics.write("flush")
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 	for key := range c.calculating {
