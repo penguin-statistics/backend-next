@@ -37,6 +37,9 @@ type testStream struct {
 	name    string
 	subject string // the subject the consumers subscribe to, like REPORT.*
 	publish string // a subject of the stream, like REPORT.SINGLE
+	// the dead-letter stream of the test, like penguin-reports-dead, and its subject prefix, like REPORT_DEAD.
+	dead       string
+	deadPrefix string
 }
 
 // newTestStream connects to PENGUIN_TEST_NATS_URL and creates a stream of its own.
@@ -57,7 +60,10 @@ func newTestStream(t *testing.T) *testStream {
 	}
 
 	id := strconv.FormatUint(rand.Uint64(), 36)
-	s := &testStream{url: url, js: js, name: "TEST_" + id, subject: "T" + id + ".*", publish: "T" + id + ".SINGLE"}
+	s := &testStream{
+		url: url, js: js, name: "TEST_" + id, subject: "T" + id + ".*", publish: "T" + id + ".SINGLE",
+		dead: "TESTDEAD_" + id, deadPrefix: "D" + id + ".",
+	}
 	if _, err := js.AddStream(&nats.StreamConfig{
 		Name:      s.name,
 		Subjects:  []string{s.subject},
@@ -73,7 +79,61 @@ func newTestStream(t *testing.T) *testStream {
 			t.Error(err)
 		}
 	})
+	s.addDeadStream(t)
 	return s
+}
+
+// addDeadStream creates the dead-letter stream of the test, configured as penguin-reports-dead is.
+func (s *testStream) addDeadStream(t *testing.T) {
+	t.Helper()
+	if _, err := s.js.AddStream(&nats.StreamConfig{
+		Name:       s.dead,
+		Subjects:   []string{s.deadPrefix + "*"},
+		Retention:  nats.LimitsPolicy,
+		Storage:    nats.FileStorage,
+		Duplicates: 10 * time.Minute,
+		MaxAge:     time.Hour,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := s.js.DeleteStream(s.dead); err != nil && !errors.Is(err, nats.ErrStreamNotFound) {
+			t.Error(err)
+		}
+	})
+}
+
+// deadMessages returns the messages of the dead-letter stream of the test, in order.
+func (s *testStream) deadMessages(t *testing.T) []*nats.RawStreamMsg {
+	t.Helper()
+	si, err := s.js.StreamInfo(s.dead)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var msgs []*nats.RawStreamMsg
+	for seq := si.State.FirstSeq; seq <= si.State.LastSeq && si.State.Msgs > 0; seq++ {
+		m, err := s.js.GetMsg(s.dead, seq)
+		if err != nil {
+			t.Fatal(err)
+		}
+		msgs = append(msgs, m)
+	}
+	return msgs
+}
+
+// checkDead checks that m is the copy of the message of sequence seq, payload data, in the dead-letter stream, moved
+// there after the given number of deliveries with an error containing errPart.
+func (s *testStream) checkDead(t *testing.T, m *nats.RawStreamMsg, seq uint64, data []byte, deliveries uint64, errPart string) {
+	t.Helper()
+	if m.Subject != s.deadPrefix+"SINGLE" || string(m.Data) != string(data) {
+		t.Errorf("dead-letter copy of %q under %s, want %q under %sSINGLE", m.Data, m.Subject, data, s.deadPrefix)
+	}
+	h := m.Header
+	if h.Get(HeaderOriginalSubject) != s.publish || h.Get(HeaderOriginalSequence) != strconv.FormatUint(seq, 10) ||
+		h.Get(HeaderDeliveries) != strconv.FormatUint(deliveries, 10) || !strings.Contains(h.Get(HeaderLastError), errPart) {
+		t.Errorf("dead-letter copy has headers %v, want subject %s, sequence %d, %d deliveries and an error with %q",
+			h, s.publish, seq, deliveries, errPart)
+	}
 }
 
 // connect returns a connection of its own to the server of the stream, closed after the test.
@@ -139,6 +199,9 @@ func logEntries(t *testing.T, logs *lockedBuffer, evtName string) []map[string]a
 	defer logs.mu.Unlock()
 	var entries []map[string]any
 	for _, line := range strings.Split(strings.TrimSpace(logs.buf.String()), "\n") {
+		if line == "" {
+			continue // nothing logged yet
+		}
 		var entry map[string]any
 		if err := json.Unmarshal([]byte(line), &entry); err != nil {
 			t.Fatal(err)
@@ -159,6 +222,7 @@ func (s *testStream) consumerConfig() consumerConfig {
 	c.fetchWait = 100 * time.Millisecond
 	c.nakDelay = 750 * time.Millisecond
 	c.maxNakDelay = 15 * time.Second
+	c.deadSubject = s.deadPrefix
 	return c
 }
 
@@ -295,6 +359,17 @@ func (c *handledCounter) add(key string) {
 }
 
 // stats returns the number of distinct keys handled, the number of handlings and the keys handled more than once.
+// counts returns how many times each key was handled.
+func (c *handledCounter) counts() map[string]int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	m := make(map[string]int, len(c.times))
+	for k, n := range c.times {
+		m[k] = n
+	}
+	return m
+}
+
 func (c *handledCounter) stats() (distinct, total, repeated int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -608,8 +683,8 @@ func TestRetryDelay(t *testing.T) {
 	}
 }
 
-// TestMalformedPayloadIsTerminated publishes a message that is no task: it is terminated without being handled, and
-// logged with its sequence number.
+// TestMalformedPayloadIsTerminated publishes a message that is no task: it is moved to the dead-letter stream and
+// terminated without being handled, and logged with its sequence number.
 func TestMalformedPayloadIsTerminated(t *testing.T) {
 	s := newTestStream(t)
 	var logs lockedBuffer
@@ -648,11 +723,16 @@ func TestMalformedPayloadIsTerminated(t *testing.T) {
 	if e := malformed[0]; e["seq"] != 1.0 || e["subject"] != s.publish || e["data"] != "not-json" || e["level"] != "error" {
 		t.Errorf("malformed task logged as %v, want its sequence 1, subject and data at error level", e)
 	}
+	dead := s.deadMessages(t)
+	if len(dead) != 1 {
+		t.Fatalf("%d messages in the dead-letter stream, want 1", len(dead))
+	}
+	s.checkDead(t, dead[0], 1, []byte("not-json"), 1, "invalid character")
 }
 
 // TestUnknownStageIsParked processes a task whose second report is of a stage that does not exist: no retry can store
-// it, so it is terminated and logged as it was published, although process merged the drops of the first report and
-// filled in its empty ip before it failed.
+// it, so it is moved to the dead-letter stream, terminated, and logged, all as it was published, although process
+// merged the drops of the first report and filled in its empty ip before it failed.
 func TestUnknownStageIsParked(t *testing.T) {
 	s := newTestStream(t)
 	tw := newTestWorker(t)
@@ -693,5 +773,150 @@ func TestUnknownStageIsParked(t *testing.T) {
 	}
 	if e := parked[0]; e["seq"] != 1.0 || !reflect.DeepEqual(e["reportTask"], published) || e["level"] != "error" {
 		t.Errorf("task parked as %v, want its sequence 1 and the task as published, %v, at error level", e, published)
+	}
+	dead := s.deadMessages(t)
+	if len(dead) != 1 {
+		t.Fatalf("%d messages in the dead-letter stream, want 1", len(dead))
+	}
+	s.checkDead(t, dead[0], 1, task, 1, "not found")
+}
+
+// TestDeadLetterAfter checks that a task failing at every delivery is retried for over an hour and a half (a database
+// outage of about an hour is retried through) and under two hours before it moves to the dead-letter stream.
+func TestDeadLetterAfter(t *testing.T) {
+	c := defaultConsumerConfig
+	var waited time.Duration
+	for d := uint64(1); d < c.deadLetterAfter; d++ {
+		waited += c.retryDelay(d)
+	}
+	if waited != 97*time.Minute+30*time.Second {
+		t.Errorf("the last delivery comes %s of retry delays after the first, want 97m30s", waited)
+	}
+}
+
+// TestPermanentFailuresMoveToDeadLetter publishes 128 tasks that fail at every delivery, twice the MaxAckPending
+// window that the tasks share, then 20 healthy ones. Each failing task moves to the dead-letter stream at its
+// deadLetterAfter-th delivery, so the healthy ones flow past them: each is handled once, and every failing one is in
+// the dead-letter stream once, with its subject, sequence, deliveries and last error.
+func TestPermanentFailuresMoveToDeadLetter(t *testing.T) {
+	s := newTestStream(t)
+	var logs lockedBuffer
+	prev := log.Logger
+	log.Logger = zerolog.New(&logs)
+	t.Cleanup(func() { log.Logger = prev })
+	conf := s.consumerConfig()
+	conf.nakDelay, conf.maxNakDelay = 10*time.Millisecond, 50*time.Millisecond
+	conf.deadLetterAfter = 3
+	w := newWorker(WorkerDeps{NatsJS: s.js}, conf)
+	var handled handledCounter
+	w.handle = func(ctx context.Context, task *types.ReportTask) error {
+		handled.add(task.TaskID)
+		if strings.HasPrefix(task.TaskID, "bad-") {
+			return errors.New("injected: value too long for type character varying(32)")
+		}
+		return nil
+	}
+
+	const bad, good = 2 * 64, 20
+	payloads := map[uint64][]byte{}
+	for i := 0; i < bad+good; i++ {
+		id := fmt.Sprintf("bad-%d", i)
+		if i >= bad {
+			id = fmt.Sprintf("good-%d", i)
+		}
+		b, err := json.Marshal(&types.ReportTask{TaskID: id})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ack, err := s.js.Publish(s.publish, b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		payloads[ack.Sequence] = b
+	}
+	startConsumer(t, w)
+	s.waitEmpty(t, conf.durable, time.Minute)
+
+	counts := handled.counts()
+	for i := bad; i < bad+good; i++ {
+		if n := counts[fmt.Sprintf("good-%d", i)]; n != 1 {
+			t.Errorf("good-%d handled %d times, want 1", i, n)
+		}
+	}
+	for i := 0; i < bad; i++ {
+		if n := counts[fmt.Sprintf("bad-%d", i)]; n != int(conf.deadLetterAfter) {
+			t.Errorf("bad-%d handled %d times, want %d", i, n, conf.deadLetterAfter)
+		}
+	}
+	dead := s.deadMessages(t)
+	if len(dead) != bad {
+		t.Fatalf("%d messages in the dead-letter stream, want %d", len(dead), bad)
+	}
+	for _, m := range dead {
+		seq, err := strconv.ParseUint(m.Header.Get(HeaderOriginalSequence), 10, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s.checkDead(t, m, seq, payloads[seq], conf.deadLetterAfter, "value too long")
+	}
+	if n := len(logEntries(t, &logs, "reportwkr.dead")); n != bad {
+		t.Errorf("%d tasks logged as moved to the dead-letter stream, want %d", n, bad)
+	}
+}
+
+// TestDeadLetterFailureKeepsTask moves a task to a dead-letter stream that does not exist: the task is not
+// terminated but delivered again, without being handled again, until the stream exists and stores it.
+func TestDeadLetterFailureKeepsTask(t *testing.T) {
+	s := newTestStream(t)
+	if err := s.js.DeleteStream(s.dead); err != nil {
+		t.Fatal(err)
+	}
+	var logs lockedBuffer
+	prev := log.Logger
+	log.Logger = zerolog.New(&logs)
+	t.Cleanup(func() { log.Logger = prev })
+	conf := s.consumerConfig()
+	conf.nakDelay, conf.maxNakDelay = 50*time.Millisecond, 100*time.Millisecond
+	conf.deadLetterAfter = 1
+	w := newWorker(WorkerDeps{NatsJS: s.js}, conf)
+	var handled handledCounter
+	w.handle = func(ctx context.Context, task *types.ReportTask) error {
+		handled.add(task.TaskID)
+		return errors.New("injected: permanent")
+	}
+	terminated := s.countTerminated(t, conf.durable)
+	startConsumer(t, w)
+	s.publishTasks(t, 1)
+
+	for deadline := time.Now().Add(10 * time.Second); len(logEntries(t, &logs, "reportwkr.dead.failed")) < 3; time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the move to the missing dead-letter stream did not fail 3 times")
+		}
+	}
+	if n := terminated(); n != 0 {
+		t.Errorf("%d messages terminated while the dead-letter stream is missing, want 0", n)
+	}
+	si, err := s.js.StreamInfo(s.name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if si.State.Msgs != 1 {
+		t.Errorf("stream holds %d messages while the dead-letter stream is missing, want 1", si.State.Msgs)
+	}
+
+	s.addDeadStream(t)
+	s.waitEmpty(t, conf.durable, 10*time.Second)
+	if _, total, _ := handled.stats(); total != 1 {
+		t.Errorf("handled %d times, want once: a task past its deliveries is only moved", total)
+	}
+	if n := terminated(); n != 1 {
+		t.Errorf("%d messages terminated, want 1", n)
+	}
+	dead := s.deadMessages(t)
+	if len(dead) != 1 {
+		t.Fatalf("%d messages in the dead-letter stream, want 1", len(dead))
+	}
+	if dead[0].Header.Get(HeaderOriginalSequence) != "1" {
+		t.Errorf("dead-letter copy of sequence %s, want 1", dead[0].Header.Get(HeaderOriginalSequence))
 	}
 }

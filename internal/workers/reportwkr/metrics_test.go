@@ -39,6 +39,19 @@ func newTestMsg(subject string, numDelivered int, data []byte) *nats.Msg {
 	}
 }
 
+// unreachableJS is a JetStream context whose publishes fail, as while NATS is unreachable.
+type unreachableJS struct {
+	nats.JetStreamContext
+}
+
+func (unreachableJS) PublishMsg(*nats.Msg, ...nats.PubOpt) (*nats.PubAck, error) {
+	return nil, nats.ErrConnectionClosed
+}
+
+func (unreachableJS) PublishMsgAsync(*nats.Msg, ...nats.PubOpt) (nats.PubAckFuture, error) {
+	return nil, nats.ErrConnectionClosed
+}
+
 // consumeDeliveries returns the current state of the consume_num_delivered histogram.
 func consumeDeliveries(t *testing.T) *dto.Histogram {
 	t.Helper()
@@ -55,7 +68,8 @@ func TestConsumeMetricsOnUnmarshalFailure(t *testing.T) {
 	ackFailuresBefore := testutil.ToFloat64(observability.ReportConsumeAckFailures)
 	deliveriesBefore := consumeDeliveries(t)
 
-	w := &Worker{}
+	// the move to the dead-letter stream fails, and so does the nak that follows it
+	w := &Worker{WorkerDeps: WorkerDeps{NatsJS: unreachableJS{}}}
 	w.ingestPreprocess(newTestMsg("REPORT.SINGLE", 3, []byte("{")))
 
 	if got := testutil.ToFloat64(consumed) - before; got != 1 {
