@@ -54,7 +54,7 @@ func (r *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.
 			log.Info().
 				Str("evt.name", "account.create.retry").
 				Int("retry", i).
-				Int("accountId", account.AccountID).
+				Str("finalizedPenguinID", account.PenguinID).
 				Msg("successfully created account after retry")
 		}
 		return account, nil

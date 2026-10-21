@@ -18,6 +18,7 @@ func Logger(app *fiber.App) {
 		app,
 		injectLogger(),
 		flog.RequestIDHandler("http.request_id", "X-Penguin-Request-ID"),
+		flog.PenguinIDHandler("usr.id"),
 		flog.RemoteAddrHandler("network.client.ip"),
 		flog.MethodHandler("http.method"),
 		flog.URLHandler("http.url"),
@@ -56,10 +57,10 @@ func requestLogger() func(ctx *fiber.Ctx) error {
 		if closed {
 			evt = evt.Bool("http.peer_closed", true)
 		}
-		// usr.id is the internal account id, for the routes that resolve the account into
-		// ctx.Locals (the report routes). Never log the PenguinID: it is the login credential.
+		// usr.id is the PenguinID; the routes that resolve the account into ctx.Locals (the
+		// report routes) also log its internal id, which joins drop_reports.account_id
 		if accountId, ok := ctx.Locals(constant.LocalsAccountIDKey).(int); ok {
-			evt = evt.Str("usr.id", strconv.Itoa(accountId))
+			evt = evt.Str("usr.account_id", strconv.Itoa(accountId))
 		}
 		evt.
 			Bytes("http.useragent", ctx.Request().Header.UserAgent()).
