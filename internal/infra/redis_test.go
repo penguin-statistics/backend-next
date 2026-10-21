@@ -29,16 +29,63 @@ func closedAddr(t *testing.T) string {
 }
 
 func TestPingRedisGivesUpAfterTheTimeout(t *testing.T) {
-	client := redis.NewClient(&redis.Options{Addr: closedAddr(t)})
-	t.Cleanup(func() { client.Close() })
-
 	start := time.Now()
-	if err := pingRedis(client, 2*time.Second); err == nil {
+	if err := pingRedis(&redis.Options{Addr: closedAddr(t)}, 2*time.Second); err == nil {
 		t.Fatal("got no error from an address nothing listens on")
 	}
 	// pings at 0 s, 0.5 s and 1.5 s; the next one would come after the timeout
 	if took := time.Since(start); took < time.Second || took > 3*time.Second {
 		t.Fatalf("took %s, want about 1.5 s", took)
+	}
+}
+
+// startSilentServer accepts connections and reads from them but never replies, like a Redis that hangs.
+func startSilentServer(t *testing.T) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var conns []net.Conn
+	t.Cleanup(func() {
+		ln.Close()
+		mu.Lock()
+		defer mu.Unlock()
+		for _, c := range conns {
+			c.Close()
+		}
+	})
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			conns = append(conns, c)
+			mu.Unlock()
+			go func() { _, _ = io.Copy(io.Discard, c) }()
+		}
+	}()
+	return ln.Addr().String()
+}
+
+// Before the boot ping had a client of its own with ContextTimeoutEnabled, each attempt against a Redis that does not
+// reply took the whole 3 s read timeout whatever the remaining timeout was, so the boot waited past it (about 63 s
+// instead of 60 s with the default options).
+func TestPingRedisStopsAtTheTimeoutWhileRedisDoesNotReply(t *testing.T) {
+	opts := &redis.Options{Addr: startSilentServer(t)}
+
+	start := time.Now()
+	if err := pingRedis(opts, time.Second); err == nil {
+		t.Fatal("got no error from a server that never replies")
+	}
+	if took := time.Since(start); took > 1500*time.Millisecond {
+		t.Fatalf("took %s, want it to stop at the 1 s timeout", took)
+	}
+	if opts.ContextTimeoutEnabled {
+		t.Fatal("pingRedis set ContextTimeoutEnabled on the options of the app's client")
 	}
 }
 
@@ -164,8 +211,7 @@ func startRedisErrorServer(t *testing.T, reply string) string {
 }
 
 func TestPingRedisRetriesOnlyWhileRedisIsLoading(t *testing.T) {
-	loading := redis.NewClient(&redis.Options{Addr: startRedisErrorServer(t, "LOADING Redis is loading the dataset in memory")})
-	t.Cleanup(func() { loading.Close() })
+	loading := &redis.Options{Addr: startRedisErrorServer(t, "LOADING Redis is loading the dataset in memory")}
 	start := time.Now()
 	if err := pingRedis(loading, 2*time.Second); err == nil || !strings.HasPrefix(err.Error(), "LOADING ") {
 		t.Fatalf("got %v, want the LOADING error", err)
@@ -174,8 +220,7 @@ func TestPingRedisRetriesOnlyWhileRedisIsLoading(t *testing.T) {
 		t.Fatalf("took %s, want it to have retried until the timeout", took)
 	}
 
-	wrongPass := redis.NewClient(&redis.Options{Addr: startRedisErrorServer(t, "WRONGPASS invalid username-password pair or user is disabled.")})
-	t.Cleanup(func() { wrongPass.Close() })
+	wrongPass := &redis.Options{Addr: startRedisErrorServer(t, "WRONGPASS invalid username-password pair or user is disabled.")}
 	start = time.Now()
 	if err := pingRedis(wrongPass, 10*time.Second); err == nil || !strings.HasPrefix(err.Error(), "WRONGPASS ") {
 		t.Fatalf("got %v, want the WRONGPASS error", err)

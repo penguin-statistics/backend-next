@@ -99,7 +99,10 @@ func TestRedisPoolMetrics(t *testing.T) {
 	}
 	defer client.Close()
 
-	// the constructor's PING opened the first connection
+	// the boot ping uses a client of its own, so the first PING opens the pool's first connection
+	if err := client.Ping(context.Background()).Err(); err != nil {
+		t.Fatal(err)
+	}
 	if v := gatheredValue(t, reg, "penguinbackend_redis_pool_total_conns"); v != 1 {
 		t.Fatalf("total conns = %v, want 1", v)
 	}
