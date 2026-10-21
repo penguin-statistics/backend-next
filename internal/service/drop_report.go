@@ -15,8 +15,9 @@ import (
 
 type DropReport struct {
 	DropReportRepo *repo.DropReport
-	// ColdDropReportRepo, when not nil, serves the archived part of the time ranges of the drop matrix (see
-	// CalcDropMatrixForIntervalsBySourceCategories).
+	// ColdDropReportRepo, when not nil, serves the archived part of the time ranges of the drop matrix and of the
+	// pattern matrix (see CalcDropMatrixForIntervalsBySourceCategories and
+	// CalcTotalQuantityForPatternMatrixBySourceCategories).
 	ColdDropReportRepo *repo.ColdDropReport
 }
 
@@ -219,10 +220,56 @@ func (s *DropReport) CalcTotalQuantityForPatternMatrix(
 	return s.DropReportRepo.CalcTotalQuantityForPatternMatrix(ctx, queryCtx)
 }
 
+// CalcTotalQuantityForPatternMatrixBySourceCategories, with the cold storage enabled for queries
+// (ColdDropReportRepo), reads the part of the interval before the hot boundary from the cold storage and the rest
+// from PostgreSQL, and adds the two up.
 func (s *DropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
 	ctx context.Context, queryCtx *model.DropReportQueryContext, sourceCategories []string,
 ) (map[string][]*model.TotalQuantityResultForPatternMatrix, error) {
-	return s.DropReportRepo.CalcTotalQuantityForPatternMatrixBySourceCategories(ctx, queryCtx, sourceCategories)
+	if s.ColdDropReportRepo == nil {
+		return s.DropReportRepo.CalcTotalQuantityForPatternMatrixBySourceCategories(ctx, queryCtx, sourceCategories)
+	}
+	view := s.ColdDropReportRepo.View()
+	cold, hot := splitQueryContexts(view, []*model.DropReportQueryContext{queryCtx})
+	if len(cold.queryCtxs) == 0 {
+		return s.DropReportRepo.CalcTotalQuantityForPatternMatrixBySourceCategories(ctx, queryCtx, sourceCategories)
+	}
+
+	results, err := s.ColdDropReportRepo.CalcTotalQuantityForPatternMatrixBySourceCategories(ctx, view, cold.queryCtxs[0], sourceCategories)
+	if err != nil {
+		return nil, err
+	}
+	if len(hot.queryCtxs) > 0 {
+		hotResults, err := s.DropReportRepo.CalcTotalQuantityForPatternMatrixBySourceCategories(ctx, hot.queryCtxs[0], sourceCategories)
+		if err != nil {
+			return nil, err
+		}
+		for _, sourceCategory := range sourceCategories {
+			results[sourceCategory] = addPatternQuantityResults(results[sourceCategory], hotResults[sourceCategory])
+		}
+	}
+	return results, nil
+}
+
+// addPatternQuantityResults adds the quantities of b to those of the same stage and pattern in a, and appends the
+// others of b.
+func addPatternQuantityResults(a, b []*model.TotalQuantityResultForPatternMatrix) []*model.TotalQuantityResultForPatternMatrix {
+	type key struct{ stageId, patternId int }
+	byKey := make(map[key]*model.TotalQuantityResultForPatternMatrix, len(a))
+	for _, result := range a {
+		byKey[key{result.StageID, result.PatternID}] = result
+	}
+	for _, result := range b {
+		k := key{result.StageID, result.PatternID}
+		if sum, ok := byKey[k]; ok {
+			sum.TotalQuantity += result.TotalQuantity
+			continue
+		}
+		sum := *result
+		byKey[k] = &sum
+		a = append(a, &sum)
+	}
+	return a
 }
 
 func (s *DropReport) CalcTotalTimesForPatternMatrix(
