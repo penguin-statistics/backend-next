@@ -890,13 +890,13 @@ func (s *DropMatrix) convertOneDropMatrixElementToStatsBundle(el *model.OneDropM
 // getOpeningStageIds returns the ids of the stages of server with a drop info in a current time range, which a
 // shim without closed zones keeps the elements of.
 func (s *DropMatrix) getOpeningStageIds(ctx context.Context, server string) (map[int]struct{}, error) {
-	currentDropInfos, err := s.DropInfoService.GetCurrentDropInfosByServer(ctx, server)
+	stageIds, err := s.DropInfoService.GetOpeningStageIdsByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
-	openingStageIds := make(map[int]struct{})
-	for _, dropInfo := range currentDropInfos {
-		openingStageIds[dropInfo.StageID] = struct{}{}
+	openingStageIds := make(map[int]struct{}, len(stageIds))
+	for _, stageId := range stageIds {
+		openingStageIds[stageId] = struct{}{}
 	}
 	return openingStageIds, nil
 }

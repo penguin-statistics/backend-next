@@ -56,6 +56,24 @@ func (r *DropInfo) GetDropInfoRangesByServer(ctx context.Context, server string)
 	})
 }
 
+// GetStageIdsByServerAndRangeIds returns the distinct ids of the stages with a drop info of server in one of the
+// time ranges of rangeIds, reading no other column.
+func (r *DropInfo) GetStageIdsByServerAndRangeIds(ctx context.Context, server string, rangeIds []int) ([]int, error) {
+	stageIds := make([]int, 0)
+	if len(rangeIds) == 0 {
+		return stageIds, nil
+	}
+	if err := r.db.NewSelect().
+		Model((*model.DropInfo)(nil)).
+		ColumnExpr("DISTINCT di.stage_id").
+		Where("di.server = ?", server).
+		Where("di.range_id IN (?)", bun.In(rangeIds)).
+		Scan(ctx, &stageIds); err != nil {
+		return nil, err
+	}
+	return stageIds, nil
+}
+
 type DropInfoQuery struct {
 	Server     string
 	ArkStageId string

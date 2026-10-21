@@ -860,6 +860,26 @@ type legacyGlobalPatternMatrixQuantity struct {
 	Quantity  int `bun:"quantity"`
 }
 
+// DropInfo.GetCurrentDropInfosByServer of v3.14.18: every drop info of server, filtered by the current time ranges
+func legacyGetCurrentDropInfosByServer(ctx context.Context, s *DropInfo, server string) ([]*model.DropInfo, error) {
+	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	currentTimeRanges, err := s.TimeRangeService.GetCurrentTimeRangesByServer(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	currentTimeRangesMap := make(map[int]*model.TimeRange)
+	for _, timeRange := range currentTimeRanges {
+		currentTimeRangesMap[timeRange.RangeID] = timeRange
+	}
+	linq.From(dropInfos).WhereT(func(dropInfo *model.DropInfo) bool {
+		return currentTimeRangesMap[dropInfo.RangeID] != nil
+	}).ToSlice(&dropInfos)
+	return dropInfos, nil
+}
+
 // the shim of v3.14.18: loads the current drop infos of server for the opening stages on every call
 func legacyApplyShimForDropMatrixQuery(ctx context.Context, s *DropMatrix, server string, showClosedZones bool, stageFilterStr, itemFilterStr string, queryResult *model.DropMatrixQueryResult) (*modelv2.DropMatrixQueryResult, error) {
 	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
@@ -875,7 +895,7 @@ func legacyApplyShimForDropMatrixQuery(ctx context.Context, s *DropMatrix, serve
 	// get opening stages from dropinfos
 	var openingStageIds []int
 	if !showClosedZones {
-		currentDropInfos, err := s.DropInfoService.GetCurrentDropInfosByServer(ctx, server)
+		currentDropInfos, err := legacyGetCurrentDropInfosByServer(ctx, s.DropInfoService, server)
 		if err != nil {
 			return nil, err
 		}

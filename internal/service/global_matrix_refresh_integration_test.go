@@ -266,6 +266,8 @@ func TestGlobalMatrixRefresh(t *testing.T) {
 	}
 	if read := counter.since(queries); len(read) != 1 {
 		t.Errorf("a refresh of %d source categories read drop_infos %d times, want 1", len(allSourceCategories), len(read))
+	} else if !strings.HasPrefix(read[0], openingStageIdsQuery) {
+		t.Errorf("a refresh read the opening stages with %s, want only their ids", read[0])
 	}
 
 	// a request with filters (not cached) reads them only when it hides closed zones
@@ -280,6 +282,8 @@ func TestGlobalMatrixRefresh(t *testing.T) {
 		}
 		if read := counter.since(queries); len(read) != want {
 			t.Errorf("a request with filters and showClosedZones %v read drop_infos %d times, want %d", showClosedZones, len(read), want)
+		} else if want == 1 && !strings.HasPrefix(read[0], openingStageIdsQuery) {
+			t.Errorf("a request with filters read the opening stages with %s, want only their ids", read[0])
 		}
 	}
 
@@ -986,6 +990,10 @@ func mustJSON(t *testing.T, v any) string {
 	}
 	return string(b)
 }
+
+// openingStageIdsQuery starts the query of the opening stages, which reads no other column of drop_infos (none of
+// the jsonb ones in particular)
+const openingStageIdsQuery = "SELECT DISTINCT di.stage_id FROM "
 
 // dropInfosQueryCounter records the queries of drop_infos
 type dropInfosQueryCounter struct {
