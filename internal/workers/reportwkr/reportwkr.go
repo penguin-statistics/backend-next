@@ -237,7 +237,10 @@ func (w *Worker) consume(sub *nats.Subscription) {
 
 		msgs, err := sub.Fetch(1, nats.MaxWait(w.conf.fetchWait))
 		if errors.Is(err, nats.ErrTimeout) {
-			// no task queued
+			// no task queued, or the request has not reached the server yet
+			if !w.waitFlushed() {
+				return
+			}
 			continue
 		}
 		if err != nil {
@@ -265,6 +268,29 @@ func (w *Worker) consume(sub *nats.Subscription) {
 // taskTimeout, far less than AckWait. NatsConn is nil in the tests that never lose the connection.
 func (w *Worker) waitConnected() bool {
 	for w.NatsConn != nil && w.NatsConn.IsReconnecting() {
+		select {
+		case <-w.stopping:
+			return false
+		case <-time.After(w.conf.fetchWait / 10):
+		}
+	}
+	return true
+}
+
+// waitFlushed waits until the server has received what the client sent, the request of the fetch that timed out
+// included, and reports false if the worker is stopped meanwhile. A connection can stay up while its traffic stalls,
+// for example behind a stuck proxy: each fetch then times out in the client while its request waits on the way, and
+// the server receives every request at once when the traffic resumes, each from that moment on, to deliver a task each
+// to this one worker. Fetching only once the requests sent before have arrived leaves at most the request of the last
+// fetch still running on the server: a second task, as in waitConnected.
+func (w *Worker) waitFlushed() bool {
+	for w.NatsConn != nil {
+		if !w.waitConnected() {
+			return false
+		}
+		if err := w.NatsConn.FlushTimeout(w.conf.fetchWait); err == nil {
+			return true
+		}
 		select {
 		case <-w.stopping:
 			return false
