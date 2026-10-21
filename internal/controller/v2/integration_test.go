@@ -203,6 +203,55 @@ func TestGetStagesLastModifiedRecalculated(t *testing.T) {
 	}
 }
 
+// a conditional GetStages whose stages are recalculated changed during the request is answered with the new stages, not
+// 304: the last modified time read before them is the one of the client's copy
+func TestGetStagesNotModifiedRecalculated(t *testing.T) {
+	db := newTestDB(t)
+	server := testServer()
+	mustExec(t, db, `INSERT INTO zones (ark_zone_id, category, name, existence) VALUES ('main_1', 'MAINLINE', '{"en": "1"}', '{}')`)
+	mustExec(t, db, `INSERT INTO stages (ark_stage_id, zone_id, stage_type, code, existence) VALUES ('main_01-07', 1, 'MAIN', '{"en": "1-7"}', '{}')`)
+	app := newCacheTestApp(t)
+	c := &Stage{StageService: service.NewStage(repo.NewStage(db))}
+	app.Get("/stages", c.GetStages)
+	target := "/stages?server=" + server
+	t.Cleanup(func() {
+		_ = cache.ShimStages.Delete(server)
+	})
+
+	get(t, app, target, "") // calculated, sent without a last modified time
+	resp, _ := get(t, app, target, "")
+	lastModified := resp.Header.Get(fiber.HeaderLastModified)
+	if lastModified == "" {
+		t.Fatalf("status %d, no Last-Modified", resp.StatusCode)
+	}
+
+	// the stages expire unchanged: the conditional request recalculating them is answered with 304
+	if err := cache.ShimStages.Delete(server); err != nil {
+		t.Fatal(err)
+	}
+	if resp, body := get(t, app, target, lastModified); resp.StatusCode != fiber.StatusNotModified {
+		t.Fatalf("after an unchanged recalculation: status %d, body %s; want 304", resp.StatusCode, body)
+	}
+
+	// the stages change and expire: the conditional request recalculating them gets them
+	mustExec(t, db, `UPDATE stages SET code = '{"en": "1-8"}'`)
+	if err := cache.ShimStages.Delete(server); err != nil {
+		t.Fatal(err)
+	}
+	resp, body := get(t, app, target, lastModified)
+	if resp.StatusCode != fiber.StatusOK || !strings.Contains(body, `"1-8"`) {
+		t.Fatalf("after a change: status %d, body %s; want 200 with the new stages", resp.StatusCode, body)
+	}
+	if got := resp.Header.Get(fiber.HeaderLastModified); got != lastModified {
+		t.Errorf("Last-Modified %q, want the one read before the recalculation, %q", got, lastModified)
+	}
+	// and the next one is answered with the new time
+	resp, _ = get(t, app, target, lastModified)
+	if resp.StatusCode != fiber.StatusOK || resp.Header.Get(fiber.HeaderLastModified) == lastModified {
+		t.Errorf("next request: status %d, Last-Modified %q; want 200 with a newer time", resp.StatusCode, resp.Header.Get(fiber.HeaderLastModified))
+	}
+}
+
 // personal and filtered drop matrices are sent without Last-Modified, so never answered with 304, even when the global
 // one they are computed alongside is not modified: the client's copy is of other data. Personal ones are marked as
 // not cacheable, filtered ones carry no caching headers.

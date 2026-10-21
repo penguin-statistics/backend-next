@@ -2,7 +2,6 @@ package v2
 
 import (
 	"strconv"
-	"time"
 
 	"exusiai.dev/gommon/constant"
 	"github.com/gofiber/fiber/v2"
@@ -51,7 +50,7 @@ func (c *Private) GetDropMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	var lastModified time.Time
+	var lastModified recordedTime
 	if !accountId.Valid {
 		key := server + constant.CacheSep + "true" + constant.CacheSep + category
 		lastModified = lastModifiedTime("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:" + key + "]")
@@ -85,7 +84,7 @@ func (c *Private) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	var lastModified time.Time
+	var lastModified recordedTime
 	if !accountId.Valid {
 		key := server + constant.CacheSep + category + constant.CacheSep + strconv.FormatBool(showAllPatterns)
 		lastModified = lastModifiedTime("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:" + key + "]")

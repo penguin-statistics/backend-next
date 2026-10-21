@@ -153,3 +153,44 @@ func TestGetDropMatrixNotModified(t *testing.T) {
 		t.Fatalf("revalidation of a stale copy: status %d, want 200", resp.StatusCode)
 	}
 }
+
+// sendCacheable does not answer with 304 when the response changed after its last modified time was read, whether
+// recalculated by the request or concurrently: the time read is then the one of the client's copy
+func TestSendCacheableChangedMeanwhile(t *testing.T) {
+	app := newCacheTestApp(t)
+	key := "[test#TestSendCacheableChangedMeanwhile:" + testServer() + "]"
+	record := func(code string) []*modelv2.Stage {
+		stages := []*modelv2.Stage{{ArkStageID: "main_01-07", Code: code}}
+		cache.SetLastModifiedTime(key, stages, func() {})
+		return stages
+	}
+	var change string // the stages recalculated after the time is read, if any
+	app.Get("/stages", func(ctx *fiber.Ctx) error {
+		lastModified := lastModifiedTime(key)
+		stages := []*modelv2.Stage{{ArkStageID: "main_01-07", Code: "1-7"}}
+		if change != "" {
+			stages = record(change)
+		}
+		return sendCacheable(ctx, lastModified, stages)
+	})
+
+	record("1-7")
+	resp, _ := get(t, app, "/stages", "")
+	lastModified := resp.Header.Get(fiber.HeaderLastModified)
+	if lastModified == "" {
+		t.Fatal("no Last-Modified")
+	}
+
+	change = "1-7" // recalculated unchanged
+	if resp, _ = get(t, app, "/stages", lastModified); resp.StatusCode != fiber.StatusNotModified {
+		t.Errorf("recalculated unchanged: status %d, want 304", resp.StatusCode)
+	}
+	change = "1-8"
+	resp, body := get(t, app, "/stages", lastModified)
+	if resp.StatusCode != fiber.StatusOK || !strings.Contains(body, `"1-8"`) {
+		t.Fatalf("recalculated changed: status %d, body %s; want 200 with the new stages", resp.StatusCode, body)
+	}
+	if got := resp.Header.Get(fiber.HeaderLastModified); got != lastModified {
+		t.Errorf("recalculated changed: Last-Modified %q, want the one read before, %q", got, lastModified)
+	}
+}
