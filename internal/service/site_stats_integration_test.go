@@ -449,3 +449,77 @@ func TestShimSiteStatsOverlappingRefreshes(t *testing.T) {
 	}
 	assertSameLines(t, "cached after overlapping refreshes", want, siteStatsLines(&cached))
 }
+
+func TestShimSiteStatsRefreshOverlappingColdRequest(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+	flushCaches(t)
+	now := time.Date(2026, 10, 19, 14, 0, 0, 0, time.UTC)
+	util.Now = func() time.Time { return now }
+	t.Cleanup(func() { util.Now = time.Now })
+	today := make(map[string]int)
+	for _, server := range testServers {
+		today[server] = util.GetDayNum(&now, server)
+	}
+	seedSiteStatsData(t, rand.New(rand.NewSource(1)), db, today, []int{-3, -1, 0})
+	hook := &pauseQueriesHook{table: "drop_matrix_elements", paused: make(chan struct{}), release: make(chan struct{})}
+	db.AddQueryHook(hook)
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(hook.release) }) }
+	t.Cleanup(release)
+	s := &SiteStats{
+		DropReportService:        NewDropReport(repo.NewDropReport(db)),
+		DropMatrixElementService: NewDropMatrixElement(repo.NewDropMatrixElement(db)),
+		StageService:             NewStage(repo.NewStage(db)),
+		ItemService:              NewItem(repo.NewItem(db)),
+		baseGenerations:          &memorySiteStatsBaseGenerations{},
+	}
+
+	// on a cold cache, refresh A reads the matrix elements, then a batch rewrites today's and a request calculates and
+	// caches the stats: A must not cache its stats over the request's
+	refreshedA := make(chan error, 1)
+	go func() {
+		_, err := s.RefreshShimSiteStats(context.WithValue(ctx, pauseQueriesKey{}, true), "CN")
+		refreshedA <- err
+	}()
+	select {
+	case <-hook.paused:
+	case <-time.After(10 * time.Second):
+		t.Fatal("refresh A never read the matrix elements")
+	}
+	mustExec(t, db, "UPDATE drop_matrix_elements SET times = times * 2, quantity = quantity * 2 WHERE server = ? AND day_num = ?", "CN", today["CN"])
+	want := legacySiteStatsLines(t, db, "CN")
+	requested := make(chan error, 1)
+	var stats *modelv2.SiteStats
+	go func() {
+		var err error
+		stats, err = s.GetShimSiteStats(ctx, "CN")
+		requested <- err
+	}()
+	// the request does not wait for the refresh
+	select {
+	case err := <-requested:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("a request on a cold cache waited for a refresh")
+	}
+	assertSameLines(t, "request", want, siteStatsLines(stats))
+	lastModified := cache.GetLastModifiedTime("[shimSiteStats#server:CN]")
+	if lastModified.IsZero() {
+		t.Fatal("no last modified time for the stats the request cached")
+	}
+	release()
+	if err := <-refreshedA; err != nil {
+		t.Fatal(err)
+	}
+	var cached modelv2.SiteStats
+	if err := cache.ShimSiteStats.Get("CN", &cached); err != nil {
+		t.Fatal(err)
+	}
+	assertSameLines(t, "cached after the older refresh", want, siteStatsLines(&cached))
+	if got := cache.GetLastModifiedTime("[shimSiteStats#server:CN]"); !got.Equal(lastModified) {
+		t.Errorf("the older refresh changed the last modified time from %v to %v", lastModified, got)
+	}
+}
