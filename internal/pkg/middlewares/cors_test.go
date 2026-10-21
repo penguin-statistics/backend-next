@@ -131,6 +131,9 @@ func TestCORSSimpleRequestExposesHeaders(t *testing.T) {
 	if got := resp.Header.Get(fiber.HeaderAccessControlAllowMethods); got != "" {
 		t.Errorf("Access-Control-Allow-Methods = %q on a simple request, want none", got)
 	}
+	if got := resp.Header.Get(fiber.HeaderAccessControlMaxAge); got != "" {
+		t.Errorf("Access-Control-Max-Age = %q on a simple request, want none", got)
+	}
 }
 
 func TestCORSPreflight(t *testing.T) {
@@ -157,6 +160,9 @@ func TestCORSPreflight(t *testing.T) {
 			// Authorization must be listed by name: a "*" in Allow-Headers does not cover it
 			if got, want := resp.Header.Get(fiber.HeaderAccessControlAllowHeaders), "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace"; got != want {
 				t.Errorf("Access-Control-Allow-Headers = %q, want %q", got, want)
+			}
+			if got := resp.Header.Get(fiber.HeaderAccessControlMaxAge); got != "600" {
+				t.Errorf("Access-Control-Max-Age = %q, want 600", got)
 			}
 			vary := resp.Header.Values(fiber.HeaderVary)
 			for _, h := range []string{fiber.HeaderOrigin, fiber.HeaderAccessControlRequestMethod, fiber.HeaderAccessControlRequestHeaders} {

@@ -17,6 +17,7 @@ var (
 	corsAllowHeaders = strings.Join([]string{
 		fiber.HeaderContentType, fiber.HeaderAuthorization, fiber.HeaderXRequestedWith, "X-Penguin-Variant", "sentry-trace",
 	}, ",")
+	corsMaxAge = "600"
 	// response headers outside the CORS-safelisted set must be listed here for cross-origin scripts to read them
 	corsExposeHeaders = strings.Join([]string{
 		fiber.HeaderContentType, fiber.HeaderETag, fiber.HeaderLink, fiber.HeaderRetryAfter,
@@ -81,6 +82,9 @@ func CORS(credentialedOrigins []string) fiber.Handler {
 		c.Vary(fiber.HeaderAccessControlRequestHeaders)
 		c.Set(fiber.HeaderAccessControlAllowMethods, corsAllowMethods)
 		c.Set(fiber.HeaderAccessControlAllowHeaders, corsAllowHeaders)
+		// lets browsers reuse a preflight for 10 minutes (Chromium caps it at 2 hours) instead of sending one before
+		// every GET with Authorization, as the iOS/macOS app does
+		c.Set(fiber.HeaderAccessControlMaxAge, corsMaxAge)
 		return c.SendStatus(fiber.StatusNoContent)
 	}
 }
