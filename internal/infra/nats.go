@@ -71,5 +71,24 @@ func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
 		return nil, nil, err
 	}
 
+	// The dead-letter stream of the report tasks that the worker gave up on, kept until they are replayed or removed
+	// by hand (see README.md). Limits retention with no limit: nothing in it expires or is discarded. Duplicates is
+	// longer than AckWait and the longest retry delay, so a task moved there twice (its Term lost) is stored once.
+	err = ensureStream(js, &nats.StreamConfig{
+		Name: "penguin-reports-dead",
+		Subjects: []string{
+			"REPORT_DEAD.*",
+		},
+		Retention:  nats.LimitsPolicy,
+		Storage:    nats.FileStorage,
+		Replicas:   1,
+		Duplicates: time.Minute * 10,
+	})
+	if err != nil {
+		// the worker could not move a task there, and would retry it forever instead
+		log.Error().Err(err).Msg("infra: nats: failed to create or update the dead-letter jetstream stream")
+		return nil, nil, err
+	}
+
 	return nc, js, nil
 }

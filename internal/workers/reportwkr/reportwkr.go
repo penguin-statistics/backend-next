@@ -2,7 +2,9 @@ package reportwkr
 
 import (
 	"context"
+	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -66,6 +68,11 @@ type consumerConfig struct {
 	// a failed task is delivered again after nakDelay times its deliveries so far, up to maxNakDelay
 	nakDelay    time.Duration
 	maxNakDelay time.Duration
+	// deadLetterAfter is the delivery whose failure moves a task to the dead-letter stream instead of retrying it
+	deadLetterAfter uint64
+	// deadSubject is the subject prefix of the dead-letter stream: a task of REPORT.SINGLE moves to
+	// <deadSubject>SINGLE
+	deadSubject string
 }
 
 var defaultConsumerConfig = consumerConfig{
@@ -80,7 +87,20 @@ var defaultConsumerConfig = consumerConfig{
 	fetchWait:     time.Second * 2,
 	nakDelay:      time.Second * 15,
 	maxNakDelay:   time.Minute * 5,
+	// The 30th delivery comes 97.5 minutes of retry delays after the first (TestDeadLetterAfter), so a database or
+	// Redis outage of up to about an hour and a half is retried through, while a task that can never be stored leaves
+	// the MaxAckPending window that it shares with the healthy tasks.
+	deadLetterAfter: 30,
+	deadSubject:     "REPORT_DEAD.",
 }
+
+// The headers of a task in the dead-letter stream.
+const (
+	HeaderOriginalSubject  = "Penguin-Original-Subject"
+	HeaderOriginalSequence = "Penguin-Original-Sequence"
+	HeaderDeliveries       = "Penguin-Deliveries"
+	HeaderLastError        = "Penguin-Last-Error"
+)
 
 type Worker struct {
 	WorkerDeps
@@ -305,8 +325,8 @@ func (w *Worker) waitFlushed() bool {
 }
 
 // ingestPreprocess handles a delivered task and settles its message by the outcome. A task processed is acked; a task
-// that can never be processed is terminated, with the log as its only record; any other failure is delivered again
-// later. Each failure is logged once, here.
+// that can never be processed, or that failed at its deadLetterAfter-th delivery, is moved to the dead-letter stream
+// (park); any other failure is delivered again later. Each failure is logged once, here.
 func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 	metadata, err := msg.Metadata()
 	if err != nil {
@@ -317,6 +337,7 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 			Str("subject", msg.Subject).
 			Bytes("data", msg.Data).
 			Msg("failed to get report task message metadata; terminating")
+		// no stream sequence to record it under; a JetStream delivery always has one
 		term(msg)
 		return
 	}
@@ -329,8 +350,24 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 			Str("subject", msg.Subject).
 			Uint64("seq", metadata.Sequence.Stream).
 			Bytes("data", msg.Data).
-			Msg("failed to decode report task; terminating")
-		term(msg)
+			Msg("failed to decode report task; moving it to the dead-letter stream")
+		w.park(msg, metadata, err)
+		return
+	}
+
+	if metadata.NumDelivered > w.conf.deadLetterAfter {
+		// moved to the dead-letter stream at an earlier delivery whose Term was lost, or whose move failed: it is not
+		// processed again, which would store it while its copy waits there to be replayed
+		err := errors.Errorf("delivered %d times, more than the %d after which a task moves to the dead-letter stream", metadata.NumDelivered, w.conf.deadLetterAfter)
+		log.Error().
+			Err(err).
+			Str("evt.name", "reportwkr.dead").
+			Str("taskId", reportTask.TaskID).
+			Uint64("delivered", metadata.NumDelivered).
+			Uint64("seq", metadata.Sequence.Stream).
+			RawJSON("reportTask", msg.Data).
+			Msg("report task moving to the dead-letter stream")
+		w.park(msg, metadata, err)
 		return
 	}
 
@@ -391,11 +428,24 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 			Str("taskId", reportTask.TaskID).
 			Uint64("seq", metadata.Sequence.Stream).
 			RawJSON("reportTask", msg.Data).
-			Msg("report task parked: it can never be processed; replay it by hand from this log")
-		term(msg)
+			Msg("report task parked: it can never be processed; moving it to the dead-letter stream")
+		w.park(msg, metadata, err)
+	case metadata.NumDelivered >= w.conf.deadLetterAfter:
+		// failed at every delivery for over an hour and a half of retries: most likely it can never be stored, and it
+		// would hold a slot of the MaxAckPending window that it shares with the healthy tasks for as long as it is
+		// retried
+		log.Error().
+			Err(err).
+			Str("evt.name", "reportwkr.dead").
+			Str("taskId", reportTask.TaskID).
+			Uint64("delivered", metadata.NumDelivered).
+			Uint64("seq", metadata.Sequence.Stream).
+			RawJSON("reportTask", msg.Data).
+			Msg("report task failed at its last delivery; moving it to the dead-letter stream")
+		w.park(msg, metadata, err)
 	default:
 		// a database, Redis or network failure, or a commit of unknown outcome (stored again if it did commit, rare
-		// against losing the task): retry later, waiting longer with each delivery, for as long as it takes
+		// against losing the task): retry later, waiting longer with each delivery, up to deadLetterAfter deliveries
 		delivered := metadata.NumDelivered
 		delay := w.conf.retryDelay(delivered)
 		ev := log.Warn()
@@ -411,14 +461,76 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 			RawJSON("reportTask", msg.Data).
 			Msg("failed to consume report task")
 
-		if err := msg.NakWithDelay(delay); err != nil {
-			// delivered again after AckWait instead
-			log.Error().
-				Err(err).
-				Str("evt.name", "reportwkr.nak.failed").
-				Str("taskId", reportTask.TaskID).
-				Msg("failed to nak report task")
-		}
+		nak(msg, delay)
+	}
+}
+
+// park moves a task that will not be processed to the dead-letter stream, then terminates it. If the dead-letter
+// stream does not store it, the task is delivered again later instead, so that it is never dropped.
+func (w *Worker) park(msg *nats.Msg, metadata *nats.MsgMetadata, cause error) {
+	if err := w.deadLetter(msg, metadata, cause); err != nil {
+		delay := w.conf.retryDelay(metadata.NumDelivered)
+		log.Error().
+			Err(err).
+			Str("evt.name", "reportwkr.dead.failed").
+			Str("subject", msg.Subject).
+			Uint64("seq", metadata.Sequence.Stream).
+			Dur("retryIn", delay).
+			Msg("failed to move report task to the dead-letter stream; delivering it again later")
+		nak(msg, delay)
+		return
+	}
+	term(msg)
+}
+
+// deadLetter copies msg to the dead-letter stream, with its subject, stream sequence, deliveries and the error that
+// put it there in headers, and returns nil once the stream has stored it. The copy is deduplicated by the stream
+// sequence of the task, so a task moved twice (its Term lost) is stored there once.
+func (w *Worker) deadLetter(msg *nats.Msg, metadata *nats.MsgMetadata, cause error) error {
+	dead := nats.NewMsg(w.conf.deadSubject + msg.Subject[strings.LastIndexByte(msg.Subject, '.')+1:])
+	dead.Data = msg.Data
+	dead.Header.Set(nats.MsgIdHdr, fmt.Sprintf("%s:%d", metadata.Stream, metadata.Sequence.Stream))
+	dead.Header.Set(HeaderOriginalSubject, msg.Subject)
+	dead.Header.Set(HeaderOriginalSequence, strconv.FormatUint(metadata.Sequence.Stream, 10))
+	dead.Header.Set(HeaderDeliveries, strconv.FormatUint(metadata.NumDelivered, 10))
+	dead.Header.Set(HeaderLastError, headerValue(cause.Error()))
+
+	// asynchronous with a bound of our own: the synchronous publish of the client (v1.24.0) keeps a response entry of
+	// the connection until it closes when the send fails at once, while the asynchronous one discards its future then
+	paf, err := w.NatsJS.PublishMsgAsync(dead)
+	if err != nil {
+		return errors.Wrap(err, "failed to publish to the dead-letter stream")
+	}
+	timer := time.NewTimer(w.conf.taskTimeout)
+	defer timer.Stop()
+	select {
+	case <-paf.Ok():
+		return nil
+	case err := <-paf.Err():
+		return errors.Wrap(err, "the dead-letter stream did not store the task")
+	case <-timer.C:
+		return errors.Errorf("the dead-letter stream did not confirm the task within %s", w.conf.taskTimeout)
+	}
+}
+
+// headerValue makes s a header value: on one line, and at most 1024 bytes.
+func headerValue(s string) string {
+	s = strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ").Replace(s)
+	if len(s) > 1024 {
+		s = strings.ToValidUTF8(s[:1024], "")
+	}
+	return s
+}
+
+// nak tells the server to deliver the message again after delay.
+func nak(msg *nats.Msg, delay time.Duration) {
+	if err := msg.NakWithDelay(delay); err != nil {
+		// delivered again after AckWait instead
+		log.Error().
+			Err(err).
+			Str("evt.name", "reportwkr.nak.failed").
+			Str("subject", msg.Subject).
+			Msg("failed to nak report task")
 	}
 }
 

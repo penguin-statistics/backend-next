@@ -24,6 +24,39 @@ This Go project mainly uses:
 
 This project mainly follows a RESTful API design.
 
+## Operations
+
+### Report tasks in the dead-letter stream
+
+The report worker moves a report task out of the `penguin-reports` stream into `penguin-reports-dead` (subjects
+`REPORT_DEAD.*`) when it can never be processed (it is not a task, or a stage of it does not exist) or when it failed at
+each of its 30 deliveries, which take about 97 minutes of retry delays. Each move is logged at error level
+(`reportwkr.malformed`, `reportwkr.parked` or `reportwkr.dead`). The copy keeps the payload as published, with these
+headers:
+
+- `Penguin-Original-Subject`: the subject it was published under, like `REPORT.SINGLE`
+- `Penguin-Original-Sequence`: its sequence in `penguin-reports`
+- `Penguin-Deliveries`: its deliveries when it moved
+- `Penguin-Last-Error`: the error that moved it
+
+Nothing in the stream expires. With the [nats CLI](https://github.com/nats-io/natscli), once the cause is fixed:
+
+```sh
+# list the tasks, with their headers
+nats stream view penguin-reports-dead
+# show one, by its sequence in penguin-reports-dead
+nats stream get penguin-reports-dead 42
+# replay it under its original subject: the worker processes it as a new task
+nats stream get penguin-reports-dead 42 --json | jq -r .data | base64 -d \
+  | nats pub REPORT.SINGLE --force-stdin
+# remove it once replayed
+nats stream rmm penguin-reports-dead 42 -f
+```
+
+A task that moved after failing at each delivery may have been stored by one of them whose commit outcome was unknown
+(for example the connection dropped during the commit); check `drop_reports` for its account and time before replaying
+it.
+
 ## Maintainers
 
 This project has mainly being maintained by the following contributors (in alphabetical order):
