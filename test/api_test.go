@@ -112,6 +112,16 @@ func TestAPIMeta(t *testing.T) {
 		assert.Equal(t, "true", resp.Header.Get("Access-Control-Allow-Credentials"))
 	})
 
+	t.Run("CORS Foreign Origin", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/PenguinStats/api/v2/config", nil)
+		req.Header.Set("Origin", "https://evil.example")
+
+		resp := request(t, req)
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
+		assert.Empty(t, resp.Header.Values("Access-Control-Allow-Credentials"))
+	})
+
 	t.Run("CORS Origin", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodOptions, "/PenguinStats/api/v2/config", nil)
 		req.Header.Set("Origin", "https://penguin-stats.io")

@@ -21,6 +21,17 @@ type ConfigSpec struct {
 	// TrustedProxies is a list of trusted proxies that are trusted to report a real IP via the X-Forwarded-For header.
 	TrustedProxies []string `required:"true" split_words:"true" default:"::1,127.0.0.1,10.0.0.0/8"`
 
+	// CORSCredentialedOrigins lists the browser origins that may send credentialed (cookie-carrying) cross-origin
+	// requests and read their responses: they get their Origin echoed back with Access-Control-Allow-Credentials.
+	// Every other origin gets Access-Control-Allow-Origin: * without credentials. An entry is an exact origin
+	// (scheme://host[:port]) or scheme://*.domain for exactly one subdomain label. See middlewares.CORS.
+	//
+	// The defaults are the first-party clients that call the API cross-origin with withCredentials: penguin-stats.io
+	// and .cn, the iOS/macOS Capacitor app, and the frontend-v2 deployments on Cloudflare Pages (production and
+	// previews) and frontend-legacy.exusiai.dev. Do not add wildcards over hosts that serve anything but the frontend
+	// (e.g. *.exusiai.dev, which includes an HTTP echo service).
+	CORSCredentialedOrigins []string `split_words:"true" default:"https://penguin-stats.io,https://penguin-stats.cn,capacitor://localhost,https://frontend-v2-8db.pages.dev,https://*.frontend-v2-8db.pages.dev,https://frontend-legacy.exusiai.dev"`
+
 	// DevMode to indicate development mode. When true, the program would spin up utilities for debugging and
 	// provide a more contextual message when encountered a panic. See internal/server/httpserver/http.go for the
 	// actual implementation details.

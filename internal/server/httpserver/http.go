@@ -14,7 +14,6 @@ import (
 	"github.com/gofiber/contrib/fibersentry"
 	"github.com/gofiber/contrib/otelfiber"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/favicon"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"github.com/gofiber/fiber/v2/middleware/recover"
@@ -76,16 +75,7 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 		Repanic: true,
 		Timeout: time.Second * 5,
 	}))
-	app.Use(cors.New(cors.Config{
-		AllowOrigins: "*",
-		AllowOriginsFunc: func(origin string) bool {
-			return true
-		},
-		AllowMethods:     "GET, POST, DELETE, OPTIONS",
-		AllowHeaders:     "Content-Type, Authorization, X-Requested-With, X-Penguin-Variant, sentry-trace",
-		ExposeHeaders:    "Content-Type, X-Penguin-Set-PenguinID, X-Penguin-Upgrade, X-Penguin-Compatible, X-Penguin-Request-ID",
-		AllowCredentials: true,
-	}))
+	app.Use(middlewares.CORS(conf.CORSCredentialedOrigins))
 	// requestid is used by report service to identify requests and generate taskId there afterwards
 	// the logger middleware now injects RequestID into the context
 	middlewares.Logger(app)
