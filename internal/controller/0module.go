@@ -4,6 +4,7 @@ import (
 	"go.uber.org/fx"
 
 	controllermeta "exusiai.dev/backend-next/internal/controller/meta"
+	controllerseo "exusiai.dev/backend-next/internal/controller/seo"
 	controllerv2 "exusiai.dev/backend-next/internal/controller/v2"
 )
 
@@ -20,6 +21,9 @@ func Module(o ...opt) fx.Option {
 
 		// Controllers (meta)
 		controllermeta.Module(),
+
+		// Server-rendered stats pages of the frontend, if enabled
+		fx.Invoke(controllerseo.Register),
 	}
 	for _, opt := range o {
 		switch opt {
