@@ -98,11 +98,10 @@ func (s *SiteStats) RefreshShimSiteStats(ctx context.Context, server string) (*m
 
 	var results modelv2.SiteStats
 	cache.ShimSiteStats.Delete(server)
-	_, err := cache.ShimSiteStats.MutexGetSet(server, &results, valueFunc, 24*time.Hour)
-	if err != nil {
+	publish := cache.PublishingLastModifiedTime[modelv2.SiteStats]("[shimSiteStats#server:" + server + "]")
+	if _, err := cache.ShimSiteStats.MutexGetSetPublishing(server, &results, valueFunc, 24*time.Hour, publish); err != nil {
 		return nil, err
 	}
-	cache.SetLastModifiedTime("[shimSiteStats#server:"+server+"]", results, nil)
 	return &results, nil
 }
 

@@ -86,11 +86,9 @@ func (s *PatternMatrix) GetShimPatternMatrix(ctx context.Context, server string,
 	var results modelv2.PatternMatrixQueryResult
 	if !accountId.Valid {
 		key := server + constant.CacheSep + sourceCategory + constant.CacheSep + strconv.FormatBool(showAllPatterns)
-		calculated, err := cache.ShimGlobalPatternMatrix.MutexGetSet(key, &results, valueFunc, 24*time.Hour)
-		if err != nil {
+		publish := cache.PublishingLastModifiedTime[modelv2.PatternMatrixQueryResult]("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:" + key + "]")
+		if _, err := cache.ShimGlobalPatternMatrix.MutexGetSetPublishing(key, &results, valueFunc, 24*time.Hour, publish); err != nil {
 			return nil, err
-		} else if calculated {
-			cache.SetLastModifiedTime("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:"+key+"]", results, nil)
 		}
 		return &results, nil
 	} else {

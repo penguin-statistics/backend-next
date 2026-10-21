@@ -29,9 +29,27 @@ var (
 //
 // cacheValue is called while recording, so that of concurrent recalculations, the value cached last is the one
 // recorded last: otherwise an older value could stay cached with the time of a newer one, and clients holding it would
-// be answered that it is not modified, even after the newer value is cached, until the next change. cacheValue is nil
-// for a value MutexGetSet has cached, which caches a recalculated value only if no other was cached meanwhile.
+// be answered that it is not modified, even after the newer value is cached, until the next change. For a value
+// calculated by MutexGetSet, see PublishingLastModifiedTime.
 func SetLastModifiedTime(key string, value any, cacheValue func()) {
+	setLastModifiedTime(key, value, func() bool {
+		cacheValue()
+		return true
+	})
+}
+
+// PublishingLastModifiedTime returns the publish function of a MutexGetSetPublishing of key's value, which caches the
+// value as SetLastModifiedTime does: while recording its last modified time, so that a value MutexGetSet caches and
+// a value refreshed meanwhile (cached by SetLastModifiedTime) are recorded in the order they are cached. Nothing is
+// recorded for a value that is not cached because a newer one was, and which MutexGetSet does not return either.
+func PublishingLastModifiedTime[T any](key string) func(value *T, cacheValue func() bool) {
+	return func(value *T, cacheValue func() bool) {
+		setLastModifiedTime(key, *value, cacheValue)
+	}
+}
+
+// setLastModifiedTime is SetLastModifiedTime, recording nothing if cacheValue returns false.
+func setLastModifiedTime(key string, value any, cacheValue func() bool) {
 	b, err := json.Marshal(value)
 	if err != nil {
 		// whether value changed is unknown: record it as changed (no value has the zero digest)
@@ -44,8 +62,8 @@ func SetLastModifiedTime(key string, value any, cacheValue func()) {
 
 	lastModifiedMu.Lock()
 	defer lastModifiedMu.Unlock()
-	if cacheValue != nil {
-		cacheValue()
+	if !cacheValue() {
+		return
 	}
 	previous, ok := lastModifiedRecords[key]
 	if ok && err == nil && previous.digest == digest {
