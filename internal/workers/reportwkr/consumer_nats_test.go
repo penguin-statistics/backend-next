@@ -645,3 +645,170 @@ func TestStopFlushesAcksAndKeepsDurable(t *testing.T) {
 			ci.NumAckPending, ci.Delivered.Consumer, ci.NumPending)
 	}
 }
+
+// TestStartTakesOverFromLegacyConsumer runs the rollout of the pull consumer: the push consumer of the previous
+// version is consuming a backlog (on PostgreSQL slowed as in TestLegacyStormWithIdempotentProcess), and Start deletes
+// it and takes the stream over while the old process still stores the tasks it holds. Every task is stored once.
+func TestStartTakesOverFromLegacyConsumer(t *testing.T) {
+	s := newTestStream(t)
+	w := newTestWorker(t)
+	if err := processTask(t, w, newTestTask(t, w, testAccountID(), time.UnixMicro(1760600000000000), "203.0.113.7", testReport("main_01-07", 30012))); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.DB.ExecContext(context.Background(), slowReportInserts); err != nil {
+		t.Fatal(err)
+	}
+	duplicates := captureLogs(t)
+	const published = 128
+
+	// the old process, on a connection of its own
+	legacyNc, legacyJs := s.connect(t)
+	legacyStream := *s
+	legacyStream.js = legacyJs
+	conf := s.consumerConfig()
+	conf.taskTimeout = 10 * time.Second // the slow database is not what this test is about
+	var legacyHandled, handled, failed handledCounter
+	stopLegacy := startLegacyConsumer(t, &legacyStream, conf.legacyDurable, func(ctx context.Context, msg *nats.Msg) error {
+		task := &types.ReportTask{}
+		if err := json.Unmarshal(msg.Data, task); err != nil {
+			return err
+		}
+		if err := w.process(ctx, task); err != nil {
+			failed.add(err.Error())
+			return err
+		}
+		legacyHandled.add(task.TaskID)
+		return nil
+	})
+
+	accountId := testAccountID()
+	createdAt := time.UnixMicro(1760600000123456)
+	for i := 0; i < published; i++ {
+		task := newTestTask(t, w, accountId+i/4, createdAt.Add(time.Duration(i)*time.Millisecond), "203.0.113.7", testReport("main_01-07", 30012))
+		if _, err := s.js.Publish(s.publish, task); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for deadline := time.Now().Add(30 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		if distinct, _, _ := legacyHandled.stats(); distinct >= 16 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the legacy consumer handles no task")
+		}
+	}
+
+	// the new process starts
+	pw := newWorker(w.WorkerDeps, conf)
+	pw.NatsJS = s.js
+	pw.handle = func(ctx context.Context, task *types.ReportTask) error {
+		if err := pw.process(ctx, task); err != nil {
+			failed.add(err.Error())
+			return err
+		}
+		handled.add(task.TaskID)
+		return nil
+	}
+	startConsumer(t, pw)
+	if si, err := s.js.StreamInfo(s.name); err != nil {
+		t.Fatal(err)
+	} else if si.State.Msgs == 0 {
+		t.Fatal("the legacy consumer was done before the takeover; the test proves nothing")
+	}
+
+	s.waitEmpty(t, conf.durable, time.Minute)
+	// the old process goes away, closing its connection as the end of a process does
+	legacyNc.Close()
+	stopLegacy()
+
+	legacyDistinct, legacyTotal, _ := legacyHandled.stats()
+	distinct, total, _ := handled.stats()
+	t.Logf("%d tasks published; the legacy consumer handled %d of them %d times, the pull consumer %d of them %d times",
+		published, legacyDistinct, legacyTotal, distinct, total)
+	if _, errs, _ := failed.stats(); errs > 0 {
+		t.Errorf("%d handlings failed: %v", errs, failed.times)
+	}
+	if distinct == 0 {
+		t.Error("the pull consumer handled no task")
+	}
+	if n := duplicates("reportwkr.duplicate"); n != legacyTotal+total-published {
+		t.Errorf("%d copies skipped, want %d", n, legacyTotal+total-published)
+	}
+
+	var reports, tasks int
+	if err := w.DB.NewRaw("SELECT count(*), count(DISTINCT (account_id, created_at)) FROM drop_reports WHERE created_at >= ?", createdAt).
+		Scan(context.Background(), &reports, &tasks); err != nil {
+		t.Fatal(err)
+	}
+	if reports != published || tasks != published {
+		t.Errorf("%d reports of %d tasks stored, want %d of %d", reports, tasks, published, published)
+	}
+	if cfg := s.consumerInfo(t, conf.durable).Config; cfg.DeliverSubject != "" {
+		t.Errorf("consumer is %+v, want the pull consumer", cfg)
+	}
+}
+
+// TestLegacyAckAfterTakeoverLosesNoTask runs the end of the old process during the rollout: it holds every task when
+// Start replaces its consumer, acks one of the last, and goes away without acking the others. The ack reaches no
+// consumer, and the pull consumer delivers every task. Were the pull consumer under the name of the old one, the ack
+// would reach it: on NATS 2.10.17 to 2.10.25 it would then skip the tasks below the one acked, which would stay in the
+// stream undelivered.
+func TestLegacyAckAfterTakeoverLosesNoTask(t *testing.T) {
+	// the test streams stand for these names; NATS 2.10.26 and later ignore such an ack, so this check is what keeps
+	// the names apart on any server
+	if defaultConsumerConfig.durable == defaultConsumerConfig.legacyDurable {
+		t.Fatal("the pull consumer has the name of the push consumer")
+	}
+	s := newTestStream(t)
+	const published = 10
+	s.publishTasks(t, published)
+
+	// the old process, on a connection of its own, holding the tasks it was delivered
+	legacyNc, legacyJs := s.connect(t)
+	conf := s.consumerConfig()
+	held := make(chan *nats.Msg, published)
+	if _, err := legacyJs.ChanQueueSubscribe(s.subject, conf.legacyDurable, held, nats.AckWait(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	for deadline := time.Now().Add(10 * time.Second); len(held) < published; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("the old process holds %d tasks, want %d", len(held), published)
+		}
+	}
+
+	// the new process sets its consumer up, then the old one acks task-7 and goes away
+	var handled handledCounter
+	w := newWorker(WorkerDeps{NatsJS: s.js}, conf)
+	w.handle = func(ctx context.Context, task *types.ReportTask) error {
+		handled.add(task.TaskID)
+		return nil
+	}
+	if err := w.subscribe(); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < published; i++ {
+		if msg := <-held; i == 7 {
+			if err := msg.Ack(); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := legacyNc.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	legacyNc.Close()
+
+	w.start()
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := w.stop(ctx); err != nil {
+			t.Error(err)
+		}
+	})
+	s.waitEmpty(t, conf.durable, 10*time.Second)
+
+	if distinct, total, _ := handled.stats(); distinct != published || total != published {
+		t.Errorf("%d tasks handled %d times, want each of %d once", distinct, total, published)
+	}
+}
