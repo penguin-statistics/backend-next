@@ -229,3 +229,13 @@ func TestNatsErrorHandlerCountsErrors(t *testing.T) {
 		t.Fatalf("async errors = %v, want %v", v, before+1)
 	}
 }
+
+// nats.go reports connection-level errors without a subscription, see processPermissionsViolation and
+// processAuthError.
+func TestNatsErrorHandlerWithoutSubscription(t *testing.T) {
+	before := testutil.ToFloat64(observability.NatsAsyncErrors)
+	natsErrorHandler(nil, nil, nats.ErrAuthorization)
+	if v := testutil.ToFloat64(observability.NatsAsyncErrors); v != before+1 {
+		t.Fatalf("async errors = %v, want %v", v, before+1)
+	}
+}
