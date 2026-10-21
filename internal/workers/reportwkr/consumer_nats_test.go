@@ -618,11 +618,15 @@ func TestStopFlushesAcksAndKeepsDurable(t *testing.T) {
 }
 
 // TestTransientErrorIsNakedAndRetried fails the first delivery of a task as a database error does: the task is
-// delivered again after the nak delay, and stored by the second delivery.
+// delivered again after the nak delay, and stored by the second delivery. Each line logged about the task carries it
+// whole, ip and accountId included.
 func TestTransientErrorIsNakedAndRetried(t *testing.T) {
 	s := newTestStream(t)
 	tw := newTestWorker(t)
-	failures := captureLogs(t)
+	var logs lockedBuffer
+	prev := log.Logger
+	log.Logger = zerolog.New(&logs)
+	t.Cleanup(func() { log.Logger = prev })
 	w := newWorker(tw.WorkerDeps, s.consumerConfig())
 	w.NatsJS = s.js
 	var mu sync.Mutex
@@ -659,8 +663,26 @@ func TestTransientErrorIsNakedAndRetried(t *testing.T) {
 	if n := countRows(t, tw.DB, "drop_reports"); n != 1 {
 		t.Errorf("%d reports stored, want 1", n)
 	}
-	if n := failures("reportwkr.failed"); n != 1 {
-		t.Errorf("%d failures logged, want 1", n)
+	var published map[string]any
+	if err := json.Unmarshal(task, &published); err != nil {
+		t.Fatal(err)
+	}
+	if failed := logEntries(t, &logs, "reportwkr.failed"); len(failed) != 1 {
+		t.Errorf("%d failures logged, want 1", len(failed))
+	} else if !reflect.DeepEqual(failed[0]["reportTask"], published) {
+		t.Errorf("failure logged with %v, want the task as published, %v", failed[0]["reportTask"], published)
+	}
+	// the task has one drop and an ip: what process changes in place (merging the drops by item, filling in an empty
+	// ip) leaves it as published
+	if received := logEntries(t, &logs, "reportwkr.received"); len(received) != 1 {
+		t.Errorf("%d tasks logged as received, want 1", len(received))
+	} else if !reflect.DeepEqual(received[0]["task"], published) {
+		t.Errorf("received task logged as %v, want %v", received[0]["task"], published)
+	}
+	if processed := logEntries(t, &logs, "reportwkr.processed"); len(processed) != 1 {
+		t.Errorf("%d tasks logged as processed, want 1", len(processed))
+	} else if e := processed[0]; e["taskId"] != published["taskId"] || !reflect.DeepEqual(e["task"], published) {
+		t.Errorf("processed task logged as %v, want taskId %v and the task %v", e, published["taskId"], published)
 	}
 }
 
