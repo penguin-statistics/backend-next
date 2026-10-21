@@ -199,21 +199,18 @@ func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.Re
 		return "", err
 	}
 
-	pub, err := s.NatsJS.PublishAsync(subject, reportTaskJsonBytes)
-	if err != nil {
+	// Wait for the stream to store the task. An asynchronous publish leaks the ack of a task given up on, and once
+	// such acks reach the limit of pending ones, every publish stalls.
+	pubCtx, cancel := context.WithTimeout(ctx.UserContext(), time.Second*10)
+	defer cancel()
+	_, err = s.NatsJS.Publish(subject, reportTaskJsonBytes, nats.Context(pubCtx))
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "", ErrNatsTimeout
+	} else if err != nil {
 		return "", err
 	}
 
-	select {
-	case err := <-pub.Err():
-		return "", err
-	case <-pub.Ok():
-		return taskId, nil
-	case <-ctx.UserContext().Done():
-		return "", ctx.UserContext().Err()
-	case <-time.After(time.Second * 10):
-		return "", ErrNatsTimeout
-	}
+	return taskId, nil
 }
 
 // returns taskID and error, if any
