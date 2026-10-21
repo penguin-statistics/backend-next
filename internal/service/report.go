@@ -184,11 +184,12 @@ func (s *Report) PipelineTaskId(ctx *fiber.Ctx) string {
 
 func (s *Report) PipelineAggregateGachaboxDrops(ctx context.Context, singleReport *types.ReportTaskSingleReport) error {
 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
-	category, err := s.StageService.GetStageExtraProcessTypeByArkId(ctx, singleReport.StageID)
+	// cached: a report is accepted without a query of the database, as long as the stage was looked up recently
+	stage, err := s.StageService.GetStageByArkId(ctx, singleReport.StageID)
 	if err != nil {
 		return err
 	}
-	if category.Valid && category.String == constant.ExtraProcessTypeGachaBox {
+	if stage.ExtraProcessType.Valid && stage.ExtraProcessType.String == constant.ExtraProcessTypeGachaBox {
 		reportutil.AggregateGachaBoxDrops(singleReport)
 	}
 
