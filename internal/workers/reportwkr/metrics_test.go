@@ -84,7 +84,7 @@ func TestConsumeMetricsOnProcessFailure(t *testing.T) {
 	// a closed database fails the transaction before anything is stored
 	db := bun.NewDB(sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN("postgres://test@127.0.0.1:1/test?sslmode=disable"))), pgdialect.New())
 	db.Close()
-	w := &Worker{WorkerDeps: WorkerDeps{DB: db, ReportVerifier: &reportverifs.ReportVerifiers{}}}
+	w := newWorker(WorkerDeps{DB: db, ReportVerifier: &reportverifs.ReportVerifiers{}}, defaultConsumerConfig)
 	data, _ := json.Marshal(&types.ReportTask{TaskID: "test"})
 	if err := w.ingestPreprocess(context.Background(), newTestMsg("REPORT.UNKNOWN", 1, data)); err == nil {
 		t.Fatal("expected a process error")
@@ -151,7 +151,7 @@ func TestConsumeMetricsOnStore(t *testing.T) {
 			stored := observability.ReportStoredTotal.WithLabelValues("maa")
 			consumedBefore, storedBefore := testutil.ToFloat64(consumed), testutil.ToFloat64(stored)
 
-			w := &Worker{WorkerDeps: WorkerDeps{
+			w := newWorker(WorkerDeps{
 				DB:                     db,
 				Redis:                  rdb,
 				StageService:           service.NewStage(repo.NewStage(db)),
@@ -160,7 +160,7 @@ func TestConsumeMetricsOnStore(t *testing.T) {
 				DropReportExtraRepo:    repo.NewDropReportExtra(db),
 				DropPatternElementRepo: repo.NewDropPatternElement(db),
 				ReportVerifier:         &reportverifs.ReportVerifiers{},
-			}}
+			}, defaultConsumerConfig)
 			if err := w.ingestPreprocess(ctx, newTestMsg("REPORT.BATCH", 1, data)); (err != nil) != tc.wantErr {
 				t.Fatalf("unexpected error %v", err)
 			}
