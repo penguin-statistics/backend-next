@@ -35,8 +35,11 @@ func (s *Stage) GetStages(ctx context.Context) ([]*model.Stage, error) {
 	}
 
 	stages, err = s.StageRepo.GetStages(ctx)
+	if err != nil {
+		return nil, err
+	}
 	cache.Stages.Set(stages, time.Minute*5)
-	return stages, err
+	return stages, nil
 }
 
 func (s *Stage) GetStageById(ctx context.Context, stageId int) (*model.Stage, error) {
