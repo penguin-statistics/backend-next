@@ -522,7 +522,7 @@ func TestTaskOfAccountDoesNotWait(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	if err := w.persist(ctx, tx, inProgress, createdAt, nil); err != nil {
+	if _, err := w.persist(ctx, tx, inProgress, createdAt, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -563,4 +563,71 @@ func TestDistinctTasksSameAccount(t *testing.T) {
 	if n := duplicates("reportwkr.duplicate"); n != 0 {
 		t.Errorf("%d copies skipped, want 0", n)
 	}
+}
+
+// TestProcessKeepsTaskWhenRedisFails checks that the recall key is best-effort: the reports are committed before it
+// is set, and a failure to set it does not fail the stored task.
+func TestProcessKeepsTaskWhenRedisFails(t *testing.T) {
+	w := newTestWorker(t)
+	unset := captureLogs(t)
+	w.Redis = redis.NewClient(&redis.Options{Addr: "127.0.0.1:1", MaxRetries: -1}) // nothing listens there
+	t.Cleanup(func() { w.Redis.Close() })
+	task := newTestTask(t, w, testAccountID(), time.UnixMicro(1760600000123456), "203.0.113.7", testReport("main_01-07", 30012))
+
+	if err := processTask(t, w, task); err != nil {
+		t.Fatal(err)
+	}
+
+	if n := countRows(t, w.DB, "drop_reports"); n != 1 {
+		t.Errorf("%d reports stored, want 1", n)
+	}
+	if n := unset("reportwkr.recall.unset"); n != 1 {
+		t.Errorf("%d failures to set the recall key logged, want 1", n)
+	}
+}
+
+// TestProcessRollsBackWithoutRecallKey fails a batch task on its second report: the first one is rolled back, so the
+// task must leave no recall key naming it.
+func TestProcessRollsBackWithoutRecallKey(t *testing.T) {
+	w := newTestWorker(t)
+	task := newTestTask(t, w, testAccountID(), time.UnixMicro(1760600000123456), "203.0.113.7",
+		testReport("main_01-07", 30012), testReport("no_such_stage", 30013))
+
+	if err := processTask(t, w, task); err == nil {
+		t.Fatal("a task with an unknown stage was processed")
+	}
+
+	if n := countRows(t, w.DB, "drop_reports"); n != 0 {
+		t.Errorf("%d reports stored, want 0", n)
+	}
+	n, err := w.Redis.Exists(context.Background(), constant.ReportRedisPrefix+taskID(t, task)).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Error("recall key set for a rolled back task")
+	}
+}
+
+// TestProcessDuplicateSetsRecallKey processes again a task stored without its recall key, as when the copy that
+// stored it died before setting it: the skipped copy sets it.
+func TestProcessDuplicateSetsRecallKey(t *testing.T) {
+	w := newTestWorker(t)
+	task := newTestTask(t, w, testAccountID(), time.UnixMicro(1760600000123456), "203.0.113.7",
+		testReport("main_01-07", 30012), testReport("main_04-04", 30013))
+
+	if err := processTask(t, w, task); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Redis.Del(context.Background(), constant.ReportRedisPrefix+taskID(t, task)).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := processTask(t, w, task); err != nil {
+		t.Fatal(err)
+	}
+
+	if n := countRows(t, w.DB, "drop_reports"); n != 2 {
+		t.Errorf("%d reports stored, want 2", n)
+	}
+	assertRecallKey(t, w, taskID(t, task), "2")
 }
