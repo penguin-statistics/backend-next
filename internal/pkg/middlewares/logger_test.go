@@ -251,3 +251,33 @@ func TestRequestLoggerLogsPenguinIDAndAccountID(t *testing.T) {
 		}
 	}
 }
+
+func TestRequestLoggerLogsExpectedStatusAtInfo(t *testing.T) {
+	for _, tc := range []struct {
+		expect bool
+		status int
+		want   string
+	}{
+		{false, 404, "warn"},
+		{true, 404, "info"},
+		{false, 503, "error"},
+		{true, 503, "info"},
+	} {
+		var buf bytes.Buffer
+		app, _ := newLoggedApp(t, &buf)
+		app.Get("/", func(c *fiber.Ctx) error {
+			if tc.expect {
+				ExpectStatus(c)
+			}
+			return c.SendStatus(tc.status)
+		})
+		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/", nil), -1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if got := requestLog(t, &buf)["level"]; got != tc.want {
+			t.Errorf("expected %v, status %d: level %v, want %s", tc.expect, tc.status, got, tc.want)
+		}
+	}
+}

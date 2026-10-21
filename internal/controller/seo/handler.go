@@ -19,6 +19,7 @@ import (
 	"go.uber.org/fx"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/pkg/observability"
 	"exusiai.dev/backend-next/internal/pkg/spashell"
 	"exusiai.dev/backend-next/internal/service"
@@ -392,6 +393,7 @@ func (h *Handler) sendRaw(c *fiber.Ctx, shell *spashell.Shell, r route, outcome 
 // sendCold sends the app as is while the catalog is not loaded: a 503 that search engines retry later
 func (h *Handler) sendCold(c *fiber.Ctx, shell *spashell.Shell, r route) {
 	count(r.kind, "shell_only")
+	middlewares.ExpectStatus(c)
 	setHTML(c, "")
 	c.Set("X-Robots-Tag", "noindex")
 	c.Set(fiber.HeaderCacheControl, "no-store")
@@ -402,6 +404,9 @@ func (h *Handler) sendCold(c *fiber.Ctx, shell *spashell.Shell, r route) {
 
 func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, p *Page, html []byte) {
 	count(p.Kind, p.Outcome)
+	// a 404 of a page that does not exist (crawlers keep requesting retired IDs) or a 503 while the data is
+	// calculated after a start is no error of the backend; their outcomes are counted above
+	middlewares.ExpectStatus(c)
 	setHTML(c, p.Head.Lang)
 	switch {
 	case p.Status == fiber.StatusServiceUnavailable:
