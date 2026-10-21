@@ -1,0 +1,29 @@
+{{- define "head" -}}
+<title>{{.Title}}</title>
+<meta name="description" content="{{.Description}}">
+<meta name="robots" content="{{.Robots}}">
+<meta name="googlebot" content="{{.Robots}}">
+{{- if .Canonical}}
+<link rel="canonical" href="{{.Canonical}}">
+{{- range .Alternates}}
+<link rel="alternate" hreflang="{{.Hreflang}}" href="{{.Href}}">
+{{- end}}
+{{- end}}
+<meta property="og:site_name" content="{{.SiteName}}">
+<meta property="og:type" content="website">
+{{- if .Canonical}}
+<meta property="og:url" content="{{.Canonical}}">
+{{- end}}
+<meta property="og:title" content="{{.Title}}">
+<meta property="og:description" content="{{.Description}}">
+<meta property="og:locale" content="{{.OGLocale}}">
+{{- range .OGLocales}}
+<meta property="og:locale:alternate" content="{{.}}">
+{{- end}}
+<meta property="og:image:alt" content="{{.ImageAlt}}">
+<meta name="twitter:image:alt" content="{{.ImageAlt}}">
+<style>#pe-ssr{box-sizing:border-box;max-width:960px;margin:0 auto;padding:24px 16px 48px;color:#ddd;font:14px/1.6 Roboto,-apple-system,"Noto Sans SC",BlinkMacSystemFont,"Segoe UI","Microsoft YaHei UI",Helvetica,Arial,sans-serif}#pe-ssr a{color:#8ab4f8}#pe-ssr h1{font-size:1.6em}#pe-ssr h2{font-size:1.3em}#pe-ssr h3{font-size:1.1em}#pe-ssr ol,#pe-ssr ul{display:flex;flex-wrap:wrap;gap:4px 16px;padding:0;list-style:none}#pe-ssr table{display:block;overflow-x:auto;border-collapse:collapse;margin:16px 0}#pe-ssr caption{text-align:left;color:#aaa}#pe-ssr td,#pe-ssr th{padding:4px 8px;border-bottom:1px solid #333;text-align:left;vertical-align:top;white-space:nowrap}#pe-ssr td{font-variant-numeric:tabular-nums}</style>
+{{- if .JSONLD}}
+<script type="application/ld+json">{{.JSONLD}}</script>
+{{- end}}
+{{end -}}
