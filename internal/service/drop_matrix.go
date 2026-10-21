@@ -71,7 +71,13 @@ func (s *DropMatrix) GetShimDropMatrix(
 		if err != nil {
 			return nil, err
 		}
-		slowResults, err := s.applyShimForDropMatrixQuery(ctx, server, showClosedZones, stageFilterStr, itemFilterStr, dropMatrixQueryResult)
+		var openingStageIds map[int]struct{}
+		if !showClosedZones {
+			if openingStageIds, err = s.getOpeningStageIds(ctx, server); err != nil {
+				return nil, err
+			}
+		}
+		slowResults, err := s.applyShimForDropMatrixQuery(ctx, showClosedZones, openingStageIds, stageFilterStr, itemFilterStr, dropMatrixQueryResult)
 		if err != nil {
 			return nil, err
 		}
@@ -371,11 +377,16 @@ func (s *DropMatrix) RefreshGlobalDropMatrixCaches(ctx context.Context, server s
 	if err != nil {
 		return err
 	}
+	// the opening stages are the same for every source category: read them once
+	openingStageIds, err := s.getOpeningStageIds(ctx, server)
+	if err != nil {
+		return err
+	}
 	for _, sourceCategory := range s.Config.MatrixWorkerSourceCategories {
 		global := globals[sourceCategory]
 		shims := make(map[bool]*modelv2.DropMatrixQueryResult, 2)
 		for _, showClosedZones := range []bool{true, false} {
-			if shims[showClosedZones], err = s.applyShimForDropMatrixQuery(ctx, server, showClosedZones, "", "", global); err != nil {
+			if shims[showClosedZones], err = s.applyShimForDropMatrixQuery(ctx, showClosedZones, openingStageIds, "", "", global); err != nil {
 				return err
 			}
 		}
@@ -571,7 +582,7 @@ func (s *DropMatrix) GetShimCustomizedDropMatrixResults(
 	if err != nil {
 		return nil, err
 	}
-	return s.applyShimForDropMatrixQuery(ctx, server, true, "", "", customizedDropMatrixQueryResult)
+	return s.applyShimForDropMatrixQuery(ctx, true, nil, "", "", customizedDropMatrixQueryResult)
 }
 
 func (s *DropMatrix) convertDropMatrixElementsToDropMatrixQueryResult(ctx context.Context, dropMatrixElements []*model.DropMatrixElement) (*model.DropMatrixQueryResult, error) {
@@ -876,7 +887,23 @@ func (s *DropMatrix) convertOneDropMatrixElementToStatsBundle(el *model.OneDropM
 	}, nil
 }
 
-func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, server string, showClosedZones bool, stageFilterStr, itemFilterStr string, queryResult *model.DropMatrixQueryResult) (*modelv2.DropMatrixQueryResult, error) {
+// getOpeningStageIds returns the ids of the stages of server with a drop info in a current time range, which a
+// shim without closed zones keeps the elements of.
+func (s *DropMatrix) getOpeningStageIds(ctx context.Context, server string) (map[int]struct{}, error) {
+	currentDropInfos, err := s.DropInfoService.GetCurrentDropInfosByServer(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	openingStageIds := make(map[int]struct{})
+	for _, dropInfo := range currentDropInfos {
+		openingStageIds[dropInfo.StageID] = struct{}{}
+	}
+	return openingStageIds, nil
+}
+
+// applyShimForDropMatrixQuery converts queryResult to its v2 form, keeping only the elements of openingStageIds (from
+// getOpeningStageIds) unless showClosedZones is set.
+func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, showClosedZones bool, openingStageIds map[int]struct{}, stageFilterStr, itemFilterStr string, queryResult *model.DropMatrixQueryResult) (*modelv2.DropMatrixQueryResult, error) {
 	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
 	if err != nil {
 		return nil, err
@@ -885,16 +912,6 @@ func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, server str
 	stagesMapById, err := s.StageService.GetStagesMapById(ctx)
 	if err != nil {
 		return nil, err
-	}
-
-	// get opening stages from dropinfos
-	var openingStageIds []int
-	if !showClosedZones {
-		currentDropInfos, err := s.DropInfoService.GetCurrentDropInfosByServer(ctx, server)
-		if err != nil {
-			return nil, err
-		}
-		linq.From(currentDropInfos).SelectT(func(el *model.DropInfo) int { return el.StageID }).Distinct().ToSlice(&openingStageIds)
 	}
 
 	// convert comma-splitted stage filter param to a hashset
@@ -921,7 +938,7 @@ func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, server str
 		Matrix: make([]*modelv2.OneDropMatrixElement, 0),
 	}
 	for _, el := range queryResult.Matrix {
-		if !showClosedZones && !linq.From(openingStageIds).Contains(el.StageID) {
+		if _, ok := openingStageIds[el.StageID]; !showClosedZones && !ok {
 			continue
 		}
 
