@@ -13,14 +13,19 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"reflect"
 	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/goccy/go-json"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"exusiai.dev/backend-next/internal/model/types"
 )
@@ -110,6 +115,41 @@ func (s *testStream) consumerInfo(t *testing.T, durable string) *nats.ConsumerIn
 	return ci
 }
 
+// countTerminated counts, from now on, the advisories the server sends when it is told never to deliver a message of
+// the durable again (Term): an Ack removes the message from the stream too, but sends none.
+func (s *testStream) countTerminated(t *testing.T, durable string) (count func() int) {
+	t.Helper()
+	nc, _ := s.connect(t)
+	var n atomic.Int32
+	if _, err := nc.Subscribe("$JS.EVENT.ADVISORY.CONSUMER.MSG_TERMINATED."+s.name+"."+durable, func(*nats.Msg) {
+		n.Add(1)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := nc.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	return func() int { return int(n.Load()) }
+}
+
+// logEntries returns the entries of logs logged with the given evt.name.
+func logEntries(t *testing.T, logs *lockedBuffer, evtName string) []map[string]any {
+	t.Helper()
+	logs.mu.Lock()
+	defer logs.mu.Unlock()
+	var entries []map[string]any
+	for _, line := range strings.Split(strings.TrimSpace(logs.buf.String()), "\n") {
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Fatal(err)
+		}
+		if entry["evt.name"] == evtName {
+			entries = append(entries, entry)
+		}
+	}
+	return entries
+}
+
 // consumerConfig is the configuration of the report consumer on the stream, with the times scaled down by 20.
 func (s *testStream) consumerConfig() consumerConfig {
 	c := defaultConsumerConfig
@@ -117,6 +157,8 @@ func (s *testStream) consumerConfig() consumerConfig {
 	c.ackWait = 3 * time.Second
 	c.taskTimeout = 500 * time.Millisecond
 	c.fetchWait = 100 * time.Millisecond
+	c.nakDelay = 750 * time.Millisecond
+	c.maxNakDelay = 15 * time.Second
 	return c
 }
 
@@ -810,5 +852,160 @@ func TestLegacyAckAfterTakeoverLosesNoTask(t *testing.T) {
 
 	if distinct, total, _ := handled.stats(); distinct != published || total != published {
 		t.Errorf("%d tasks handled %d times, want each of %d once", distinct, total, published)
+	}
+}
+
+// TestTransientErrorIsNakedAndRetried fails the first delivery of a task as a database error does: the task is
+// delivered again after the nak delay, and stored by the second delivery.
+func TestTransientErrorIsNakedAndRetried(t *testing.T) {
+	s := newTestStream(t)
+	tw := newTestWorker(t)
+	failures := captureLogs(t)
+	w := newWorker(tw.WorkerDeps, s.consumerConfig())
+	w.NatsJS = s.js
+	var mu sync.Mutex
+	var calls []time.Time
+	w.handle = func(ctx context.Context, task *types.ReportTask) error {
+		mu.Lock()
+		calls = append(calls, time.Now())
+		first := len(calls) == 1
+		mu.Unlock()
+		if first {
+			return errors.New("injected: connection reset by peer")
+		}
+		return w.process(ctx, task)
+	}
+	startConsumer(t, w)
+	task := newTestTask(t, tw, testAccountID(), time.UnixMicro(1760600000123456), "203.0.113.7", testReport("main_01-07", 30012))
+	if _, err := s.js.Publish(s.publish, task); err != nil {
+		t.Fatal(err)
+	}
+
+	s.waitEmpty(t, w.conf.durable, 10*time.Second)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(calls) != 2 {
+		t.Fatalf("handled %d times, want 2", len(calls))
+	}
+	if d := calls[1].Sub(calls[0]); d < w.conf.nakDelay {
+		t.Errorf("delivered again after %s, want at least the nak delay %s", d, w.conf.nakDelay)
+	}
+	if ci := s.consumerInfo(t, w.conf.durable); ci.Delivered.Consumer != 2 || ci.NumAckPending != 0 {
+		t.Errorf("%d deliveries and %d acks pending, want 2 and 0", ci.Delivered.Consumer, ci.NumAckPending)
+	}
+	if n := countRows(t, tw.DB, "drop_reports"); n != 1 {
+		t.Errorf("%d reports stored, want 1", n)
+	}
+	if n := failures("reportwkr.failed"); n != 1 {
+		t.Errorf("%d failures logged, want 1", n)
+	}
+}
+
+// TestRetryDelay checks the delay before a failed task is delivered again: 15s times its deliveries so far, up to 5
+// minutes however often it fails.
+func TestRetryDelay(t *testing.T) {
+	for _, tc := range []struct {
+		delivered uint64
+		want      time.Duration
+	}{
+		{1, 15 * time.Second},
+		{5, 75 * time.Second},
+		{19, 285 * time.Second},
+		{20, 5 * time.Minute},
+		{21, 5 * time.Minute},
+		{1000, 5 * time.Minute},
+	} {
+		if got := defaultConsumerConfig.retryDelay(tc.delivered); got != tc.want {
+			t.Errorf("after delivery %d: retry in %s, want %s", tc.delivered, got, tc.want)
+		}
+	}
+}
+
+// TestMalformedPayloadIsTerminated publishes a message that is no task: it is terminated without being handled, and
+// logged with its sequence number.
+func TestMalformedPayloadIsTerminated(t *testing.T) {
+	s := newTestStream(t)
+	var logs lockedBuffer
+	prev := log.Logger
+	log.Logger = zerolog.New(&logs)
+	t.Cleanup(func() { log.Logger = prev })
+	w := newWorker(WorkerDeps{NatsJS: s.js}, s.consumerConfig())
+	var handled handledCounter
+	w.handle = func(ctx context.Context, task *types.ReportTask) error {
+		handled.add(task.TaskID)
+		return nil
+	}
+	terminated := s.countTerminated(t, w.conf.durable)
+	startConsumer(t, w)
+	if _, err := s.js.Publish(s.publish, []byte("not-json")); err != nil {
+		t.Fatal(err)
+	}
+
+	s.waitEmpty(t, w.conf.durable, 10*time.Second)
+	// terminated, so not delivered again after the nak delay or AckWait
+	time.Sleep(w.conf.ackWait + time.Second)
+
+	if _, total, _ := handled.stats(); total != 0 {
+		t.Errorf("handled %d times, want never", total)
+	}
+	if ci := s.consumerInfo(t, w.conf.durable); ci.Delivered.Consumer != 1 {
+		t.Errorf("%d deliveries, want 1", ci.Delivered.Consumer)
+	}
+	if n := terminated(); n != 1 {
+		t.Errorf("%d messages terminated, want 1", n)
+	}
+	malformed := logEntries(t, &logs, "reportwkr.malformed")
+	if len(malformed) != 1 {
+		t.Fatalf("%d malformed tasks logged, want 1", len(malformed))
+	}
+	if e := malformed[0]; e["seq"] != 1.0 || e["subject"] != s.publish || e["data"] != "not-json" || e["level"] != "error" {
+		t.Errorf("malformed task logged as %v, want its sequence 1, subject and data at error level", e)
+	}
+}
+
+// TestUnknownStageIsParked processes a task whose second report is of a stage that does not exist: no retry can store
+// it, so it is terminated and logged as it was published, although process merged the drops of the first report and
+// filled in its empty ip before it failed.
+func TestUnknownStageIsParked(t *testing.T) {
+	s := newTestStream(t)
+	tw := newTestWorker(t)
+	var logs lockedBuffer
+	prev := log.Logger
+	log.Logger = zerolog.New(&logs)
+	t.Cleanup(func() { log.Logger = prev })
+	w := newWorker(tw.WorkerDeps, s.consumerConfig())
+	w.NatsJS = s.js
+	terminated := s.countTerminated(t, w.conf.durable)
+	startConsumer(t, w)
+	first := testReport("main_01-07", 30012)
+	first.Drops = append(first.Drops, &types.Drop{DropType: "EXTRA", ItemID: 30012, Quantity: 1})
+	task := newTestTask(t, tw, testAccountID(), time.UnixMicro(1760600000123456), "", first, testReport("no_such_stage", 30012))
+	if _, err := s.js.Publish(s.publish, task); err != nil {
+		t.Fatal(err)
+	}
+
+	s.waitEmpty(t, w.conf.durable, 10*time.Second)
+	time.Sleep(2 * w.conf.nakDelay)
+
+	if ci := s.consumerInfo(t, w.conf.durable); ci.Delivered.Consumer != 1 {
+		t.Errorf("%d deliveries, want 1", ci.Delivered.Consumer)
+	}
+	if n := terminated(); n != 1 {
+		t.Errorf("%d messages terminated, want 1", n)
+	}
+	if n := countRows(t, tw.DB, "drop_reports"); n != 0 {
+		t.Errorf("%d reports stored, want 0", n)
+	}
+	parked := logEntries(t, &logs, "reportwkr.parked")
+	if len(parked) != 1 {
+		t.Fatalf("%d tasks parked, want 1", len(parked))
+	}
+	var published map[string]any
+	if err := json.Unmarshal(task, &published); err != nil {
+		t.Fatal(err)
+	}
+	if e := parked[0]; e["seq"] != 1.0 || !reflect.DeepEqual(e["reportTask"], published) || e["level"] != "error" {
+		t.Errorf("task parked as %v, want its sequence 1 and the task as published, %v, at error level", e, published)
 	}
 }
