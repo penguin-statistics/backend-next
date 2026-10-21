@@ -39,6 +39,9 @@ headers:
 - `Penguin-Deliveries`: its deliveries when it moved
 - `Penguin-Last-Error`: the error that moved it
 
+A task too close to the maximum payload to fit with these headers moves without them, and its subject under
+`REPORT_DEAD.*` names its original subject; its move is logged as `reportwkr.dead.bare`, with the sequence and the error.
+
 Nothing in the stream expires. With the [nats CLI](https://github.com/nats-io/natscli), once the cause is fixed:
 
 ```sh
