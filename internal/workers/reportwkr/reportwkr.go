@@ -468,7 +468,8 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 // park moves a task that will not be processed to the dead-letter stream, then terminates it. If the dead-letter
 // stream does not store it, the task is delivered again later instead, so that it is never dropped.
 func (w *Worker) park(msg *nats.Msg, metadata *nats.MsgMetadata, cause error) {
-	if err := w.deadLetter(msg, metadata, cause); err != nil {
+	withHeaders, err := w.deadLetter(msg, metadata, cause)
+	if err != nil {
 		delay := w.conf.retryDelay(metadata.NumDelivered)
 		log.Error().
 			Err(err).
@@ -480,13 +481,26 @@ func (w *Worker) park(msg *nats.Msg, metadata *nats.MsgMetadata, cause error) {
 		nak(msg, delay)
 		return
 	}
+	if !withHeaders {
+		log.Error().
+			Err(cause).
+			Str("evt.name", "reportwkr.dead.bare").
+			Str("subject", msg.Subject).
+			Uint64("seq", metadata.Sequence.Stream).
+			Uint64("delivered", metadata.NumDelivered).
+			Msg("report task moved to the dead-letter stream without its headers: with them it would exceed the maximum payload")
+	}
 	term(msg)
 }
 
 // deadLetter copies msg to the dead-letter stream, with its subject, stream sequence, deliveries and the error that
-// put it there in headers, and returns nil once the stream has stored it. The copy is deduplicated by the stream
-// sequence of the task, so a task moved twice (its Term lost) is stored there once.
-func (w *Worker) deadLetter(msg *nats.Msg, metadata *nats.MsgMetadata, cause error) error {
+// put it there in headers, and returns once the stream has stored it, or failed to. The copy is deduplicated by the
+// stream sequence of the task, so a task moved twice (its Term lost) is stored there once.
+//
+// The maximum payload of NATS counts the headers too, so a task that the stream accepted just under it would not fit
+// with them, and could never be moved: such a task is copied with its payload only (withHeaders false), which fits as
+// the stream accepted it, and its log is the record of the rest.
+func (w *Worker) deadLetter(msg *nats.Msg, metadata *nats.MsgMetadata, cause error) (withHeaders bool, err error) {
 	dead := nats.NewMsg(w.conf.deadSubject + msg.Subject[strings.LastIndexByte(msg.Subject, '.')+1:])
 	dead.Data = msg.Data
 	dead.Header.Set(nats.MsgIdHdr, fmt.Sprintf("%s:%d", metadata.Stream, metadata.Sequence.Stream))
@@ -494,23 +508,32 @@ func (w *Worker) deadLetter(msg *nats.Msg, metadata *nats.MsgMetadata, cause err
 	dead.Header.Set(HeaderOriginalSequence, strconv.FormatUint(metadata.Sequence.Stream, 10))
 	dead.Header.Set(HeaderDeliveries, strconv.FormatUint(metadata.NumDelivered, 10))
 	dead.Header.Set(HeaderLastError, headerValue(cause.Error()))
+	withHeaders = true
+	if w.NatsConn != nil && int64(headerSize(dead.Header)+len(dead.Data)) > w.NatsConn.MaxPayload() {
+		dead.Header = nats.Header{}
+		withHeaders = false
+	}
 
-	// asynchronous with a bound of our own: the synchronous publish of the client (v1.24.0) keeps a response entry of
-	// the connection until it closes when the send fails at once, while the asynchronous one discards its future then
-	paf, err := w.NatsJS.PublishMsgAsync(dead)
-	if err != nil {
-		return errors.Wrap(err, "failed to publish to the dead-letter stream")
+	// synchronous, bounded by taskTimeout: an asynchronous future whose ack never arrives (lost to a reconnect) stays
+	// pending in the JetStream context, which report publishing shares, until the connection closes, while a request
+	// that times out is removed from the connection
+	ctx, cancel := context.WithTimeout(context.Background(), w.conf.taskTimeout)
+	defer cancel()
+	if _, err := w.NatsJS.PublishMsg(dead, nats.Context(ctx)); err != nil {
+		return withHeaders, errors.Wrap(err, "the dead-letter stream did not store the task")
 	}
-	timer := time.NewTimer(w.conf.taskTimeout)
-	defer timer.Stop()
-	select {
-	case <-paf.Ok():
-		return nil
-	case err := <-paf.Err():
-		return errors.Wrap(err, "the dead-letter stream did not store the task")
-	case <-timer.C:
-		return errors.Errorf("the dead-letter stream did not confirm the task within %s", w.conf.taskTimeout)
+	return withHeaders, nil
+}
+
+// headerSize returns the size of h on the wire, as NATS counts it against the maximum payload.
+func headerSize(h nats.Header) int {
+	n := len("NATS/1.0\r\n") + len("\r\n")
+	for k, vs := range h {
+		for _, v := range vs {
+			n += len(k) + len(": ") + len(v) + len("\r\n")
+		}
 	}
+	return n
 }
 
 // headerValue makes s a header value: on one line, and at most 1024 bytes.

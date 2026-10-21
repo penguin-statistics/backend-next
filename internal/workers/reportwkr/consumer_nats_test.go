@@ -9,6 +9,7 @@ package reportwkr
 // Every test works on a stream of its own, which it deletes afterwards. Times are scaled down by 10.
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/rand"
@@ -864,59 +865,149 @@ func TestPermanentFailuresMoveToDeadLetter(t *testing.T) {
 	}
 }
 
-// TestDeadLetterFailureKeepsTask moves a task to a dead-letter stream that does not exist: the task is not
-// terminated but delivered again, without being handled again, until the stream exists and stores it.
+// TestDeadLetterFailureKeepsTask moves a task to a dead-letter stream that does not exist, and to one whose server
+// never answers: the task is not terminated but delivered again, without being handled again, until the stream exists
+// and stores it, and the failed publishes leave nothing pending in the JetStream context.
 func TestDeadLetterFailureKeepsTask(t *testing.T) {
-	s := newTestStream(t)
-	if err := s.js.DeleteStream(s.dead); err != nil {
-		t.Fatal(err)
+	for _, tc := range []struct {
+		name        string
+		breakStream func(t *testing.T, s *testStream) (repair func())
+	}{
+		{"missing", func(t *testing.T, s *testStream) func() {
+			if err := s.js.DeleteStream(s.dead); err != nil {
+				t.Fatal(err)
+			}
+			return func() { s.addDeadStream(t) }
+		}},
+		{"silent", func(t *testing.T, s *testStream) func() {
+			// a subscriber that never answers, as a server whose ack is lost: each publish times out
+			if err := s.js.DeleteStream(s.dead); err != nil {
+				t.Fatal(err)
+			}
+			nc, _ := s.connect(t)
+			sub, err := nc.SubscribeSync(s.deadPrefix + "*")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := nc.Flush(); err != nil {
+				t.Fatal(err)
+			}
+			return func() {
+				if err := sub.Unsubscribe(); err != nil {
+					t.Fatal(err)
+				}
+				if err := nc.Flush(); err != nil {
+					t.Fatal(err)
+				}
+				s.addDeadStream(t)
+			}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newTestStream(t)
+			repair := tc.breakStream(t, s)
+			var logs lockedBuffer
+			prev := log.Logger
+			log.Logger = zerolog.New(&logs)
+			t.Cleanup(func() { log.Logger = prev })
+			conf := s.consumerConfig()
+			conf.nakDelay, conf.maxNakDelay = 50*time.Millisecond, 100*time.Millisecond
+			conf.taskTimeout = 200 * time.Millisecond
+			conf.deadLetterAfter = 1
+			w := newWorker(WorkerDeps{NatsJS: s.js}, conf)
+			var handled handledCounter
+			w.handle = func(ctx context.Context, task *types.ReportTask) error {
+				handled.add(task.TaskID)
+				return errors.New("injected: permanent")
+			}
+			terminated := s.countTerminated(t, conf.durable)
+			startConsumer(t, w)
+			s.publishTasks(t, 1)
+
+			for deadline := time.Now().Add(10 * time.Second); len(logEntries(t, &logs, "reportwkr.dead.failed")) < 3; time.Sleep(20 * time.Millisecond) {
+				if time.Now().After(deadline) {
+					t.Fatal("the move to the broken dead-letter stream did not fail 3 times")
+				}
+			}
+			if n := terminated(); n != 0 {
+				t.Errorf("%d messages terminated while the dead-letter stream is broken, want 0", n)
+			}
+			si, err := s.js.StreamInfo(s.name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if si.State.Msgs != 1 {
+				t.Errorf("stream holds %d messages while the dead-letter stream is broken, want 1", si.State.Msgs)
+			}
+			if n := s.js.PublishAsyncPending(); n != 0 {
+				t.Errorf("%d publishes pending in the JetStream context after the failed moves, want 0", n)
+			}
+
+			repair()
+			s.waitEmpty(t, conf.durable, 10*time.Second)
+			if _, total, _ := handled.stats(); total != 1 {
+				t.Errorf("handled %d times, want once: a task past its deliveries is only moved", total)
+			}
+			if n := terminated(); n != 1 {
+				t.Errorf("%d messages terminated, want 1", n)
+			}
+			dead := s.deadMessages(t)
+			if len(dead) != 1 {
+				t.Fatalf("%d messages in the dead-letter stream, want 1", len(dead))
+			}
+			if dead[0].Header.Get(HeaderOriginalSequence) != "1" {
+				t.Errorf("dead-letter copy of sequence %s, want 1", dead[0].Header.Get(HeaderOriginalSequence))
+			}
+			// the shared context still publishes
+			if _, err := s.js.Publish(s.publish, []byte("{}")); err != nil {
+				t.Errorf("publish after the failed moves: %v", err)
+			}
+		})
 	}
+}
+
+// TestNearLimitTaskMovesWithoutHeaders moves a task that the stream accepted 64 bytes under the maximum payload, too
+// little room for the headers of its copy: the copy keeps the payload, byte for byte, without the headers, and the move
+// is logged.
+func TestNearLimitTaskMovesWithoutHeaders(t *testing.T) {
+	s := newTestStream(t)
+	nc, js := s.connect(t)
 	var logs lockedBuffer
 	prev := log.Logger
 	log.Logger = zerolog.New(&logs)
 	t.Cleanup(func() { log.Logger = prev })
 	conf := s.consumerConfig()
-	conf.nakDelay, conf.maxNakDelay = 50*time.Millisecond, 100*time.Millisecond
 	conf.deadLetterAfter = 1
-	w := newWorker(WorkerDeps{NatsJS: s.js}, conf)
-	var handled handledCounter
+	w := newWorker(WorkerDeps{NatsJS: js, NatsConn: nc}, conf)
 	w.handle = func(ctx context.Context, task *types.ReportTask) error {
-		handled.add(task.TaskID)
-		return errors.New("injected: permanent")
+		return errors.New("injected: value too long for type character varying(32)")
 	}
-	terminated := s.countTerminated(t, conf.durable)
-	startConsumer(t, w)
-	s.publishTasks(t, 1)
 
-	for deadline := time.Now().Add(10 * time.Second); len(logEntries(t, &logs, "reportwkr.dead.failed")) < 3; time.Sleep(20 * time.Millisecond) {
-		if time.Now().After(deadline) {
-			t.Fatal("the move to the missing dead-letter stream did not fail 3 times")
-		}
-	}
-	if n := terminated(); n != 0 {
-		t.Errorf("%d messages terminated while the dead-letter stream is missing, want 0", n)
-	}
-	si, err := s.js.StreamInfo(s.name)
+	b, err := json.Marshal(&types.ReportTask{TaskID: "near-limit"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if si.State.Msgs != 1 {
-		t.Errorf("stream holds %d messages while the dead-letter stream is missing, want 1", si.State.Msgs)
+	b, err = json.Marshal(&types.ReportTask{TaskID: "near-limit", IP: strings.Repeat("x", int(nc.MaxPayload())-64-len(b))})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	s.addDeadStream(t)
+	if int64(len(b)) != nc.MaxPayload()-64 {
+		t.Fatalf("task of %d bytes, want %d", len(b), nc.MaxPayload()-64)
+	}
+	if _, err := s.js.Publish(s.publish, b); err != nil {
+		t.Fatal(err)
+	}
+	startConsumer(t, w)
 	s.waitEmpty(t, conf.durable, 10*time.Second)
-	if _, total, _ := handled.stats(); total != 1 {
-		t.Errorf("handled %d times, want once: a task past its deliveries is only moved", total)
-	}
-	if n := terminated(); n != 1 {
-		t.Errorf("%d messages terminated, want 1", n)
-	}
+
 	dead := s.deadMessages(t)
 	if len(dead) != 1 {
 		t.Fatalf("%d messages in the dead-letter stream, want 1", len(dead))
 	}
-	if dead[0].Header.Get(HeaderOriginalSequence) != "1" {
-		t.Errorf("dead-letter copy of sequence %s, want 1", dead[0].Header.Get(HeaderOriginalSequence))
+	if !bytes.Equal(dead[0].Data, b) || len(dead[0].Header) != 0 {
+		t.Errorf("dead-letter copy of %d bytes with headers %v, want the %d bytes of the task and no header", len(dead[0].Data), dead[0].Header, len(b))
+	}
+	if n := len(logEntries(t, &logs, "reportwkr.dead.bare")); n != 1 {
+		t.Errorf("%d moves without headers logged, want 1", n)
 	}
 }
