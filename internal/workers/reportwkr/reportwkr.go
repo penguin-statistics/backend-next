@@ -109,9 +109,20 @@ func (w *Worker) Consumer(ctx context.Context, ch chan error) error {
 func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
 	defer func() {
 		if err := msg.Ack(); err != nil {
+			observability.ReportConsumeAckFailures.Inc()
 			log.Error().Err(err).Msg("failed to ack")
 		}
 	}()
+
+	outcome := "failed_process"
+	defer func() {
+		observability.ReportConsumeTotal.
+			WithLabelValues(outcome, observability.ReportSubjectLabel(msg.Subject)).
+			Inc()
+	}()
+	if metadata, err := msg.Metadata(); err == nil {
+		observability.ReportConsumeNumDelivered.Observe(float64(metadata.NumDelivered))
+	}
 
 	taskCtx, cancelTask := context.WithTimeout(ctx, time.Second*10)
 	defer cancelTask()
@@ -126,6 +137,7 @@ func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
 
 	reportTask := &types.ReportTask{}
 	if err := json.Unmarshal(msg.Data, reportTask); err != nil {
+		outcome = "failed_unmarshal"
 		return err
 	}
 
@@ -175,6 +187,7 @@ func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
 		Dur("duration", time.Since(start)).
 		Msg("report task processed successfully")
 
+	outcome = "stored"
 	return nil
 }
 
@@ -298,6 +311,9 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 	if err := tx.Commit(); err != nil {
 		return errors.Wrap(err, "failed to commit transaction")
 	}
+	observability.ReportStoredTotal.
+		WithLabelValues(observability.ReportSourceLabel(reportTask.Source)).
+		Add(float64(len(reportTask.Reports)))
 
 	return nil
 }
