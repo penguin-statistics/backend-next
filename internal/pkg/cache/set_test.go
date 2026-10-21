@@ -121,6 +121,28 @@ func TestMutexGetSetDoesNotCacheAfterADelete(t *testing.T) {
 	}
 }
 
+// the value MutexGetSetPublishing returns is the one cacheValue reports, even if the key is deleted right after
+func TestMutexGetSetPublishingDeletedAfterPublication(t *testing.T) {
+	c := NewSet[int]("test")
+	var (
+		v        int
+		returned bool
+	)
+	if _, err := c.MutexGetSetPublishing("key", &v, func() (*int, error) {
+		c.Set("key", 2, time.Minute) // the worker's refresh
+		one := 1
+		return &one, nil
+	}, time.Minute, func(value *int, cacheValue func() bool) {
+		returned = cacheValue()
+		_ = c.Delete("key") // a failed refresh
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if v != 2 || returned {
+		t.Errorf("got %d, cacheValue reported %v; want the refreshed 2, reported as not the calculation", v, returned)
+	}
+}
+
 func TestMutexGetSetForgetsKeysNotInUse(t *testing.T) {
 	c := NewSet[int]("test")
 	for i := 0; i < 100; i++ {
