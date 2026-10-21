@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"reflect"
 	"sync"
 	"time"
 
@@ -30,15 +29,8 @@ func (c *Singular[T]) Get(dest *T) error {
 	if !ok {
 		return ErrNotFound
 	}
-	// copy value to dest
-	var r reflect.Value
-	if reflect.ValueOf(result).Kind() == reflect.Ptr {
-		r = reflect.ValueOf(result).Elem()
-	} else {
-		r = reflect.ValueOf(result)
-	}
-	reflect.ValueOf(dest).Elem().Set(r)
-
+	// c holds only values of T: Set and MutexGetSet store nothing else
+	*dest = result.(T)
 	return nil
 }
 
@@ -77,16 +69,7 @@ func (c *Singular[T]) slowMutexGetSet(dest *T, valueFunc func() (T, error), expi
 
 	c.Set(value, expire)
 
-	// copy value to dest
-	// copy value to dest
-	var r reflect.Value
-	if reflect.ValueOf(value).Kind() == reflect.Ptr {
-		r = reflect.ValueOf(value).Elem()
-	} else {
-		r = reflect.ValueOf(value)
-	}
-	reflect.ValueOf(dest).Elem().Set(r)
-
+	*dest = value
 	return nil
 }
 

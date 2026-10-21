@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 func TestMutexGetSetDoesNotMakeOtherKeysWait(t *testing.T) {
@@ -131,5 +133,78 @@ func TestMutexGetSetForgetsKeysNotInUse(t *testing.T) {
 	}
 	if len(c.locks) != 0 || len(c.calculating) != 0 {
 		t.Errorf("kept %d locks and %d calculating keys", len(c.locks), len(c.calculating))
+	}
+}
+
+type testValue struct {
+	ID   int
+	Name string
+	Tags []string
+}
+
+func TestGetCopiesTheCachedValue(t *testing.T) {
+	c := NewSet[testValue]("test")
+	tags := []string{"a"}
+	c.Set("key", testValue{ID: 1, Name: "one", Tags: tags}, time.Minute)
+
+	var v testValue
+	if err := c.Get("key", &v); err != nil {
+		t.Fatal(err)
+	}
+	if v.ID != 1 || v.Name != "one" || len(v.Tags) != 1 || &v.Tags[0] != &tags[0] {
+		t.Errorf("got %+v, want the cached value (sharing its slice)", v)
+	}
+	if err := c.Get("missing", &v); err != ErrNotFound {
+		t.Errorf("got %v for a missing key, want ErrNotFound", err)
+	}
+}
+
+func TestGetKeepsNilSlicesAndMaps(t *testing.T) {
+	slices := NewSet[[]int]("test")
+	slices.Set("key", nil, time.Minute)
+	s := []int{1}
+	if err := slices.Get("key", &s); err != nil || s != nil {
+		t.Errorf("got %v (%v), want a nil slice", s, err)
+	}
+
+	maps := NewSet[map[int]int]("test")
+	maps.Set("key", nil, time.Minute)
+	m := map[int]int{1: 1}
+	if err := maps.Get("key", &m); err != nil || m != nil {
+		t.Errorf("got %v (%v), want a nil map", m, err)
+	}
+}
+
+func TestGetOfAPointerTypeKeepsThePointer(t *testing.T) {
+	c := NewSet[*testValue]("test")
+	cached := &testValue{ID: 1}
+	c.Set("key", cached, time.Minute)
+
+	var v *testValue
+	if err := c.Get("key", &v); err != nil || v != cached {
+		t.Errorf("got %p (%v), want the cached pointer %p", v, err, cached)
+	}
+
+	calculated := &testValue{ID: 2}
+	if _, err := c.MutexGetSet("other", &v, func() (**testValue, error) { return &calculated, nil }, time.Minute); err != nil || v != calculated {
+		t.Errorf("got %p (%v), want the calculated pointer %p", v, err, calculated)
+	}
+}
+
+func BenchmarkSetGet(b *testing.B) {
+	// keep the trace log of Set out of the benchmark output
+	level := zerolog.GlobalLevel()
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	defer zerolog.SetGlobalLevel(level)
+
+	c := NewSet[testValue]("test")
+	c.Set("key", testValue{ID: 1, Name: "one", Tags: []string{"a"}}, time.Minute)
+	var v testValue
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := c.Get("key", &v); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
