@@ -49,15 +49,6 @@ func (r *DropReport) DeleteDropReport(ctx context.Context, reportId int) error {
 	return err
 }
 
-func (r *DropReport) UpdateDropReportReliability(ctx context.Context, tx bun.Tx, reportId int, reliability int) error {
-	_, err := tx.NewUpdate().
-		Model((*model.DropReport)(nil)).
-		Set("reliability = ?", reliability).
-		Where("report_id = ?", reportId).
-		Exec(ctx)
-	return err
-}
-
 // only filtered by stage_id, not item_id, needs post-filtering
 func (r *DropReport) CalcQuantityUniqCount(
 	ctx context.Context, queryCtx *model.DropReportQueryContext,
@@ -642,15 +633,6 @@ func (r *DropReport) handleAccountAndReliability(query *bun.SelectQuery, account
 		query = query.Where("dr.reliability >= 0 AND dr.account_id = ?", accountId.Int64)
 	} else {
 		query = query.Where("dr.reliability = 0")
-	}
-}
-
-func (r *DropReport) handleCreatedAtWithTimeRange(query *bun.SelectQuery, timeRange *model.TimeRange) {
-	if timeRange.StartTime != nil {
-		query = query.Where("dr.created_at >= timestamp with time zone ?", timeRange.StartTime.Format(time.RFC3339))
-	}
-	if timeRange.EndTime != nil {
-		query = query.Where("dr.created_at < timestamp with time zone ?", timeRange.EndTime.Format(time.RFC3339))
 	}
 }
 
