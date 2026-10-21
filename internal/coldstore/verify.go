@@ -113,6 +113,10 @@ func VerifyMonth(ctx context.Context, opts Options, dir string, m *Manifest, mon
 		for _, p := range src.diff(got) {
 			problems = append(problems, "files vs PostgreSQL: "+p)
 		}
+		if j.orphanExtras > 0 {
+			problems = append(problems, fmt.Sprintf("PostgreSQL: %d drop_report_extras rows of the month belong to no report of "+
+				"the month and are not archived", j.orphanExtras))
+		}
 	}
 
 	if len(problems) > 0 {

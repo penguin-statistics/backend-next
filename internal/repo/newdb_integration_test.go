@@ -135,7 +135,8 @@ func TestDropReportReadsOnNewDBSchema(t *testing.T) {
 		return results, err
 	})
 
-	// DeleteDropReport marks a report of each partition unreliable by its id
+	// DeleteDropReport marks a report of each partition unreliable by its id, but only one submitted within
+	// RecallMaxAge (the recall's bound): an older fixture report is left alone on both schemas
 	for _, at := range []time.Time{base, base.Add(20 * time.Hour)} {
 		for _, db := range []*bun.DB{oldDB, newDB} {
 			var reportId int
@@ -147,8 +148,12 @@ func TestDropReportReadsOnNewDBSchema(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if rowsAffected != 1 {
-				t.Errorf("DeleteDropReport(%d) affected %d rows, want 1", reportId, rowsAffected)
+			want := int64(0)
+			if time.Since(at) < RecallMaxAge {
+				want = 1
+			}
+			if rowsAffected != want {
+				t.Errorf("DeleteDropReport(%d) affected %d rows, want %d", reportId, rowsAffected, want)
 			}
 		}
 	}

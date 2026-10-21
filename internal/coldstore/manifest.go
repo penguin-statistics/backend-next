@@ -47,6 +47,11 @@ type MonthEntry struct {
 	Files       []FileEntry `json:"files"`
 	GeneratedAt time.Time   `json:"generated_at"`
 	Generator   string      `json:"generator"`
+	// RecordedAt is when the monthly archiving found the month in the local manifest (so readers can load it from
+	// then on) while its partitions were still in PostgreSQL: they are dropped once readers have had the time to load
+	// the manifest (see ArchiveOptions.DropDelay). It is left out for the months recorded otherwise and, until it is
+	// set, for a month the archiving publishes; a new entry of the month (e.g. a patch) drops it.
+	RecordedAt time.Time `json:"recorded_at,omitzero"`
 }
 
 // FileEntry describes one file.
@@ -148,10 +153,24 @@ func parseManifest(b []byte, name string) (*Manifest, error) {
 
 // WriteManifest writes a manifest file atomically: to a temporary file next to it, flushed, then renamed.
 func WriteManifest(name string, m *Manifest) error {
-	b, err := json.MarshalIndent(m, "", "  ")
+	b, err := MarshalManifest(m)
 	if err != nil {
 		return err
 	}
+	return writeManifestFile(name, b)
+}
+
+// MarshalManifest returns the content of a manifest file.
+func MarshalManifest(m *Manifest) ([]byte, error) {
+	b, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	return append(b, '\n'), nil
+}
+
+// writeManifestFile writes the content of a manifest file atomically.
+func writeManifestFile(name string, b []byte) error {
 	if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
 		return errors.Wrap(err, "coldstore: create directory")
 	}
@@ -160,7 +179,7 @@ func WriteManifest(name string, m *Manifest) error {
 		return errors.Wrap(err, "coldstore: create manifest")
 	}
 	defer os.Remove(f.Name())
-	_, err = f.Write(append(b, '\n'))
+	_, err = f.Write(b)
 	if err == nil {
 		err = f.Chmod(0o644)
 	}
@@ -188,6 +207,17 @@ func WriteManifest(name string, m *Manifest) error {
 // read-modify-write holds an exclusive lock on name+".lock", so concurrent exports into one directory never lose
 // each other's entries.
 func UpdateManifest(name string, fn func(*Manifest) error) error {
+	return updateManifest(name, fn, nil)
+}
+
+// errManifestUnchanged is returned by the fn of updateManifest that leaves the manifest as it is.
+var errManifestUnchanged = errors.New("coldstore: manifest unchanged")
+
+// updateManifest is UpdateManifest; commit, if not nil, is called with the new manifest and its content once fn has
+// applied its changes, before the file is written, still holding the lock: an error from it leaves the file as it
+// was. The monthly archiving uploads the content to the bucket there, so that the bucket's manifest is the local one.
+// If fn returns errManifestUnchanged, the file is not written, and commit gets its current content.
+func updateManifest(name string, fn func(*Manifest) error, commit func(m *Manifest, content []byte) error) error {
 	unlock, err := lockManifest(name)
 	if err != nil {
 		return err
@@ -201,12 +231,30 @@ func UpdateManifest(name string, fn func(*Manifest) error) error {
 	if err != nil {
 		return err
 	}
-	if err := fn(m); err != nil {
+	if err := fn(m); errors.Is(err, errManifestUnchanged) {
+		if commit == nil {
+			return nil
+		}
+		b, err := os.ReadFile(name)
+		if err != nil {
+			return errors.Wrap(err, "coldstore: read manifest")
+		}
+		return commit(m, b)
+	} else if err != nil {
 		return err
 	}
 	m.GeneratedAt = time.Now().UTC()
 	m.Generator = Generator()
-	return WriteManifest(name, m)
+	b, err := MarshalManifest(m)
+	if err != nil {
+		return err
+	}
+	if commit != nil {
+		if err := commit(m, b); err != nil {
+			return err
+		}
+	}
+	return writeManifestFile(name, b)
 }
 
 // lockManifest takes the exclusive lock of UpdateManifest on the manifest name (name+".lock"), and returns its

@@ -178,13 +178,6 @@ func TestProcessWritesDropReportExtrasCreatedAt(t *testing.T) {
 	if extra.ReportID != 4988525 || extra.IP != "127.0.0.1/32" || extra.CreatedAt != nil {
 		t.Errorf("GetDropReportExtraById = %+v", extra)
 	}
-	extras, _, err := w.DropReportExtraRepo.GetDropReportExtraForArchive(ctx, nil, 4988523, 4988525, 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(extras) != 3 {
-		t.Errorf("GetDropReportExtraForArchive returned %d extras, want 3", len(extras))
-	}
 }
 
 // TestProcessStoresRecruitReportsInDropReports pins that the flag changes nothing else: on the new database a

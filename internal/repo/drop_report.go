@@ -94,13 +94,22 @@ func (r *DropReport) CreateDropReport(ctx context.Context, tx bun.Tx, dropReport
 	return err
 }
 
+// RecallMaxAge bounds the created_at of a recalled report. The recall key of a report lives 24 hours after the
+// report is stored, and created_at is when it was submitted: this leaves 6 days to the report queue. The bound is
+// sent as a constant, so that the planner prunes the partitions of the older months (drop_reports is partitioned by
+// month of created_at in the new database): the recall then never locks those, and never waits for the monthly
+// archiving that holds an old month's partitions locked to drop them (internal/coldstore). It must stay below the 31
+// days coldstore.ArchiveOptions.After is at least.
+const RecallMaxAge = 7 * 24 * time.Hour
+
 // DeleteDropReport marks the report as recalled (reliability -1) and returns the number of rows affected: 0 when the
-// report does not exist.
+// report does not exist, or was submitted more than RecallMaxAge ago.
 func (r *DropReport) DeleteDropReport(ctx context.Context, reportId int) (int64, error) {
 	res, err := r.db.NewUpdate().
 		Model((*model.DropReport)(nil)).
 		Set("reliability = ?", -1).
 		Where("report_id = ?", reportId).
+		Where("created_at >= ?", time.Now().Add(-RecallMaxAge)).
 		Exec(ctx)
 	if err != nil {
 		return -1, err
@@ -675,42 +684,6 @@ func (r *DropReport) GetDropReports(ctx context.Context, queryCtx *model.DropRep
 	return results, nil
 }
 
-func (r *DropReport) GetDropReportsForArchive(ctx context.Context, cursor *model.Cursor, date time.Time, limit int) ([]*model.DropReport, model.Cursor, error) {
-	start := time.UnixMilli(util.GetDayStartTime(&date, "CN")) // we use CN server's day start time across all servers for archive
-	end := start.Add(time.Hour * 24)
-	results := make([]*model.DropReport, 0, limit)
-	query := r.db.NewSelect().
-		Model(&results).
-		Where("created_at >= to_timestamp(?)", start.Unix()).
-		Where("created_at < to_timestamp(?)", end.Unix()).
-		Order("report_id").
-		Limit(limit)
-	if cursor != nil && cursor.Start > 0 {
-		query = query.Where("report_id > ?", cursor.Start)
-	}
-	if err := query.
-		Scan(ctx); err != nil {
-		return nil, model.Cursor{}, err
-	}
-	return results, newCursor(results), nil
-}
-
-// DeleteDropReportsForArchive deletes drop reports for archive.
-// returns number of rows affected and error
-func (r *DropReport) DeleteDropReportsForArchive(ctx context.Context, tx bun.Tx, date time.Time) (int64, error) {
-	start := time.UnixMilli(util.GetDayStartTime(&date, "CN")) // we use CN server's day start time across all servers for archive
-	end := start.Add(time.Hour * 24)
-	res, err := tx.NewDelete().
-		Model((*model.DropReport)(nil)).
-		Where("created_at >= to_timestamp(?)", start.Unix()).
-		Where("created_at < to_timestamp(?)", end.Unix()).
-		Exec(ctx)
-	if err != nil {
-		return -1, err
-	}
-	return res.RowsAffected()
-}
-
 func (r *DropReport) handleStagesAndItems(query *bun.SelectQuery, stageIdItemIdMap map[int][]int) {
 	stageConditions := make([]string, 0)
 	for stageId, itemIds := range stageIdItemIdMap {
@@ -813,14 +786,4 @@ func (r *DropReport) genSubQueryForTrendSegments(gameDayStart time.Time, interva
 			int(intervalLength.Hours()),
 			int(intervalLength.Hours()),
 		)
-}
-
-func newCursor(reports []*model.DropReport) model.Cursor {
-	if len(reports) == 0 {
-		return model.Cursor{}
-	}
-	return model.Cursor{
-		Start: reports[0].ReportID,
-		End:   reports[len(reports)-1].ReportID,
-	}
 }

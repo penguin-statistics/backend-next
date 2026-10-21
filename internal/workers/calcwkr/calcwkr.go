@@ -38,7 +38,6 @@ type WorkerDeps struct {
 	PatternMatrixService *service.PatternMatrix
 	TrendService         *service.Trend
 	SiteStatsService     *service.SiteStats
-	ArchiveService       *service.Archive
 	RedSync              *redsync.Redsync
 }
 
@@ -265,17 +264,6 @@ func (w *Worker) calcStats(ctx context.Context, server string) (err error) {
 		return err
 	}); err != nil {
 		return err
-	}
-
-	// server == "CN": we only run archive job on a singular server
-	if w.Config.DropReportArchiveEnabled && server == "CN" {
-		// Archive
-		if err = w.microtask(ctx, "archive", server, func(ctx context.Context) error {
-			err := w.ArchiveService.ArchiveByGlobalConfig(ctx)
-			return err
-		}); err != nil {
-			return err
-		}
 	}
 
 	return nil
