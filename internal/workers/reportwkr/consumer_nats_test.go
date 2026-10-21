@@ -20,12 +20,14 @@ import (
 
 	"github.com/goccy/go-json"
 	"github.com/nats-io/nats.go"
+	"github.com/pkg/errors"
 
 	"exusiai.dev/backend-next/internal/model/types"
 )
 
 // testStream is a work queue stream of a test, like penguin-reports in production.
 type testStream struct {
+	url     string
 	js      nats.JetStreamContext
 	name    string
 	subject string // the subject the consumers subscribe to, like REPORT.*
@@ -50,12 +52,14 @@ func newTestStream(t *testing.T) *testStream {
 	}
 
 	id := strconv.FormatUint(rand.Uint64(), 36)
-	s := &testStream{js: js, name: "TEST_" + id, subject: "T" + id + ".*", publish: "T" + id + ".SINGLE"}
+	s := &testStream{url: url, js: js, name: "TEST_" + id, subject: "T" + id + ".*", publish: "T" + id + ".SINGLE"}
 	if _, err := js.AddStream(&nats.StreamConfig{
 		Name:      s.name,
 		Subjects:  []string{s.subject},
 		Retention: nats.WorkQueuePolicy,
 		Storage:   nats.FileStorage,
+		// a stream left behind by a killed run expires on its own
+		MaxAge: time.Hour,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -65,6 +69,77 @@ func newTestStream(t *testing.T) *testStream {
 		}
 	})
 	return s
+}
+
+// connect returns a connection of its own to the server of the stream, closed after the test.
+func (s *testStream) connect(t *testing.T) (*nats.Conn, nats.JetStreamContext) {
+	t.Helper()
+	nc, err := nats.Connect(s.url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(nc.Close)
+	js, err := nc.JetStream()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return nc, js
+}
+
+// publishTasks publishes n tasks of no report, with the task ids task-0 to task-<n-1>.
+func (s *testStream) publishTasks(t *testing.T, n int) {
+	t.Helper()
+	for i := 0; i < n; i++ {
+		b, err := json.Marshal(&types.ReportTask{TaskID: fmt.Sprintf("task-%d", i)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.js.Publish(s.publish, b); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// consumerInfo returns the info of the durable, which must exist.
+func (s *testStream) consumerInfo(t *testing.T, durable string) *nats.ConsumerInfo {
+	t.Helper()
+	ci, err := s.js.ConsumerInfo(s.name, durable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ci
+}
+
+// consumerConfig is the configuration of the report consumer on the stream, with the times scaled down by 20.
+func (s *testStream) consumerConfig() consumerConfig {
+	c := defaultConsumerConfig
+	c.stream, c.durable, c.legacyDurable, c.subject = s.name, "reports-pull", "reports", s.subject
+	c.ackWait = 3 * time.Second
+	c.taskTimeout = 500 * time.Millisecond
+	c.fetchWait = 100 * time.Millisecond
+	return c
+}
+
+// startConsumer sets the consumer of w up and starts its workers. The returned function stops them and waits for the
+// tasks in progress; it is called at the end of the test too.
+func startConsumer(t *testing.T, w *Worker) (stop func()) {
+	t.Helper()
+	if err := w.subscribe(); err != nil {
+		t.Fatal(err)
+	}
+	w.start()
+	var once sync.Once
+	stop = func() {
+		once.Do(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if err := w.stop(ctx); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	t.Cleanup(stop)
+	return stop
 }
 
 // waitEmpty waits until the stream holds no message, that is until every message was acked, and returns the
@@ -381,5 +456,192 @@ func TestCommitThenCrashBeforeAck(t *testing.T) {
 	}
 	if n := countRows(t, w.DB, "drop_report_extras"); n != 1 {
 		t.Errorf("%d extras stored, want 1", n)
+	}
+}
+
+// TestPullConsumerNoRedeliveryUnderSlowHandler runs the load of TestLegacyPushConsumerRedeliversQueuedMessages on the
+// pull consumer: a worker asks for a task only when it is free, so no task waits in the client while its AckWait runs,
+// and every task is delivered and handled once.
+func TestPullConsumerNoRedeliveryUnderSlowHandler(t *testing.T) {
+	s := newTestStream(t)
+	const published = 128
+
+	var handled handledCounter
+	w := newWorker(WorkerDeps{NatsJS: s.js}, s.consumerConfig())
+	w.handle = func(ctx context.Context, task *types.ReportTask) error {
+		time.Sleep(250 * time.Millisecond)
+		handled.add(task.TaskID)
+		return nil
+	}
+	startConsumer(t, w)
+	s.publishTasks(t, published)
+
+	maxRedelivered := s.waitEmpty(t, w.conf.durable, time.Minute)
+
+	distinct, total, repeated := handled.stats()
+	t.Logf("%d tasks published, %d handled %d times", published, distinct, total)
+	if distinct != published || total != published || repeated != 0 {
+		t.Errorf("%d tasks handled %d times, %d of them more than once; want each of %d once", distinct, total, repeated, published)
+	}
+	if maxRedelivered != 0 {
+		t.Errorf("up to %d tasks redelivered at once, want none", maxRedelivered)
+	}
+	if ci := s.consumerInfo(t, w.conf.durable); ci.Delivered.Consumer != published {
+		t.Errorf("%d deliveries, want %d", ci.Delivered.Consumer, published)
+	}
+}
+
+// TestStartReconcilesOrMigratesConsumer checks the consumer Start sets up: a missing one is created, a pull consumer of
+// another configuration is updated, and the push consumer of the previous versions is deleted.
+func TestStartReconcilesOrMigratesConsumer(t *testing.T) {
+	t.Run("created", func(t *testing.T) {
+		s := newTestStream(t)
+		w := newWorker(WorkerDeps{NatsJS: s.js}, s.consumerConfig())
+		if err := w.subscribe(); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg := s.consumerInfo(t, w.conf.durable).Config
+		if cfg.DeliverSubject != "" || cfg.AckPolicy != nats.AckExplicitPolicy || cfg.DeliverPolicy != nats.DeliverAllPolicy ||
+			cfg.AckWait != w.conf.ackWait || cfg.MaxAckPending != w.conf.maxAckPending || cfg.FilterSubject != s.subject {
+			t.Errorf("consumer created with %+v", cfg)
+		}
+		if len(w.subs) != w.conf.workers {
+			t.Errorf("%d subscriptions, want %d", len(w.subs), w.conf.workers)
+		}
+	})
+
+	t.Run("updated", func(t *testing.T) {
+		s := newTestStream(t)
+		w := newWorker(WorkerDeps{NatsJS: s.js}, s.consumerConfig())
+		if _, err := s.js.AddConsumer(s.name, &nats.ConsumerConfig{
+			Durable:       w.conf.durable,
+			AckPolicy:     nats.AckExplicitPolicy,
+			AckWait:       10 * time.Second,
+			MaxAckPending: 1000,
+			FilterSubject: s.subject,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.subscribe(); err != nil {
+			t.Fatal(err)
+		}
+
+		cfg := s.consumerInfo(t, w.conf.durable).Config
+		if cfg.AckWait != w.conf.ackWait || cfg.MaxAckPending != w.conf.maxAckPending {
+			t.Errorf("consumer has AckWait %s and MaxAckPending %d, want %s and %d", cfg.AckWait, cfg.MaxAckPending, w.conf.ackWait, w.conf.maxAckPending)
+		}
+	})
+
+	t.Run("push", func(t *testing.T) {
+		s := newTestStream(t)
+		w := newWorker(WorkerDeps{NatsJS: s.js}, s.consumerConfig())
+		// as the legacy ChanQueueSubscribe creates it
+		if _, err := s.js.AddConsumer(s.name, &nats.ConsumerConfig{
+			Durable:        w.conf.legacyDurable,
+			DeliverSubject: nats.NewInbox(),
+			DeliverGroup:   w.conf.legacyDurable,
+			AckPolicy:      nats.AckExplicitPolicy,
+			AckWait:        legacyAckWait,
+			MaxAckPending:  legacyMaxAckPending,
+			FilterSubject:  s.subject,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		migrated := captureLogs(t)
+
+		if err := w.subscribe(); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := s.js.ConsumerInfo(s.name, w.conf.legacyDurable); !errors.Is(err, nats.ErrConsumerNotFound) {
+			t.Errorf("push consumer still there: %v", err)
+		}
+		cfg := s.consumerInfo(t, w.conf.durable).Config
+		if cfg.DeliverSubject != "" || cfg.AckWait != w.conf.ackWait || cfg.MaxAckPending != w.conf.maxAckPending {
+			t.Errorf("consumer created with %+v", cfg)
+		}
+		if len(w.subs) != w.conf.workers {
+			t.Errorf("%d subscriptions, want %d", len(w.subs), w.conf.workers)
+		}
+		if n := migrated("reportwkr.consumer.migrate"); n != 1 {
+			t.Errorf("%d migrations logged, want 1", n)
+		}
+	})
+}
+
+// TestBindRequiresDurable deletes the durable between its setup and the subscriptions, as a second pod starting at once
+// could: the subscriptions fail, rather than create a durable of the library's defaults that a drain would delete.
+func TestBindRequiresDurable(t *testing.T) {
+	s := newTestStream(t)
+	w := newWorker(WorkerDeps{NatsJS: s.js}, s.consumerConfig())
+	if err := w.setUpConsumer(); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.js.DeleteConsumer(s.name, w.conf.durable); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := w.bind(); err == nil {
+		t.Error("subscribed without the durable")
+	}
+	if _, err := s.js.ConsumerInfo(s.name, w.conf.durable); !errors.Is(err, nats.ErrConsumerNotFound) {
+		t.Errorf("durable created again: %v", err)
+	}
+}
+
+// TestStopFlushesAcksAndKeepsDurable stops the consumer with a task in progress: the stop waits for the task and its
+// Ack, the workers fetch nothing more, and draining the connection afterwards, as the app does, keeps the durable.
+func TestStopFlushesAcksAndKeepsDurable(t *testing.T) {
+	s := newTestStream(t)
+	nc, js := s.connect(t)
+	w := newWorker(WorkerDeps{NatsJS: js}, s.consumerConfig())
+	started, release := make(chan struct{}), make(chan struct{})
+	w.handle = func(ctx context.Context, task *types.ReportTask) error {
+		close(started)
+		<-release
+		return nil
+	}
+	stop := startConsumer(t, w)
+	s.publishTasks(t, 1)
+	select {
+	case <-started:
+	case <-time.After(10 * time.Second):
+		t.Fatal("task not handled")
+	}
+
+	stopped := make(chan struct{})
+	go func() {
+		stop()
+		close(stopped)
+	}()
+	select {
+	case <-stopped:
+		t.Fatal("stopped with a task in progress")
+	case <-time.After(500 * time.Millisecond):
+	}
+	close(release)
+	select {
+	case <-stopped:
+	case <-time.After(10 * time.Second):
+		t.Fatal("not stopped after the task in progress")
+	}
+
+	if err := nc.Drain(); err != nil {
+		t.Fatal(err)
+	}
+	for deadline := time.Now().Add(10 * time.Second); !nc.IsClosed(); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("connection not drained")
+		}
+	}
+
+	// a task published after the stop stays queued, and the task handled is not delivered again after AckWait
+	s.publishTasks(t, 1)
+	time.Sleep(w.conf.ackWait + time.Second)
+	ci := s.consumerInfo(t, w.conf.durable)
+	if ci.NumAckPending != 0 || ci.Delivered.Consumer != 1 || ci.NumPending != 1 {
+		t.Errorf("after the stop: %d acks pending, %d deliveries, %d tasks pending; want 0, 1, 1",
+			ci.NumAckPending, ci.Delivered.Consumer, ci.NumPending)
 	}
 }
