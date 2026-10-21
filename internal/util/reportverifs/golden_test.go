@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/goccy/go-json"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
@@ -139,38 +140,85 @@ func loadGolden(t *testing.T) (*bun.DB, *goldenFixture) {
 	return db, &f
 }
 
-// TestReliabilityGolden verifies the report tasks of the fixture, and checks that each report gets the reliability
-// stored for it in production.
+// task returns the i-th task of the fixture, as the worker decodes it.
+func (f *goldenFixture) task(i int) *types.ReportTask {
+	ft := f.Tasks[i]
+	task := &types.ReportTask{
+		TaskID:    fmt.Sprintf("golden-%d", i),
+		CreatedAt: ft.CreatedAt,
+		FragmentReportCommon: types.FragmentReportCommon{
+			Server:  ft.Server,
+			Source:  ft.Source,
+			Version: ft.Version,
+		},
+		AccountID: ft.AccountID,
+		IP:        "198.51.100.1/32",
+	}
+	for _, r := range ft.Reports {
+		r := r.ReportTaskSingleReport
+		task.Reports = append(task.Reports, &r)
+	}
+	return task
+}
+
+// TestReliabilityGolden verifies the report tasks of the fixture with the pipeline of verifiers and with Verifier, and
+// checks that both give each report the reliability stored for it in production.
 func TestReliabilityGolden(t *testing.T) {
 	db, f := loadGolden(t)
 	verifiers := NewReportVerifier(NewDropVerifier(repo.NewDropInfo(db)), NewRejectRuleVerifier(repo.NewRejectRule(db)))
+	v := &Verifier{DropInfoRepo: repo.NewDropInfo(db), RejectRuleRepo: repo.NewRejectRule(db)}
+	ctx := context.Background()
 
 	counts := map[int]int{}
 	for i, ft := range f.Tasks {
-		task := &types.ReportTask{
-			TaskID:    fmt.Sprintf("golden-%d", i),
-			CreatedAt: ft.CreatedAt,
-			FragmentReportCommon: types.FragmentReportCommon{
-				Server:  ft.Server,
-				Source:  ft.Source,
-				Version: ft.Version,
-			},
-			AccountID: ft.AccountID,
-			IP:        "198.51.100.1/32",
-		}
-		for _, r := range ft.Reports {
-			r := r.ReportTaskSingleReport
-			task.Reports = append(task.Reports, &r)
-		}
-
-		violations := verifiers.Verify(context.Background(), task)
-		for idx, r := range ft.Reports {
-			got := violations.Reliability(idx)
+		task := f.task(i)
+		violations := verifiers.Verify(ctx, task)
+		for idx, report := range task.Reports {
+			got, err := v.Reliability(ctx, task, report)
+			if err != nil {
+				t.Fatal(err)
+			}
 			counts[got]++
-			if got != r.Reliability {
-				t.Errorf("task %d (created at %d), report %d: reliability %d, stored %d", i, ft.CreatedAt, idx, got, r.Reliability)
+			if pipeline, stored := violations.Reliability(idx), ft.Reports[idx].Reliability; got != pipeline || got != stored {
+				t.Errorf("task %d (created at %d), report %d: reliability %d, %d by the pipeline, stored %d",
+					i, ft.CreatedAt, idx, got, pipeline, stored)
 			}
 		}
 	}
 	t.Logf("%d tasks verified; reports by reliability: %v", len(f.Tasks), counts)
+}
+
+// TestReliabilityDatabaseError checks that a database error fails Verifier, where the pipeline gives reliability 6 or
+// 7.
+func TestReliabilityDatabaseError(t *testing.T) {
+	db, f := loadGolden(t)
+	verifiers := NewReportVerifier(NewDropVerifier(repo.NewDropInfo(db)), NewRejectRuleVerifier(repo.NewRejectRule(db)))
+	v := &Verifier{DropInfoRepo: repo.NewDropInfo(db), RejectRuleRepo: repo.NewRejectRule(db)}
+	ctx := context.Background()
+	// the first task of reliability 0 passes the drop check, so that both checks run
+	task := f.task(0)
+	for i := range f.Tasks {
+		if f.Tasks[i].Reports[0].Reliability == 0 {
+			task = f.task(i)
+			break
+		}
+	}
+
+	for _, tc := range []struct {
+		table    string
+		pipeline int
+	}{
+		{"reject_rules", constant.ViolationReliabilityRejectRuleUnexpected},
+		{"drop_infos", constant.ViolationReliabilityDrop},
+	} {
+		if _, err := db.ExecContext(ctx, "ALTER TABLE "+tc.table+" RENAME TO "+tc.table+"_gone"); err != nil {
+			t.Fatal(err)
+		}
+		if r, err := v.Reliability(ctx, task, task.Reports[0]); err == nil {
+			t.Errorf("without %s: reliability %d, want an error", tc.table, r)
+		}
+		if r := verifiers.Verify(ctx, task).Reliability(0); r != tc.pipeline {
+			t.Errorf("without %s: reliability %d by the pipeline, want %d", tc.table, r, tc.pipeline)
+		}
+	}
 }
