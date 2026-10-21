@@ -33,6 +33,49 @@ func NewDropReport(db *bun.DB) *DropReport {
 	}
 }
 
+type statementDeadlineKey struct{}
+
+// RunWithStatementTimeout runs fn with a context in which the drop report aggregations (CalcQuantityUniqCount,
+// CalcTotalTimes, CalcTotalQuantityForTrend and CalcTotalTimesForTrend) end at most timeout after it was called:
+// each of them runs in a transaction of its own, with what is left of timeout as its statement timeout, after which
+// PostgreSQL cancels it. pgdriver does not cancel a statement on the server when its context ends, so this is what
+// bounds the work of a statement on the server. It does so only while the read timeout of the connection (see
+// infra.Postgres) is longer than timeout: otherwise the driver gives up on the statement first, and it keeps running on
+// the server.
+//
+// No connection is held between those statements, so fn can run other queries on the pool, even one of a single
+// connection; they run without a statement timeout.
+func (r *DropReport) RunWithStatementTimeout(ctx context.Context, timeout time.Duration, fn func(ctx context.Context) error) error {
+	return fn(context.WithValue(ctx, statementDeadlineKey{}, time.Now().Add(timeout)))
+}
+
+// runWithStatementDeadline runs fn on the database, or, if ctx comes from RunWithStatementTimeout, in a transaction
+// whose statement timeout is the time left until its deadline.
+func (r *DropReport) runWithStatementDeadline(ctx context.Context, fn func(ctx context.Context, db bun.IConn) error) error {
+	deadline, ok := ctx.Value(statementDeadlineKey{}).(time.Time)
+	if !ok {
+		return fn(ctx, r.db)
+	}
+	return r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		// measured once the transaction has a connection; a statement_timeout of 0 turns the timeout off
+		timeoutMillis := time.Until(deadline).Milliseconds()
+		if timeoutMillis < 1 {
+			timeoutMillis = 1
+		}
+		if _, err := tx.ExecContext(ctx, "SET LOCAL statement_timeout = ?", timeoutMillis); err != nil {
+			return err
+		}
+		return fn(ctx, tx)
+	})
+}
+
+// scan scans q into dest, under the statement deadline of ctx if it has one (see runWithStatementDeadline).
+func (r *DropReport) scan(ctx context.Context, q *bun.SelectQuery, dest ...interface{}) error {
+	return r.runWithStatementDeadline(ctx, func(ctx context.Context, db bun.IConn) error {
+		return q.Conn(db).Scan(ctx, dest...)
+	})
+}
+
 func (r *DropReport) CreateDropReport(ctx context.Context, tx bun.Tx, dropReport *model.DropReport) error {
 	_, err := tx.NewInsert().
 		Model(dropReport).
@@ -76,9 +119,7 @@ func (r *DropReport) CalcQuantityUniqCount(
 		ColumnExpr("COUNT(*) AS count")
 	r.handleSourceName(mainq, queryCtx.SourceCategory)
 
-	if err := mainq.
-		Group("stage_id", "item_id", "quantity").
-		Scan(ctx, &results); err != nil {
+	if err := r.scan(ctx, mainq.Group("stage_id", "item_id", "quantity"), &results); err != nil {
 		return nil, err
 	}
 	return results, nil
@@ -109,9 +150,7 @@ func (r *DropReport) CalcTotalTimes(
 		ColumnExpr("SUM(times) AS total_times")
 	r.handleSourceName(mainq, queryCtx.SourceCategory)
 
-	if err := mainq.
-		Group("stage_id").
-		Scan(ctx, &results); err != nil {
+	if err := r.scan(ctx, mainq.Group("stage_id"), &results); err != nil {
 		return nil, err
 	}
 	return results, nil
@@ -425,9 +464,7 @@ func (r *DropReport) CalcTotalQuantityForTrend(
 		ColumnExpr("SUM(quantity) AS total_quantity")
 	r.handleSourceName(mainq, sourceCategory)
 
-	if err := mainq.
-		Group("group_id", "interval_start", "interval_end", "stage_id", "item_id").
-		Scan(ctx, &results); err != nil {
+	if err := r.scan(ctx, mainq.Group("group_id", "interval_start", "interval_end", "stage_id", "item_id"), &results); err != nil {
 		return nil, err
 	}
 	return results, nil
@@ -461,9 +498,7 @@ func (r *DropReport) CalcTotalTimesForTrend(
 		ColumnExpr("SUM(times) AS total_times")
 	r.handleSourceName(mainq, sourceCategory)
 
-	if err := mainq.
-		Group("group_id", "interval_start", "interval_end", "stage_id").
-		Scan(ctx, &results); err != nil {
+	if err := r.scan(ctx, mainq.Group("group_id", "interval_start", "interval_end", "stage_id"), &results); err != nil {
 		return nil, err
 	}
 	return results, nil

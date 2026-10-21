@@ -22,6 +22,12 @@ func NewDropReport(dropReportRepo *repo.DropReport) *DropReport {
 	}
 }
 
+// RunWithStatementTimeout runs fn with a context in which PostgreSQL cancels the drop report aggregations still running
+// timeout after it was called. Each aggregation runs in a transaction of its own; fn holds no connection between them.
+func (s *DropReport) RunWithStatementTimeout(ctx context.Context, timeout time.Duration, fn func(ctx context.Context) error) error {
+	return s.DropReportRepo.RunWithStatementTimeout(ctx, timeout, fn)
+}
+
 // DropMatrix
 
 func (s *DropReport) CalcQuantityUniqCount(
