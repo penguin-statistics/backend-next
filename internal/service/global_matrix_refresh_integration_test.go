@@ -8,6 +8,8 @@ import (
 	"math/rand"
 	"sort"
 	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -336,4 +338,291 @@ func globalPatternMatrixLines(result *model.PatternMatrixQueryResult) []string {
 	}
 	sort.Strings(lines) // the order of the elements is not significant
 	return lines
+}
+
+// requestWhileRefreshWaits starts refresh, holds a lock on table until the refresh waits for it, and runs request
+// meanwhile: request must not wait for the refresh, as it would if the refresh dropped the cache first.
+func requestWhileRefreshWaits(t *testing.T, db *bun.DB, table string, refresh func() error, request func()) {
+	t.Helper()
+	ctx := context.Background()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, "LOCK TABLE "+table+" IN ACCESS EXCLUSIVE MODE"); err != nil {
+		t.Fatal(err)
+	}
+	refreshed := make(chan error, 1)
+	go func() { refreshed <- refresh() }()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		var waiting int
+		if err := db.NewRaw("SELECT count(*) FROM pg_locks WHERE relation = ?::regclass AND NOT granted", table).Scan(ctx, &waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the refresh never read %s", table)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	requested := make(chan struct{})
+	go func() {
+		defer close(requested)
+		request()
+	}()
+	select {
+	case <-requested:
+	case <-time.After(5 * time.Second):
+		t.Error("a request waited for the refresh")
+	}
+	if err := tx.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	<-requested
+	if err := <-refreshed; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestShimTrendRefresh(t *testing.T) {
+	db, dropMatrix, _ := newGlobalMatrixTestData(t)
+	ctx := context.Background()
+	trend := &Trend{StageService: dropMatrix.StageService, ItemService: dropMatrix.ItemService, DropMatrixElementService: dropMatrix.DropMatrixElementService}
+	stale := modelv2.TrendQueryResult{Trend: map[string]*modelv2.StageTrend{"stale": {}}}
+	isStale := func(server string) bool {
+		var cached modelv2.TrendQueryResult
+		if err := cache.ShimTrend.Get(server, &cached); err != nil {
+			if !errors.Is(err, pkgcache.ErrNotFound) {
+				t.Fatal(err)
+			}
+			return false
+		}
+		_, ok := cached.Trend["stale"]
+		return ok
+	}
+
+	// the worker's drop matrix job keeps the cached trend
+	cache.ShimTrend.Set("CN", stale, time.Hour)
+	if err := dropMatrix.RunCalcDropMatrixJob(ctx, "CN"); err != nil {
+		t.Fatal(err)
+	}
+	if !isStale("CN") {
+		t.Fatal("the drop matrix job dropped the cached trend")
+	}
+
+	// the trend covers the days before the actual date: replace the seeded elements with some of those days
+	mustExec(t, db, "DELETE FROM drop_matrix_elements")
+	now := time.Now()
+	r := rand.New(rand.NewSource(1))
+	for _, server := range testServers {
+		today := util.GetDayNum(&now, server)
+		for _, dayNum := range []int{today - 40, today - 7, today - 1, today} {
+			for stageId := 1; stageId <= 6; stageId++ {
+				times := r.Intn(100)
+				for itemId := 10; itemId <= 15; itemId++ {
+					if r.Intn(2) == 0 {
+						continue
+					}
+					for _, sourceCategory := range allSourceCategories {
+						mustExec(t, db, `INSERT INTO drop_matrix_elements (stage_id, item_id, quantity, times, server, source_category, day_num)
+							VALUES (?, ?, ?, ?, ?, ?, ?)`, stageId, itemId, r.Intn(200), times, server, sourceCategory, dayNum)
+					}
+				}
+			}
+		}
+	}
+
+	// what requests calculate from an empty cache
+	flushCaches(t)
+	want := make(map[string]string)
+	for _, server := range testServers {
+		result, err := trend.GetShimTrend(ctx, server)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(result.Trend) == 0 {
+			t.Fatalf("%s: the trend is empty: the data does not exercise the refresh", server)
+		}
+		b, _ := json.Marshal(result) // maps are encoded in key order
+		want[server] = string(b)
+	}
+
+	// a refresh replaces the stale trend with exactly that
+	flushCaches(t)
+	for _, server := range testServers {
+		cache.ShimTrend.Set(server, stale, time.Hour)
+		if err := trend.RefreshShimTrend(ctx, server); err != nil {
+			t.Fatal(err)
+		}
+		var lastModified time.Time
+		if err := cache.LastModifiedTime.Get("[shimTrend#server:"+server+"]", &lastModified); err != nil {
+			t.Errorf("%s: no last modified time for the refreshed trend", server)
+		}
+		var cached modelv2.TrendQueryResult
+		if err := cache.ShimTrend.Get(server, &cached); err != nil {
+			t.Fatal(err)
+		}
+		if b, _ := json.Marshal(cached); string(b) != want[server] {
+			t.Errorf("%s: refreshed trend differs from the one calculated on request\ngot  %.300s\nwant %.300s", server, b, want[server])
+		}
+	}
+
+	// requests get the stale trend while a refresh calculates, without waiting for it
+	cache.ShimTrend.Set("CN", stale, time.Hour)
+	requestWhileRefreshWaits(t, db, "drop_matrix_elements", func() error { return trend.RefreshShimTrend(ctx, "CN") }, func() {
+		result, err := trend.GetShimTrend(ctx, "CN")
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		if _, ok := result.Trend["stale"]; !ok {
+			t.Error("a request during a refresh did not get the cached trend")
+		}
+	})
+	if isStale("CN") {
+		t.Error("the refresh kept the stale trend")
+	}
+
+	// a failed refresh drops the stale trend, so that requests recalculate it, and only that of its server
+	for _, server := range testServers {
+		cache.ShimTrend.Set(server, stale, time.Hour)
+	}
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	if err := trend.RefreshShimTrend(cancelled, "CN"); err == nil {
+		t.Fatal("refreshing with a cancelled context succeeded")
+	}
+	if isStale("CN") {
+		t.Error("a failed refresh kept the stale trend")
+	}
+	if !isStale("US") {
+		t.Error("a failed refresh of CN dropped the trend of another server")
+	}
+
+	// a refresh that panics (an element of an item the items map does not have yet, e.g. during a metadata update)
+	// drops the stale trend too, and only that of its server
+	for _, server := range testServers {
+		cache.ShimTrend.Set(server, stale, time.Hour)
+	}
+	today := util.GetDayNum(&now, "CN")
+	mustExec(t, db, `INSERT INTO drop_matrix_elements (stage_id, item_id, quantity, times, server, source_category, day_num)
+		VALUES (1, 999, 1, 1, 'CN', ?, ?)`, constant.SourceCategoryAll, today)
+	func() {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("the refresh did not panic: the test does not exercise a panic")
+			}
+		}()
+		_ = trend.RefreshShimTrend(ctx, "CN")
+	}()
+	if isStale("CN") {
+		t.Error("a refresh that panicked kept the stale trend")
+	}
+	if !isStale("US") {
+		t.Error("a refresh of CN that panicked dropped the trend of another server")
+	}
+}
+
+// pauseAfterReading pauses the first query of table made with a context carrying it, once it has run, until released.
+type pauseAfterReading struct {
+	table   string
+	once    sync.Once
+	read    chan struct{}
+	release chan struct{}
+}
+
+type pauseAfterReadingKey struct{}
+
+func (p *pauseAfterReading) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	return ctx
+}
+
+func (p *pauseAfterReading) AfterQuery(ctx context.Context, event *bun.QueryEvent) {
+	if ctx.Value(pauseAfterReadingKey{}) != p || !strings.Contains(event.Query, p.table) {
+		return
+	}
+	p.once.Do(func() {
+		close(p.read)
+		<-p.release
+	})
+}
+
+// A refresh that read the elements before an admin recalculation of them and the purge of the trend must not cache
+// its trend over the one a request calculates from the recalculated elements.
+func TestShimTrendRefreshAfterAPurge(t *testing.T) {
+	db, dropMatrix, _ := newGlobalMatrixTestData(t)
+	ctx := context.Background()
+	trend := &Trend{StageService: dropMatrix.StageService, ItemService: dropMatrix.ItemService, DropMatrixElementService: dropMatrix.DropMatrixElementService}
+	trendJSON := func(result *modelv2.TrendQueryResult) string {
+		b, _ := json.Marshal(result) // maps are encoded in key order
+		return string(b)
+	}
+
+	// the trend covers the days before the actual date
+	now := time.Now()
+	today := util.GetDayNum(&now, "CN")
+	mustExec(t, db, "DELETE FROM drop_matrix_elements")
+	mustExec(t, db, `INSERT INTO drop_matrix_elements (stage_id, item_id, quantity, times, server, source_category, day_num)
+		VALUES (1, 10, 1, 10, 'CN', ?, ?)`, constant.SourceCategoryAll, today)
+	flushCaches(t)
+	before, err := trend.GetShimTrend(ctx, "CN")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pause := &pauseAfterReading{table: "drop_matrix_elements", read: make(chan struct{}), release: make(chan struct{})}
+	db.AddQueryHook(pause)
+	refreshed := make(chan error, 1)
+	go func() {
+		refreshed <- trend.RefreshShimTrend(context.WithValue(ctx, pauseAfterReadingKey{}, pause), "CN")
+	}()
+	select {
+	case <-pause.read:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the refresh never read the elements")
+	}
+
+	// the admin recalculation, and the purge of the trend, while the refresh holds the elements it read before
+	mustExec(t, db, "UPDATE drop_matrix_elements SET quantity = 2 WHERE server = 'CN'")
+	if err := cache.Delete("shimTrend#server", null.StringFrom("CN")); err != nil {
+		t.Fatal(err)
+	}
+	requested := make(chan *modelv2.TrendQueryResult, 1)
+	go func() {
+		result, err := trend.GetShimTrend(ctx, "CN")
+		if err != nil {
+			t.Error(err)
+		}
+		requested <- result
+	}()
+	time.Sleep(100 * time.Millisecond) // for the request to wait for the refresh, or to calculate meanwhile
+	close(pause.release)
+	if err := <-refreshed; err != nil {
+		t.Fatal(err)
+	}
+	during := <-requested
+
+	cached, err := trend.GetShimTrend(ctx, "CN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	flushCaches(t)
+	want, err := trend.GetShimTrend(ctx, "CN")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trendJSON(want) == trendJSON(before) {
+		t.Fatal("the recalculation did not change the trend: the test does not exercise the purge")
+	}
+	if during != nil && trendJSON(during) != trendJSON(want) {
+		t.Errorf("the request after the purge got\n%s\nwant the recalculated\n%s", trendJSON(during), trendJSON(want))
+	}
+	if trendJSON(cached) != trendJSON(want) {
+		t.Errorf("cached after the refresh\n%s\nwant the recalculated\n%s", trendJSON(cached), trendJSON(want))
+	}
 }

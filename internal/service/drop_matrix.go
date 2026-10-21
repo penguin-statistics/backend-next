@@ -127,11 +127,8 @@ func (s *DropMatrix) RunCalcDropMatrixJob(ctx context.Context, server string) er
 		}
 	}
 
-	// the global drop matrices are replaced by RefreshGlobalDropMatrixCaches, not dropped: requests keep getting
-	// the previous ones while new ones are calculated
-	if err := cache.ShimTrend.Delete(server); err != nil {
-		return err
-	}
+	// the global drop matrices and the trend are replaced by RefreshGlobalDropMatrixCaches and
+	// Trend.RefreshShimTrend, not dropped: requests keep getting the previous ones while new ones are calculated
 	return nil
 }
 

@@ -279,3 +279,139 @@ func TestMutexGetSetPublishing(t *testing.T) {
 		})
 	}
 }
+
+// refreshBlocked starts a Refresh of key whose calculation returns calculated once released, and waits until it
+// calculates. cached receives whether the refresh cached it.
+func refreshBlocked(c *Set[int], key string, calculated int) (release func(), cached <-chan bool) {
+	started := make(chan struct{})
+	unblock := make(chan struct{})
+	results := make(chan bool, 1)
+	go func() {
+		ok, err := c.Refresh(key, func() (*int, error) {
+			close(started)
+			<-unblock
+			return &calculated, nil
+		}, time.Minute, nil)
+		if err != nil {
+			panic(err)
+		}
+		results <- ok
+	}()
+	<-started
+	return func() { close(unblock) }, results
+}
+
+func TestRefresh(t *testing.T) {
+	c := NewSet[int]("test")
+	c.Set("key", 1, time.Minute)
+	release, cached := refreshBlocked(c, "key", 2)
+	var v int
+	if err := c.Get("key", &v); err != nil || v != 1 {
+		t.Errorf("got %d (%v) during the refresh, want the previous 1", v, err)
+	}
+	release()
+	if !<-cached {
+		t.Error("the refresh did not cache its value")
+	}
+	if err := c.Get("key", &v); err != nil || v != 2 {
+		t.Errorf("got %d (%v) after the refresh, want 2", v, err)
+	}
+	if len(c.calculating) != 0 {
+		t.Errorf("calculating %v after the refresh, want nothing", c.calculating)
+	}
+}
+
+func TestRefreshDoesNotCacheAfterAWrite(t *testing.T) {
+	tests := []struct {
+		name  string
+		write func(c *Set[int])
+		want  int // 0: not cached
+	}{
+		// e.g. purged after a recalculation of the data the refresh may have read before
+		{"delete", func(c *Set[int]) { _ = c.Delete("key") }, 0},
+		{"flush", func(c *Set[int]) { _ = c.Flush() }, 0},
+		// a value calculated from newer data
+		{"set", func(c *Set[int]) { c.Set("key", 3, time.Minute) }, 3},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewSet[int]("test")
+			c.Set("key", 1, time.Minute)
+			release, cached := refreshBlocked(c, "key", 2)
+			tt.write(c)
+			release()
+			if <-cached {
+				t.Error("the refresh cached its value after a write")
+			}
+			var v int
+			err := c.Get("key", &v)
+			if tt.want == 0 && err == nil {
+				t.Errorf("cached %d, want nothing", v)
+			}
+			if tt.want != 0 && (err != nil || v != tt.want) {
+				t.Errorf("cached %d (%v), want %d", v, err, tt.want)
+			}
+		})
+	}
+}
+
+func TestRefreshAndMutexGetSetCalculateOneAfterTheOther(t *testing.T) {
+	c := NewSet[int]("test")
+	release, cached := refreshBlocked(c, "key", 2)
+	var calculated atomic.Bool
+	result := make(chan int, 1)
+	go func() {
+		var v int
+		if _, err := c.MutexGetSet("key", &v, func() (*int, error) {
+			calculated.Store(true)
+			one := 1
+			return &one, nil
+		}, time.Minute); err != nil {
+			t.Error(err)
+		}
+		result <- v
+	}()
+	time.Sleep(50 * time.Millisecond)
+	if calculated.Load() {
+		t.Fatal("a request calculated the key during its refresh")
+	}
+	release()
+	if !<-cached {
+		t.Error("the refresh did not cache its value")
+	}
+	if v := <-result; v != 2 || calculated.Load() {
+		t.Errorf("the request got %d (calculated: %v), want the refreshed 2", v, calculated.Load())
+	}
+}
+
+func TestRefreshPublishing(t *testing.T) {
+	c := NewSet[int]("test")
+	var published []bool
+	publish := func(value *int, cacheValue func() bool) { published = append(published, cacheValue()) }
+	two := 2
+	if ok, err := c.Refresh("key", func() (*int, error) { return &two, nil }, time.Minute, publish); err != nil || !ok {
+		t.Fatalf("Refresh: %v, %v", ok, err)
+	}
+	if len(published) != 1 || !published[0] {
+		t.Errorf("publish was told %v, want that the value is cached", published)
+	}
+}
+
+func TestRefreshFailure(t *testing.T) {
+	c := NewSet[int]("test")
+	c.Set("key", 1, time.Minute)
+	if ok, err := c.Refresh("key", func() (*int, error) { return nil, ErrNotFound }, time.Minute, nil); err == nil || ok {
+		t.Errorf("Refresh: %v, %v; want the error", ok, err)
+	}
+	func() {
+		defer func() { _ = recover() }()
+		_, _ = c.Refresh("key", func() (*int, error) { panic("refresh") }, time.Minute, nil)
+	}()
+	var v int
+	if err := c.Get("key", &v); err != nil || v != 1 {
+		t.Errorf("got %d (%v), want the previous 1: dropping it is up to the caller", v, err)
+	}
+	if len(c.calculating) != 0 {
+		t.Errorf("calculating %v after failed refreshes, want nothing", c.calculating)
+	}
+}
