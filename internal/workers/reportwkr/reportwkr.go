@@ -24,6 +24,7 @@ import (
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/pkg/jetstream"
 	"exusiai.dev/backend-next/internal/pkg/observability"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/repo"
 	"exusiai.dev/backend-next/internal/service"
 	"exusiai.dev/backend-next/internal/util/reportutil"
@@ -62,6 +63,9 @@ type consumerConfig struct {
 	taskTimeout   time.Duration
 	// fetchWait is how long a worker waits for a task before checking whether it is stopped
 	fetchWait time.Duration
+	// a failed task is delivered again after nakDelay times its deliveries so far, up to maxNakDelay
+	nakDelay    time.Duration
+	maxNakDelay time.Duration
 }
 
 var defaultConsumerConfig = consumerConfig{
@@ -74,6 +78,8 @@ var defaultConsumerConfig = consumerConfig{
 	maxAckPending: 64,
 	taskTimeout:   time.Second * 10,
 	fetchWait:     time.Second * 2,
+	nakDelay:      time.Second * 15,
+	maxNakDelay:   time.Minute * 5,
 }
 
 type Worker struct {
@@ -250,9 +256,7 @@ func (w *Worker) consume(sub *nats.Subscription) {
 			continue
 		}
 
-		if err := w.ingestPreprocess(context.Background(), msgs[0]); err != nil {
-			log.Err(err).Msg("failed to ingest preprocess")
-		}
+		w.ingestPreprocess(msgs[0])
 	}
 }
 
@@ -273,20 +277,38 @@ func (w *Worker) waitConnected() bool {
 	return true
 }
 
-func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
-	defer func() {
-		if err := msg.Ack(); err != nil {
-			log.Error().Err(err).Msg("failed to ack")
-		}
-	}()
-
-	taskCtx, cancelTask := context.WithTimeout(ctx, w.conf.taskTimeout)
-	defer cancelTask()
+// ingestPreprocess handles a delivered task and settles its message by the outcome. A task processed, or found stored
+// already, is acked; a task that can never be processed is terminated, with the log as its only record; any other
+// failure is delivered again later. Each failure is logged once, here.
+func (w *Worker) ingestPreprocess(msg *nats.Msg) {
+	metadata, err := msg.Metadata()
+	if err != nil {
+		// should not happen: the message should be always a jetstream message
+		log.Error().
+			Err(err).
+			Str("evt.name", "reportwkr.malformed").
+			Str("subject", msg.Subject).
+			Bytes("data", msg.Data).
+			Msg("failed to get report task message metadata; terminating")
+		term(msg)
+		return
+	}
 
 	reportTask := &types.ReportTask{}
 	if err := json.Unmarshal(msg.Data, reportTask); err != nil {
-		return err
+		log.Error().
+			Err(err).
+			Str("evt.name", "reportwkr.malformed").
+			Str("subject", msg.Subject).
+			Uint64("seq", metadata.Sequence.Stream).
+			Bytes("data", msg.Data).
+			Msg("failed to decode report task; terminating")
+		term(msg)
+		return
 	}
+
+	taskCtx, cancelTask := context.WithTimeout(context.Background(), w.conf.taskTimeout)
+	defer cancelTask()
 
 	start := time.Now()
 	defer func() {
@@ -294,12 +316,6 @@ func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
 			WithLabelValues().
 			Observe(time.Since(start).Seconds())
 	}()
-
-	metadata, err := msg.Metadata()
-	if err != nil {
-		// should not happen: the message should be always a jetstream message
-		return err
-	}
 
 	var span trace.Span
 	taskCtx, span = tracer.
@@ -314,27 +330,88 @@ func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
 
 	err = w.handle(taskCtx, reportTask)
 	if err != nil {
-		log.Error().
-			Err(err).
-			Str("taskId", reportTask.TaskID).
-			Interface("reportTask", reportTask).
-			Msg("failed to consume report task")
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		span.End()
-		return err
+	} else {
+		span.SetStatus(codes.Ok, "")
 	}
-	span.SetStatus(codes.Ok, "")
 	span.End()
 
-	log.Info().
-		Str("evt.name", "reportwkr.processed").
-		Str("taskId", reportTask.TaskID).
-		Interface("task", reportTask).
-		Dur("duration", time.Since(start)).
-		Msg("report task processed successfully")
+	switch {
+	case err == nil:
+		log.Info().
+			Str("evt.name", "reportwkr.processed").
+			Str("taskId", reportTask.TaskID).
+			Interface("task", reportTask).
+			Dur("duration", time.Since(start)).
+			Msg("report task processed successfully")
 
-	return nil
+		if err := msg.AckSync(); err != nil {
+			// the task is stored: delivered again, it is skipped
+			log.Error().
+				Err(err).
+				Str("evt.name", "reportwkr.ack.failed").
+				Str("taskId", reportTask.TaskID).
+				Msg("failed to ack report task")
+		}
+	case errors.Is(err, pgerr.ErrNotFound):
+		// a stage of the task does not exist (process looks nothing else up by key): no retry can store it. The task
+		// is logged as it was published: process changes its drops and ip in place.
+		log.Error().
+			Err(err).
+			Str("evt.name", "reportwkr.parked").
+			Str("taskId", reportTask.TaskID).
+			Uint64("seq", metadata.Sequence.Stream).
+			RawJSON("reportTask", msg.Data).
+			Msg("report task parked: it can never be processed; replay it by hand from this log")
+		term(msg)
+	default:
+		// a database, Redis or network failure, or a commit of unknown outcome (a copy delivered again after a commit
+		// is skipped): retry later, waiting longer with each delivery, for as long as it takes
+		delivered := metadata.NumDelivered
+		delay := w.conf.retryDelay(delivered)
+		ev := log.Warn()
+		if delivered > 5 {
+			ev = log.Error()
+		}
+		ev.Err(err).
+			Str("evt.name", "reportwkr.failed").
+			Str("taskId", reportTask.TaskID).
+			Uint64("delivered", delivered).
+			Dur("retryIn", delay).
+			Uint64("seq", metadata.Sequence.Stream).
+			RawJSON("reportTask", msg.Data).
+			Msg("failed to consume report task")
+
+		if err := msg.NakWithDelay(delay); err != nil {
+			// delivered again after AckWait instead
+			log.Error().
+				Err(err).
+				Str("evt.name", "reportwkr.nak.failed").
+				Str("taskId", reportTask.TaskID).
+				Msg("failed to nak report task")
+		}
+	}
+}
+
+// retryDelay returns how long a task that failed at its delivered-th delivery waits before it is delivered again.
+func (c *consumerConfig) retryDelay(delivered uint64) time.Duration {
+	delay := time.Duration(delivered) * c.nakDelay
+	if delay > c.maxNakDelay {
+		delay = c.maxNakDelay
+	}
+	return delay
+}
+
+// term tells the server never to deliver the message again.
+func term(msg *nats.Msg) {
+	if err := msg.Term(); err != nil {
+		log.Error().
+			Err(err).
+			Str("evt.name", "reportwkr.term.failed").
+			Str("subject", msg.Subject).
+			Msg("failed to terminate report task")
+	}
 }
 
 func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) error {
