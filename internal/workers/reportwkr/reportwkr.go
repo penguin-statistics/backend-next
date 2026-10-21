@@ -275,7 +275,8 @@ func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.Repor
 		if err != nil {
 			return 0, errors.Wrap(err, "failed to calculate drop pattern hash")
 		}
-		if created {
+		// the pattern of no drops has no elements: inserting none is a syntax error
+		if created && len(report.Drops) > 0 {
 			_, err := w.DropPatternElementRepo.CreateDropPatternElements(ctx, tx, dropPattern.PatternID, report.Drops)
 			if err != nil {
 				return 0, errors.Wrap(err, "failed to create drop pattern elements")
