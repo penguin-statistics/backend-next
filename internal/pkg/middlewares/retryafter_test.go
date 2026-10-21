@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"errors"
+	"fmt"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -16,11 +17,13 @@ func TestRetryAfter(t *testing.T) {
 	app := fiber.New(fiber.Config{
 		// like httpserver.ErrorHandler, which writes a PenguinError with its own status
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
-			var e *pgerr.PenguinError
-			if errors.As(err, &e) {
+			if e, ok := err.(*pgerr.PenguinError); ok {
 				return c.Status(e.StatusCode).JSON(e)
 			}
-			return fiber.DefaultErrorHandler(c, err)
+			if e, ok := err.(*fiber.Error); ok {
+				return fiber.DefaultErrorHandler(c, e)
+			}
+			return c.SendStatus(fiber.StatusInternalServerError)
 		},
 	})
 	app.Use(RetryAfter(time.Minute))
@@ -47,6 +50,15 @@ func TestRetryAfter(t *testing.T) {
 	})
 	app.Get("/ok", func(c *fiber.Ctx) error {
 		return c.SendString("ok")
+	})
+	// sets 429 but then fails: the ErrorHandler answers 500, which needs no Retry-After
+	app.Get("/429-then-error", func(c *fiber.Ctx) error {
+		c.Status(fiber.StatusTooManyRequests)
+		return errors.New("boom")
+	})
+	// a wrapped 429 error: the ErrorHandler only matches the bare type, so this becomes a 500 too
+	app.Get("/wrapped-429", func(c *fiber.Ctx) error {
+		return fmt.Errorf("wrapped: %w", fiber.ErrTooManyRequests)
 	})
 
 	get := func(t *testing.T, path string) (int, string) {
@@ -93,6 +105,14 @@ func TestRetryAfter(t *testing.T) {
 			t.Errorf("second request: Retry-After = %q, want the limiter's", retryAfter)
 		}
 	})
+
+	for _, path := range []string{"/429-then-error", "/wrapped-429"} {
+		t.Run(path, func(t *testing.T) {
+			if status, retryAfter := get(t, path); status != fiber.StatusInternalServerError || retryAfter != "" {
+				t.Errorf("status %d, Retry-After %q; want 500 without Retry-After", status, retryAfter)
+			}
+		})
+	}
 
 	t.Run("/ok", func(t *testing.T) {
 		if _, retryAfter := get(t, "/ok"); retryAfter != "" {

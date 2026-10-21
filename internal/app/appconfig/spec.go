@@ -29,7 +29,14 @@ type ConfigSpec struct {
 	// The defaults are the first-party clients that call the API cross-origin with withCredentials: penguin-stats.io
 	// and .cn, the iOS/macOS Capacitor app, and the frontend-v2 deployments on Cloudflare Pages (production and
 	// previews) and frontend-legacy.exusiai.dev. Do not add wildcards over hosts that serve anything but the frontend
-	// (e.g. *.exusiai.dev, which includes an HTTP echo service).
+	// (e.g. *.exusiai.dev, which includes an HTTP echo service); wildcards over public suffixes (*.pages.dev) are
+	// rejected. https://*.frontend-v2-8db.pages.dev covers every preview the Pages project ever built, which never
+	// expire, including branch aliases anyone with push access can create; Pages does not build pull requests from
+	// forks there (2026-10: same-repo PRs get a Cloudflare Pages check run, fork PRs #588 and #592 none). Drop the
+	// Pages entries once frontend-v2 stops sending withCredentials.
+	//
+	// Setting PENGUIN_V3_CORS_CREDENTIALED_ORIGINS replaces the whole list; keep capacitor://localhost in it, or the
+	// iOS/macOS app fails on every request.
 	CORSCredentialedOrigins []string `split_words:"true" default:"https://penguin-stats.io,https://penguin-stats.cn,capacitor://localhost,https://frontend-v2-8db.pages.dev,https://*.frontend-v2-8db.pages.dev,https://frontend-legacy.exusiai.dev"`
 
 	// DevMode to indicate development mode. When true, the program would spin up utilities for debugging and

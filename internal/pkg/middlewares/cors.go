@@ -5,6 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/net/publicsuffix"
 
 	"exusiai.dev/backend-next/internal/pkg/pgid"
 )
@@ -16,6 +17,7 @@ var (
 	corsAllowHeaders = strings.Join([]string{
 		fiber.HeaderContentType, fiber.HeaderAuthorization, fiber.HeaderXRequestedWith, "X-Penguin-Variant", "sentry-trace",
 	}, ",")
+	corsMaxAge = "600"
 	// response headers outside the CORS-safelisted set must be listed here for cross-origin scripts to read them
 	corsExposeHeaders = strings.Join([]string{
 		fiber.HeaderContentType, fiber.HeaderETag, fiber.HeaderLink, fiber.HeaderRetryAfter,
@@ -40,8 +42,9 @@ const (
 //
 // Each entry of credentialedOrigins is either an exact origin ("https://penguin-stats.io", "capacitor://localhost";
 // scheme, host and port must all match) or "<scheme>://*.<domain>", which matches the origins of <scheme> whose host
-// is one more DNS label in front of <domain> (not <domain> itself, nor a deeper subdomain, nor any port). Entries are
-// lowercased; "*", "null" and malformed entries are ignored with a warning.
+// is one more DNS label in front of <domain> (not <domain> itself, nor a deeper subdomain, nor any port). <domain> must
+// not be a public suffix (e.g. pages.dev, vercel.app, github.io), whose subdomains belong to anyone. Entries are
+// lowercased; "*", "null" and malformed entries are ignored with an error log.
 //
 // A request that a browser sent from another site outside the allowlist does not use the PenguinID cookie it carries
 // (see pgid.IgnoreCookie): CORS only keeps that site from reading the response, not a simple request (an HTML form, or
@@ -79,6 +82,9 @@ func CORS(credentialedOrigins []string) fiber.Handler {
 		c.Vary(fiber.HeaderAccessControlRequestHeaders)
 		c.Set(fiber.HeaderAccessControlAllowMethods, corsAllowMethods)
 		c.Set(fiber.HeaderAccessControlAllowHeaders, corsAllowHeaders)
+		// lets browsers reuse a preflight for 10 minutes (Chromium caps it at 2 hours) instead of sending one before
+		// every GET with Authorization, as the iOS/macOS app does
+		c.Set(fiber.HeaderAccessControlMaxAge, corsMaxAge)
 		return c.SendStatus(fiber.StatusNoContent)
 	}
 }
@@ -125,7 +131,7 @@ func newOriginAllowlist(entries []string) originAllowlist {
 
 		scheme, host, ok := strings.Cut(o, "://")
 		if !ok || scheme == "" || host == "" || strings.ContainsAny(host, "/?#@") {
-			log.Warn().
+			log.Error().
 				Str("evt.name", "infra.cors.origin.invalid").
 				Str("origin", entry).
 				Msg("ignoring an invalid CORS credentialed origin: it must be an origin like https://example.com")
@@ -134,17 +140,25 @@ func newOriginAllowlist(entries []string) originAllowlist {
 
 		if strings.HasPrefix(host, "*.") {
 			domain := strings.TrimPrefix(host, "*.")
-			if domain == "" || strings.Contains(domain, "*") {
-				log.Warn().
+			// a port or a trailing dot would slip a public suffix (*.pages.dev:8443, *.pages.dev.) past the check below
+			if domain == "" || strings.ContainsAny(domain, "*:") || strings.HasSuffix(domain, ".") {
+				log.Error().
 					Str("evt.name", "infra.cors.origin.invalid").
 					Str("origin", entry).
 					Msg("ignoring an invalid CORS credentialed origin: a wildcard must look like https://*.example.com")
 				continue
 			}
+			if suffix, _ := publicsuffix.PublicSuffix(domain); suffix == domain {
+				log.Error().
+					Str("evt.name", "infra.cors.origin.invalid").
+					Str("origin", entry).
+					Msg("ignoring an invalid CORS credentialed origin: a wildcard over a public suffix covers sites of anyone")
+				continue
+			}
 			l.subdomains = append(l.subdomains, subdomainOrigin{prefix: scheme + "://", suffix: "." + domain})
 		} else {
 			if strings.Contains(host, "*") {
-				log.Warn().
+				log.Error().
 					Str("evt.name", "infra.cors.origin.invalid").
 					Str("origin", entry).
 					Msg("ignoring an invalid CORS credentialed origin: a wildcard is only allowed as the first label")
@@ -155,6 +169,12 @@ func newOriginAllowlist(entries []string) originAllowlist {
 		accepted = append(accepted, o)
 	}
 
+	if len(accepted) == 0 {
+		log.Error().
+			Str("evt.name", "infra.cors.origins.empty").
+			Msg("CORS: no origin may send credentialed requests; first-party clients that send them, such as the " +
+				"iOS/macOS app (capacitor://localhost), will fail")
+	}
 	log.Info().
 		Str("evt.name", "infra.cors.origins").
 		Strs("origins", accepted).

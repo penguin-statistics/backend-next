@@ -1,7 +1,6 @@
 package middlewares
 
 import (
-	"errors"
 	"strconv"
 	"time"
 
@@ -29,15 +28,19 @@ func RetryAfter(fallback time.Duration) fiber.Handler {
 	}
 }
 
-// statusOf returns the status the response will be sent with, once the ErrorHandler has handled err.
+// statusOf returns the status the response will be sent with, once httpserver.ErrorHandler has handled err. It
+// mirrors that handler: a *fiber.Error or *pgerr.PenguinError keeps its own code, any other error becomes a 400
+// (fs.PathError) or a 500, and without an error the response keeps the status the handler set.
 func statusOf(c *fiber.Ctx, err error) int {
-	var fe *fiber.Error
-	if errors.As(err, &fe) {
-		return fe.Code
+	switch e := err.(type) {
+	case nil:
+		return c.Response().StatusCode()
+	case *fiber.Error:
+		return e.Code
+	case *pgerr.PenguinError:
+		return e.StatusCode
+	default:
+		// not a 429 in any case
+		return fiber.StatusInternalServerError
 	}
-	var pe *pgerr.PenguinError
-	if errors.As(err, &pe) {
-		return pe.StatusCode
-	}
-	return c.Response().StatusCode()
 }

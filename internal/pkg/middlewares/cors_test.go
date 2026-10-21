@@ -17,11 +17,16 @@ var testCredentialedOrigins = []string{
 	" https://Penguin-Stats.CN/ ", // normalized
 	"capacitor://localhost",
 	"https://*.frontend-v2-8db.pages.dev",
-	"*",                        // ignored
-	"null",                     // ignored
-	"https://a.*.example.com",  // ignored
-	"https://example.com/path", // ignored
-	"",                         // ignored
+	"*",                          // ignored
+	"null",                       // ignored
+	"https://a.*.example.com",    // ignored
+	"https://example.com/path",   // ignored
+	"https://*.pages.dev",        // ignored: public suffix
+	"https://*.github.io",        // ignored: public suffix
+	"https://*.com",              // ignored: public suffix
+	"https://*.vercel.app.",      // ignored: trailing dot
+	"https://*.netlify.app:8443", // ignored: port
+	"",                           // ignored
 }
 
 func newCORSApp() *fiber.App {
@@ -57,6 +62,10 @@ func TestCORSOriginTiers(t *testing.T) {
 		{"http://x.frontend-v2-8db.pages.dev", false},
 		{"https://x.frontend-v2-8db.pages.dev:8443", false},
 		{"https://evil-frontend-v2-8db.pages.dev", false},
+		// wildcards over public suffixes are ignored, also when written with a trailing dot or a port
+		{"https://x.vercel.app.", false},
+		{"https://x.vercel.app", false},
+		{"https://x.netlify.app:8443", false},
 		// exact entries need the same scheme, host and port
 		{"http://penguin-stats.io", false},
 		{"https://penguin-stats.io:8443", false},
@@ -128,6 +137,9 @@ func TestCORSSimpleRequestExposesHeaders(t *testing.T) {
 	if got := resp.Header.Get(fiber.HeaderAccessControlAllowMethods); got != "" {
 		t.Errorf("Access-Control-Allow-Methods = %q on a simple request, want none", got)
 	}
+	if got := resp.Header.Get(fiber.HeaderAccessControlMaxAge); got != "" {
+		t.Errorf("Access-Control-Max-Age = %q on a simple request, want none", got)
+	}
 }
 
 func TestCORSPreflight(t *testing.T) {
@@ -154,6 +166,9 @@ func TestCORSPreflight(t *testing.T) {
 			// Authorization must be listed by name: a "*" in Allow-Headers does not cover it
 			if got, want := resp.Header.Get(fiber.HeaderAccessControlAllowHeaders), "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace"; got != want {
 				t.Errorf("Access-Control-Allow-Headers = %q, want %q", got, want)
+			}
+			if got := resp.Header.Get(fiber.HeaderAccessControlMaxAge); got != "600" {
+				t.Errorf("Access-Control-Max-Age = %q, want 600", got)
 			}
 			vary := resp.Header.Values(fiber.HeaderVary)
 			for _, h := range []string{fiber.HeaderOrigin, fiber.HeaderAccessControlRequestMethod, fiber.HeaderAccessControlRequestHeaders} {
@@ -224,7 +239,10 @@ func TestOriginAllowlistIgnoresInvalidEntries(t *testing.T) {
 	if len(l.exact) != 3 || len(l.subdomains) != 1 {
 		t.Errorf("allowlist = %+v, want 3 exact origins and 1 wildcard", l)
 	}
-	for _, origin := range []string{"*", "null", "https://example.com", "https://example.com/path", "https://a.x.example.com"} {
+	for _, origin := range []string{
+		"*", "null", "https://example.com", "https://example.com/path", "https://a.x.example.com",
+		"https://evil.pages.dev", "https://evil.github.io", "https://evil.com",
+	} {
 		if l.allows(origin) {
 			t.Errorf("allows(%q) = true, want false", origin)
 		}
