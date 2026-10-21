@@ -2,12 +2,14 @@ package repo
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
+	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/coldstore"
@@ -142,6 +144,213 @@ func (r *ColdDropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
 	return splitPatternMatrixRowsBySourceCategories(results, sourceCategories), nil
 }
 
+// CalcTotalQuantityForTrend is DropReport.CalcTotalQuantityForTrendWithin on the archived reports of view: [from, to)
+// must end at the latest at view's hot boundary. It counts the reports per bucket of the trend from the same files as
+// CalcDropMatrixForIntervalsBySourceCategories, with the bucket boundaries as the segments.
+func (r *ColdDropReport) CalcTotalQuantityForTrend(
+	ctx context.Context, view *coldstore.View, from, to time.Time, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int, sourceCategory string,
+) (_ []*model.TotalQuantityResultForTrend, err error) {
+	results := make([]*model.TotalQuantityResultForTrend, 0)
+	if len(stageIdItemIdMap) == 0 {
+		return results, nil
+	}
+	stageIds := make([]int, 0, len(stageIdItemIdMap))
+	for stageId := range stageIdItemIdMap {
+		stageIds = append(stageIds, stageId)
+	}
+	sort.Ints(stageIds)
+	trend, err := newColdTrendPlan(view.HotBoundary(), from, to, server, *startTime, intervalLength, intervalNum, stageIds)
+	if err != nil {
+		return nil, err
+	}
+	if len(trend.plan.thresholds) < 2 {
+		return results, nil
+	}
+	queryCtx := &model.DropReportQueryContext{Server: server, AccountID: accountId}
+	var queryFiles coldstore.QueryFiles
+	counts, ok := coldReportCounts(&queryFiles, view, trend.plan, queryCtx)
+	if !ok {
+		return results, nil
+	}
+
+	// the filter of handleStagesAndItems
+	stageConditions := make([]string, 0, len(stageIds))
+	for _, stageId := range stageIds {
+		condition := "a.stage_id = " + strconv.Itoa(stageId)
+		if itemIds := stageIdItemIdMap[stageId]; len(itemIds) > 0 {
+			condition += " AND dpe.item_id IN (" + joinInts(itemIds) + ")"
+		}
+		stageConditions = append(stageConditions, "("+condition+")")
+	}
+
+	started := time.Now()
+	defer func() { coldstore.ObserveQuery("trend_quantity", started, err) }()
+	rows, err := r.reader.Query(ctx, &queryFiles, counts+`
+		SELECT a.segment, a.stage_id, dpe.item_id, sum(a.cnt * dpe.quantity)::BIGINT AS total_quantity
+		FROM a JOIN `+queryFiles.ReadParquet([]string{view.DimFile(coldstore.DropPatternElementsFile)})+` AS dpe
+			ON dpe.drop_pattern_id = a.pattern_id
+		WHERE (`+strings.Join(stageConditions, " OR ")+`)`+coldSourceCategoryFilter(sourceCategory)+`
+		GROUP BY a.segment, a.stage_id, dpe.item_id`, coldTrendArgs(queryCtx)...)
+	if err != nil {
+		return nil, errors.Wrap(err, "coldstore: trend quantity")
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var segment int
+		result := &model.TotalQuantityResultForTrend{}
+		if err := rows.Scan(&segment, &result.StageID, &result.ItemID, &result.TotalQuantity); err != nil {
+			return nil, errors.Wrap(err, "coldstore: trend quantity")
+		}
+		bucket, err := trend.bucket(segment)
+		if err != nil {
+			return nil, err
+		}
+		result.GroupID, result.IntervalStart, result.IntervalEnd = bucket.groupId, &bucket.start, &bucket.end
+		results = append(results, result)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "coldstore: trend quantity")
+	}
+	return results, nil
+}
+
+// CalcTotalTimesForTrend is DropReport.CalcTotalTimesForTrendWithin on the archived reports of view, as
+// CalcTotalQuantityForTrend.
+func (r *ColdDropReport) CalcTotalTimesForTrend(
+	ctx context.Context, view *coldstore.View, from, to time.Time, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId null.Int, sourceCategory string,
+) (_ []*model.TotalTimesResultForTrend, err error) {
+	results := make([]*model.TotalTimesResultForTrend, 0)
+	if len(stageIds) == 0 {
+		return results, nil
+	}
+	trend, err := newColdTrendPlan(view.HotBoundary(), from, to, server, *startTime, intervalLength, intervalNum, stageIds)
+	if err != nil {
+		return nil, err
+	}
+	if len(trend.plan.thresholds) < 2 {
+		return results, nil
+	}
+	queryCtx := &model.DropReportQueryContext{Server: server, AccountID: accountId}
+	var queryFiles coldstore.QueryFiles
+	counts, ok := coldReportCounts(&queryFiles, view, trend.plan, queryCtx)
+	if !ok {
+		return results, nil
+	}
+
+	started := time.Now()
+	defer func() { coldstore.ObserveQuery("trend_times", started, err) }()
+	rows, err := r.reader.Query(ctx, &queryFiles, counts+`
+		SELECT a.segment, a.stage_id, sum(a.times)::BIGINT AS total_times
+		FROM a
+		WHERE true`+coldSourceCategoryFilter(sourceCategory)+`
+		GROUP BY a.segment, a.stage_id`, coldTrendArgs(queryCtx)...)
+	if err != nil {
+		return nil, errors.Wrap(err, "coldstore: trend times")
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var segment int
+		result := &model.TotalTimesResultForTrend{}
+		if err := rows.Scan(&segment, &result.StageID, &result.TotalTimes); err != nil {
+			return nil, errors.Wrap(err, "coldstore: trend times")
+		}
+		bucket, err := trend.bucket(segment)
+		if err != nil {
+			return nil, err
+		}
+		result.GroupID, result.IntervalStart, result.IntervalEnd = bucket.groupId, &bucket.start, &bucket.end
+		results = append(results, result)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "coldstore: trend times")
+	}
+	return results, nil
+}
+
+// coldTrendPlan counts the reports of a part of a trend per bucket: segment i+1 of plan lies in buckets[i].
+type coldTrendPlan struct {
+	plan    dropMatrixPlan
+	buckets []coldTrendBucket
+}
+
+// bucket returns the bucket of a segment.
+func (p coldTrendPlan) bucket(segment int) (coldTrendBucket, error) {
+	if segment < 1 || segment > len(p.buckets) {
+		return coldTrendBucket{}, errors.Errorf("coldstore: trend segment %d out of %d buckets", segment, len(p.buckets))
+	}
+	return p.buckets[segment-1], nil
+}
+
+// coldTrendBucket is a bucket of a trend query, as genSubQueryForTrendSegments numbers it (group_id).
+type coldTrendBucket struct {
+	groupId    int
+	start, end time.Time
+}
+
+// newColdTrendPlan returns the plan of the reports of the stages created in [from, to), cut to whole seconds and to
+// the buckets of the trend, which must end at the latest at the hot boundary. Its thresholds are from, the bucket
+// boundaries in between and to.
+func newColdTrendPlan(
+	hotBoundary, from, to time.Time, server string, startTime time.Time, intervalLength time.Duration, intervalNum int, stageIds []int,
+) (coldTrendPlan, error) {
+	hours := int(intervalLength.Hours())
+	if hours <= 0 {
+		return coldTrendPlan{}, errors.Errorf("coldstore: trend interval length %s is shorter than an hour", intervalLength)
+	}
+	length := time.Duration(hours) * time.Hour
+	gameDayStart, lastDayEnd := TrendTimeRange(server, startTime, intervalLength, intervalNum)
+	// as handleCreatedAtWithTime compares them
+	from, to = time.Unix(from.Unix(), 0), time.Unix(to.Unix(), 0)
+	if from.Before(gameDayStart) {
+		from = gameDayStart
+	}
+	if to.After(lastDayEnd) {
+		to = lastDayEnd
+	}
+	trend := coldTrendPlan{plan: dropMatrixPlan{stageIds: stageIds}}
+	if !from.Before(to) {
+		return trend, nil
+	}
+	if to.After(hotBoundary) {
+		return coldTrendPlan{}, errors.Errorf("coldstore: trend ends at %s, after the hot boundary %s", to.UTC(), hotBoundary.UTC())
+	}
+	firstGroupId := int(from.Sub(gameDayStart) / length)
+	trend.plan.thresholds = []time.Time{from}
+	trend.plan.bucketStart, trend.plan.bucketLength = gameDayStart.Add(length*time.Duration(firstGroupId)), length
+	for groupId := firstGroupId; trend.plan.thresholds[len(trend.plan.thresholds)-1].Before(to); groupId++ {
+		bucket := coldTrendBucket{groupId: groupId, start: gameDayStart.Add(length * time.Duration(groupId))}
+		bucket.end = bucket.start.Add(length)
+		trend.buckets = append(trend.buckets, bucket)
+		end := bucket.end
+		if end.After(to) {
+			end = to
+		}
+		trend.plan.thresholds = append(trend.plan.thresholds, end)
+	}
+	return trend, nil
+}
+
+// coldSourceCategoryFilter is handleSourceName on a(is_manual) of coldReportCounts, as a condition to append.
+func coldSourceCategoryFilter(sourceCategory string) string {
+	switch sourceCategory {
+	case constant.SourceCategoryManual:
+		return " AND a.is_manual"
+	case constant.SourceCategoryAutomated:
+		return " AND NOT a.is_manual"
+	default:
+		return ""
+	}
+}
+
+// coldTrendArgs returns the parameters of coldReportCounts: the server and the account, if any.
+func coldTrendArgs(queryCtx *model.DropReportQueryContext) []any {
+	args := []any{queryCtx.Server}
+	if queryCtx.AccountID.Valid {
+		args = append(args, queryCtx.AccountID.Int64)
+	}
+	return args
+}
+
 // coldDropMatrixQuery returns the DuckDB query of CalcDropMatrixForIntervalsBySourceCategories, with the server as
 // $1 and the account, if any, as $2, over the files of view it adds to queryFiles; or false when no file holds
 // reports of the plan.
@@ -248,6 +457,15 @@ func coldReportCounts(queryFiles *coldstore.QueryFiles, view *coldstore.View, pl
 		segments = append(segments, "("+strconv.Itoa(i+1)+", "+timestamptz(plan.thresholds[i])+")")
 	}
 	for i, part := range parts {
+		if plan.bucketLength > 0 {
+			// the bucket of a report, computed: three times faster than the join over the tens of millions of rollup
+			// rows of a stage over years (no report is before bucketStart, so the division rounds down)
+			parts[i] = `SELECT p.stage_id, p.pattern_id, p.is_manual,
+					(1 + (epoch_us(p.ts) - ` + strconv.FormatInt(plan.bucketStart.UnixMicro(), 10) + `) // ` + strconv.FormatInt(plan.bucketLength.Microseconds(), 10) + `)::INTEGER AS segment,
+					p.cnt, p.times
+				FROM (` + part + `) AS p`
+			continue
+		}
 		parts[i] = `SELECT p.stage_id, p.pattern_id, p.is_manual, seg.segment, p.cnt, p.times
 			FROM (` + part + `) AS p ASOF JOIN seg ON p.ts >= seg.seg_start`
 	}

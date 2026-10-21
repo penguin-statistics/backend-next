@@ -225,6 +225,11 @@ type dropMatrixPlan struct {
 	segmentByBoundary map[int64]int
 	// stageIds are the stages to count, or none for every stage.
 	stageIds []int
+	// bucketLength, if set, tells that segment i+1 lies in the bucket [bucketStart + i*bucketLength,
+	// bucketStart + (i+1)*bucketLength), as in a trend. The cold storage then computes the segment of a report
+	// instead of looking it up (see coldReportCounts).
+	bucketStart  time.Time
+	bucketLength time.Duration
 }
 
 func newDropMatrixPlan(queryCtxs []*model.DropReportQueryContext) dropMatrixPlan {
@@ -483,8 +488,25 @@ func splitPatternMatrixRowsBySourceCategories(
 	return resultsBySourceCategory
 }
 
+// TrendTimeRange returns the time range that the buckets of a trend query (CalcTotalQuantityForTrend and
+// CalcTotalTimesForTrend) cover: intervalNum+1 consecutive buckets of intervalLength, in whole hours, from the start of
+// the game day of startTime.
+func TrendTimeRange(server string, startTime time.Time, intervalLength time.Duration, intervalNum int) (start, end time.Time) {
+	start = gameday.StartTime(server, startTime)
+	return start, start.Add(time.Hour * time.Duration(int(intervalLength.Hours())*(intervalNum+1)))
+}
+
 func (r *DropReport) CalcTotalQuantityForTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int, sourceCategory string,
+) ([]*model.TotalQuantityResultForTrend, error) {
+	gameDayStart, lastDayEnd := TrendTimeRange(server, *startTime, intervalLength, intervalNum)
+	return r.CalcTotalQuantityForTrendWithin(ctx, gameDayStart, lastDayEnd, server, startTime, intervalLength, intervalNum, stageIdItemIdMap, accountId, sourceCategory)
+}
+
+// CalcTotalQuantityForTrendWithin is CalcTotalQuantityForTrend on the reports created in [from, to) only (compared in
+// whole seconds), e.g. those after the hot boundary of the cold storage. The buckets stay those of the whole trend.
+func (r *DropReport) CalcTotalQuantityForTrendWithin(
+	ctx context.Context, from, to time.Time, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int, sourceCategory string,
 ) ([]*model.TotalQuantityResultForTrend, error) {
 	results := make([]*model.TotalQuantityResultForTrend, 0)
 	if len(stageIdItemIdMap) == 0 {
@@ -492,7 +514,6 @@ func (r *DropReport) CalcTotalQuantityForTrend(
 	}
 
 	gameDayStart := gameday.StartTime(server, *startTime)
-	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(int(intervalLength.Hours())*(intervalNum+1)))
 
 	subq1 := r.db.NewSelect().
 		With("intervals", r.genSubQueryForTrendSegments(gameDayStart, intervalLength, intervalNum)).
@@ -502,7 +523,7 @@ func (r *DropReport) CalcTotalQuantityForTrend(
 		Join("RIGHT JOIN intervals AS sub").
 		JoinOn("dr.created_at >= sub.interval_start AND dr.created_at < sub.interval_end")
 	r.handleAccountAndReliability(subq1, accountId)
-	r.handleCreatedAtWithTime(subq1, &gameDayStart, &lastDayEnd)
+	r.handleCreatedAtWithTime(subq1, &from, &to)
 	r.handleServer(subq1, server)
 	r.handleStagesAndItems(subq1, stageIdItemIdMap)
 
@@ -521,13 +542,21 @@ func (r *DropReport) CalcTotalQuantityForTrend(
 func (r *DropReport) CalcTotalTimesForTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId null.Int, sourceCategory string,
 ) ([]*model.TotalTimesResultForTrend, error) {
+	gameDayStart, lastDayEnd := TrendTimeRange(server, *startTime, intervalLength, intervalNum)
+	return r.CalcTotalTimesForTrendWithin(ctx, gameDayStart, lastDayEnd, server, startTime, intervalLength, intervalNum, stageIds, accountId, sourceCategory)
+}
+
+// CalcTotalTimesForTrendWithin is CalcTotalTimesForTrend on the reports created in [from, to) only, as
+// CalcTotalQuantityForTrendWithin.
+func (r *DropReport) CalcTotalTimesForTrendWithin(
+	ctx context.Context, from, to time.Time, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId null.Int, sourceCategory string,
+) ([]*model.TotalTimesResultForTrend, error) {
 	results := make([]*model.TotalTimesResultForTrend, 0)
 	if len(stageIds) == 0 {
 		return results, nil
 	}
 
 	gameDayStart := gameday.StartTime(server, *startTime)
-	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(int(intervalLength.Hours())*(intervalNum+1)))
 
 	subq1 := r.db.NewSelect().
 		With("intervals", r.genSubQueryForTrendSegments(gameDayStart, intervalLength, intervalNum)).
@@ -536,7 +565,7 @@ func (r *DropReport) CalcTotalTimesForTrend(
 		Join("RIGHT JOIN intervals AS sub").
 		JoinOn("dr.created_at >= sub.interval_start AND dr.created_at < sub.interval_end")
 	r.handleAccountAndReliability(subq1, accountId)
-	r.handleCreatedAtWithTime(subq1, &gameDayStart, &lastDayEnd)
+	r.handleCreatedAtWithTime(subq1, &from, &to)
 	r.handleServer(subq1, server)
 	r.handleStages(subq1, stageIds)
 
