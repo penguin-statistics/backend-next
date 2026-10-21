@@ -33,18 +33,6 @@ func (r *Snapshot) GetSnapshotsByIds(ctx context.Context, ids []int) ([]*model.S
 	})
 }
 
-func (r *Snapshot) GetLatestSnapshotByKey(ctx context.Context, key string) (*model.Snapshot, error) {
-	return r.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.Where("key = ?", key).OrderExpr("snapshot_id DESC").Limit(1)
-	})
-}
-
-func (r *Snapshot) GetSnapshotsByVersions(ctx context.Context, key string, versions []string) ([]*model.Snapshot, error) {
-	return r.sel.SelectMany(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.Where("key = ?", key).Where("version IN (?)", bun.In(versions))
-	})
-}
-
 func (r *Snapshot) SaveSnapshot(ctx context.Context, snapshot *model.Snapshot) (*model.Snapshot, error) {
 	_, err := r.db.NewInsert().
 		Model(snapshot).
