@@ -1,0 +1,317 @@
+package service
+
+import (
+	"context"
+	"math"
+	"sort"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"exusiai.dev/gommon/constant"
+	"github.com/goccy/go-json"
+	"github.com/rs/zerolog/log"
+	"go.uber.org/fx"
+	"gopkg.in/guregu/null.v3"
+
+	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model/cache"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+)
+
+// SEOSourceCategory is the source category of the matrix the stats pages show: the one the frontend shows by
+// default (frontend-v2 src/store/modules/dataSource.js).
+const SEOSourceCategory = constant.SourceCategoryAll
+
+// SEOCatalogRefreshInterval is how often SEOData reloads the items, stages and zones.
+const SEOCatalogRefreshInterval = time.Minute
+
+// SEOData is the data of the server-rendered stats pages. It never waits for the database: the items, stages and
+// zones are reloaded in the background, and the matrix is the cached global matrix of the frontend, which the calc
+// worker keeps up to date.
+type SEOData struct {
+	itemService  *Item
+	stageService *Stage
+	zoneService  *Zone
+
+	catalog atomic.Pointer[SEOCatalog]
+
+	matricesMu sync.Mutex
+	matrices   map[string]*seoMatrixMemo
+}
+
+func NewSEOData(lc fx.Lifecycle, conf *appconfig.Config, itemService *Item, stageService *Stage, zoneService *Zone) *SEOData {
+	d := &SEOData{
+		itemService:  itemService,
+		stageService: stageService,
+		zoneService:  zoneService,
+		matrices:     make(map[string]*seoMatrixMemo),
+	}
+	if conf.SEOPagesEnabled {
+		ctx, cancel := context.WithCancel(context.Background())
+		lc.Append(fx.Hook{
+			OnStart: func(context.Context) error {
+				go d.run(ctx)
+				return nil
+			},
+			OnStop: func(context.Context) error {
+				cancel()
+				return nil
+			},
+		})
+	}
+	return d
+}
+
+func (d *SEOData) run(ctx context.Context) {
+	ticker := time.NewTicker(SEOCatalogRefreshInterval)
+	defer ticker.Stop()
+	for {
+		if err := d.RefreshCatalog(ctx); err != nil && ctx.Err() == nil {
+			log.Warn().
+				Str("evt.name", "seo.catalog.refresh_failed").
+				Err(err).
+				Msg("failed to reload the items, stages and zones of the stats pages; keeping the ones at hand")
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+// RefreshCatalog reloads the items, stages and zones.
+func (d *SEOData) RefreshCatalog(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	items, err := d.itemService.GetItems(ctx)
+	if err != nil {
+		return err
+	}
+	stages, err := d.stageService.GetStages(ctx)
+	if err != nil {
+		return err
+	}
+	zones, err := d.zoneService.GetZones(ctx)
+	if err != nil {
+		return err
+	}
+	d.catalog.Store(NewSEOCatalog(items, stages, zones))
+	return nil
+}
+
+// Catalog returns the items, stages and zones, or nil before they are loaded.
+func (d *SEOData) Catalog() *SEOCatalog {
+	return d.catalog.Load()
+}
+
+// Matrix returns the global matrix of server shown by the frontend, or nil if it is not calculated (yet). It only
+// looks at the cache, as calculating the matrix takes long.
+func (d *SEOData) Matrix(server string) *SEOMatrix {
+	key := server + constant.CacheSep + "true" + constant.CacheSep + SEOSourceCategory
+	var result modelv2.DropMatrixQueryResult
+	if err := cache.ShimGlobalDropMatrix.Get(key, &result); err != nil {
+		return nil
+	}
+	var lastModified time.Time
+	_ = cache.LastModifiedTime.Get("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", &lastModified)
+
+	d.matricesMu.Lock()
+	memo, ok := d.matrices[server]
+	if !ok {
+		memo = &seoMatrixMemo{}
+		d.matrices[server] = memo
+	}
+	d.matricesMu.Unlock()
+	return memo.get(server, result.Matrix, lastModified)
+}
+
+// seoMatrixMemo keeps the SEOMatrix of a server built from the cached matrix, until the cached matrix is replaced
+type seoMatrixMemo struct {
+	mu     sync.Mutex
+	first  *modelv2.OneDropMatrixElement
+	n      int
+	at     time.Time
+	matrix *SEOMatrix
+}
+
+func (m *seoMatrixMemo) get(server string, rows []*modelv2.OneDropMatrixElement, lastModified time.Time) *SEOMatrix {
+	var first *modelv2.OneDropMatrixElement
+	if len(rows) > 0 {
+		first = rows[0]
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.matrix == nil || m.first != first || m.n != len(rows) || !m.at.Equal(lastModified) {
+		m.first, m.n, m.at = first, len(rows), lastModified
+		m.matrix = NewSEOMatrix(server, rows, lastModified)
+	}
+	return m.matrix
+}
+
+// SEOI18n is a text in the languages of the frontend (zh, en, ja, ko).
+type SEOI18n map[string]string
+
+// In returns the text in lang, or else in en, or else in zh, like the frontend (src/utils/strings.js translate); ""
+// if there is none.
+func (s SEOI18n) In(lang string) string {
+	for _, l := range []string{lang, "en", "zh"} {
+		if v := s[l]; v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// SEOExistence is the existence of an item, stage or zone in each server.
+type SEOExistence map[string]struct {
+	Exist    bool     `json:"exist"`
+	OpenTime null.Int `json:"openTime"`
+}
+
+func (e SEOExistence) In(server string) bool {
+	return e[server].Exist
+}
+
+type SEOItem struct {
+	ArkID     string
+	Type      string
+	Name      SEOI18n
+	SortID    int
+	Group     string
+	Existence SEOExistence
+}
+
+type SEOZone struct {
+	ArkID     string
+	ZoneID    int
+	Index     int
+	Category  string
+	Name      SEOI18n
+	Existence SEOExistence
+}
+
+type SEOStage struct {
+	ArkID     string
+	StageID   int
+	Code      SEOI18n
+	Sanity    null.Int
+	Zone      *SEOZone
+	Existence SEOExistence
+}
+
+// SEOCatalog holds the items, stages and zones.
+type SEOCatalog struct {
+	Items map[string]*SEOItem
+	// ItemList is ordered by sort ID
+	ItemList []*SEOItem
+	Stages   map[string]*SEOStage
+	// StageList is ordered by the numerical stage ID
+	StageList []*SEOStage
+	Zones     map[string]*SEOZone
+}
+
+func NewSEOCatalog(items []*model.Item, stages []*model.Stage, zones []*model.Zone) *SEOCatalog {
+	c := &SEOCatalog{
+		Items:  make(map[string]*SEOItem, len(items)),
+		Stages: make(map[string]*SEOStage, len(stages)),
+		Zones:  make(map[string]*SEOZone, len(zones)),
+	}
+	zonesByID := make(map[int]*SEOZone, len(zones))
+	for _, z := range zones {
+		zone := &SEOZone{ArkID: z.ArkZoneID, ZoneID: z.ZoneID, Index: z.Index, Category: z.Category}
+		unmarshalLenient(z.Name, &zone.Name)
+		unmarshalLenient(z.Existence, &zone.Existence)
+		c.Zones[zone.ArkID] = zone
+		zonesByID[zone.ZoneID] = zone
+	}
+	for _, it := range items {
+		item := &SEOItem{ArkID: it.ArkItemID, Type: it.Type, SortID: it.SortID, Group: it.Group.String}
+		unmarshalLenient(it.Name, &item.Name)
+		unmarshalLenient(it.Existence, &item.Existence)
+		c.Items[item.ArkID] = item
+		c.ItemList = append(c.ItemList, item)
+	}
+	for _, st := range stages {
+		stage := &SEOStage{ArkID: st.ArkStageID, StageID: st.StageID, Sanity: st.Sanity, Zone: zonesByID[st.ZoneID]}
+		unmarshalLenient(st.Code, &stage.Code)
+		unmarshalLenient(st.Existence, &stage.Existence)
+		c.Stages[stage.ArkID] = stage
+		c.StageList = append(c.StageList, stage)
+	}
+	sort.SliceStable(c.ItemList, func(i, j int) bool { return c.ItemList[i].SortID < c.ItemList[j].SortID })
+	sort.SliceStable(c.StageList, func(i, j int) bool { return c.StageList[i].StageID < c.StageList[j].StageID })
+	return c
+}
+
+// unmarshalLenient leaves dest as is if raw is not what dest is: a malformed name or existence of one row must not
+// keep the others from being shown
+func unmarshalLenient(raw json.RawMessage, dest any) {
+	if len(raw) == 0 {
+		return
+	}
+	if err := json.Unmarshal(raw, dest); err != nil {
+		log.Warn().
+			Str("evt.name", "seo.catalog.malformed").
+			Err(err).
+			Str("raw", string(raw)).
+			Msg("malformed i18n text or existence")
+	}
+}
+
+// SEORow is a row of the matrix with its drop rate.
+type SEORow struct {
+	*modelv2.OneDropMatrixElement
+	// Rate is quantity / times rounded to 5 decimals, the frontend's percentage (src/utils/getters.js): the expected
+	// quantity per run, which exceeds 1 for items dropped more than once per run on average
+	Rate float64
+}
+
+// SEOMatrix is the global matrix of a server indexed by item and by stage.
+type SEOMatrix struct {
+	Server       string
+	LastModified time.Time
+	// ByItem holds the rows of each item ordered by rate, then times descending, then stage ID: the frontend's order
+	ByItem map[string][]SEORow
+	// ByStage holds the rows of each stage ordered by rate, then times descending, then item ID
+	ByStage map[string][]SEORow
+}
+
+func NewSEOMatrix(server string, rows []*modelv2.OneDropMatrixElement, lastModified time.Time) *SEOMatrix {
+	m := &SEOMatrix{
+		Server:       server,
+		LastModified: lastModified,
+		ByItem:       make(map[string][]SEORow),
+		ByStage:      make(map[string][]SEORow),
+	}
+	for _, el := range rows {
+		row := SEORow{OneDropMatrixElement: el}
+		if el.Times > 0 {
+			row.Rate = math.Round(float64(el.Quantity)/float64(el.Times)*1e5) / 1e5
+		}
+		m.ByItem[el.ItemID] = append(m.ByItem[el.ItemID], row)
+		m.ByStage[el.StageID] = append(m.ByStage[el.StageID], row)
+	}
+	for _, rows := range m.ByItem {
+		sortSEORows(rows, func(r SEORow) string { return r.StageID })
+	}
+	for _, rows := range m.ByStage {
+		sortSEORows(rows, func(r SEORow) string { return r.ItemID })
+	}
+	return m
+}
+
+func sortSEORows(rows []SEORow, id func(SEORow) string) {
+	sort.Slice(rows, func(i, j int) bool {
+		a, b := rows[i], rows[j]
+		if a.Rate != b.Rate {
+			return a.Rate > b.Rate
+		}
+		if a.Times != b.Times {
+			return a.Times > b.Times
+		}
+		return id(a) < id(b)
+	})
+}
