@@ -5,6 +5,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/rs/zerolog/log"
+
+	"exusiai.dev/backend-next/internal/pkg/pgid"
 )
 
 var (
@@ -33,6 +35,10 @@ var (
 // is one more DNS label in front of <domain> (not <domain> itself, nor a deeper subdomain, nor any port). Entries are
 // lowercased; "*", "null" and malformed entries are ignored with a warning.
 //
+// A request that a browser sent from another site outside the allowlist does not use the PenguinID cookie it carries
+// (see pgid.IgnoreCookie): CORS only keeps that site from reading the response, not a simple request (an HTML form, or
+// fetch with mode no-cors) from being sent and acted on.
+//
 // Every OPTIONS request is answered here as a preflight with 204, for both tiers.
 func CORS(credentialedOrigins []string) fiber.Handler {
 	allowlist := newOriginAllowlist(credentialedOrigins)
@@ -47,6 +53,9 @@ func CORS(credentialedOrigins []string) fiber.Handler {
 			c.Set(fiber.HeaderAccessControlAllowCredentials, "true")
 		} else {
 			c.Set(fiber.HeaderAccessControlAllowOrigin, "*")
+			if sentCrossSite(c, origin) {
+				pgid.IgnoreCookie(c)
+			}
 		}
 
 		if c.Method() != fiber.MethodOptions {
@@ -60,6 +69,25 @@ func CORS(credentialedOrigins []string) fiber.Handler {
 		c.Set(fiber.HeaderAccessControlAllowHeaders, corsAllowHeaders)
 		return c.SendStatus(fiber.StatusNoContent)
 	}
+}
+
+// sentCrossSite reports whether a browser sent the request from a page on another site, so that the cookies it carries
+// were attached without the visitor using this site.
+func sentCrossSite(c *fiber.Ctx, origin string) bool {
+	// Fetch Metadata cannot be set by a page; browsers without it (Safari before 16.4) and non-browser clients fall
+	// through to Origin
+	switch c.Get("Sec-Fetch-Site") {
+	case "cross-site":
+		return true
+	case "same-origin", "same-site", "none":
+		return false
+	}
+	if origin == "" {
+		return false
+	}
+	// "null" (sandboxed frames, Referrer-Policy: no-referrer forms) is cross-site too
+	_, host, ok := strings.Cut(origin, "://")
+	return !ok || host != string(c.Request().Host())
 }
 
 type subdomainOrigin struct {

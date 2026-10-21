@@ -1,12 +1,15 @@
 package middlewares
 
 import (
+	"io"
 	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+
+	"exusiai.dev/backend-next/internal/pkg/pgid"
 )
 
 var testCredentialedOrigins = []string{
@@ -157,6 +160,60 @@ func TestCORSPreflight(t *testing.T) {
 				if !varies(vary, h) {
 					t.Errorf("Vary = %q, want it to hold %s", vary, h)
 				}
+			}
+		})
+	}
+}
+
+func TestCORSIgnoresCookieOfCrossSiteRequests(t *testing.T) {
+	app := fiber.New()
+	app.Use(CORS(testCredentialedOrigins))
+	app.Post("/report", func(c *fiber.Ctx) error {
+		if pgid.IgnoredCookie(c) {
+			return c.SendString("ignored")
+		}
+		return c.SendString("used")
+	})
+
+	tests := []struct {
+		name         string
+		origin       string
+		secFetchSite string
+		wantIgnored  bool
+	}{
+		{"allowlisted cross-site", "capacitor://localhost", "cross-site", false},
+		{"allowlisted without fetch metadata", "https://1b5f51bd.frontend-v2-8db.pages.dev", "", false},
+		{"foreign form", "https://evil.example", "cross-site", true},
+		{"foreign without fetch metadata", "https://evil.example", "", true},
+		{"null origin", "null", "cross-site", true},
+		{"null origin without fetch metadata", "null", "", true},
+		{"same origin, host not allowlisted", "https://mirror.example", "same-origin", false},
+		{"same host without fetch metadata", "https://example.com", "", false},
+		{"same site", "https://sub.example.com", "same-site", false},
+		{"no Origin, e.g. MAA", "", "", false},
+		{"cross-site navigation", "", "cross-site", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(fiber.MethodPost, "/report", strings.NewReader("server=CN"))
+			req.Host = "example.com"
+			req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationForm)
+			req.Header.Set("Cookie", "userID=11111111")
+			if tt.origin != "" {
+				req.Header.Set(fiber.HeaderOrigin, tt.origin)
+			}
+			if tt.secFetchSite != "" {
+				req.Header.Set("Sec-Fetch-Site", tt.secFetchSite)
+			}
+			resp, err := app.Test(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+
+			body, _ := io.ReadAll(resp.Body)
+			if got := string(body) == "ignored"; got != tt.wantIgnored {
+				t.Errorf("cookie ignored = %v, want %v", got, tt.wantIgnored)
 			}
 		})
 	}
