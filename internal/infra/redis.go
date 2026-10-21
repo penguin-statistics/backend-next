@@ -2,6 +2,8 @@ package infra
 
 import (
 	"context"
+	"crypto/tls"
+	"net"
 	"strings"
 	"time"
 
@@ -42,9 +44,22 @@ func Redis(conf *appconfig.Config) (*redis.Client, error) {
 // It pings with a client of its own that has ContextTimeoutEnabled set: go-redis ignores the deadline of the context
 // otherwise, so a Redis that accepts connections but does not reply would hold each attempt for its whole read timeout
 // and run past the timeout. Setting it on the client the app uses would change the timeouts of every later command.
+// For rediss:// URLs it also dials TLS with the context, as the default dialer of go-redis v9.0.5 uses
+// tls.DialWithDialer, which ignores it and only stops the handshake at the dial timeout.
 func pingRedis(opts *redis.Options, timeout time.Duration) error {
 	bootOpts := *opts
 	bootOpts.ContextTimeoutEnabled = true
+	if bootOpts.Dialer == nil && bootOpts.TLSConfig != nil {
+		bootOpts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			// the same dialer as go-redis's default one, with the context; DialTimeout is read here, after
+			// redis.NewClient has set its default
+			d := &tls.Dialer{
+				NetDialer: &net.Dialer{Timeout: bootOpts.DialTimeout, KeepAlive: 5 * time.Minute},
+				Config:    bootOpts.TLSConfig,
+			}
+			return d.DialContext(ctx, network, addr)
+		}
+	}
 	client := redis.NewClient(&bootOpts)
 	defer client.Close()
 
