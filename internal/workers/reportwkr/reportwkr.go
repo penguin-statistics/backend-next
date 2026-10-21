@@ -406,7 +406,7 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 
 	switch {
 	case err == nil:
-		// the task is stored: its payload is not logged, unlike a failed or parked one, whose log is its only record
+		// the task is stored: its payload is not logged, unlike a failed or parked one, which may have to be replayed by hand
 		log.Info().
 			Str("evt.name", "reportwkr.processed").
 			Str("taskId", reportTask.TaskID).
