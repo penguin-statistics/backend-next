@@ -23,6 +23,14 @@ var (
 	}, ",")
 )
 
+// localsKeyCORSTier holds the tier the CORS middleware chose for a request with an Origin, for the request log.
+const localsKeyCORSTier = "cors.tier"
+
+const (
+	corsTierCredentialed = "credentialed"
+	corsTierPublic       = "public"
+)
+
 // CORS answers cross-origin requests in two tiers.
 //
 // A request whose Origin is in credentialedOrigins gets that origin back in Access-Control-Allow-Origin, together
@@ -49,9 +57,13 @@ func CORS(credentialedOrigins []string) fiber.Handler {
 		// the answer depends on Origin, whichever tier it falls in
 		c.Vary(fiber.HeaderOrigin)
 		if allowlist.allows(origin) {
+			c.Locals(localsKeyCORSTier, corsTierCredentialed)
 			c.Set(fiber.HeaderAccessControlAllowOrigin, origin)
 			c.Set(fiber.HeaderAccessControlAllowCredentials, "true")
 		} else {
+			if origin != "" {
+				c.Locals(localsKeyCORSTier, corsTierPublic)
+			}
 			c.Set(fiber.HeaderAccessControlAllowOrigin, "*")
 			if sentCrossSite(c, origin) {
 				pgid.IgnoreCookie(c)

@@ -11,7 +11,11 @@ import (
 
 	"exusiai.dev/backend-next/internal/pkg/flog"
 	"exusiai.dev/backend-next/internal/pkg/observability"
+	"exusiai.dev/backend-next/internal/pkg/pgid"
 )
+
+// maxLoggedOriginLength bounds the Origin header in the request log, as the client sets it.
+const maxLoggedOriginLength = 256
 
 func Logger(app *fiber.App) {
 	Chained(
@@ -61,6 +65,20 @@ func requestLogger() func(ctx *fiber.Ctx) error {
 		// report routes) also log its internal id, which joins drop_reports.account_id
 		if accountId, ok := ctx.Locals(constant.LocalsAccountIDKey).(int); ok {
 			evt = evt.Str("usr.account_id", strconv.Itoa(accountId))
+		}
+		// browser requests only (MAA and other clients send no Origin): which origins call the API, and which
+		// tier CORS gave them. A page outside the allowlist that sends credentials fails in the browser while
+		// this still logs 200, so these fields are the only trace of it.
+		if origin := ctx.Get(fiber.HeaderOrigin); origin != "" {
+			if len(origin) > maxLoggedOriginLength {
+				origin = origin[:maxLoggedOriginLength]
+			}
+			tier, _ := ctx.Locals(localsKeyCORSTier).(string)
+			evt = evt.Str("http.origin", origin).Str("http.cors_tier", tier)
+		}
+		if pgid.IgnoredCookie(ctx) {
+			// see pgid.IgnoreCookie: a cross-site request that carried the PenguinID cookie
+			evt = evt.Bool("usr.cookie_ignored", true)
 		}
 		evt.
 			Bytes("http.useragent", ctx.Request().Header.UserAgent()).
