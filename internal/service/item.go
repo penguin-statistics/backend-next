@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/goccy/go-json"
 
@@ -63,6 +64,17 @@ func (s *Item) GetItemByArkId(ctx context.Context, arkItemId string) (*model.Ite
 	err := cache.ItemByArkID.Get(arkItemId, &item)
 	if err == nil {
 		return &item, nil
+	}
+
+	// an id missing from the cached itemsMapByArkId is not found without querying it: reports carry unknown ids
+	// (e.g. from MAA), and caching those per id would let any request grow the cache. Ids with NUL characters or
+	// invalid UTF-8 are still queried, as bun drops and replaces those when sending the id, so that they may match.
+	itemsMapByArkId, err := s.GetItemsMapByArkId(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := itemsMapByArkId[arkItemId]; !ok && utf8.ValidString(arkItemId) && !strings.ContainsRune(arkItemId, 0) {
+		return nil, pgerr.ErrNotFound
 	}
 
 	dbItem, err := s.ItemRepo.GetItemByArkId(ctx, arkItemId)
@@ -138,7 +150,9 @@ func (s *Item) GetItemsMapById(ctx context.Context) (map[int]*model.Item, error)
 func (s *Item) GetItemsMapByArkId(ctx context.Context) (map[string]*model.Item, error) {
 	var itemsMapByArkId map[string]*model.Item
 	err := cache.ItemsMapByArkID.MutexGetSet(&itemsMapByArkId, func() (map[string]*model.Item, error) {
-		items, err := s.GetItems(ctx)
+		// loaded from the database rather than the cached items, as GetItemByArkId answers the ids missing from it as
+		// not found: an item inserted is then found once this map expires, not once both it and items have expired
+		items, err := s.ItemRepo.GetItems(ctx)
 		if err != nil {
 			return nil, err
 		}
