@@ -78,6 +78,24 @@ var (
 		Name: prometheus.BuildFQName(ServiceName, "cache", "writes_total"),
 		Help: "Cache Set, Delete and Flush calls",
 	}, []string{"cache", "op"})
+	AdvancedQueryInFlight = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: prometheus.BuildFQName(ServiceName, "advanced_query", "in_flight_requests"),
+		Help: "Number of advanced query requests being handled, including any waiting in middlewares before the handler",
+	})
+	AdvancedQueryDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    prometheus.BuildFQName(ServiceName, "advanced_query", "duration_seconds"),
+		Help:    "Duration of advanced query requests in seconds",
+		Buckets: prometheus.ExponentialBuckets(0.05, 2, 12),
+	}, []string{"outcome"})
+	AdvancedQueryRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "advanced_query", "requests_total"),
+		Help: "Number of advanced query requests handled, by outcome (ok, client_error, error)",
+	}, []string{"outcome"})
+	AdvancedQueryQueriesPerRequest = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    prometheus.BuildFQName(ServiceName, "advanced_query", "queries_per_request"),
+		Help:    "Number of queries in a valid advanced query request",
+		Buckets: prometheus.LinearBuckets(1, 1, 5),
+	})
 )
 
 // ReportSubjectLabel bounds the subject label of the report metrics to the subjects reports are published to.

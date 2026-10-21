@@ -19,6 +19,7 @@ import (
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/cachectrl"
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
+	"exusiai.dev/backend-next/internal/pkg/observability"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
@@ -91,7 +92,7 @@ func RegisterResult(v2 *svr.V2, c Result) {
 		},
 		Max:        30,
 		Expiration: time.Minute * 5,
-	}), c.AdvancedQuery)
+	}), observeAdvancedQuery, c.AdvancedQuery)
 }
 
 //	@Summary	Get Drop Matrix
@@ -246,6 +247,7 @@ func (c *Result) AdvancedQuery(ctx *fiber.Ctx) error {
 	if err := rekuest.ValidBody(ctx, &request); err != nil {
 		return err
 	}
+	observability.AdvancedQueryQueriesPerRequest.Observe(float64(len(request.Queries)))
 	result := &modelv2.AdvancedQueryResult{
 		AdvancedResults: make([]any, 0),
 	}
@@ -257,6 +259,57 @@ func (c *Result) AdvancedQuery(ctx *fiber.Ctx) error {
 		result.AdvancedResults = append(result.AdvancedResults, oneResult)
 	}
 	return ctx.JSON(result)
+}
+
+const (
+	advancedQueryOutcomeOK          = "ok"
+	advancedQueryOutcomeClientError = "client_error"
+	advancedQueryOutcomeError       = "error"
+)
+
+// observeAdvancedQuery records the advanced query requests in flight, and the duration and outcome of each of them.
+// A request counts as in flight from here on, including any time it spends in later middlewares before the handler.
+func observeAdvancedQuery(ctx *fiber.Ctx) (err error) {
+	observability.AdvancedQueryInFlight.Inc()
+	start := time.Now()
+	defer func() {
+		observability.AdvancedQueryInFlight.Dec()
+		r := recover()
+		outcome := advancedQueryOutcomeError
+		if r == nil {
+			outcome = advancedQueryOutcome(ctx, err)
+		}
+		observability.AdvancedQueryDuration.WithLabelValues(outcome).Observe(time.Since(start).Seconds())
+		observability.AdvancedQueryRequests.WithLabelValues(outcome).Inc()
+		if r != nil {
+			// let the recover middleware answer the panic with a 500 as before
+			panic(r)
+		}
+	}()
+	return ctx.Next()
+}
+
+// advancedQueryOutcome classifies a request by the status its client is answered with: the status already written
+// when no error is returned, or else the status httpserver.ErrorHandler answers err with. A 4xx is a client error,
+// a 5xx is an error.
+func advancedQueryOutcome(ctx *fiber.Ctx, err error) string {
+	status := fiber.StatusInternalServerError
+	switch e := err.(type) {
+	case nil:
+		status = ctx.Response().StatusCode()
+	case *pgerr.PenguinError:
+		status = e.StatusCode
+	case *fiber.Error:
+		status = e.Code
+	}
+	switch {
+	case status >= 500:
+		return advancedQueryOutcomeError
+	case status >= 400:
+		return advancedQueryOutcomeClientError
+	default:
+		return advancedQueryOutcomeOK
+	}
 }
 
 func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery) (any, error) {
