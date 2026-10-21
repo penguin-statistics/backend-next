@@ -76,6 +76,8 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 		Timeout: time.Second * 5,
 	}))
 	app.Use(middlewares.CORS(conf.CORSCredentialedOrigins))
+	// a 429 without its own Retry-After (fiber's limiter sets one) tells clients to wait a minute
+	app.Use(middlewares.RetryAfter(time.Minute))
 	// requestid is used by report service to identify requests and generate taskId there afterwards
 	// the logger middleware now injects RequestID into the context
 	middlewares.Logger(app)

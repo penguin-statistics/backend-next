@@ -1,15 +1,20 @@
 package httpserver
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/pkg/pgerr"
 )
 
 // defaultCredentialedOrigins returns the CORSCredentialedOrigins default the service ships with.
@@ -22,15 +27,37 @@ func defaultCredentialedOrigins(t *testing.T) []string {
 	return strings.Split(field.Tag.Get("default"), ",")
 }
 
-// newCORSServiceApp builds the real middleware chain with the default allowlist and a GET /stats answering 200.
+// newCORSServiceApp builds the real middleware chain with the default allowlist and these routes:
+//   - GET /stats answers 200
+//   - GET /limited is behind a limiter like the /result one, which lets one request through
+//   - GET /bare-429 answers 429 JSON without a Retry-After, like a hand-written rejection
+//   - GET /penguin-429 returns a 429 PenguinError
 func newCORSServiceApp(t *testing.T) *fiber.App {
 	t.Helper()
 
 	conf := &appconfig.Config{}
 	conf.CORSCredentialedOrigins = defaultCredentialedOrigins(t)
 	app := CreateServiceApp(conf)
+
+	tooMany := func(c *fiber.Ctx) error {
+		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+			"code":    "TOO_MANY_REQUESTS",
+			"message": "Your client is sending requests too frequently.",
+		})
+	}
 	app.Get("/stats", func(c *fiber.Ctx) error {
 		return c.SendString("ok")
+	})
+	app.Get("/limited", limiter.New(limiter.Config{
+		LimitReached: tooMany,
+		Max:          1,
+		Expiration:   time.Minute * 5,
+	}), func(c *fiber.Ctx) error {
+		return c.SendString("ok")
+	})
+	app.Get("/bare-429", tooMany)
+	app.Get("/penguin-429", func(c *fiber.Ctx) error {
+		return pgerr.New(fiber.StatusTooManyRequests, "TOO_MANY_REQUESTS", "Your client is sending requests too frequently.")
 	})
 	return app
 }
@@ -83,6 +110,65 @@ func TestServiceAppCORS(t *testing.T) {
 				assertCORS(t, resp, tt.origin, tt.credentialed)
 			})
 		}
+	}
+}
+
+func TestServiceAppTooManyRequestsCarryRetryAfterAndCORS(t *testing.T) {
+	app := newCORSServiceApp(t)
+
+	get := func(t *testing.T, path, origin string) *http.Response {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set(fiber.HeaderOrigin, origin)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { resp.Body.Close() })
+		return resp
+	}
+
+	if resp := get(t, "/limited", "https://evil.example"); resp.StatusCode != fiber.StatusOK {
+		t.Fatalf("first /limited: status = %d, want 200", resp.StatusCode)
+	}
+
+	tests := []struct {
+		path       string
+		origin     string
+		retryAfter string // "" for any number of seconds but the 60 s fallback
+	}{
+		{"/limited", "https://evil.example", ""},
+		{"/limited", "capacitor://localhost", ""},
+		{"/bare-429", "https://evil.example", "60"},
+		{"/penguin-429", "https://penguin-stats.io", "60"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path+" "+tt.origin, func(t *testing.T) {
+			resp := get(t, tt.path, tt.origin)
+			if resp.StatusCode != fiber.StatusTooManyRequests {
+				t.Fatalf("status = %d, want 429", resp.StatusCode)
+			}
+
+			retryAfter := resp.Header.Get(fiber.HeaderRetryAfter)
+			if tt.retryAfter != "" && retryAfter != tt.retryAfter {
+				t.Errorf("Retry-After = %q, want %q", retryAfter, tt.retryAfter)
+			}
+			if tt.retryAfter == "" && (retryAfter == "" || retryAfter == "60") {
+				t.Errorf("Retry-After = %q, want the limiter's own", retryAfter)
+			}
+
+			var body struct {
+				Code    string `json:"code"`
+				Message string `json:"message"`
+			}
+			raw, _ := io.ReadAll(resp.Body)
+			if err := json.Unmarshal(raw, &body); err != nil || body.Code != "TOO_MANY_REQUESTS" || body.Message == "" {
+				t.Errorf("body = %s, want the JSON {code, message}", raw)
+			}
+
+			// a cross-origin client can read the 429 and its Retry-After
+			assertCORS(t, resp, tt.origin, tt.origin != "https://evil.example")
+		})
 	}
 }
 
