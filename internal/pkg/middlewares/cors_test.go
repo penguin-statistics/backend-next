@@ -17,14 +17,16 @@ var testCredentialedOrigins = []string{
 	" https://Penguin-Stats.CN/ ", // normalized
 	"capacitor://localhost",
 	"https://*.frontend-v2-8db.pages.dev",
-	"*",                        // ignored
-	"null",                     // ignored
-	"https://a.*.example.com",  // ignored
-	"https://example.com/path", // ignored
-	"https://*.pages.dev",      // ignored: public suffix
-	"https://*.github.io",      // ignored: public suffix
-	"https://*.com",            // ignored: public suffix
-	"",                         // ignored
+	"*",                          // ignored
+	"null",                       // ignored
+	"https://a.*.example.com",    // ignored
+	"https://example.com/path",   // ignored
+	"https://*.pages.dev",        // ignored: public suffix
+	"https://*.github.io",        // ignored: public suffix
+	"https://*.com",              // ignored: public suffix
+	"https://*.vercel.app.",      // ignored: trailing dot
+	"https://*.netlify.app:8443", // ignored: port
+	"",                           // ignored
 }
 
 func newCORSApp() *fiber.App {
@@ -60,6 +62,10 @@ func TestCORSOriginTiers(t *testing.T) {
 		{"http://x.frontend-v2-8db.pages.dev", false},
 		{"https://x.frontend-v2-8db.pages.dev:8443", false},
 		{"https://evil-frontend-v2-8db.pages.dev", false},
+		// wildcards over public suffixes are ignored, also when written with a trailing dot or a port
+		{"https://x.vercel.app.", false},
+		{"https://x.vercel.app", false},
+		{"https://x.netlify.app:8443", false},
 		// exact entries need the same scheme, host and port
 		{"http://penguin-stats.io", false},
 		{"https://penguin-stats.io:8443", false},

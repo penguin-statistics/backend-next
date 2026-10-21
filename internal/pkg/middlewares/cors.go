@@ -140,7 +140,8 @@ func newOriginAllowlist(entries []string) originAllowlist {
 
 		if strings.HasPrefix(host, "*.") {
 			domain := strings.TrimPrefix(host, "*.")
-			if domain == "" || strings.Contains(domain, "*") {
+			// a port or a trailing dot would slip a public suffix (*.pages.dev:8443, *.pages.dev.) past the check below
+			if domain == "" || strings.ContainsAny(domain, "*:") || strings.HasSuffix(domain, ".") {
 				log.Error().
 					Str("evt.name", "infra.cors.origin.invalid").
 					Str("origin", entry).
