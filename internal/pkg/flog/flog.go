@@ -188,12 +188,21 @@ func CustomHeaderHandler(fieldKey, header string) func(ctx *fiber.Ctx) error {
 }
 
 // AccessHandler returns a handler that call f after each request.
+//
+// An error returned by the rest of the chain is handed to the app's error
+// handler here rather than returned, because fiber only runs the error handler
+// after the whole chain has returned: f would otherwise see the status code
+// from before the error was handled (e.g. 200 for a 500).
 func AccessHandler(f func(ctx *fiber.Ctx, duration time.Duration)) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		start := time.Now()
-		err := ctx.Next()
+		if err := ctx.Next(); err != nil {
+			if err := ctx.App().ErrorHandler(ctx, err); err != nil {
+				_ = ctx.SendStatus(fiber.StatusInternalServerError)
+			}
+		}
 		f(ctx, time.Since(start))
-		return err
+		return nil
 	}
 }
 
