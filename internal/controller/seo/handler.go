@@ -37,8 +37,12 @@ type ShellSource interface {
 	Get(ctx context.Context) (*spashell.Shell, error)
 }
 
-// shortMaxAge is the max-age of pages without data: 404s, and pages rendered before the matrix was calculated
+// shortMaxAge is the max-age of pages without data: 404s, and the lists rendered before the matrix was calculated
 const shortMaxAge = time.Minute
+
+// retryAfterCold is the Retry-After of the 503s served while the data is loaded or calculated after a start: the
+// catalog takes seconds, the matrices up to a few minutes
+const retryAfterCold = 120 * time.Second
 
 // isolationHeaders are the headers of the global helmet middleware that isolate a document from other origins: the
 // app loads images, scripts and fonts from other origins (CDN, S3, Crisp), which require-corp would block. The
@@ -212,7 +216,8 @@ func (h *Handler) Serve(c *fiber.Ctx) error {
 
 	catalog := h.data.Catalog()
 	if catalog == nil {
-		h.sendRaw(c, shell, r, "shell_only", false)
+		// right after a start: tell search engines to come back instead of indexing the bare app
+		h.sendCold(c, shell, r)
 		return nil
 	}
 
@@ -355,12 +360,27 @@ func (h *Handler) sendRaw(c *fiber.Ctx, shell *spashell.Shell, r route, outcome 
 	_ = c.Send(shell.Raw())
 }
 
+// sendCold sends the app as is while the catalog is not loaded: a 503 that search engines retry later
+func (h *Handler) sendCold(c *fiber.Ctx, shell *spashell.Shell, r route) {
+	count(r.kind, "shell_only")
+	setHTML(c, "")
+	c.Set("X-Robots-Tag", "noindex")
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	c.Set(fiber.HeaderRetryAfter, strconv.Itoa(int(retryAfterCold.Seconds())))
+	c.Status(fiber.StatusServiceUnavailable)
+	_ = c.Send(shell.Raw())
+}
+
 func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, p *Page, html []byte) {
 	count(p.Kind, p.Outcome)
 	setHTML(c, p.Head.Lang)
-	if p.Status == fiber.StatusOK && p.Cacheable {
+	switch {
+	case p.Status == fiber.StatusServiceUnavailable:
+		c.Set(fiber.HeaderCacheControl, "no-store")
+		c.Set(fiber.HeaderRetryAfter, strconv.Itoa(int(retryAfterCold.Seconds())))
+	case p.Status == fiber.StatusOK && p.Cacheable:
 		h.cacheFor(c, h.maxAge)
-	} else {
+	default:
 		h.cacheFor(c, h.shortMaxAge())
 	}
 	if !p.Indexable {

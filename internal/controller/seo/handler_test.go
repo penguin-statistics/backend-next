@@ -612,17 +612,25 @@ func TestListPagesAreRenderedOncePerData(t *testing.T) {
 func TestMatrixNotCalculated(t *testing.T) {
 	e := newTestEnv(t)
 	e.data.matrices = nil
-	r := e.get(t, "/en/result/cn/item/30012")
-	if r.status != 200 || r.header.Get("Cache-Control") != "public, max-age=60" || r.header.Get("X-Robots-Tag") != "" {
-		t.Errorf("status %d, Cache-Control %q, X-Robots-Tag %q", r.status, r.header.Get("Cache-Control"), r.header.Get("X-Robots-Tag"))
-	}
-	assertOnce(t, r.body, `<link rel="canonical" href="https://penguin-stats.io/en/result/cn/item/30012">`,
-		`<p>The drop data is being calculated. Please check back later.</p>`)
-	if strings.Contains(r.body, "<table>") || strings.Contains(r.body, "application/ld+json") {
-		t.Error("a table or a Dataset without data")
+	// the pages of items and stages: search engines come back later instead of indexing them without their data
+	for _, path := range []string{"/en/result/cn/item/30012", "/en/result/cn/stage/main_1/main_01-07", "/en/result/cn/stage/recruit/recruit"} {
+		r := e.get(t, path)
+		if r.status != 503 || r.header.Get("Retry-After") != "120" || r.header.Get("Cache-Control") != "no-store" ||
+			r.header.Get("X-Robots-Tag") != "noindex, follow" {
+			t.Errorf("%s: status %d, Retry-After %q, Cache-Control %q, X-Robots-Tag %q", path, r.status,
+				r.header.Get("Retry-After"), r.header.Get("Cache-Control"), r.header.Get("X-Robots-Tag"))
+		}
+		assertApp(t, r)
+		assertOnce(t, r.body, `<p>The drop data is being calculated. Please check back later.</p>`, `<meta name="robots" content="noindex,follow">`)
+		if strings.Contains(r.body, "<table>") || strings.Contains(r.body, "application/ld+json") || strings.Contains(r.body, `rel="canonical"`) {
+			t.Errorf("%s: a table, a Dataset or a canonical link without data", path)
+		}
 	}
 	// the lists link what exists on the server
-	r = e.get(t, "/en/result/cn/item")
+	r := e.get(t, "/en/result/cn/item")
+	if r.status != 200 || r.header.Get("Cache-Control") != "public, max-age=60" || r.header.Get("X-Robots-Tag") != "" {
+		t.Errorf("item list: status %d, Cache-Control %q, X-Robots-Tag %q", r.status, r.header.Get("Cache-Control"), r.header.Get("X-Robots-Tag"))
+	}
 	if !strings.Contains(r.body, "/en/result/cn/item/quiet") || strings.Contains(r.body, "/en/result/cn/item/tag_1") {
 		t.Error("item list without the matrix")
 	}
@@ -632,8 +640,9 @@ func TestCatalogNotLoaded(t *testing.T) {
 	e := newTestEnv(t)
 	e.data.catalog = nil
 	r := e.get(t, "/en/result/cn/item/30012")
-	if r.status != 200 || r.header.Get("Cache-Control") != "no-store" || r.body != string(e.shells.shell.Raw()) {
-		t.Errorf("status %d, Cache-Control %q", r.status, r.header.Get("Cache-Control"))
+	if r.status != 503 || r.header.Get("Cache-Control") != "no-store" || r.header.Get("Retry-After") != "120" ||
+		r.header.Get("X-Robots-Tag") != "noindex" || r.body != string(e.shells.shell.Raw()) {
+		t.Errorf("status %d, Cache-Control %q, Retry-After %q", r.status, r.header.Get("Cache-Control"), r.header.Get("Retry-After"))
 	}
 }
 
@@ -749,10 +758,10 @@ func TestRegister(t *testing.T) {
 		// off, the stats paths go back to the frontend: the ingress may still route them here
 		{name: "disabled", enabled: false, shellURL: shellServer.URL, ttl: time.Minute, status: 302},
 		{name: "invalid shell URL", enabled: true, shellURL: "frontend-rollout/", ttl: time.Minute, status: 302},
-		// enabled, it serves the app until the catalog is loaded
-		{name: "enabled", enabled: true, shellURL: shellServer.URL, ttl: time.Minute, status: 200},
+		// enabled, it serves the app with a 503 until the catalog is loaded
+		{name: "enabled", enabled: true, shellURL: shellServer.URL, ttl: time.Minute, status: 503},
 		// a TTL of 0 used to panic in the goroutine fetching the shell
-		{name: "zero TTL", enabled: true, shellURL: shellServer.URL, ttl: 0, status: 200},
+		{name: "zero TTL", enabled: true, shellURL: shellServer.URL, ttl: 0, status: 503},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			conf := &appconfig.Config{ConfigSpec: appconfig.ConfigSpec{
