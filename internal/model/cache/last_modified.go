@@ -80,3 +80,16 @@ func setLastModifiedTime(key string, value any, cacheValue func() bool) {
 	lastModifiedRecords[key] = lastModifiedRecord{digest: digest, time: now}
 	LastModifiedTime.Set(key, now, 0)
 }
+
+// GetLastModifiedTime returns the last modified time of key, or the zero time if there is none (never recorded, or
+// flushed). It waits for a recording of key in progress (see SetLastModifiedTime), which caches the value first: a
+// value cached before the call is thus never newer than the time returned.
+func GetLastModifiedTime(key string) time.Time {
+	lastModifiedMu.Lock()
+	defer lastModifiedMu.Unlock()
+	var lastModified time.Time
+	if err := LastModifiedTime.Get(key, &lastModified); err != nil {
+		return time.Time{}
+	}
+	return lastModified
+}

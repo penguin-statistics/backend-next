@@ -180,7 +180,7 @@ func (c *Result) GetDropMatrix(ctx *fiber.Ctx) error {
 	}
 
 	useCache := !accountId.Valid && stageFilterStr == "" && itemFilterStr == ""
-	var lastModified time.Time
+	var lastModified recordedTime
 	if useCache {
 		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones) + constant.CacheSep + sourceCategory
 		lastModified = lastModifiedTime("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:" + key + "]")
@@ -234,7 +234,7 @@ func (c *Result) GetPatternMatrix(ctx *fiber.Ctx) error {
 		accountId.Valid = true
 	}
 
-	var lastModified time.Time
+	var lastModified recordedTime
 	if !accountId.Valid {
 		key := server + constant.CacheSep + constant.SourceCategoryAll + constant.CacheSep + strconv.FormatBool(showAllPatterns)
 		lastModified = lastModifiedTime("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:" + key + "]")
