@@ -2,14 +2,12 @@ package repo
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model"
-	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/pkg/pgid"
 	"exusiai.dev/backend-next/internal/repo/selector"
@@ -73,26 +71,4 @@ func (r *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (
 	return r.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("penguin_id = ?", penguinId)
 	})
-}
-
-func (r *Account) IsAccountExistWithId(ctx context.Context, accountId int) bool {
-	var exist int
-	err := cache.AccountExistence.Get(strconv.Itoa(accountId), &exist)
-	if err == nil {
-		return exist == 1
-	}
-	account, err := r.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.Column("account_id").Where("account_id = ?", accountId)
-	})
-	if err != nil {
-		return false
-	}
-
-	exists := account != nil
-
-	if exists {
-		cache.AccountExistence.Set(strconv.Itoa(account.AccountID), 1, time.Hour*24)
-	}
-
-	return exists
 }
