@@ -1,14 +1,10 @@
 package v2
 
 import (
-	"time"
-
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 
-	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
-	"exusiai.dev/backend-next/internal/pkg/cachectrl"
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
@@ -36,16 +32,12 @@ func RegisterStage(v2 *svr.V2, c Stage) {
 func (c *Stage) GetStages(ctx *fiber.Ctx) error {
 	server := ctx.Query("server", "CN")
 
+	lastModified := lastModifiedTime("[shimStages#server:" + server + "]")
 	stages, err := c.StageService.GetShimStages(ctx.UserContext(), server)
 	if err != nil {
 		return err
 	}
-	var lastModifiedTime time.Time
-	if err := cache.LastModifiedTime.Get("[shimStages#server:"+server+"]", &lastModifiedTime); err != nil {
-		lastModifiedTime = time.Now()
-	}
-	cachectrl.OptIn(ctx, lastModifiedTime)
-	return ctx.JSON(stages)
+	return sendCacheable(ctx, lastModified, stages)
 }
 
 //	@Summary	Get a Stage with ID
