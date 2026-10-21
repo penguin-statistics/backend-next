@@ -17,6 +17,16 @@ import (
 // maxLoggedOriginLength bounds the Origin header in the request log, as the client sets it.
 const maxLoggedOriginLength = 256
 
+// localsKeyExpectedStatus marks a response whose status is an expected answer of its route (see ExpectStatus).
+const localsKeyExpectedStatus = "log.expected_status"
+
+// ExpectStatus marks the response of ctx as an expected answer of its route, whatever its status: the request log
+// logs it at info instead of as a warning (4xx) or an error (5xx), e.g. the 404 of a page that does not exist, which
+// crawlers request routinely. Its status is still logged, and the client going away still makes it a warning.
+func ExpectStatus(ctx *fiber.Ctx) {
+	ctx.Locals(localsKeyExpectedStatus, true)
+}
+
 func Logger(app *fiber.App) {
 	Chained(
 		app,
@@ -46,6 +56,9 @@ func requestLogger() func(ctx *fiber.Ctx) error {
 		status := ctx.Response().StatusCode()
 		bytesWritten := len(ctx.Response().Body())
 		level := requestLogLevel(status)
+		if expected, _ := ctx.Locals(localsKeyExpectedStatus).(bool); expected {
+			level = zerolog.InfoLevel
+		}
 		// fasthttp does not tell the handler that the client went away, and writes
 		// the response only after this returns, so check the connection here: the
 		// status logged was never delivered to a peer that has already closed it.

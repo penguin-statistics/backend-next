@@ -1,6 +1,7 @@
 package seo
 
 import (
+	"net/http"
 	"net/url"
 	"sort"
 	"strconv"
@@ -352,6 +353,14 @@ func noindex(p *Page, outcome string) {
 	p.Head.JSONLD = nil
 }
 
+// cold makes p, the page of an item or a stage, the page served while the matrix is not calculated, as after a
+// restart: a 503 that search engines retry later instead of indexing the page without its data. Browsers show the
+// app as usual.
+func cold(p *Page) {
+	noindex(p, "cold")
+	p.Status = http.StatusServiceUnavailable
+}
+
 // servers are the links to the page on each server it is on
 func (b *builder) servers(kind pageKind, on func(server string) bool, ids ...string) []ServerLink {
 	var links []ServerLink
@@ -513,6 +522,7 @@ func (b *builder) itemPage() *Page {
 	switch {
 	case b.matrix == nil:
 		p.Body.Paragraphs = []string{b.t.Cold}
+		cold(p)
 	case len(rows) == 0:
 		p.Body.Paragraphs = []string{b.t.Empty}
 		noindex(p, "no_data")
@@ -547,26 +557,22 @@ func (b *builder) itemPage() *Page {
 }
 
 // itemHighlights quotes the rows with the highest rates among those still open with many samples, then the rows
-// with the highest rates
+// with the most samples: the highest rates of the others are often those of a handful of runs
 func (b *builder) itemHighlights(rows []service.SEORow) string {
-	var picked []service.SEORow
-	used := map[string]bool{}
+	var picked, rest []service.SEORow
 	for _, row := range rows {
-		if len(picked) == highlights {
-			break
-		}
-		if !row.EndTime.Valid && row.Times >= highlightMinTimes {
+		if len(picked) < highlights && !row.EndTime.Valid && row.Times >= highlightMinTimes {
 			picked = append(picked, row)
-			used[row.StageID] = true
+		} else {
+			rest = append(rest, row)
 		}
 	}
-	for _, row := range rows {
-		if len(picked) == highlights {
-			break
+	if n := highlights - len(picked); n > 0 {
+		sort.SliceStable(rest, func(i, j int) bool { return rest[i].Times > rest[j].Times })
+		if n > len(rest) {
+			n = len(rest)
 		}
-		if !used[row.StageID] {
-			picked = append(picked, row)
-		}
+		picked = append(picked, rest[:n]...)
 	}
 	parts := make([]string, len(picked))
 	for i, row := range picked {
@@ -635,6 +641,7 @@ func (b *builder) stagePage() *Page {
 	switch {
 	case b.matrix == nil:
 		p.Body.Paragraphs = append(p.Body.Paragraphs, b.t.Cold)
+		cold(p)
 	case len(rows) == 0:
 		p.Body.Paragraphs = append(p.Body.Paragraphs, b.t.Empty)
 		noindex(p, "no_data")
@@ -658,7 +665,7 @@ func (b *builder) stagePage() *Page {
 		p.Body.Notes = b.notes("stageFilter", stage.ArkID)
 		p.Head.JSONLD = b.jsonLD(p, fill(b.t.DatasetName, "name", name, "server", server), "stageFilter", stage.ArkID, rows, []Link{b.home(), b.listCrumb(kindStageList), {Name: name}})
 	}
-	if isRecruit(stage) {
+	if isRecruit(stage) && p.Indexable {
 		// the recruitment statistics are in beta in the frontend, with measures of their own
 		noindex(p, "noindex")
 	}

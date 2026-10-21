@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"net/url"
 	"sync/atomic"
 	"time"
 
@@ -23,19 +24,53 @@ const MaxShellSize = 2 << 20
 // ErrUnavailable is returned by Get when no shell has been fetched and fetching one failed.
 var ErrUnavailable = errors.New("spashell: no shell fetched yet")
 
+const (
+	// DefaultTTL is the TTL of a Config without a positive one
+	DefaultTTL = 15 * time.Second
+	// DefaultTimeout is the Timeout of a Config without a positive one
+	DefaultTimeout = 3 * time.Second
+)
+
+// ValidateURL tells whether raw is an absolute http(s) URL with a host, which a Source can fetch.
+func ValidateURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	if u.Scheme != "http" && u.Scheme != "https" || u.Host == "" {
+		return fmt.Errorf("spashell: %q is not an absolute http(s) URL", raw)
+	}
+	return nil
+}
+
 // Config configures a Source.
 type Config struct {
 	// URL is the URL of the index.html
 	URL string
-	// TTL is how often the shell is fetched again
+	// TTL is how often the shell is fetched again; DefaultTTL if not positive
 	TTL time.Duration
-	// Timeout is the timeout of a single fetch
+	// Timeout is the timeout of a single fetch; DefaultTimeout if not positive
 	Timeout time.Duration
 	// RetryAfter is how long Get answers ErrUnavailable without fetching after a fetch without a copy at hand
 	// failed; 10s by default
 	RetryAfter time.Duration
-	// Client is the HTTP client fetches use; one with Timeout by default
+	// Client is the HTTP client fetches use; by default one with Timeout that ignores the proxy settings of the
+	// environment (the shell is fetched in the cluster) and follows no redirects: a redirect is a failed fetch, so
+	// only the configured URL can supply the HTML served as the site's own
 	Client *http.Client
+}
+
+// newClient is the default Client of a Config
+func newClient(timeout time.Duration) *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: transport,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 }
 
 // Source keeps a copy of the app's index.html: it fetches it again every TTL, revalidating the copy at hand, and
@@ -54,14 +89,26 @@ type Source struct {
 	now func() time.Time
 }
 
+// New returns a Source of conf; a TTL or Timeout that is not positive is replaced by its default.
 func New(conf Config) *Source {
-	if conf.RetryAfter == 0 {
+	if conf.TTL <= 0 {
+		conf.TTL = DefaultTTL
+	}
+	if conf.Timeout <= 0 {
+		conf.Timeout = DefaultTimeout
+	}
+	if conf.RetryAfter <= 0 {
 		conf.RetryAfter = 10 * time.Second
 	}
 	if conf.Client == nil {
-		conf.Client = &http.Client{Timeout: conf.Timeout}
+		conf.Client = newClient(conf.Timeout)
 	}
 	return &Source{conf: conf, now: time.Now}
+}
+
+// Config is the configuration of s, with the defaults applied.
+func (s *Source) Config() Config {
+	return s.conf
 }
 
 // Get returns the copy at hand. With no copy, it fetches one unless a fetch failed less than RetryAfter ago; then, or
@@ -107,6 +154,10 @@ func (s *Source) Refresh(ctx context.Context) error {
 
 // Run fetches the shell, then fetches it again every TTL until ctx is done.
 func (s *Source) Run(ctx context.Context) {
+	if s.cur.Load() == nil {
+		// the age of the shell counts from now until one is fetched
+		observability.SEOShellFresh(s.now())
+	}
 	_ = s.Refresh(ctx)
 	ticker := time.NewTicker(s.conf.TTL)
 	defer ticker.Stop()
@@ -162,10 +213,15 @@ func (s *Source) fetch(ctx context.Context) (err error) {
 
 	if resp.StatusCode == http.StatusNotModified && cur != nil {
 		outcome = "not_modified"
-		s.cur.CompareAndSwap(cur, cur.revalidated(s.now()))
+		now := s.now()
+		s.cur.CompareAndSwap(cur, cur.revalidated(now))
+		observability.SEOShellFresh(now)
 		return nil
 	}
 	if resp.StatusCode != http.StatusOK {
+		if loc := resp.Header.Get("Location"); loc != "" {
+			return fmt.Errorf("unexpected status %d (redirect to %q, not followed)", resp.StatusCode, loc)
+		}
 		return fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 	if mt, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type")); err != nil || mt != "text/html" {
@@ -202,5 +258,6 @@ func (s *Source) fetch(ctx context.Context) (err error) {
 		outcome = "ok_unspliceable"
 	}
 	s.cur.Store(shell)
+	observability.SEOShellFresh(now)
 	return nil
 }

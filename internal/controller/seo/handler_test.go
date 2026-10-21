@@ -22,6 +22,7 @@ import (
 	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/model"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/pkg/spashell"
 	"exusiai.dev/backend-next/internal/service"
 )
@@ -129,13 +130,14 @@ type testEnv struct {
 	shells *fakeShells
 }
 
-// newTestEnv mounts the pages behind the helmet middleware of the service app (internal/server/httpserver)
+// newTestEnv mounts the pages behind the CORS and helmet middlewares of the service app (internal/server/httpserver)
 func newTestEnv(t testing.TB) *testEnv {
 	e := &testEnv{
 		data:   &fakeData{catalog: testCatalog(), matrices: testMatrices()},
 		shells: &fakeShells{shell: loadShell(t)},
 	}
 	e.app = fiber.New(fiber.Config{Immutable: true})
+	e.app.Use(middlewares.CORS([]string{"https://penguin-stats.io"}))
 	e.app.Use(helmet.New(helmet.Config{
 		HSTSMaxAge:         31356000,
 		HSTSPreloadEnabled: true,
@@ -230,7 +232,7 @@ func TestItemPage(t *testing.T) {
 	for k, want := range map[string]string{
 		"Content-Type":     "text/html; charset=utf-8",
 		"Content-Language": "zh",
-		"Cache-Control":    "public, max-age=300",
+		"Cache-Control":    "public, max-age=60, s-maxage=300",
 		"Last-Modified":    "Wed, 21 Oct 2026 10:30:00 GMT",
 		"X-Robots-Tag":     "",
 		// helmet's isolation would block the app's cross-origin images and scripts
@@ -238,6 +240,16 @@ func TestItemPage(t *testing.T) {
 		"Cross-Origin-Opener-Policy":   "",
 		"Cross-Origin-Resource-Policy": "",
 		"Origin-Agent-Cluster":         "",
+		// nor does the frontend send these
+		"X-Frame-Options":                   "",
+		"X-DNS-Prefetch-Control":            "",
+		"X-Download-Options":                "",
+		"X-Permitted-Cross-Domain-Policies": "",
+		"Access-Control-Allow-Origin":       "",
+		"Access-Control-Expose-Headers":     "",
+		"Vary":                              "",
+		// helmet's headers the frontend sends too, or harmless
+		"X-Content-Type-Options": "nosniff",
 	} {
 		if got := r.header.Get(k); got != want {
 			t.Errorf("%s: %q, want %q", k, got, want)
@@ -547,7 +559,7 @@ func TestRedirectsToCanonical(t *testing.T) {
 func TestListPages(t *testing.T) {
 	e := newTestEnv(t)
 	r := e.get(t, "/zh/result/cn/item")
-	if r.status != 200 || r.header.Get("Cache-Control") != "public, max-age=300" {
+	if r.status != 200 || r.header.Get("Cache-Control") != "public, max-age=60, s-maxage=300" {
 		t.Fatalf("item list: %d %q", r.status, r.header.Get("Cache-Control"))
 	}
 	// the items with drops on the server, by category
@@ -582,7 +594,7 @@ func TestListPages(t *testing.T) {
 func TestListPagesAreRenderedOncePerData(t *testing.T) {
 	e := newTestEnv(t)
 	first := e.get(t, "/en/result/cn/item")
-	if again := e.get(t, "/en/result/cn/item"); again.body != first.body || again.header.Get("Cache-Control") != "public, max-age=300" {
+	if again := e.get(t, "/en/result/cn/item"); again.body != first.body || again.header.Get("Cache-Control") != "public, max-age=60, s-maxage=300" {
 		t.Error("the list page changed without the data changing")
 	}
 	if !strings.Contains(first.body, "/en/result/cn/item/evil") {
@@ -612,17 +624,25 @@ func TestListPagesAreRenderedOncePerData(t *testing.T) {
 func TestMatrixNotCalculated(t *testing.T) {
 	e := newTestEnv(t)
 	e.data.matrices = nil
-	r := e.get(t, "/en/result/cn/item/30012")
-	if r.status != 200 || r.header.Get("Cache-Control") != "public, max-age=60" || r.header.Get("X-Robots-Tag") != "" {
-		t.Errorf("status %d, Cache-Control %q, X-Robots-Tag %q", r.status, r.header.Get("Cache-Control"), r.header.Get("X-Robots-Tag"))
-	}
-	assertOnce(t, r.body, `<link rel="canonical" href="https://penguin-stats.io/en/result/cn/item/30012">`,
-		`<p>The drop data is being calculated. Please check back later.</p>`)
-	if strings.Contains(r.body, "<table>") || strings.Contains(r.body, "application/ld+json") {
-		t.Error("a table or a Dataset without data")
+	// the pages of items and stages: search engines come back later instead of indexing them without their data
+	for _, path := range []string{"/en/result/cn/item/30012", "/en/result/cn/stage/main_1/main_01-07", "/en/result/cn/stage/recruit/recruit"} {
+		r := e.get(t, path)
+		if r.status != 503 || r.header.Get("Retry-After") != "120" || r.header.Get("Cache-Control") != "no-store" ||
+			r.header.Get("X-Robots-Tag") != "noindex, follow" {
+			t.Errorf("%s: status %d, Retry-After %q, Cache-Control %q, X-Robots-Tag %q", path, r.status,
+				r.header.Get("Retry-After"), r.header.Get("Cache-Control"), r.header.Get("X-Robots-Tag"))
+		}
+		assertApp(t, r)
+		assertOnce(t, r.body, `<p>The drop data is being calculated. Please check back later.</p>`, `<meta name="robots" content="noindex,follow">`)
+		if strings.Contains(r.body, "<table>") || strings.Contains(r.body, "application/ld+json") || strings.Contains(r.body, `rel="canonical"`) {
+			t.Errorf("%s: a table, a Dataset or a canonical link without data", path)
+		}
 	}
 	// the lists link what exists on the server
-	r = e.get(t, "/en/result/cn/item")
+	r := e.get(t, "/en/result/cn/item")
+	if r.status != 200 || r.header.Get("Cache-Control") != "public, max-age=60" || r.header.Get("X-Robots-Tag") != "" {
+		t.Errorf("item list: status %d, Cache-Control %q, X-Robots-Tag %q", r.status, r.header.Get("Cache-Control"), r.header.Get("X-Robots-Tag"))
+	}
 	if !strings.Contains(r.body, "/en/result/cn/item/quiet") || strings.Contains(r.body, "/en/result/cn/item/tag_1") {
 		t.Error("item list without the matrix")
 	}
@@ -632,8 +652,9 @@ func TestCatalogNotLoaded(t *testing.T) {
 	e := newTestEnv(t)
 	e.data.catalog = nil
 	r := e.get(t, "/en/result/cn/item/30012")
-	if r.status != 200 || r.header.Get("Cache-Control") != "no-store" || r.body != string(e.shells.shell.Raw()) {
-		t.Errorf("status %d, Cache-Control %q", r.status, r.header.Get("Cache-Control"))
+	if r.status != 503 || r.header.Get("Cache-Control") != "no-store" || r.header.Get("Retry-After") != "120" ||
+		r.header.Get("X-Robots-Tag") != "noindex" || r.body != string(e.shells.shell.Raw()) {
+		t.Errorf("status %d, Cache-Control %q, Retry-After %q", r.status, r.header.Get("Cache-Control"), r.header.Get("Retry-After"))
 	}
 }
 
@@ -688,6 +709,8 @@ func TestSameHTMLForEveryone(t *testing.T) {
 		{},
 		{"User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", "Accept-Language": "ja"},
 		{"User-Agent": "Mozilla/5.0 (iPhone)", "Accept-Language": "ko-KR", "Cookie": "a=b"},
+		// an allow-listed origin got its own CORS headers
+		{"Origin": "https://penguin-stats.io"},
 	} {
 		req := httptest.NewRequest(fiber.MethodGet, "/en/result/cn/item/30012", nil)
 		for k, v := range h {
@@ -704,8 +727,10 @@ func TestSameHTMLForEveryone(t *testing.T) {
 		} else if !bytes.Equal(first, b) {
 			t.Errorf("different HTML for %v", h)
 		}
-		if v := resp.Header.Get("Vary"); v != "" {
-			t.Errorf("Vary %q", v)
+		for _, k := range []string{"Vary", "Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"} {
+			if v := resp.Header.Get(k); v != "" {
+				t.Errorf("%s %q for %v", k, v, h)
+			}
 		}
 	}
 }
@@ -739,29 +764,62 @@ func TestRegister(t *testing.T) {
 	}))
 	defer shellServer.Close()
 
-	for _, enabled := range []bool{false, true} {
-		conf := &appconfig.Config{ConfigSpec: appconfig.ConfigSpec{
-			SEOPagesEnabled:      enabled,
-			SEOShellURL:          shellServer.URL,
-			SEOShellTTL:          time.Minute,
-			SEOShellFetchTimeout: time.Second,
-			SEOSiteURL:           site,
-			SEOPageMaxAge:        5 * time.Minute,
-		}}
-		lc := fxtest.NewLifecycle(t)
-		data := service.NewSEOData(lc, &appconfig.Config{}, nil, nil, nil)
-		app := fiber.New()
-		Register(lc, app, conf, data)
-		lc.RequireStart()
-		resp, err := app.Test(httptest.NewRequest(fiber.MethodGet, "/zh/result/cn/item", nil), -1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		resp.Body.Close()
-		// enabled, it serves the app until the catalog is loaded
-		if want := map[bool]int{false: 404, true: 200}[enabled]; resp.StatusCode != want {
-			t.Errorf("enabled %v: status %d, want %d", enabled, resp.StatusCode, want)
-		}
-		lc.RequireStop()
+	for _, tc := range []struct {
+		name     string
+		enabled  bool
+		shellURL string
+		ttl      time.Duration
+		status   int
+	}{
+		// off, the stats paths go back to the frontend: the ingress may still route them here
+		{name: "disabled", enabled: false, shellURL: shellServer.URL, ttl: time.Minute, status: 302},
+		{name: "invalid shell URL", enabled: true, shellURL: "frontend-rollout/", ttl: time.Minute, status: 302},
+		// enabled, it serves the app with a 503 until the catalog is loaded
+		{name: "enabled", enabled: true, shellURL: shellServer.URL, ttl: time.Minute, status: 503},
+		// a TTL of 0 used to panic in the goroutine fetching the shell
+		{name: "zero TTL", enabled: true, shellURL: shellServer.URL, ttl: 0, status: 503},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			conf := &appconfig.Config{ConfigSpec: appconfig.ConfigSpec{
+				SEOPagesEnabled:      tc.enabled,
+				SEOShellURL:          tc.shellURL,
+				SEOShellTTL:          tc.ttl,
+				SEOShellFetchTimeout: time.Second,
+				SEOSiteURL:           site,
+				SEOPageMaxAge:        5 * time.Minute,
+			}}
+			lc := fxtest.NewLifecycle(t)
+			data := service.NewSEOData(lc, &appconfig.Config{}, nil, nil, nil, nil)
+			app := fiber.New()
+			Register(lc, app, conf, data)
+			lc.RequireStart()
+			defer lc.RequireStop()
+			resp, err := app.Test(httptest.NewRequest(fiber.MethodGet, "/zh/result/cn/item?a=1", nil), -1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != tc.status {
+				t.Errorf("status %d, want %d", resp.StatusCode, tc.status)
+			}
+			if tc.status == 302 && resp.Header.Get("Location") != "/ZH/result/cn/item?a=1" {
+				t.Errorf("Location %q", resp.Header.Get("Location"))
+			}
+		})
+	}
+}
+
+func TestItemDescriptionQuotesWellSampledRows(t *testing.T) {
+	e := newTestEnv(t)
+	// no open row with many samples: the description falls back to the rows with the most samples, not to the
+	// 100% of a few runs
+	e.data.matrices = map[string]*service.SEOMatrix{"CN": service.NewSEOMatrix("CN", []*modelv2.OneDropMatrixElement{
+		{StageID: "act1_02", ItemID: "30012", Times: 2, Quantity: 2, StartTime: 1688025600000},
+		{StageID: "act1_01", ItemID: "30012", Times: 1, Quantity: 1, StartTime: 1688025600000},
+		{StageID: "main_01-07", ItemID: "30012", Times: 900, Quantity: 450, StartTime: 1556676000000},
+	}, lastModified)}
+	r := e.get(t, "/en/result/cn/item/30012")
+	if !strings.Contains(r.body, `<meta name="description" content="Orirock Cube drop rates on the CN server: 1-7 50.00% (900 samples), EV-2 100.00% (2), `) {
+		t.Errorf("description: %s", regexp.MustCompile(`<meta name="description"[^>]*>`).FindString(r.body))
 	}
 }
