@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -172,6 +173,64 @@ func (w *Worker) globalMatrixRefresh(batchCtx context.Context, name, server stri
 	}()
 }
 
+// warmUpGlobalCaches fills the caches of the global matrices and trends of every server, empty after the process
+// started, by refresh, from the matrix elements earlier batches saved: requests then do not each wait for a
+// calculation until the first batch has refreshed them. The first batch runs it before its jobs, holding the worker
+// lock, so that it does not read the matrix elements while another process's batch replaces them, and holding
+// refreshMu, one server at a time. A server that fails is left to the requests, as before.
+func (w *Worker) warmUpGlobalCaches(ctx context.Context, refresh func(ctx context.Context, server string) error) {
+	if !w.refreshGlobalMatrices {
+		return
+	}
+	w.refreshMu.Lock()
+	defer w.refreshMu.Unlock()
+	for _, server := range constant.Servers {
+		server := server
+		// microtask keeps the worker lock and logs the error
+		_ = w.microtask(ctx, "globalCachesWarmUp", server, func(ctx context.Context) (err error) {
+			// a panic would end the process on every start: fail the server instead
+			defer func() {
+				if r := recover(); r != nil {
+					err = errors.Errorf("panic: %v\n%s", r, debug.Stack())
+				}
+			}()
+			return refresh(ctx, server)
+		})
+	}
+}
+
+// cacheRefresh is a refresh of cached results of a server, named in the logs.
+type cacheRefresh struct {
+	name    string
+	refresh func(ctx context.Context, server string) error
+}
+
+// refreshGlobalCaches refreshes the cached global matrices and trend of server.
+func (w *Worker) refreshGlobalCaches(ctx context.Context, server string) error {
+	return refreshEach(ctx, server, []cacheRefresh{
+		{"globalDropMatrix", w.DropMatrixService.RefreshGlobalDropMatrixCaches},
+		{"globalPatternMatrix", w.PatternMatrixService.RefreshGlobalPatternMatrixCaches},
+		{"shimTrend", w.TrendService.RefreshShimTrend},
+	})
+}
+
+// refreshEach runs every refresh of server, also after one failed: each drops its caches if it fails. It logs every
+// failure and returns an error naming the failed refreshes.
+func refreshEach(ctx context.Context, server string, refreshes []cacheRefresh) error {
+	var failed []string
+	for _, r := range refreshes {
+		if err := r.refresh(ctx, server); err != nil {
+			log.Ctx(ctx).Error().Str("evt.name", "worker.calcwkr.globalCachesWarmUp").Str("server", server).Str("cache", r.name).Err(err).
+				Msg("failed to refresh the cached global results: dropped them, requests recalculate them")
+			failed = append(failed, r.name)
+		}
+	}
+	if len(failed) > 0 {
+		return errors.Errorf("failed to refresh %s", strings.Join(failed, ", "))
+	}
+	return nil
+}
+
 // calcStats runs every stats calculation of a single server.
 func (w *Worker) calcStats(ctx context.Context, server string) (err error) {
 	ctx, span := tracer.Start(ctx, "calcwkr.server", trace.WithAttributes(attribute.String("server", server)))
@@ -299,7 +358,11 @@ func (w *Worker) batch(parentCtx context.Context, typ WorkerCalcType, f func(ctx
 
 	// buffered: after a timeout nobody receives, and the goroutine must not leak
 	errChan := make(chan error, 1)
+	first := w.count == 0
 	go func() {
+		if first {
+			w.warmUpGlobalCaches(ctx, w.refreshGlobalCaches)
+		}
 		errChan <- runForAllServers(ctx, f)
 	}()
 
