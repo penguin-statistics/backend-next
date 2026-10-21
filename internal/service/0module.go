@@ -7,7 +7,6 @@ import (
 func Module() fx.Option {
 	return fx.Module("service", fx.Provide(
 		NewItem,
-		NewInit,
 		NewZone,
 		NewStage,
 		NewGeoIP,
