@@ -7,58 +7,11 @@ import (
 
 	"exusiai.dev/gommon/constant"
 	"github.com/rs/zerolog/log"
-	"go.opentelemetry.io/otel"
 
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/pkg/observability"
 	"exusiai.dev/backend-next/internal/repo"
 )
-
-var tracer = otel.Tracer("reportverifs")
-
-// pipelineVerifier is a check of the pipeline of ReportVerifiers.
-type pipelineVerifier interface {
-	Name() string
-	Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) *Rejection
-}
-
-type ReportVerifiers []pipelineVerifier
-
-func NewReportVerifier(dropVerifier *DropVerifier, rejectRuleVerifier *RejectRuleVerifier) *ReportVerifiers {
-	return &ReportVerifiers{
-		dropVerifier,
-		rejectRuleVerifier,
-	}
-}
-
-func (verifiers ReportVerifiers) Verify(ctx context.Context, reportTask *types.ReportTask) (violations Violations) {
-	violations = map[int]*Violation{}
-
-	for reportIndex, report := range reportTask.Reports {
-		for _, pipe := range verifiers {
-			start := time.Now()
-
-			name := pipe.Name()
-
-			rejection := pipe.Verify(ctx, report, reportTask)
-
-			observability.ReportVerifyDuration.
-				WithLabelValues(name).
-				Observe(time.Since(start).Seconds())
-
-			if rejection != nil {
-				violations[reportIndex] = &Violation{
-					Name:      name,
-					Rejection: *rejection,
-				}
-
-				break
-			}
-		}
-	}
-
-	return violations
-}
 
 // Verifier decides the reliability of the reports of a task.
 type Verifier struct {
