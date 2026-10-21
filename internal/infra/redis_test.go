@@ -89,6 +89,26 @@ func TestPingRedisStopsAtTheTimeoutWhileRedisDoesNotReply(t *testing.T) {
 	}
 }
 
+// tls.DialWithDialer, which go-redis's default dialer uses for rediss:// URLs, ignores the context: the TLS handshake
+// with a server that does not reply took the whole dial timeout (3 s here) whatever the remaining timeout was.
+func TestPingRedisStopsAtTheTimeoutWhileTheTLSHandshakeHangs(t *testing.T) {
+	opts, err := redis.ParseURL("rediss://" + startSilentServer(t) + "/0?dial_timeout=3s")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	start := time.Now()
+	if err := pingRedis(opts, time.Second); err == nil {
+		t.Fatal("got no error from a server that never replies")
+	}
+	if took := time.Since(start); took > 1500*time.Millisecond {
+		t.Fatalf("took %s, want it to stop at the 1 s timeout", took)
+	}
+	if opts.Dialer != nil {
+		t.Fatal("pingRedis set a dialer on the options of the app's client")
+	}
+}
+
 // startRedisProxyAfter forwards addr to the Redis at target, but only starts listening after delay, like a Redis that
 // is still being rescheduled when the backend boots.
 func startRedisProxyAfter(t *testing.T, addr, target string, delay time.Duration) {
