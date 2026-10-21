@@ -54,6 +54,13 @@ jobs:
           # setup-go v6+ keys the module cache on go.mod by default; keep keying it on go.sum
           cache-dependency-path: go.sum
 
+      # disposable NATS with JetStream for the NATS integration tests; not a service container, as those cannot pass
+      # the server its -js flag
+      - name: Start NATS
+        run: |
+          docker run -d --name nats -p 4222:4222 nats:2.10-alpine -js
+          timeout 30 sh -c 'until nc -z 127.0.0.1 4222; do sleep 1; done'
+
       - name: Vet
         run: |
           go vet ./...
@@ -64,4 +71,5 @@ jobs:
         env:
           PENGUIN_TEST_POSTGRES_DSN: postgres://postgres:test@127.0.0.1:5432/postgres?sslmode=disable
           PENGUIN_TEST_REDIS_URL: redis://127.0.0.1:6379/0
+          PENGUIN_TEST_NATS_URL: nats://127.0.0.1:4222
         run: go test -race -count=1 $(go list ./... | grep -v '/backend-next/test$')
