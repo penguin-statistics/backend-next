@@ -11,9 +11,7 @@ import (
 
 func TestColdstoreSettings(t *testing.T) {
 	// the settings required without a default
-	for _, key := range []string{"DROP_REPORT_ARCHIVE_S3_BUCKET", "DROP_REPORT_ARCHIVE_S3_REGION", "AWS_ACCESS_KEY", "AWS_SECRET_KEY", "POSTGRES_DSN"} {
-		t.Setenv("PENGUIN_V3_"+key, "x")
-	}
+	t.Setenv("PENGUIN_V3_POSTGRES_DSN", "x")
 
 	var defaults ConfigSpec
 	if err := envconfig.Process("penguin_v3", &defaults); err != nil {
@@ -47,5 +45,33 @@ func TestColdstoreSettings(t *testing.T) {
 	}
 	if set.ColdstoreExtensionDirectory != "/tmp/ext" {
 		t.Errorf("ColdstoreExtensionDirectory = %q, want /tmp/ext", set.ColdstoreExtensionDirectory)
+	}
+}
+
+// The monthly archiving drops partitions: it must stay off unless turned on, and the old archiver's settings are no
+// longer required.
+func TestColdstoreArchiveSettings(t *testing.T) {
+	t.Setenv("PENGUIN_V3_POSTGRES_DSN", "x")
+	var defaults ConfigSpec
+	if err := envconfig.Process("penguin_v3", &defaults); err != nil {
+		t.Fatal(err)
+	}
+	if defaults.ColdstoreArchiveEnabled {
+		t.Error("ColdstoreArchiveEnabled is on by default")
+	}
+	if defaults.ColdstoreArchiveAfter != 60*24*time.Hour || defaults.ColdstoreS3Region != "ap-southeast-1" ||
+		defaults.ColdstoreS3Prefix != "coldstore/v1" || defaults.ColdstoreS3StorageClass != "STANDARD_IA" ||
+		defaults.ColdstoreArchiveMinFreeBytes != 10<<30 || defaults.ColdstoreArchiveDropDelay != 15*time.Minute {
+		t.Errorf("defaults: %+v", defaults)
+	}
+
+	t.Setenv("PENGUIN_V3_COLDSTORE_ARCHIVE_ENABLED", "true")
+	t.Setenv("PENGUIN_V3_COLDSTORE_S3_STORAGE_CLASS", "GLACIER_IR")
+	var set ConfigSpec
+	if err := envconfig.Process("penguin_v3", &set); err != nil {
+		t.Fatal(err)
+	}
+	if !set.ColdstoreArchiveEnabled || set.ColdstoreS3StorageClass != "GLACIER_IR" {
+		t.Errorf("set: enabled %v, storage class %q", set.ColdstoreArchiveEnabled, set.ColdstoreS3StorageClass)
 	}
 }

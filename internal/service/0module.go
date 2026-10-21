@@ -33,8 +33,6 @@ func Module() fx.Option {
 		NewDropPatternElement,
 		NewPatternMatrixElement,
 		NewExport,
-		NewDropReportExtra,
-		NewArchive,
 		NewSEOData,
 	))
 }
