@@ -55,6 +55,10 @@ func ensureStream(js nats.JetStreamContext, cfg *nats.StreamConfig) error {
 // went, reporting a subscription that did not drain in time or a final flush that failed only to the error handler, so
 // drainNATS returns the first error the connection reports from the start of the drain until it is closed: the closed
 // handler runs after the error handlers of every error reported before the close, in order.
+//
+// A connection lost during the drain bypasses the error handler: the client (v1.24.0) does not reconnect a draining
+// connection, but records the error as its last error and closes it. So once closed, a last error other than the one
+// the connection had when the drain started is returned too; an error of the connection from before the drain is not.
 func drainNATS(ctx context.Context, nc *nats.Conn) error {
 	var (
 		mu       sync.Mutex
@@ -74,14 +78,19 @@ func drainNATS(ctx context.Context, nc *nats.Conn) error {
 	closed := make(chan struct{})
 	nc.SetClosedHandler(func(*nats.Conn) { close(closed) })
 
+	before := nc.LastError()
 	if err := nc.Drain(); err != nil {
 		return err
 	}
 	select {
 	case <-closed:
 		mu.Lock()
-		defer mu.Unlock()
-		return errors.Wrap(drainErr, "failed to drain the NATS connection")
+		err := drainErr
+		mu.Unlock()
+		if last := nc.LastError(); err == nil && last != nil && !errors.Is(last, before) {
+			err = last
+		}
+		return errors.Wrap(err, "failed to drain the NATS connection")
 	case <-ctx.Done():
 		return ctx.Err()
 	}
