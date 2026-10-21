@@ -44,15 +44,33 @@ const shortMaxAge = time.Minute
 // catalog takes seconds, the matrices up to a few minutes
 const retryAfterCold = 120 * time.Second
 
-// isolationHeaders are the headers of the global helmet middleware that isolate a document from other origins: the
-// app loads images, scripts and fonts from other origins (CDN, S3, Crisp), which require-corp would block. The
-// frontend's own server sends none of them.
-var isolationHeaders = []string{
+// headersNotSentByFrontend are the headers of the global middlewares that the frontend's own server does not send
+// for these pages, removed so the pages behave as the app does elsewhere on the site:
+//   - helmet's isolation of a document from other origins: the app loads images, scripts and fonts from other
+//     origins (CDN, S3, Crisp), which require-corp would block;
+//   - helmet's X-Frame-Options, X-DNS-Prefetch-Control (the app preconnects to its CDN), X-Download-Options and
+//     X-Permitted-Cross-Domain-Policies;
+//   - the CORS headers, which vary by Origin (Access-Control-Allow-Credentials and the Origin echoed for
+//     allow-listed origins) on responses that are otherwise the same for everyone and cached publicly.
+var headersNotSentByFrontend = []string{
 	"Cross-Origin-Embedder-Policy",
 	"Cross-Origin-Opener-Policy",
 	"Cross-Origin-Resource-Policy",
 	"Origin-Agent-Cluster",
+	fiber.HeaderXFrameOptions,
+	fiber.HeaderXDNSPrefetchControl,
+	fiber.HeaderXDownloadOptions,
+	fiber.HeaderXPermittedCrossDomainPolicies,
+	fiber.HeaderAccessControlAllowOrigin,
+	fiber.HeaderAccessControlAllowCredentials,
+	fiber.HeaderAccessControlExposeHeaders,
+	fiber.HeaderVary,
 }
+
+// browserMaxAge caps the max-age of the pages with data in browsers: a page refers to the scripts of the frontend
+// release whose index.html it was made of, which a release removes. Shared caches keep them for the max-age of the
+// pages (s-maxage).
+const browserMaxAge = time.Minute
 
 // Register registers the stats pages if they are enabled, and keeps the frontend's index.html they are made of.
 // Disabled, or with a shell URL that cannot be fetched, the stats paths are still registered, to send their requests
@@ -189,7 +207,7 @@ func (r route) canonicalPath() string {
 
 // Serve serves a page. It never returns an error: the error handler of the app answers in JSON.
 func (h *Handler) Serve(c *fiber.Ctx) error {
-	for _, k := range isolationHeaders {
+	for _, k := range headersNotSentByFrontend {
 		c.Response().Header.Del(k)
 	}
 	// as requested, not unescaped (fiber's UnescapePath is off)
@@ -317,6 +335,17 @@ func (h *Handler) cacheFor(c *fiber.Ctx, d time.Duration) {
 	c.Set(fiber.HeaderCacheControl, "public, max-age="+strconv.Itoa(int(d.Seconds())))
 }
 
+// cachePage sets the caching of a page with data: browsers keep it for browserMaxAge at most, shared caches for the
+// max-age of the pages
+func (h *Handler) cachePage(c *fiber.Ctx) {
+	if h.maxAge <= browserMaxAge {
+		h.cacheFor(c, h.maxAge)
+		return
+	}
+	c.Set(fiber.HeaderCacheControl, "public, max-age="+strconv.Itoa(int(browserMaxAge.Seconds()))+
+		", s-maxage="+strconv.Itoa(int(h.maxAge.Seconds())))
+}
+
 func (h *Handler) shortMaxAge() time.Duration {
 	if h.maxAge < shortMaxAge {
 		return h.maxAge
@@ -379,7 +408,7 @@ func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, p *Page, html []byte
 		c.Set(fiber.HeaderCacheControl, "no-store")
 		c.Set(fiber.HeaderRetryAfter, strconv.Itoa(int(retryAfterCold.Seconds())))
 	case p.Status == fiber.StatusOK && p.Cacheable:
-		h.cacheFor(c, h.maxAge)
+		h.cachePage(c)
 	default:
 		h.cacheFor(c, h.shortMaxAge())
 	}

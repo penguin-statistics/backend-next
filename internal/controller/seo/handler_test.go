@@ -22,6 +22,7 @@ import (
 	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/model"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/pkg/spashell"
 	"exusiai.dev/backend-next/internal/service"
 )
@@ -129,13 +130,14 @@ type testEnv struct {
 	shells *fakeShells
 }
 
-// newTestEnv mounts the pages behind the helmet middleware of the service app (internal/server/httpserver)
+// newTestEnv mounts the pages behind the CORS and helmet middlewares of the service app (internal/server/httpserver)
 func newTestEnv(t testing.TB) *testEnv {
 	e := &testEnv{
 		data:   &fakeData{catalog: testCatalog(), matrices: testMatrices()},
 		shells: &fakeShells{shell: loadShell(t)},
 	}
 	e.app = fiber.New(fiber.Config{Immutable: true})
+	e.app.Use(middlewares.CORS([]string{"https://penguin-stats.io"}))
 	e.app.Use(helmet.New(helmet.Config{
 		HSTSMaxAge:         31356000,
 		HSTSPreloadEnabled: true,
@@ -230,7 +232,7 @@ func TestItemPage(t *testing.T) {
 	for k, want := range map[string]string{
 		"Content-Type":     "text/html; charset=utf-8",
 		"Content-Language": "zh",
-		"Cache-Control":    "public, max-age=300",
+		"Cache-Control":    "public, max-age=60, s-maxage=300",
 		"Last-Modified":    "Wed, 21 Oct 2026 10:30:00 GMT",
 		"X-Robots-Tag":     "",
 		// helmet's isolation would block the app's cross-origin images and scripts
@@ -238,6 +240,16 @@ func TestItemPage(t *testing.T) {
 		"Cross-Origin-Opener-Policy":   "",
 		"Cross-Origin-Resource-Policy": "",
 		"Origin-Agent-Cluster":         "",
+		// nor does the frontend send these
+		"X-Frame-Options":                   "",
+		"X-DNS-Prefetch-Control":            "",
+		"X-Download-Options":                "",
+		"X-Permitted-Cross-Domain-Policies": "",
+		"Access-Control-Allow-Origin":       "",
+		"Access-Control-Expose-Headers":     "",
+		"Vary":                              "",
+		// helmet's headers the frontend sends too, or harmless
+		"X-Content-Type-Options": "nosniff",
 	} {
 		if got := r.header.Get(k); got != want {
 			t.Errorf("%s: %q, want %q", k, got, want)
@@ -547,7 +559,7 @@ func TestRedirectsToCanonical(t *testing.T) {
 func TestListPages(t *testing.T) {
 	e := newTestEnv(t)
 	r := e.get(t, "/zh/result/cn/item")
-	if r.status != 200 || r.header.Get("Cache-Control") != "public, max-age=300" {
+	if r.status != 200 || r.header.Get("Cache-Control") != "public, max-age=60, s-maxage=300" {
 		t.Fatalf("item list: %d %q", r.status, r.header.Get("Cache-Control"))
 	}
 	// the items with drops on the server, by category
@@ -582,7 +594,7 @@ func TestListPages(t *testing.T) {
 func TestListPagesAreRenderedOncePerData(t *testing.T) {
 	e := newTestEnv(t)
 	first := e.get(t, "/en/result/cn/item")
-	if again := e.get(t, "/en/result/cn/item"); again.body != first.body || again.header.Get("Cache-Control") != "public, max-age=300" {
+	if again := e.get(t, "/en/result/cn/item"); again.body != first.body || again.header.Get("Cache-Control") != "public, max-age=60, s-maxage=300" {
 		t.Error("the list page changed without the data changing")
 	}
 	if !strings.Contains(first.body, "/en/result/cn/item/evil") {
@@ -697,6 +709,8 @@ func TestSameHTMLForEveryone(t *testing.T) {
 		{},
 		{"User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", "Accept-Language": "ja"},
 		{"User-Agent": "Mozilla/5.0 (iPhone)", "Accept-Language": "ko-KR", "Cookie": "a=b"},
+		// an allow-listed origin got its own CORS headers
+		{"Origin": "https://penguin-stats.io"},
 	} {
 		req := httptest.NewRequest(fiber.MethodGet, "/en/result/cn/item/30012", nil)
 		for k, v := range h {
@@ -713,8 +727,10 @@ func TestSameHTMLForEveryone(t *testing.T) {
 		} else if !bytes.Equal(first, b) {
 			t.Errorf("different HTML for %v", h)
 		}
-		if v := resp.Header.Get("Vary"); v != "" {
-			t.Errorf("Vary %q", v)
+		for _, k := range []string{"Vary", "Access-Control-Allow-Origin", "Access-Control-Allow-Credentials"} {
+			if v := resp.Header.Get(k); v != "" {
+				t.Errorf("%s %q for %v", k, v, h)
+			}
 		}
 	}
 }
