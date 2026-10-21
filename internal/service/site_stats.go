@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"exusiai.dev/gommon/constant"
@@ -23,6 +24,11 @@ type SiteStats struct {
 	ItemService              *Item
 
 	baseGenerations siteStatsBaseGenerations
+
+	// refreshLocks holds a *sync.Mutex per server, so that the refreshes of a server (the worker's and the admin
+	// endpoint's) run one at a time: one that read older matrix elements cannot cache its stats over those of a
+	// refresh that read newer ones
+	refreshLocks sync.Map
 }
 
 func NewSiteStats(
@@ -57,16 +63,26 @@ func (s *SiteStats) GetShimSiteStats(ctx context.Context, server string) (*model
 
 // RefreshShimSiteStats recalculates the site stats of server and replaces the cached ones. Requests keep getting the
 // previous ones in the meantime instead of waiting for a recalculation. If the recalculation fails, the cached ones
-// are dropped.
+// are dropped, also if it panics. The refreshes of a server run one at a time.
 func (s *SiteStats) RefreshShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
+	mu, _ := s.refreshLocks.LoadOrStore(server, &sync.Mutex{})
+	mu.(*sync.Mutex).Lock()
+	defer mu.(*sync.Mutex).Unlock()
+
+	refreshed := false
+	defer func() {
+		if !refreshed {
+			cache.ShimSiteStats.Delete(server)
+		}
+	}()
 	results, err := s.calcShimSiteStats(ctx, server)
 	if err != nil {
-		cache.ShimSiteStats.Delete(server)
 		return nil, err
 	}
 	cache.SetLastModifiedTime("[shimSiteStats#server:"+server+"]", *results, func() {
 		cache.ShimSiteStats.Set(server, *results, 24*time.Hour)
 	})
+	refreshed = true
 	return results, nil
 }
 

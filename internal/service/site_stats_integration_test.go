@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -356,4 +357,95 @@ func TestShimSiteStatsCache(t *testing.T) {
 	if err := cache.ShimSiteStats.Get("US", &stats); err != nil || stats.TotalSanityCost != -1 {
 		t.Errorf("a failed refresh of CN dropped the stats of another server: %v", err)
 	}
+}
+
+type pauseQueriesKey struct{}
+
+// pauseQueriesHook holds the queries of a context marked with pauseQueriesKey that read table, after they ran, until
+// release is closed; paused is closed when the first one is held.
+type pauseQueriesHook struct {
+	table   string
+	once    sync.Once
+	paused  chan struct{}
+	release chan struct{}
+}
+
+func (h *pauseQueriesHook) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	return ctx
+}
+
+func (h *pauseQueriesHook) AfterQuery(ctx context.Context, event *bun.QueryEvent) {
+	if ctx.Value(pauseQueriesKey{}) == nil || !strings.Contains(event.Query, h.table) {
+		return
+	}
+	h.once.Do(func() { close(h.paused) })
+	<-h.release
+}
+
+func TestShimSiteStatsOverlappingRefreshes(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+	flushCaches(t)
+	now := time.Date(2026, 10, 19, 14, 0, 0, 0, time.UTC)
+	util.Now = func() time.Time { return now }
+	t.Cleanup(func() { util.Now = time.Now })
+	today := make(map[string]int)
+	for _, server := range testServers {
+		today[server] = util.GetDayNum(&now, server)
+	}
+	seedSiteStatsData(t, rand.New(rand.NewSource(1)), db, today, []int{-3, -1, 0})
+	hook := &pauseQueriesHook{table: "drop_matrix_elements", paused: make(chan struct{}), release: make(chan struct{})}
+	db.AddQueryHook(hook)
+	s := &SiteStats{
+		DropReportService:        NewDropReport(repo.NewDropReport(db)),
+		DropMatrixElementService: NewDropMatrixElement(repo.NewDropMatrixElement(db)),
+		StageService:             NewStage(repo.NewStage(db)),
+		ItemService:              NewItem(repo.NewItem(db)),
+		baseGenerations:          &memorySiteStatsBaseGenerations{},
+	}
+
+	// refresh A reads the matrix elements, then a batch rewrites today's and refresh B starts: A must not cache its
+	// stats over B's
+	refreshedA := make(chan error, 1)
+	go func() {
+		_, err := s.RefreshShimSiteStats(context.WithValue(ctx, pauseQueriesKey{}, true), "CN")
+		refreshedA <- err
+	}()
+	select {
+	case <-hook.paused:
+	case <-time.After(10 * time.Second):
+		close(hook.release)
+		t.Fatal("refresh A never read the matrix elements")
+	}
+	mustExec(t, db, "UPDATE drop_matrix_elements SET times = times * 2, quantity = quantity * 2 WHERE server = ? AND day_num = ?", "CN", today["CN"])
+	want := legacySiteStatsLines(t, db, "CN")
+	refreshedB := make(chan error, 1)
+	go func() {
+		_, err := s.RefreshShimSiteStats(ctx, "CN")
+		refreshedB <- err
+	}()
+	// B runs after A: give B the time to finish first if it does not wait for A
+	bDone := false
+	select {
+	case err := <-refreshedB:
+		bDone = true
+		if err != nil {
+			t.Error(err)
+		}
+	case <-time.After(500 * time.Millisecond):
+	}
+	close(hook.release)
+	if err := <-refreshedA; err != nil {
+		t.Fatal(err)
+	}
+	if !bDone {
+		if err := <-refreshedB; err != nil {
+			t.Fatal(err)
+		}
+	}
+	var cached modelv2.SiteStats
+	if err := cache.ShimSiteStats.Get("CN", &cached); err != nil {
+		t.Fatal(err)
+	}
+	assertSameLines(t, "cached after overlapping refreshes", want, siteStatsLines(&cached))
 }
