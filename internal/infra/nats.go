@@ -1,11 +1,13 @@
 package infra
 
 import (
+	"context"
 	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"go.uber.org/fx"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
 )
@@ -32,7 +34,23 @@ func ensureStream(js nats.JetStreamContext, cfg *nats.StreamConfig) error {
 	return err
 }
 
-func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
+// drainNATS drains the connection, delivering what its subscriptions hold and flushing what it publishes, and waits
+// until it is closed or ctx ends.
+func drainNATS(ctx context.Context, nc *nats.Conn) error {
+	if err := nc.Drain(); err != nil {
+		return err
+	}
+	for !nc.IsClosed() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	return nil
+}
+
+func NATS(lc fx.Lifecycle, conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
 	nc, err := nats.Connect(conf.NatsURL,
 		nats.PingInterval(time.Second*20),
 		// keep reconnecting however long NATS is down: by default the client gives up after 60 attempts (about 2
@@ -70,6 +88,14 @@ func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
 		log.Error().Err(err).Msg("infra: nats: failed to create or update jetstream stream")
 		return nil, nil, err
 	}
+
+	// Stop hooks run in the reverse order of their registration, so the report workers, which need the connection,
+	// are stopped before it is drained. They bind to their durable, so draining their subscriptions keeps it.
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			return drainNATS(ctx, nc)
+		},
+	})
 
 	return nc, js, nil
 }
