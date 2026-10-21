@@ -208,3 +208,52 @@ func BenchmarkSetGet(b *testing.B) {
 		}
 	}
 }
+
+// MutexGetSetPublishing caches a calculated value through publish, which learns whether it is the value returned
+func TestMutexGetSetPublishing(t *testing.T) {
+	tests := []struct {
+		name string
+		// meanwhile happens during the calculation of 1
+		meanwhile    func(c *Set[int])
+		want         int
+		wantReturned bool
+		wantCached   bool
+	}{
+		{"published", func(c *Set[int]) {}, 1, true, true},
+		// the worker's refresh is returned instead
+		{"written meanwhile", func(c *Set[int]) { c.Set("key", 2, time.Minute) }, 2, false, true},
+		// the calculation is returned, but not cached
+		{"deleted meanwhile", func(c *Set[int]) { _ = c.Delete("key") }, 1, true, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewSet[int]("test")
+			var (
+				v         int
+				published []int
+				returned  bool
+			)
+			calculated, err := c.MutexGetSetPublishing("key", &v, func() (*int, error) {
+				tt.meanwhile(c)
+				one := 1
+				return &one, nil
+			}, time.Minute, func(value *int, cacheValue func() bool) {
+				published = append(published, *value)
+				returned = cacheValue()
+			})
+			if err != nil || !calculated {
+				t.Fatalf("calculated %v, %v", calculated, err)
+			}
+			if v != tt.want || returned != tt.wantReturned {
+				t.Errorf("got %d, cacheValue reported %v; want %d, %v", v, returned, tt.want, tt.wantReturned)
+			}
+			if len(published) != 1 || published[0] != 1 {
+				t.Errorf("published %v, want the calculation [1]", published)
+			}
+			var cached int
+			if err := c.Get("key", &cached); (err == nil) != tt.wantCached || (tt.wantCached && cached != tt.want) {
+				t.Errorf("cached %d (%v)", cached, err)
+			}
+		})
+	}
+}

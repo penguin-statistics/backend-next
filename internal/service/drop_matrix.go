@@ -81,11 +81,9 @@ func (s *DropMatrix) GetShimDropMatrix(
 	var results modelv2.DropMatrixQueryResult
 	if !accountId.Valid && stageFilterStr == "" && itemFilterStr == "" {
 		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones) + constant.CacheSep + sourceCategory
-		calculated, err := cache.ShimGlobalDropMatrix.MutexGetSet(key, &results, valueFunc, 24*time.Hour)
-		if err != nil {
+		publish := cache.PublishingLastModifiedTime[modelv2.DropMatrixQueryResult]("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:" + key + "]")
+		if _, err := cache.ShimGlobalDropMatrix.MutexGetSetPublishing(key, &results, valueFunc, 24*time.Hour, publish); err != nil {
 			return nil, err
-		} else if calculated {
-			cache.SetLastModifiedTime("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", results, nil)
 		}
 	} else {
 		return valueFunc()

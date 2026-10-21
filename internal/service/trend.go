@@ -58,11 +58,9 @@ func (s *Trend) GetShimTrend(ctx context.Context, server string) (*modelv2.Trend
 
 	var shimResult modelv2.TrendQueryResult
 	key := server
-	calculated, err := cache.ShimTrend.MutexGetSet(key, &shimResult, valueFunc, 24*time.Hour)
-	if err != nil {
+	publish := cache.PublishingLastModifiedTime[modelv2.TrendQueryResult]("[shimTrend#server:" + key + "]")
+	if _, err := cache.ShimTrend.MutexGetSetPublishing(key, &shimResult, valueFunc, 24*time.Hour, publish); err != nil {
 		return nil, err
-	} else if calculated {
-		cache.SetLastModifiedTime("[shimTrend#server:"+key+"]", shimResult, nil)
 	}
 	return &shimResult, nil
 }
