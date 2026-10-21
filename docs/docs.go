@@ -905,7 +905,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid or missing zoneId. Notice that this shall be the **string ID** of the zone, instead of the v3 API internally used numerical ID of the zone.",
+                        "description": "Invalid or missing zoneId. Notice that this shall be the **string ID** of the zone, instead of the internally used numerical ID of the zone.",
                         "schema": {
                             "$ref": "#/definitions/pgerr.PenguinError"
                         }

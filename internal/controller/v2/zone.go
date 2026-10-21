@@ -50,7 +50,7 @@ func (c *Zone) GetZones(ctx *fiber.Ctx) error {
 //	@Produce	json
 //	@Param		zoneId	path		int	true	"Zone ID"
 //	@Success	200		{object}	modelv2.Zone{existence=model.Existence,zoneName_i18n=model.I18nString}
-//	@Failure	400		{object}	pgerr.PenguinError	"Invalid or missing zoneId. Notice that this shall be the **string ID** of the zone, instead of the v3 API internally used numerical ID of the zone."
+//	@Failure	400		{object}	pgerr.PenguinError	"Invalid or missing zoneId. Notice that this shall be the **string ID** of the zone, instead of the internally used numerical ID of the zone."
 //	@Failure	500		{object}	pgerr.PenguinError	"An unexpected error occurred"
 //	@Router		/PenguinStats/api/v2/zones/{zoneId} [GET]
 func (c *Zone) GetZoneByArkId(ctx *fiber.Ctx) error {
