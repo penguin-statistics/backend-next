@@ -7,7 +7,7 @@ type ReportTaskSingleReport struct {
 	Times int     `json:"times"`
 
 	// Metadata is optional
-	Metadata *ReportRequestMetadata `json:"metadata" validate:"dive"`
+	Metadata *ReportRequestMetadata `json:"metadata"`
 }
 
 type ReportTask struct {
