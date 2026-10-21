@@ -58,9 +58,12 @@ func (s *Trend) GetShimTrend(ctx context.Context, server string) (*modelv2.Trend
 }
 
 // RefreshShimTrend recalculates the trend of server from the drop matrix elements and replaces the cached one.
-// Requests keep getting the previous one in the meantime instead of waiting for a recalculation. If the
-// recalculation fails, the cached one is dropped, also if it panics (the worker recovers the panic). The trend is
-// cached while its last modified time is recorded, as a request's calculation is (see cache.SetLastModifiedTime).
+// Requests keep getting the previous one in the meantime instead of waiting for a recalculation, unless the cache is
+// cold: then they wait for the refresh, see cache.Set.Refresh. The trend is not cached if it was dropped or replaced
+// meanwhile (e.g. purged after an admin recalculation of the elements): it may have been calculated from the elements
+// before. If the recalculation fails, the cached one is dropped, also if it panics (the worker recovers the panic).
+// The trend is cached while its last modified time is recorded, as a request's calculation is (see
+// cache.SetLastModifiedTime).
 func (s *Trend) RefreshShimTrend(ctx context.Context, server string) error {
 	refreshed := false
 	defer func() {
@@ -68,13 +71,13 @@ func (s *Trend) RefreshShimTrend(ctx context.Context, server string) error {
 			cache.ShimTrend.Delete(server)
 		}
 	}()
-	shimResult, err := s.calcShimTrend(ctx, server)
-	if err != nil {
+	valueFunc := func() (*modelv2.TrendQueryResult, error) {
+		return s.calcShimTrend(ctx, server)
+	}
+	publish := cache.PublishingLastModifiedTime[modelv2.TrendQueryResult]("[shimTrend#server:" + server + "]")
+	if _, err := cache.ShimTrend.Refresh(server, valueFunc, 24*time.Hour, publish); err != nil {
 		return err
 	}
-	cache.SetLastModifiedTime("[shimTrend#server:"+server+"]", *shimResult, func() {
-		cache.ShimTrend.Set(server, *shimResult, 24*time.Hour)
-	})
 	refreshed = true
 	return nil
 }

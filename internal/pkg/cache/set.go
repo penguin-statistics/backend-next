@@ -193,6 +193,54 @@ func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, erro
 	return nil
 }
 
+// Refresh recalculates the value of key with valueFunc and caches it through publish (as MutexGetSetPublishing does),
+// replacing the cached value, which Get keeps returning meanwhile. It holds the key's lock, so it and a MutexGetSet
+// calculating the key run one after the other: one never caches over the other a value calculated from older data.
+// As MutexGetSet, it does not cache the value if the key was written, deleted or flushed meanwhile (e.g. purged after
+// a recalculation of its data): the value may then be older than the data or the value written, and the key keeps
+// what it was written, and is calculated on the next request if it was deleted. It reports whether it cached the
+// value; publish is told whether through cacheValue, which it must call.
+func (c *Set[T]) Refresh(key string, valueFunc func() (*T, error), expire time.Duration, publish func(value *T, cacheValue func() bool)) (bool, error) {
+	defer c.lockKey(key)()
+	k := c.key(key)
+	// the key's lock makes this the only calculation of the key
+	c.writeMu.Lock()
+	c.calculating[k] = false
+	c.writeMu.Unlock()
+
+	var called, cached bool
+	defer func() { // also if valueFunc panics
+		c.writeMu.Lock()
+		defer c.writeMu.Unlock()
+		if !called {
+			delete(c.calculating, k)
+		}
+	}()
+	value, err := valueFunc()
+	if err != nil {
+		return false, err
+	}
+
+	cacheValue := func() bool {
+		c.writeMu.Lock()
+		defer c.writeMu.Unlock()
+		if called {
+			return cached
+		}
+		called = true
+		cached = !c.calculating[k]
+		delete(c.calculating, k)
+		if cached {
+			c.c.Set(k, *value, expire)
+		}
+		return cached
+	}
+	if publish != nil {
+		publish(value, cacheValue)
+	}
+	return cacheValue(), nil
+}
+
 func (c *Set[T]) Delete(key string) error {
 	key = c.key(key)
 	if l := log.Trace(); l.Enabled() {
