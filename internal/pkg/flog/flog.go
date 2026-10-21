@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"exusiai.dev/backend-next/internal/pkg/pgid"
 	"exusiai.dev/backend-next/internal/util"
 )
 
@@ -68,14 +69,13 @@ func RequestHandler(fieldKey string) func(ctx *fiber.Ctx) error {
 	}
 }
 
-// RemoteAddrHandler adds the request's remote network as a field to the context's logger
-// using fieldKey as field key. Only the /24 (IPv4) or /48 (IPv6) network of the client
-// address is logged, see util.TruncateIP.
+// RemoteAddrHandler adds the request's remote address as a field to the context's logger
+// using fieldKey as field key.
 func RemoteAddrHandler(fieldKey string) func(ctx *fiber.Ctx) error {
 	return func(ctx *fiber.Ctx) error {
 		log := zerolog.Ctx(ctx.UserContext())
 		log.UpdateContext(func(c zerolog.Context) zerolog.Context {
-			return c.Str(fieldKey, util.TruncateIP(util.ExtractIP(ctx)))
+			return c.Str(fieldKey, util.ExtractIP(ctx))
 		})
 		return ctx.Next()
 	}
@@ -223,4 +223,14 @@ func FatalFrom(ctx *fiber.Ctx, name string) *zerolog.Event {
 
 func PanicFrom(ctx *fiber.Ctx, name string) *zerolog.Event {
 	return FromFiberCtx(ctx).Panic().Str("evt.name", name)
+}
+
+// PenguinIDHandler adds the request's penguin id as a field to the context's logger
+func PenguinIDHandler(fieldKey string) func(ctx *fiber.Ctx) error {
+	return func(ctx *fiber.Ctx) error {
+		UpdateContext(ctx, func(c zerolog.Context) zerolog.Context {
+			return c.Str(fieldKey, pgid.Extract(ctx))
+		})
+		return ctx.Next()
+	}
 }

@@ -190,14 +190,14 @@ func TestRequestLogLevel(t *testing.T) {
 	}
 }
 
-func TestRequestLoggerTruncatesClientIP(t *testing.T) {
+func TestRequestLoggerLogsClientIP(t *testing.T) {
 	tests := []struct {
 		forwardedFor string
 		want         string
 	}{
-		{"203.0.113.77", "203.0.113.0"},
-		{"203.0.113.77, 10.0.0.1", "203.0.113.0"},
-		{"2001:db8:1234:5678::1", "2001:db8:1234::"},
+		{"203.0.113.77", "203.0.113.77"},
+		{"203.0.113.77, 10.0.0.1", "203.0.113.77"},
+		{"2001:db8:1234:5678::1", "2001:db8:1234:5678::1"},
 	}
 	for _, tt := range tests {
 		var buf bytes.Buffer
@@ -215,7 +215,7 @@ func TestRequestLoggerTruncatesClientIP(t *testing.T) {
 	}
 }
 
-func TestRequestLoggerLogsAccountIDNotPenguinID(t *testing.T) {
+func TestRequestLoggerLogsPenguinIDAndAccountID(t *testing.T) {
 	const penguinId = "87654321"
 
 	var buf bytes.Buffer
@@ -228,8 +228,8 @@ func TestRequestLoggerLogsAccountIDNotPenguinID(t *testing.T) {
 	})
 
 	tests := []struct {
-		path string
-		want any
+		path      string
+		accountId any
 	}{
 		{"/anonymous", nil},
 		{"/account", "4242"},
@@ -242,11 +242,12 @@ func TestRequestLoggerLogsAccountIDNotPenguinID(t *testing.T) {
 		if _, err := app.Test(req); err != nil {
 			t.Fatal(err)
 		}
-		if got := requestLog(t, &buf)["usr.id"]; got != tt.want {
-			t.Errorf("%s: logged usr.id = %v, want %v", tt.path, got, tt.want)
+		entry := requestLog(t, &buf)
+		if got := entry["usr.id"]; got != penguinId {
+			t.Errorf("%s: logged usr.id = %v, want the PenguinID %s", tt.path, got, penguinId)
 		}
-		if strings.Contains(buf.String(), penguinId) {
-			t.Errorf("%s: PenguinID logged: %s", tt.path, buf.String())
+		if got := entry["usr.account_id"]; got != tt.accountId {
+			t.Errorf("%s: logged usr.account_id = %v, want %v", tt.path, got, tt.accountId)
 		}
 	}
 }
