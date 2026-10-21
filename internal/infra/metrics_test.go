@@ -3,14 +3,17 @@ package infra
 import (
 	"context"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/redis/go-redis/v9"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/pkg/observability"
 )
 
 // useTestRegistry makes the constructors register their metrics on a registry of the test's own.
@@ -140,5 +143,89 @@ penguinbackend_redis_pool_total_conns 4
 `
 	if err := testutil.CollectAndCompare(c, strings.NewReader(want)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+type fakeNatsConn struct {
+	status nats.Status
+	stats  nats.Statistics
+}
+
+func (f *fakeNatsConn) Status() nats.Status    { return f.status }
+func (f *fakeNatsConn) Stats() nats.Statistics { return f.stats }
+
+// natsConnMetrics is the expected exposition of the NATS connection collector.
+func natsConnMetrics(state string, reconnects int) string {
+	var b strings.Builder
+	b.WriteString("# HELP penguinbackend_nats_connection_state 1 for the current state of the NATS connection, 0 for the other states\n")
+	b.WriteString("# TYPE penguinbackend_nats_connection_state gauge\n")
+	for _, s := range []string{"closed", "connected", "connecting", "disconnected", "draining_pubs", "draining_subs", "reconnecting"} {
+		v := "0"
+		if s == state {
+			v = "1"
+		}
+		b.WriteString(`penguinbackend_nats_connection_state{state="` + s + `"} ` + v + "\n")
+	}
+	b.WriteString("# HELP penguinbackend_nats_reconnects_total Number of NATS reconnect attempts that reached the server\n")
+	b.WriteString("# TYPE penguinbackend_nats_reconnects_total counter\n")
+	b.WriteString("penguinbackend_nats_reconnects_total " + strconv.Itoa(reconnects) + "\n")
+	return b.String()
+}
+
+func TestNatsConnCollector(t *testing.T) {
+	conn := &fakeNatsConn{status: nats.CONNECTED}
+	c := newNatsConnCollector(conn)
+
+	if err := testutil.CollectAndCompare(c, strings.NewReader(natsConnMetrics("connected", 0))); err != nil {
+		t.Fatal(err)
+	}
+
+	conn.status = nats.RECONNECTING
+	if err := testutil.CollectAndCompare(c, strings.NewReader(natsConnMetrics("reconnecting", 0))); err != nil {
+		t.Fatal(err)
+	}
+
+	conn.status = nats.CONNECTED
+	conn.stats.Reconnects = 1
+	if err := testutil.CollectAndCompare(c, strings.NewReader(natsConnMetrics("connected", 1))); err != nil {
+		t.Fatal(err)
+	}
+
+	conn.status = nats.CLOSED
+	if err := testutil.CollectAndCompare(c, strings.NewReader(natsConnMetrics("closed", 1))); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestNatsConnectMetrics needs PENGUIN_TEST_NATS_URL, a disposable NATS server. It only connects: NATS() itself
+// is not called, as it creates the penguin-reports stream.
+func TestNatsConnectMetrics(t *testing.T) {
+	url := os.Getenv("PENGUIN_TEST_NATS_URL")
+	if url == "" {
+		t.Skip("PENGUIN_TEST_NATS_URL is not set")
+	}
+	reg := useTestRegistry(t)
+
+	nc, err := natsConnect(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nc.Close()
+
+	names := []string{"penguinbackend_nats_connection_state", "penguinbackend_nats_reconnects_total"}
+	if err := testutil.GatherAndCompare(reg, strings.NewReader(natsConnMetrics("connected", 0)), names...); err != nil {
+		t.Fatal(err)
+	}
+	nc.Close()
+	if err := testutil.GatherAndCompare(reg, strings.NewReader(natsConnMetrics("closed", 0)), names...); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestNatsErrorHandlerCountsErrors(t *testing.T) {
+	before := testutil.ToFloat64(observability.NatsAsyncErrors)
+	natsErrorHandler(nil, &nats.Subscription{Subject: "REPORT.test"}, nats.ErrSlowConsumer)
+	if v := testutil.ToFloat64(observability.NatsAsyncErrors); v != before+1 {
+		t.Fatalf("async errors = %v, want %v", v, before+1)
 	}
 }

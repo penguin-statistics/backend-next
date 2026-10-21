@@ -1,6 +1,9 @@
 package infra
 
 import (
+	"strings"
+
+	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
@@ -63,4 +66,56 @@ func (c *redisPoolCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(c.totalConns, prometheus.GaugeValue, float64(s.TotalConns))
 	ch <- prometheus.MustNewConstMetric(c.idleConns, prometheus.GaugeValue, float64(s.IdleConns))
 	ch <- prometheus.MustNewConstMetric(c.staleConns, prometheus.CounterValue, float64(s.StaleConns))
+}
+
+// natsConnStater is implemented by *nats.Conn.
+type natsConnStater interface {
+	Status() nats.Status
+	Stats() nats.Statistics
+}
+
+// natsStatuses is the fixed set of values of the state label.
+var natsStatuses = []nats.Status{
+	nats.DISCONNECTED,
+	nats.CONNECTED,
+	nats.CLOSED,
+	nats.RECONNECTING,
+	nats.CONNECTING,
+	nats.DRAINING_SUBS,
+	nats.DRAINING_PUBS,
+}
+
+// natsConnCollector exports the state of a NATS connection on every scrape.
+type natsConnCollector struct {
+	conn natsConnStater
+
+	state, reconnects *prometheus.Desc
+}
+
+func newNatsConnCollector(conn natsConnStater) *natsConnCollector {
+	return &natsConnCollector{
+		conn: conn,
+		state: prometheus.NewDesc(prometheus.BuildFQName(observability.ServiceName, "nats", "connection_state"),
+			"1 for the current state of the NATS connection, 0 for the other states", []string{"state"}, nil),
+		reconnects: prometheus.NewDesc(prometheus.BuildFQName(observability.ServiceName, "nats", "reconnects_total"),
+			// nats.go counts a reconnect once the server accepts the connection, before the handshake, so a
+			// failing handshake counts on every retry: connection_state tells whether it recovered
+			"Number of NATS reconnect attempts that reached the server", nil, nil),
+	}
+}
+
+func (c *natsConnCollector) Describe(ch chan<- *prometheus.Desc) {
+	prometheus.DescribeByCollect(c, ch)
+}
+
+func (c *natsConnCollector) Collect(ch chan<- prometheus.Metric) {
+	current := c.conn.Status()
+	for _, status := range natsStatuses {
+		v := 0.0
+		if status == current {
+			v = 1
+		}
+		ch <- prometheus.MustNewConstMetric(c.state, prometheus.GaugeValue, v, strings.ToLower(status.String()))
+	}
+	ch <- prometheus.MustNewConstMetric(c.reconnects, prometheus.CounterValue, float64(c.conn.Stats().Reconnects))
 }

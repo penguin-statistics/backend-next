@@ -33,4 +33,8 @@ var (
 		Name: prometheus.BuildFQName(ServiceName, "worker", "calc_duration_seconds"),
 		Help: "Duration of last worker calculation in seconds",
 	}, []string{"service", "server"})
+	NatsAsyncErrors = promauto.NewCounter(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "nats", "async_errors_total"),
+		Help: "Number of asynchronous errors reported by the NATS connection",
+	})
 )
