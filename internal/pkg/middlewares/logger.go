@@ -28,8 +28,17 @@ func injectLogger() func(ctx *fiber.Ctx) error {
 
 func requestLogger() func(ctx *fiber.Ctx) error {
 	return flog.AccessHandler(func(ctx *fiber.Ctx, duration time.Duration) {
+		// the last matched route, never the raw URL, so that it stays bounded and can
+		// be grouped on. It is the handler's template (e.g.
+		// /stages/:stageId) unless a group or app middleware answered without calling
+		// Next: then it is that middleware's prefix, e.g. /PenguinStats/api/v2/result
+		// for a cache hit or limiter rejection there, or / or a group prefix for a path
+		// no route matches.
+		route := ctx.Route().Path
+
 		flog.InfoFrom(ctx, "http.request").
 			Bytes("http.useragent", ctx.Request().Header.UserAgent()).
+			Str("http.route", route).
 			Int("http.status_code", ctx.Response().StatusCode()).
 			Int("network.bytes_read", len(ctx.Request().Body())).
 			Int("network.bytes_written", len(ctx.Response().Body())).
