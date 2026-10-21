@@ -25,47 +25,15 @@ type SiteStats struct {
 
 	baseGenerations siteStatsBaseGenerations
 
-	// publications holds a *siteStatsPublication per server
-	publications sync.Map
+	// calcLocks holds a *sync.Mutex per server, held while calculating its site stats (by a refresh or a request on a
+	// cold cache) and, by a refresh, while caching them: the calculations of a server thus read the matrix elements
+	// one after another, and one that read older ones cannot cache its stats over those of one that read newer ones
+	calcLocks sync.Map
 }
 
-// siteStatsPublication orders the caching of the site stats of a server. Its calculations (the refreshes of the
-// worker and the admin endpoint, and that of requests on a cold cache) run concurrently, and one is cached only if no
-// calculation that started after it has been cached already: stats calculated from older matrix elements thus never
-// replace stats calculated from newer ones.
-type siteStatsPublication struct {
-	mu sync.Mutex
-	// started numbers the calculations in the order they start; published is the number of the latest-started one
-	// cached
-	started, published uint64
-}
-
-func (s *SiteStats) publication(server string) *siteStatsPublication {
-	p, _ := s.publications.LoadOrStore(server, &siteStatsPublication{})
-	return p.(*siteStatsPublication)
-}
-
-// start numbers a calculation, which must read nothing before.
-func (p *siteStatsPublication) start() uint64 {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.started++
-	return p.started
-}
-
-// publish caches the stats of calculation seq by calling cacheValue, unless a calculation started after seq has been
-// cached. cacheValue reports whether it cached them, or found no newer ones cached either (a calculation that started
-// before seq then skips publication too). cacheValue may take the lock of the last modified times and that of the
-// cache, never the other way around.
-func (p *siteStatsPublication) publish(seq uint64, cacheValue func() bool) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if seq < p.published {
-		return
-	}
-	if cacheValue() {
-		p.published = seq
-	}
+func (s *SiteStats) calcLock(server string) *sync.Mutex {
+	mu, _ := s.calcLocks.LoadOrStore(server, &sync.Mutex{})
+	return mu.(*sync.Mutex)
 }
 
 func NewSiteStats(
@@ -85,56 +53,52 @@ func NewSiteStats(
 }
 
 // Cache: shimSiteStats#server:{server}, 24hrs, records last modified time
+//
+// A request on a cold cache calculates under the calculation lock, after any refresh in progress, and caches its stats
+// after releasing it: should a refresh then calculate and cache newer stats first, MutexGetSet notices the write and
+// does not cache the request's. The calculation lock is taken while holding the cache's key lock, which refreshes
+// never take, and released before caching, so that no lock cycle with the cache's own locks exists.
 func (s *SiteStats) GetShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
-	p := s.publication(server)
-	var seq uint64
 	valueFunc := func() (*modelv2.SiteStats, error) {
-		seq = p.start()
+		mu := s.calcLock(server)
+		mu.Lock()
+		defer mu.Unlock()
+		// a refresh this waited for has cached its stats: MutexGetSet returns them instead of this calculation's
+		var cached modelv2.SiteStats
+		if err := cache.ShimSiteStats.Get(server, &cached); err == nil {
+			return &cached, nil
+		}
 		return s.calcShimSiteStats(ctx, server)
-	}
-	// the stats a request calculates are cached through p too, so that a refresh that started before them does not
-	// replace them. Should p skip them, MutexGetSet does not cache them either when it calls cacheValue itself: the
-	// refresh that started after seq and was cached wrote the key after valueFunc was called, which MutexGetSet notices.
-	lastModified := cache.PublishingLastModifiedTime[modelv2.SiteStats]("[shimSiteStats#server:" + server + "]")
-	publish := func(value *modelv2.SiteStats, cacheValue func() bool) {
-		p.publish(seq, func() (cached bool) {
-			lastModified(value, func() bool {
-				cached = cacheValue()
-				return cached
-			})
-			return cached
-		})
 	}
 
 	var results modelv2.SiteStats
+	publish := cache.PublishingLastModifiedTime[modelv2.SiteStats]("[shimSiteStats#server:" + server + "]")
 	if _, err := cache.ShimSiteStats.MutexGetSetPublishing(server, &results, valueFunc, 24*time.Hour, publish); err != nil {
 		return nil, err
 	}
 	return &results, nil
 }
 
-// RefreshShimSiteStats recalculates the site stats of server and replaces the cached ones, unless a calculation that
-// started later (another refresh, or that of a request on a cold cache) has cached its stats already; it returns the
-// stats it calculated. Requests keep getting the previous ones in the meantime instead of waiting for a
-// recalculation. If the recalculation fails, the cached ones are dropped, also if it panics.
+// RefreshShimSiteStats recalculates the site stats of server and replaces the cached ones. Requests keep getting the
+// previous ones in the meantime instead of waiting for a recalculation, unless the cache is cold. If the
+// recalculation fails, the cached ones are dropped, also if it panics.
 func (s *SiteStats) RefreshShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
+	mu := s.calcLock(server)
+	mu.Lock()
+	defer mu.Unlock()
+
 	refreshed := false
 	defer func() {
 		if !refreshed {
 			cache.ShimSiteStats.Delete(server)
 		}
 	}()
-	p := s.publication(server)
-	seq := p.start()
 	results, err := s.calcShimSiteStats(ctx, server)
 	if err != nil {
 		return nil, err
 	}
-	p.publish(seq, func() bool {
-		cache.SetLastModifiedTime("[shimSiteStats#server:"+server+"]", *results, func() {
-			cache.ShimSiteStats.Set(server, *results, 24*time.Hour)
-		})
-		return true
+	cache.SetLastModifiedTime("[shimSiteStats#server:"+server+"]", *results, func() {
+		cache.ShimSiteStats.Set(server, *results, 24*time.Hour)
 	})
 	refreshed = true
 	return results, nil
