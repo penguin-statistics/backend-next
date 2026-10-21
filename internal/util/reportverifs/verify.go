@@ -68,14 +68,15 @@ type Verifier struct {
 
 // Reliability checks a report of the task, in this order: its drops against the drop infos of its stage, current now
 // (6 if they do not fit), then the active reject rules by rule id (the reliability of the first one it matches). A
-// report passing both gets 0. A database error is returned: the task is to be retried, not stored with a reliability
-// the checks did not decide.
-func (v *Verifier) Reliability(ctx context.Context, reportTask *types.ReportTask, report *types.ReportTaskSingleReport) (int, error) {
+// report passing both gets 0. The message says why a report is rejected, as the pipeline's Violation did, and is empty
+// for 0. A database error is returned: the task is to be retried, not stored with a reliability the checks did not
+// decide.
+func (v *Verifier) Reliability(ctx context.Context, reportTask *types.ReportTask, report *types.ReportTaskSingleReport) (reliability int, message string, err error) {
 	start := time.Now()
 	violations, err := v.verifyDrops(ctx, report, reportTask)
 	observability.ReportVerifyDuration.WithLabelValues("drop").Observe(time.Since(start).Seconds())
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	if len(violations) > 0 {
 		var b strings.Builder
@@ -92,11 +93,11 @@ func (v *Verifier) Reliability(ctx context.Context, reportTask *types.ReportTask
 			Str("stageId", report.StageID).
 			Str("violations", b.String()).
 			Msg("drops do not fit the drop infos, rejecting")
-		return constant.ViolationReliabilityDrop, nil
+		return constant.ViolationReliabilityDrop, b.String(), nil
 	}
 
 	start = time.Now()
-	reliability, err := v.rejectRuleReliability(ctx, report, reportTask)
+	reliability, message, err = v.rejectRuleReliability(ctx, report, reportTask)
 	observability.ReportVerifyDuration.WithLabelValues("reject_rule").Observe(time.Since(start).Seconds())
-	return reliability, err
+	return reliability, message, err
 }

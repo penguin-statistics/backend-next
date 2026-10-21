@@ -616,19 +616,23 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 
 	// verified before persisting: persist merges the drops of each report by item, in place
 	reliabilities := make([]int, len(reportTask.Reports))
-	rejected := false
+	// the messages of the rejected reports, joined as the pipeline's Violations were
+	var violations []string
 	for idx, report := range reportTask.Reports {
-		reliability, err := w.verifier.Reliability(verifyCtx, reportTask, report)
+		reliability, message, err := w.verifier.Reliability(verifyCtx, reportTask, report)
 		if err != nil {
 			verifySpan.End()
 			return errors.Wrap(err, "failed to verify report")
 		}
 		reliabilities[idx] = reliability
-		rejected = rejected || reliability != 0
+		if reliability != 0 {
+			violations = append(violations, message)
+		}
 	}
-	if rejected {
+	if len(violations) > 0 {
 		L.Warn().
 			Str("evt.name", "reportwkr.violations").
+			Str("violations", strings.Join(violations, "; ")).
 			Ints("reliabilities", reliabilities).
 			Msg("report task verification failed on some or all reports")
 	}

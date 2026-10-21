@@ -113,12 +113,12 @@ func (d *RejectRuleVerifier) Verify(ctx context.Context, report *types.ReportTas
 	return nil
 }
 
-// rejectRuleReliability returns the reliability of the first active reject rule the report matches, by rule id, or 0
-// if it matches none. A rule whose reliability is out of range, or that fails to evaluate, is skipped.
-func (v *Verifier) rejectRuleReliability(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) (int, error) {
+// rejectRuleReliability returns the reliability of the first active reject rule the report matches, by rule id, with
+// the message "reject rule <id> matched", or 0 if it matches none. A rule whose reliability is out of range, or that fails to evaluate, is skipped.
+func (v *Verifier) rejectRuleReliability(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) (int, string, error) {
 	rejectRules, err := v.RejectRuleRepo.GetAllActiveRejectRules(ctx)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to get reject rules")
+		return 0, "", errors.Wrap(err, "failed to get reject rules")
 	}
 
 	reportContext := ReportContext{
@@ -166,7 +166,7 @@ func (v *Verifier) rejectRuleReliability(ctx context.Context, report *types.Repo
 				Bool("verifier.evaluation.should_reject", shouldReject).
 				Msg("reject rule matched, rejecting using specified reliability value")
 
-			return rejectRule.WithReliability, nil
+			return rejectRule.WithReliability, fmt.Sprintf("reject rule %d matched", rejectRule.RuleID), nil
 		} else {
 			if l := log.Trace(); l.Enabled() {
 				l.Interface("context", reportContext).
@@ -176,7 +176,7 @@ func (v *Verifier) rejectRuleReliability(ctx context.Context, report *types.Repo
 		}
 	}
 
-	return 0, nil
+	return 0, "", nil
 }
 
 func resultHandler(result any) bool {

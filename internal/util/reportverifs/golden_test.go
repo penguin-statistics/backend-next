@@ -174,7 +174,7 @@ func TestReliabilityGolden(t *testing.T) {
 		task := f.task(i)
 		violations := verifiers.Verify(ctx, task)
 		for idx, report := range task.Reports {
-			got, err := v.Reliability(ctx, task, report)
+			got, message, err := v.Reliability(ctx, task, report)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -182,6 +182,13 @@ func TestReliabilityGolden(t *testing.T) {
 			if pipeline, stored := violations.Reliability(idx), ft.Reports[idx].Reliability; got != pipeline || got != stored {
 				t.Errorf("task %d (created at %d), report %d: reliability %d, %d by the pipeline, stored %d",
 					i, ft.CreatedAt, idx, got, pipeline, stored)
+			}
+			var want string
+			if violation, ok := violations[idx]; ok {
+				want = violation.Message
+			}
+			if message != want {
+				t.Errorf("task %d (created at %d), report %d: message %q, %q by the pipeline", i, ft.CreatedAt, idx, message, want)
 			}
 		}
 	}
@@ -214,7 +221,7 @@ func TestReliabilityDatabaseError(t *testing.T) {
 		if _, err := db.ExecContext(ctx, "ALTER TABLE "+tc.table+" RENAME TO "+tc.table+"_gone"); err != nil {
 			t.Fatal(err)
 		}
-		if r, err := v.Reliability(ctx, task, task.Reports[0]); err == nil {
+		if r, _, err := v.Reliability(ctx, task, task.Reports[0]); err == nil {
 			t.Errorf("without %s: reliability %d, want an error", tc.table, r)
 		}
 		if r := verifiers.Verify(ctx, task).Reliability(0); r != tc.pipeline {

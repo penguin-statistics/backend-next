@@ -450,9 +450,14 @@ func TestProcessStoresReportWithoutDrops(t *testing.T) {
 
 // TestProcessStoresReliabilities stores the reliability the verification gives each report of a task: 0 for drops
 // that fit the drop infos, 6 for drops that do not, and the reliability of the reject rule a report matches. The drop
-// check comes first: a report failing both gets 6.
+// check comes first: a report failing both gets 6. The rejection is logged with why each rejected report was rejected
+// (violations) and the reliabilities.
 func TestProcessStoresReliabilities(t *testing.T) {
 	w := newTestWorker(t)
+	var logs lockedBuffer
+	prev := log.Logger
+	log.Logger = zerolog.New(&logs)
+	t.Cleanup(func() { log.Logger = prev })
 	rejected := testReport("main_04-04", 30013)
 	rejected.Times = 7
 	both := testReport("main_01-07", 99999)
@@ -470,6 +475,17 @@ func TestProcessStoresReliabilities(t *testing.T) {
 	}
 	if want := []int{0, 6, 300, 6}; !reflect.DeepEqual(reliabilities, want) {
 		t.Errorf("reliabilities %v stored, want %v", reliabilities, want)
+	}
+	rejections := logEntries(t, &logs, "reportwkr.violations")
+	if len(rejections) != 1 {
+		t.Fatalf("%d rejections logged, want 1", len(rejections))
+	}
+	violations, _ := rejections[0]["violations"].(string)
+	if n := strings.Count(violations, "; ") + 1; n != 3 || !strings.Contains(violations, "reject rule") {
+		t.Errorf("violations %q logged, want the messages of the 3 rejected reports, one of a reject rule", violations)
+	}
+	if got, want := fmt.Sprint(rejections[0]["reliabilities"]), "[0 6 300 6]"; got != want {
+		t.Errorf("reliabilities %s logged, want %s", got, want)
 	}
 }
 
