@@ -80,7 +80,7 @@ func TestGetStagesNotModified(t *testing.T) {
 	}
 
 	calculate("1-7")
-	resp, body := get(t, app, target, "")
+	resp, body := getCacheable(t, app, target)
 	lastModified := resp.Header.Get(fiber.HeaderLastModified)
 	if resp.StatusCode != fiber.StatusOK || !strings.Contains(body, `"1-7"`) || lastModified == "" {
 		t.Fatalf("first request: status %d, Last-Modified %q, body %s", resp.StatusCode, lastModified, body)
@@ -247,7 +247,7 @@ func TestSendCacheableChangedMeanwhile(t *testing.T) {
 	})
 
 	record("1-7")
-	resp, _ := get(t, app, "/stages", "")
+	resp, _ := getCacheable(t, app, "/stages")
 	lastModified := resp.Header.Get(fiber.HeaderLastModified)
 	if lastModified == "" {
 		t.Fatal("no Last-Modified")

@@ -219,7 +219,7 @@ func TestGetStagesNotModifiedRecalculated(t *testing.T) {
 	})
 
 	get(t, app, target, "") // calculated, sent without a last modified time
-	resp, _ := get(t, app, target, "")
+	resp, _ := getCacheable(t, app, target)
 	lastModified := resp.Header.Get(fiber.HeaderLastModified)
 	if lastModified == "" {
 		t.Fatalf("status %d, no Last-Modified", resp.StatusCode)
