@@ -154,6 +154,29 @@ type ConfigSpec struct {
 	NoArchiveDays int `split_words:"true" default:"60"`
 
 	DeleteDropReportAfterArchive bool `split_words:"true" default:"false"`
+
+	// SEOPagesEnabled serves the stats pages of the frontend (/{zh,en,ja,ko}/result/...) from here: the frontend's
+	// index.html with the page's title, description, canonical and hreflang links, structured data and a plain HTML
+	// table of its data, for search engines and link previews. The ingress has to route those paths here. When
+	// false, the routes are not registered at all.
+	SEOPagesEnabled bool `split_words:"true" default:"false"`
+
+	// SEOShellURL is the URL of the frontend's index.html, which the stats pages are made of.
+	SEOShellURL string `split_words:"true" default:"http://frontend-rollout.default.svc.cluster.local/"`
+
+	// SEOShellTTL is how often the index.html is fetched again. Keep it short: a copy from before a frontend
+	// release refers to scripts the release removed. The last copy fetched is served while a fetch fails.
+	SEOShellTTL time.Duration `split_words:"true" default:"1m"`
+
+	// SEOShellFetchTimeout is the timeout of a single fetch of the index.html.
+	SEOShellFetchTimeout time.Duration `split_words:"true" default:"3s"`
+
+	// SEOSiteURL is the origin of the canonical URLs of the stats pages, whichever host the request was sent to.
+	SEOSiteURL string `split_words:"true" default:"https://penguin-stats.io"`
+
+	// SEOPageMaxAge is the max-age of the stats pages. Pages without data (404s, a matrix not calculated yet) are
+	// cached for a minute at most.
+	SEOPageMaxAge time.Duration `split_words:"true" default:"5m"`
 }
 
 type Config struct {
