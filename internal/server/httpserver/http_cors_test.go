@@ -15,6 +15,7 @@ import (
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/pkg/pgid"
 )
 
 // defaultCredentialedOrigins returns the CORSCredentialedOrigins default the service ships with.
@@ -32,6 +33,7 @@ func defaultCredentialedOrigins(t *testing.T) []string {
 //   - GET /limited is behind a limiter like the /result one, which lets one request through
 //   - GET /bare-429 answers 429 JSON without a Retry-After, like a hand-written rejection
 //   - GET /penguin-429 returns a 429 PenguinError
+//   - POST /whoami answers the PenguinID of the request and sets a new one, like POST /report for a new visitor
 func newCORSServiceApp(t *testing.T) *fiber.App {
 	t.Helper()
 
@@ -56,6 +58,11 @@ func newCORSServiceApp(t *testing.T) *fiber.App {
 		return c.SendString("ok")
 	})
 	app.Get("/bare-429", tooMany)
+	app.Post("/whoami", func(c *fiber.Ctx) error {
+		id := pgid.Extract(c)
+		pgid.Inject(c, "33333333")
+		return c.SendString(id)
+	})
 	app.Get("/penguin-429", func(c *fiber.Ctx) error {
 		return pgerr.New(fiber.StatusTooManyRequests, "TOO_MANY_REQUESTS", "Your client is sending requests too frequently.")
 	})
@@ -168,6 +175,52 @@ func TestServiceAppTooManyRequestsCarryRetryAfterAndCORS(t *testing.T) {
 
 			// a cross-origin client can read the 429 and its Retry-After
 			assertCORS(t, resp, tt.origin, tt.origin != "https://evil.example")
+		})
+	}
+}
+
+// A cross-site HTML form (or fetch with mode no-cors) is a simple request: it gets no preflight, and the browser
+// attaches the SameSite=None PenguinID cookie. Its write must not happen as the visitor, nor replace their cookie.
+func TestServiceAppIgnoresCookieOfCrossSiteForms(t *testing.T) {
+	app := newCORSServiceApp(t)
+
+	tests := []struct {
+		origin       string
+		secFetchSite string
+		wantID       string
+	}{
+		{"https://evil.example", "cross-site", ""},
+		{"https://evil.example", "", ""},
+		{"null", "", ""},
+		{"https://penguin-stats.io", "same-origin", "11111111"},
+		{"capacitor://localhost", "cross-site", "11111111"},
+		{"", "", "11111111"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.origin+" "+tt.secFetchSite, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/whoami", strings.NewReader("server=CN&stageId=main_01-07"))
+			req.Host = "penguin-stats.io"
+			req.Header.Set(fiber.HeaderContentType, fiber.MIMEApplicationForm)
+			req.Header.Set("Cookie", "userID=11111111")
+			if tt.origin != "" {
+				req.Header.Set(fiber.HeaderOrigin, tt.origin)
+			}
+			if tt.secFetchSite != "" {
+				req.Header.Set("Sec-Fetch-Site", tt.secFetchSite)
+			}
+			resp, err := app.Test(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+
+			body, _ := io.ReadAll(resp.Body)
+			if string(body) != tt.wantID {
+				t.Errorf("PenguinID = %q, want %q", body, tt.wantID)
+			}
+			if got, want := resp.Header.Get(fiber.HeaderSetCookie) != "", tt.wantID != ""; got != want {
+				t.Errorf("Set-Cookie sent = %v, want %v", got, want)
+			}
 		})
 	}
 }
