@@ -28,13 +28,17 @@ const SEOSourceCategory = constant.SourceCategoryAll
 // SEOCatalogRefreshInterval is how often SEOData reloads the items, stages and zones.
 const SEOCatalogRefreshInterval = time.Minute
 
+// seoWarmTimeout bounds the calculation of the matrix of a server at start
+const seoWarmTimeout = 10 * time.Minute
+
 // SEOData is the data of the server-rendered stats pages. It never waits for the database: the items, stages and
 // zones are reloaded in the background, and the matrix is the cached global matrix of the frontend, which the calc
 // worker keeps up to date.
 type SEOData struct {
-	itemService  *Item
-	stageService *Stage
-	zoneService  *Zone
+	itemService       *Item
+	stageService      *Stage
+	zoneService       *Zone
+	dropMatrixService *DropMatrix
 
 	catalog atomic.Pointer[SEOCatalog]
 	// catalogInputs are the items, stages and zones the catalog was built from; only run writes them
@@ -44,12 +48,13 @@ type SEOData struct {
 	matrices   map[string]*seoMatrixMemo
 }
 
-func NewSEOData(lc fx.Lifecycle, conf *appconfig.Config, itemService *Item, stageService *Stage, zoneService *Zone) *SEOData {
+func NewSEOData(lc fx.Lifecycle, conf *appconfig.Config, itemService *Item, stageService *Stage, zoneService *Zone, dropMatrixService *DropMatrix) *SEOData {
 	d := &SEOData{
-		itemService:  itemService,
-		stageService: stageService,
-		zoneService:  zoneService,
-		matrices:     make(map[string]*seoMatrixMemo),
+		itemService:       itemService,
+		stageService:      stageService,
+		zoneService:       zoneService,
+		dropMatrixService: dropMatrixService,
+		matrices:          make(map[string]*seoMatrixMemo),
 	}
 	if conf.SEOPagesEnabled {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -70,18 +75,55 @@ func NewSEOData(lc fx.Lifecycle, conf *appconfig.Config, itemService *Item, stag
 func (d *SEOData) run(ctx context.Context) {
 	ticker := time.NewTicker(SEOCatalogRefreshInterval)
 	defer ticker.Stop()
+	warmed := false
 	for {
 		if err := d.RefreshCatalog(ctx); err != nil && ctx.Err() == nil {
 			log.Warn().
 				Str("evt.name", "seo.catalog.refresh_failed").
 				Err(err).
 				Msg("failed to reload the items, stages and zones of the stats pages; keeping the ones at hand")
+		} else if err == nil && !warmed {
+			warmed = true
+			go d.warmMatrices(ctx)
 		}
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
 		}
+	}
+}
+
+// warmMatrices calculates the cached matrix of each server that is not cached yet, one server at a time, the way
+// the first visit to the app does: after a start the pages of items and stages are 503s until then, and the worker
+// refreshes the matrices only in the process that holds its lock.
+func (d *SEOData) warmMatrices(ctx context.Context) {
+	for _, server := range constant.Servers {
+		if ctx.Err() != nil {
+			return
+		}
+		if d.Matrix(server) != nil {
+			continue
+		}
+		start := time.Now()
+		wctx, cancel := context.WithTimeout(ctx, seoWarmTimeout)
+		_, err := d.dropMatrixService.GetShimDropMatrix(wctx, server, true, "", "", null.Int{}, SEOSourceCategory)
+		cancel()
+		if err != nil {
+			if ctx.Err() == nil {
+				log.Warn().
+					Str("evt.name", "seo.matrix.warm_failed").
+					Err(err).
+					Str("server", server).
+					Msg("failed to calculate the matrix of the stats pages at start; the first visit to the app calculates it")
+			}
+			continue
+		}
+		log.Info().
+			Str("evt.name", "seo.matrix.warmed").
+			Str("server", server).
+			Dur("duration", time.Since(start)).
+			Msg("calculated the matrix of the stats pages at start")
 	}
 }
 

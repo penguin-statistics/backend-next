@@ -149,3 +149,15 @@ func TestSEODataKeepsTheCatalogWhileUnchanged(t *testing.T) {
 		t.Fatalf("catalog not replaced for changed rows: %v", err)
 	}
 }
+
+func TestSEODataWarmsOnlyMissingMatrices(t *testing.T) {
+	cache.Initialize()
+	for _, server := range []string{"CN", "US", "JP", "KR"} {
+		key := server + "|true|all"
+		cache.ShimGlobalDropMatrix.Set(key, modelv2.DropMatrixQueryResult{}, time.Hour)
+		t.Cleanup(func() { _ = cache.ShimGlobalDropMatrix.Delete(key) })
+	}
+	// with every matrix cached, nothing is calculated: the nil service is never called
+	d := &SEOData{matrices: make(map[string]*seoMatrixMemo)}
+	d.warmMatrices(context.Background())
+}

@@ -773,7 +773,7 @@ func TestRegister(t *testing.T) {
 				SEOPageMaxAge:        5 * time.Minute,
 			}}
 			lc := fxtest.NewLifecycle(t)
-			data := service.NewSEOData(lc, &appconfig.Config{}, nil, nil, nil)
+			data := service.NewSEOData(lc, &appconfig.Config{}, nil, nil, nil, nil)
 			app := fiber.New()
 			Register(lc, app, conf, data)
 			lc.RequireStart()
