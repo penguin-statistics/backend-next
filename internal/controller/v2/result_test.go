@@ -119,10 +119,20 @@ func newAdvancedQueryTestResult(t *testing.T) (*Result, *bun.DB) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		if _, err := admin.ExecContext(context.Background(), "DROP SCHEMA "+schema+" CASCADE"); err != nil {
-			t.Error(err)
+		defer admin.Close()
+		// a lookup a test gave up on can still run on the server, and deadlock with the drop: PostgreSQL then aborts one
+		// of them
+		for attempt := 1; ; attempt++ {
+			_, err := admin.ExecContext(context.Background(), "DROP SCHEMA "+schema+" CASCADE")
+			var pgErr pgdriver.Error
+			if err == nil || attempt == 5 || !errors.As(err, &pgErr) || pgErr.Field('C') != "40P01" {
+				if err != nil {
+					t.Error(err)
+				}
+				return
+			}
+			time.Sleep(200 * time.Millisecond)
 		}
-		admin.Close()
 	})
 
 	db := bun.NewDB(sql.OpenDB(pgdriver.NewConnector(
