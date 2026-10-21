@@ -1,8 +1,11 @@
-// Package script_coldstore exports, verifies and indexes the cold storage of the drop reports (#752). See
-// internal/coldstore for the layout of the files.
+// Package script_coldstore exports, verifies, indexes and patches the cold storage of the drop reports (#752), and
+// checks it against the production database. See internal/coldstore for the layout of the files, and
+// docs/coldstore.md for how the commands are used.
 package script_coldstore
 
 import (
+	"time"
+
 	"github.com/urfave/cli/v2"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
@@ -131,6 +134,99 @@ func Commands(depsFn func() CommandDeps) []*cli.Command {
 			}, duckdbFlags()...),
 			Action: func(ctx *cli.Context) error {
 				return runManifest(ctx, depsFn(), ctx.String("dir"), ctx.String("out"), ctx.Bool("force"))
+			},
+		},
+		{
+			Name: "coldstore-patch",
+			Description: "apply an admin fix (reports deleted, reliability changed) to archived months: read the month's files, " +
+				"apply the change, write all the month's files again (rollup included) and publish them with the manifest's entry, " +
+				"recoverably (see coldstore-recover)",
+			Flags: append([]cli.Flag{
+				monthFlag("month to patch (default: the months whose files hold the reports)"),
+				&cli.StringFlag{
+					Name:     "dir",
+					Aliases:  []string{"d"},
+					Usage:    "cold storage directory",
+					Required: true,
+				},
+				&cli.StringSliceFlag{
+					Name:  "delete",
+					Usage: "report ids to delete, with their extras (comma-separated or repeated)",
+				},
+				&cli.StringSliceFlag{
+					Name:  "reliability",
+					Usage: "new reliabilities as report_id=reliability (comma-separated or repeated); the app's delete is reliability -1",
+				},
+				&cli.StringFlag{
+					Name:  "file",
+					Usage: "file of changes, one per line: '<report_id> <reliability>' or '<report_id> delete'; '#' starts a comment",
+				},
+				&cli.BoolFlag{
+					Name:  "ignore-missing",
+					Usage: "patch the reports found even if some are in no archived month (e.g. still only in PostgreSQL)",
+				},
+				&cli.BoolFlag{
+					Name:  "dry-run",
+					Usage: "only report what would change",
+				},
+			}, duckdbFlags()...),
+			Action: func(ctx *cli.Context) error {
+				return runPatch(ctx, depsFn())
+			},
+		},
+		{
+			Name: "coldstore-recover",
+			Description: "complete or undo the patches that stopped partway (killed, or a failed write), from their journal in the " +
+				"directory and the manifest, without PostgreSQL: a patch whose manifest entry was committed is completed, any other " +
+				"is undone. A later coldstore-patch or coldstore-export of the month does this by itself",
+			Flags: []cli.Flag{
+				monthFlag("month to recover (default: every month with a journal)"),
+				&cli.StringFlag{
+					Name:     "dir",
+					Aliases:  []string{"d"},
+					Usage:    "cold storage directory",
+					Required: true,
+				},
+			},
+			Action: func(ctx *cli.Context) error {
+				return runRecover(ctx)
+			},
+		},
+		{
+			Name: "coldstore-prodcheck",
+			Description: "count the reports of every archived month in PostgreSQL, one statement per UTC day, and list the months " +
+				"whose count differs from the manifest (rows added or removed after the export). A reliability change keeps the count: " +
+				"only --reliability catches it. Read-only and bounded by a statement timeout; run it off-peak",
+			Flags: append([]cli.Flag{
+				&cli.StringFlag{
+					Name:    "dir",
+					Aliases: []string{"d"},
+					Usage:   "cold storage directory; when it holds a mismatching month's files, the days that differ are listed",
+				},
+				&cli.StringFlag{
+					Name:  "manifest",
+					Usage: "manifest file; default: manifest.json in --dir",
+				},
+				&cli.StringSliceFlag{
+					Name:  "month",
+					Usage: "months to check (comma-separated or repeated); default: every month of the manifest",
+				},
+				&cli.DurationFlag{
+					Name:  "statement-timeout",
+					Usage: "statement_timeout of the session",
+					Value: time.Minute,
+				},
+				&cli.DurationFlag{
+					Name:  "pause",
+					Usage: "pause between two statements",
+				},
+				&cli.BoolFlag{
+					Name:  "reliability",
+					Usage: "also compare the reliable rows (non-recruit, reliability = 0); reads the table, not only the created_at index: much slower",
+				},
+			}, duckdbFlags()...),
+			Action: func(ctx *cli.Context) error {
+				return runProdCheck(ctx, depsFn())
 			},
 		},
 	}

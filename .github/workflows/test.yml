@@ -75,6 +75,10 @@ jobs:
           curl -fsSL --retry 3 "https://extensions.duckdb.org/$DUCKDB_VERSION/linux_amd64/postgres_scanner.duckdb_extension.gz" \
             | gunzip > "$dir/postgres_scanner.duckdb_extension"
 
+      # backfill.sh's markers, resuming and upload checks, with a fake app binary and an rclone stub (a few seconds)
+      - name: Test the cold storage backfill script
+        run: scripts/coldstore/backfill_test.sh
+
       - name: Vet
         run: |
           go vet ./...

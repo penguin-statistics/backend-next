@@ -147,13 +147,23 @@ type monthFiles map[Kind]string
 // stage_id put back), the extras are drop_report_extras ∪ the recruit rows' extras columns (recruit rows without
 // extras have a NULL ip, which drop_report_extras never has).
 func (j *job) fileStats(ctx context.Context, files monthFiles, recruitStageID int) (MonthStats, error) {
-	reports := `SELECT ` + reportColumns + ` FROM read_parquet([` + quote(files[KindDropReports]) + `])
+	return j.monthStats(ctx, fileReports(files, recruitStageID), fileExtras(files), recruitStageID)
+}
+
+// fileReports is the query of a month's reports (reportColumns) from its files: drop_reports ∪ recruit, with the
+// recruit stage_id put back.
+func fileReports(files monthFiles, recruitStageID int) string {
+	return `SELECT ` + reportColumns + ` FROM read_parquet([` + quote(files[KindDropReports]) + `])
 		UNION ALL SELECT report_id, ` + strconv.Itoa(recruitStageID) + `::INTEGER AS stage_id, pattern_id, times,
 			created_at, reliability, server, account_id, source_name, version
 		FROM read_parquet([` + quote(files[KindRecruit]) + `])`
-	extras := `SELECT ` + extrasColumns + ` FROM read_parquet([` + quote(files[KindExtras]) + `])
+}
+
+// fileExtras is the query of the extras (extrasColumns) of a month's reports from its files: drop_report_extras ∪
+// the recruit rows' extras columns.
+func fileExtras(files monthFiles) string {
+	return `SELECT ` + extrasColumns + ` FROM read_parquet([` + quote(files[KindExtras]) + `])
 		UNION ALL SELECT ` + extrasColumns + ` FROM read_parquet([` + quote(files[KindRecruit]) + `]) WHERE ip IS NOT NULL`
-	return j.monthStats(ctx, reports, extras, recruitStageID)
 }
 
 // rollupTotals returns sum(cnt) and sum(times) of a rollup file, which must equal ReliableRows and ReliableTimes.

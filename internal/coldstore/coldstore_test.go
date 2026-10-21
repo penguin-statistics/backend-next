@@ -50,6 +50,10 @@ func listFiles(t *testing.T, dir string) []string {
 	t.Helper()
 	var out []string
 	err := filepath.WalkDir(dir, func(p string, de fs.DirEntry, err error) error {
+		// the publications' lock files are not part of the cold storage
+		if err == nil && de.IsDir() && de.Name() == LocksDir {
+			return filepath.SkipDir
+		}
 		if err == nil && !de.IsDir() {
 			out = append(out, strings.TrimPrefix(p, dir))
 		}

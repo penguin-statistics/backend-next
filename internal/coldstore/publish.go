@@ -31,13 +31,18 @@ var testHookLockWait func(target string)
 // UpdateManifest's lock only keeps concurrent writers from losing each other's entries; this one keeps the manifest
 // in agreement with the files: without it, two exports of the same target could replace the files in one order and
 // record them in the other, leaving entries that describe the other export's files. Distinct targets (e.g. two
-// months) are published concurrently.
+// months) are published concurrently. A patch of the target that stopped partway is completed or undone (see
+// publishGeneration) before write is called.
 func Publish(dir, target string, write func(m *Manifest) (record func(*Manifest), err error)) error {
 	unlock, err := lockTarget(dir, target)
 	if err != nil {
 		return err
 	}
 	defer unlock()
+	// a patch of the month that stopped partway is completed or undone first
+	if _, err := recoverTarget(dir, target); err != nil {
+		return err
+	}
 
 	name := filepath.Join(dir, ManifestFile)
 	m, err := ReadManifest(name)
@@ -76,6 +81,25 @@ func LockTargets(dir string, targets []string) (func(), error) {
 		unlocks = append(unlocks, unlock)
 	}
 	return release, nil
+}
+
+// lockTargetShared takes a shared lock on a target of the cold storage directory dir, for a reader that must not
+// see a publication of the target halfway (a dry run), and returns its release. It creates nothing, so that it works
+// on a read-only copy: without a lock file (nothing was ever published there, or it cannot be read), it locks
+// nothing.
+func lockTargetShared(dir, target string) (func(), error) {
+	f, err := os.Open(filepath.Join(dir, LocksDir, target+".lock"))
+	if err != nil {
+		return func() {}, nil
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_SH); err != nil {
+		f.Close()
+		return nil, errors.Wrapf(err, "coldstore: lock %s", target)
+	}
+	return func() {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		f.Close()
+	}, nil
 }
 
 // lockTarget takes an exclusive lock on a target of the cold storage directory dir, and returns its release.

@@ -26,6 +26,9 @@ func (e *VerificationError) Error() string {
 // content of the files with it, which is what ties the files to the source: the manifest is only a record of the
 // export. It returns a *VerificationError when the files do not pass.
 func VerifyMonth(ctx context.Context, opts Options, dir string, m *Manifest, month Month, againstSource bool) error {
+	if PendingPatch(dir, month.Key) {
+		return fmt.Errorf("coldstore: a patch of %s stopped partway (%s): run coldstore-recover first", month.Key, journalPath(dir, MonthTarget(month.Key)))
+	}
 	entry := m.Month(month.Key)
 	if entry == nil {
 		return fmt.Errorf("coldstore: month %s is not in the manifest", month.Key)

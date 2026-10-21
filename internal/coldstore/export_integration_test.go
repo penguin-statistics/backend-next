@@ -8,7 +8,8 @@ package coldstore
 //	PENGUIN_TEST_POSTGRES_DSN='postgres://postgres:test@127.0.0.1:55432/postgres?sslmode=disable' \
 //	PENGUIN_TEST_DUCKDB_EXTENSION_DIR=/opt/duckdb/extensions go test ./internal/coldstore/
 //
-// Every test works in a schema of its own, which it drops afterwards.
+// Every test works in a schema of its own, which it drops afterwards. The tests of ProdCheck (prodcheck_test.go) only
+// need the database, so they run in CI.
 
 import (
 	"context"
@@ -66,10 +67,21 @@ INSERT INTO drop_pattern_elements (drop_pattern_id, item_id, quantity)
 // it and a connection to it.
 func newTestPostgres(t *testing.T, d *testData) (Options, *sql.DB) {
 	t.Helper()
-	dsn := os.Getenv("PENGUIN_TEST_POSTGRES_DSN")
 	extDir := os.Getenv("PENGUIN_TEST_DUCKDB_EXTENSION_DIR")
-	if dsn == "" || extDir == "" {
-		t.Skip("PENGUIN_TEST_POSTGRES_DSN or PENGUIN_TEST_DUCKDB_EXTENSION_DIR is not set")
+	if extDir == "" {
+		t.Skip("PENGUIN_TEST_DUCKDB_EXTENSION_DIR is not set")
+	}
+	dsn, db := newTestSchema(t, d)
+	return Options{PostgresDSN: dsn, ExtensionDirectory: extDir, WorkDir: t.TempDir(), Threads: 2, MemoryLimit: "1GB"}, db
+}
+
+// newTestSchema fills a fresh schema with testSchema and the test data, and returns its DSN (which selects the
+// schema) and a connection to it.
+func newTestSchema(t *testing.T, d *testData) (string, *sql.DB) {
+	t.Helper()
+	dsn := os.Getenv("PENGUIN_TEST_POSTGRES_DSN")
+	if dsn == "" {
+		t.Skip("PENGUIN_TEST_POSTGRES_DSN is not set")
 	}
 	ctx := context.Background()
 	schema := fmt.Sprintf("it_%d_%d", time.Now().UnixNano(), rand.Int63())
@@ -98,7 +110,7 @@ func newTestPostgres(t *testing.T, d *testData) (Options, *sql.DB) {
 			t.Fatal(err)
 		}
 	}
-	return Options{PostgresDSN: dsn, ExtensionDirectory: extDir, WorkDir: t.TempDir(), Threads: 2, MemoryLimit: "1GB"}, db
+	return dsn, db
 }
 
 func TestExportFromPostgres(t *testing.T) {
