@@ -91,8 +91,9 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 			return err
 		}
 
-		// Idempotency key not empty and not found in storage. Lock the key
-		if l := log.Debug(); l.Enabled() {
+		// Idempotency key not empty and not found in storage. Lock the key.
+		// Logged at info: dashboards count lock + hit as the opt-in requests.
+		if l := log.Info(); l.Enabled() {
 			l.
 				Str("evt.name", "http.idempotency.lock").
 				Str("key", key).
@@ -235,8 +236,9 @@ func checkWriteIdempotencyCachedMessage(c *fiber.Ctx, conf *IdempotencyConfig, k
 	// Idempotency key not empty. Check if it is in the storage
 	response, err := conf.Storage.Get(key)
 	if err == nil && response != nil {
-		// Idempotency key found in storage. Return the response
-		if l := log.Debug(); l.Enabled() {
+		// Idempotency key found in storage. Return the response.
+		// Logged at info: dashboards count the hits.
+		if l := log.Info(); l.Enabled() {
 			l.
 				Str("evt.name", "http.idempotency.hit").
 				Str("key", key).
