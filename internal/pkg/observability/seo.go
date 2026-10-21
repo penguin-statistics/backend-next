@@ -13,6 +13,6 @@ var (
 	SEOPageRenderTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: prometheus.BuildFQName(ServiceName, "seo", "page_render_total"),
 		Help: "Stats pages served by page (item, item_list, stage, stage_list, other) and outcome " +
-			"(ok, no_data, noindex, not_found, redirect, shell_only, unavailable)",
+			"(ok, no_data, noindex, not_found, redirect, shell_only, error, unavailable_redirect, unavailable)",
 	}, []string{"page", "outcome"})
 )

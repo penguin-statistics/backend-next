@@ -1,0 +1,66 @@
+{{- define "body" -}}
+<section id="pe-ssr" lang="{{.Lang}}">
+{{- with .Breadcrumbs}}
+<nav aria-label="{{$.BreadcrumbLabel}}"><ol>
+{{- range .}}<li>{{if .Href}}<a href="{{.Href}}">{{.Name}}</a>{{else}}<span aria-current="page">{{.Name}}</span>{{end}}</li>{{end -}}
+</ol></nav>
+{{- end}}
+{{- if .Subheading}}
+<h2>{{.Subheading}}</h2>
+{{- end}}
+<h1>{{.Heading}}</h1>
+{{- with .Servers}}
+<nav aria-label="{{$.ServerLabel}}"><ul>
+{{- range .}}<li>{{if .Current}}<strong aria-current="page">{{.Name}}</strong>{{else}}<a href="{{.Href}}">{{.Name}}</a>{{end}}</li>{{end -}}
+</ul></nav>
+{{- end}}
+{{- range .Paragraphs}}
+<p>{{.}}</p>
+{{- end}}
+{{- with .Table}}
+<table>
+<caption>{{.Caption}}</caption>
+<thead><tr>{{range .Headers}}<th scope="col">{{.}}</th>{{end}}</tr></thead>
+<tbody>
+{{- range .Rows}}
+<tr><th scope="row">{{if .Head.Href}}<a href="{{.Head.Href}}">{{.Head.Name}}</a>{{else}}{{.Head.Name}}{{end}}{{if .HeadExtra}} {{.HeadExtra}}{{end}}</th>
+{{- range .Cells}}<td>{{.}}</td>{{end -}}
+<td>{{template "window" .Window}}</td></tr>
+{{- end}}
+</tbody>
+</table>
+{{- end}}
+{{- with .Notes}}
+<p>{{.Definitions}}</p>
+<p>
+{{- with .Updated}}{{$.Notes.UpdatedLabel}} <time datetime="{{.Datetime}}">{{.Text}}</time>{{$.Notes.Stop}}{{end -}}
+{{- with .Data}}<a href="{{.Href}}">{{.Name}}</a>{{$.Notes.Stop}}{{end -}}
+{{.LicenseLabel}}<a href="{{.LicenseURL}}" rel="license">CC BY-NC 4.0</a></p>
+{{- end}}
+{{- range .Groups}}
+<h2>{{.Heading}}</h2>
+{{- template "links" .Links}}
+{{- range .Subgroups}}
+<h3>{{.Heading}}</h3>
+{{- template "links" .Links}}
+{{- end}}
+{{- end}}
+{{- with .Related}}
+<nav aria-label="{{.Heading}}"><h2>{{.Heading}}</h2>
+{{- template "links" .Links}}</nav>
+{{- end}}
+{{- with .Back}}
+<p><a href="{{.Href}}">{{.Name}}</a></p>
+{{- end}}
+</section>
+{{end -}}
+
+{{- define "links" -}}
+{{- if .}}
+<ul>{{range .}}<li><a href="{{.Href}}">{{.Name}}</a></li>{{end}}</ul>
+{{- end -}}
+{{- end -}}
+
+{{- define "window" -}}
+{{.Before}}<time datetime="{{.Start.Datetime}}">{{.Start.Text}}</time>{{.Mid}}{{with .End}}<time datetime="{{.Datetime}}">{{.Text}}</time>{{end}}{{.After}}
+{{- end -}}
