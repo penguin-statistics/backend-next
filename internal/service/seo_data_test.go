@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -113,5 +114,38 @@ func TestSEODataMatrixPeeksTheCache(t *testing.T) {
 	cache.LastModifiedTime.Set(lmKey, time.Unix(200, 0), 0)
 	if m2 := d.Matrix("KR"); m2 == m || len(m2.ByItem["j"]) != 1 || len(m2.ByItem["i"]) != 0 {
 		t.Errorf("matrix not rebuilt after refresh: %+v", m2)
+	}
+}
+
+func TestSEODataKeepsTheCatalogWhileUnchanged(t *testing.T) {
+	cache.Initialize()
+	t.Cleanup(func() {
+		_ = cache.Items.Delete()
+		_ = cache.Stages.Delete()
+		_ = cache.Zones.Delete()
+	})
+	items := func(name string) []*model.Item {
+		return []*model.Item{{ArkItemID: "30012", Type: "MATERIAL", Name: []byte(`{"en":"` + name + `"}`)}}
+	}
+	cache.Items.Set(items("Orirock Cube"), time.Hour)
+	cache.Stages.Set([]*model.Stage{{ArkStageID: "main_01-07", StageID: 1, ZoneID: 1}}, time.Hour)
+	cache.Zones.Set([]*model.Zone{{ArkZoneID: "main_1", ZoneID: 1}}, time.Hour)
+	d := &SEOData{itemService: &Item{}, stageService: &Stage{}, zoneService: &Zone{}}
+	ctx := context.Background()
+	if err := d.RefreshCatalog(ctx); err != nil {
+		t.Fatal(err)
+	}
+	first := d.Catalog()
+	if err := d.RefreshCatalog(ctx); err != nil || d.Catalog() != first {
+		t.Fatalf("catalog replaced while the cached rows are the same: %v", err)
+	}
+	// the cache expired and the same rows were loaded again
+	cache.Items.Set(items("Orirock Cube"), time.Hour)
+	if err := d.RefreshCatalog(ctx); err != nil || d.Catalog() != first {
+		t.Fatalf("catalog replaced for equal rows: %v", err)
+	}
+	cache.Items.Set(items("Orirock Cube II"), time.Hour)
+	if err := d.RefreshCatalog(ctx); err != nil || d.Catalog() == first || d.Catalog().Items["30012"].Name.In("en") != "Orirock Cube II" {
+		t.Fatalf("catalog not replaced for changed rows: %v", err)
 	}
 }

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"math"
+	"reflect"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -36,6 +37,8 @@ type SEOData struct {
 	zoneService  *Zone
 
 	catalog atomic.Pointer[SEOCatalog]
+	// catalogInputs are the items, stages and zones the catalog was built from; only run writes them
+	catalogInputs seoCatalogInputs
 
 	matricesMu sync.Mutex
 	matrices   map[string]*seoMatrixMemo
@@ -82,7 +85,8 @@ func (d *SEOData) run(ctx context.Context) {
 	}
 }
 
-// RefreshCatalog reloads the items, stages and zones.
+// RefreshCatalog reloads the items, stages and zones, and replaces the catalog if they changed. It is not safe for
+// concurrent use.
 func (d *SEOData) RefreshCatalog(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -98,8 +102,37 @@ func (d *SEOData) RefreshCatalog(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	inputs := seoCatalogInputs{items: items, stages: stages, zones: zones}
+	if d.catalog.Load() != nil && inputs.same(d.catalogInputs) {
+		// the pages rendered from the catalog at hand stay valid (the lists are rendered once per catalog)
+		return nil
+	}
+	d.catalogInputs = inputs
 	d.catalog.Store(NewSEOCatalog(items, stages, zones))
 	return nil
+}
+
+// seoCatalogInputs are the rows a catalog is built from
+type seoCatalogInputs struct {
+	items  []*model.Item
+	stages []*model.Stage
+	zones  []*model.Zone
+}
+
+// same tells whether i and o hold the same rows: the same cached slices, or rows equal to them once the caches of
+// the items, stages and zones expired and they were loaded again
+func (i seoCatalogInputs) same(o seoCatalogInputs) bool {
+	return sameRows(i.items, o.items) && sameRows(i.stages, o.stages) && sameRows(i.zones, o.zones)
+}
+
+func sameRows[T any](a, b []*T) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	if len(a) == 0 || &a[0] == &b[0] {
+		return true
+	}
+	return reflect.DeepEqual(a, b)
 }
 
 // Catalog returns the items, stages and zones, or nil before they are loaded.
