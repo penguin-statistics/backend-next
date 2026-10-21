@@ -210,7 +210,15 @@ func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.Re
 	start := time.Now()
 	pubCtx, cancel := context.WithTimeout(ctx.UserContext(), natsPublishTimeout)
 	defer cancel()
-	_, err = s.NatsJS.Publish(subject, reportTaskJsonBytes, nats.Context(pubCtx))
+	opts := []nats.PubOpt{nats.Context(pubCtx)}
+	// A request retried with its idempotency key after a timeout publishes the task again; the stream stores only the
+	// first copy published within its duplicate window, unless the server restarted after a worker consumed that copy:
+	// a restarted server knows the ids of the tasks it still holds only. The task id is unique per request, so it
+	// cannot be the id.
+	if key, ok := ctx.Locals(constant.IdempotencyKeyLocalsKey).(string); ok && key != "" {
+		opts = append(opts, nats.MsgId(key))
+	}
+	_, err = s.NatsJS.Publish(subject, reportTaskJsonBytes, opts...)
 	switch {
 	case err == nil:
 		observeReportPublish(start, "ok")
