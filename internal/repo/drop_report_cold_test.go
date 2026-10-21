@@ -84,6 +84,32 @@ func TestNewColdDropReport(t *testing.T) {
 	if _, err := NewColdDropReport(conf, nil); err == nil {
 		t.Error("enabled without the cold storage: no error")
 	}
+	// the reader is only kept, never used, here
+	reader := new(coldstore.Reader)
+	if r, err := NewColdDropReport(conf, reader); err != nil || r.Shadow().Enabled {
+		t.Errorf("queries enabled: %v, %v", r, err)
+	}
+
+	conf.ColdstoreShadowEnabled = true
+	conf.ColdstoreShadowTimeout, conf.ColdstoreShadowMaxInFlight = 30*time.Second, 2
+	if _, err := NewColdDropReport(conf, reader); err == nil {
+		t.Error("queries and shadow mode enabled: no error")
+	}
+	conf.ColdstoreQueriesEnabled = false
+	if _, err := NewColdDropReport(conf, nil); err == nil {
+		t.Error("shadow mode without the cold storage: no error")
+	}
+	r, err := NewColdDropReport(conf, reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (ColdShadowSettings{Enabled: true, Timeout: 30 * time.Second, MaxInFlight: 2}); r.Shadow() != want {
+		t.Errorf("shadow settings %+v, want %+v", r.Shadow(), want)
+	}
+	conf.ColdstoreShadowMaxInFlight = 0
+	if _, err := NewColdDropReport(conf, reader); err == nil {
+		t.Error("shadow mode without slots: no error")
+	}
 }
 
 func TestNewColdTrendPlan(t *testing.T) {
