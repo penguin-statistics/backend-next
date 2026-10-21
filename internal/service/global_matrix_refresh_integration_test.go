@@ -284,6 +284,99 @@ func TestGlobalMatrixRefresh(t *testing.T) {
 	}
 }
 
+func TestGlobalMatrixRefreshPanic(t *testing.T) {
+	db, dropMatrix, patternMatrix := newGlobalMatrixTestData(t)
+	ctx := context.Background()
+
+	// a drop matrix element and a pattern of an item the items map does not have (e.g. during a metadata update), in
+	// the manual source category only: a refresh of CN caches the matrices of the all source category, then panics
+	globals, err := dropMatrix.calcGlobalDropMatrices(ctx, "CN", allSourceCategories)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drop := globals[constant.SourceCategoryManual].Matrix[0]
+	mustExec(t, db, `INSERT INTO drop_infos (server, stage_id, item_id, drop_type, range_id, accumulable)
+		SELECT server, stage_id, 999, drop_type, range_id, accumulable FROM drop_infos WHERE server = 'CN' AND stage_id = ? AND item_id = ?`,
+		drop.StageID, drop.ItemID)
+	mustExec(t, db, `INSERT INTO drop_matrix_elements (stage_id, item_id, quantity, times, server, quantity_buckets, source_category, start_time, end_time, day_num)
+		SELECT stage_id, 999, quantity, times, server, quantity_buckets, source_category, start_time, end_time, day_num
+		FROM drop_matrix_elements WHERE server = 'CN' AND source_category = ? AND stage_id = ? AND item_id = ?`,
+		constant.SourceCategoryManual, drop.StageID, drop.ItemID)
+	patterns, err := patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pattern := patterns[constant.SourceCategoryManual].PatternMatrix[0]
+	mustExec(t, db, "INSERT INTO drop_pattern_elements (drop_pattern_id, item_id, quantity) VALUES (999, 999, 1)")
+	mustExec(t, db, `INSERT INTO pattern_matrix_elements (stage_id, pattern_id, quantity, times, server, source_category, start_time, end_time, day_num)
+		SELECT stage_id, 999, quantity, times, server, source_category, start_time, end_time, day_num
+		FROM pattern_matrix_elements WHERE server = 'CN' AND source_category = ? AND stage_id = ? AND pattern_id = ?`,
+		constant.SourceCategoryManual, pattern.StageID, pattern.PatternID)
+	flushCaches(t)
+	globals, err = dropMatrix.calcGlobalDropMatrices(ctx, "CN", allSourceCategories)
+	if err != nil {
+		t.Fatal(err)
+	}
+	patterns, err = patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sourceCategory := range allSourceCategories {
+		hasDrop := lo.ContainsBy(globals[sourceCategory].Matrix, func(el *model.OneDropMatrixElement) bool { return el.ItemID == 999 })
+		hasPattern := lo.ContainsBy(patterns[sourceCategory].PatternMatrix, func(el *model.OnePatternMatrixElement) bool { return el.PatternID == 999 })
+		if wantIn := sourceCategory == constant.SourceCategoryManual; hasDrop != wantIn || hasPattern != wantIn {
+			t.Fatalf("%s: the matrices have the element of the unknown item: drop %v, pattern %v, want %v", sourceCategory, hasDrop, hasPattern, wantIn)
+		}
+	}
+
+	setStaleGlobalMatrices()
+	// the raw drop matrices too: the refresh of CN panics before it replaces those of manual and automated
+	staleRaw := model.DropMatrixQueryResult{Matrix: []*model.OneDropMatrixElement{{StageID: -1}}}
+	for _, server := range testServers {
+		for _, sourceCategory := range allSourceCategories {
+			cache.GlobalDropMatrix.Set(server+constant.CacheSep+sourceCategory, staleRaw, time.Hour)
+		}
+	}
+	for _, refresh := range []func(context.Context, string) error{dropMatrix.RefreshGlobalDropMatrixCaches, patternMatrix.RefreshGlobalPatternMatrixCaches} {
+		func() {
+			defer func() {
+				if r := recover(); r == nil {
+					t.Error("the refresh did not panic: the test does not exercise a panic")
+				}
+			}()
+			_ = refresh(ctx, "CN")
+		}()
+	}
+
+	// no source category of CN keeps a matrix, raw or shim, either of the refresh (all) or stale (the others); US
+	// keeps its stale ones
+	notCached := func(err error) bool { return errors.Is(err, pkgcache.ErrNotFound) }
+	for _, v := range globalMatrixVariants() {
+		var raw model.DropMatrixQueryResult
+		rawErr := cache.GlobalDropMatrix.Get(v.server+constant.CacheSep+v.sourceCategory, &raw)
+		if v.server != "CN" {
+			if dropStale, patternStale := isStale(t, v); !dropStale || !patternStale {
+				t.Errorf("%+v: a refresh of CN that panicked dropped the matrices of another server", v)
+			}
+			if rawErr != nil || len(raw.Matrix) != 1 || raw.Matrix[0].StageID != -1 {
+				t.Errorf("%+v: a refresh of CN that panicked dropped the raw drop matrix of another server (%v)", v, rawErr)
+			}
+			continue
+		}
+		if !notCached(rawErr) {
+			t.Errorf("%+v: a refresh that panicked kept the raw drop matrix (%v)", v, rawErr)
+		}
+		var drop modelv2.DropMatrixQueryResult
+		if err := cache.ShimGlobalDropMatrix.Get(v.dropKey(), &drop); !notCached(err) {
+			t.Errorf("%+v: a refresh that panicked kept the drop matrix (%v)", v, err)
+		}
+		var pattern modelv2.PatternMatrixQueryResult
+		if err := cache.ShimGlobalPatternMatrix.Get(v.patternKey(), &pattern); !notCached(err) {
+			t.Errorf("%+v: a refresh that panicked kept the pattern matrix (%v)", v, err)
+		}
+	}
+}
+
 func TestGlobalMatricesMatchLegacy(t *testing.T) {
 	db, dropMatrix, patternMatrix := newGlobalMatrixTestData(t)
 	ctx := context.Background()

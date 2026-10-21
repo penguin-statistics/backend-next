@@ -357,10 +357,13 @@ func (s *DropMatrix) calcGlobalDropMatrix(ctx context.Context, server string, so
 
 // RefreshGlobalDropMatrixCaches recalculates the global drop matrices of server and replaces the cached ones (for
 // every source category, raw and shim with and without closed zones). Requests keep getting the previous ones in
-// the meantime instead of all waiting for a recalculation. If the recalculation fails, the cached ones are dropped.
-func (s *DropMatrix) RefreshGlobalDropMatrixCaches(ctx context.Context, server string) (err error) {
+// the meantime instead of all waiting for a recalculation. If the recalculation fails, the cached ones are dropped,
+// also if it panics (the worker recovers the panic): the source categories cached before it must not keep matrices
+// of this refresh while the others keep those of an earlier one.
+func (s *DropMatrix) RefreshGlobalDropMatrixCaches(ctx context.Context, server string) error {
+	refreshed := false
 	defer func() {
-		if err != nil {
+		if !refreshed {
 			s.deleteGlobalDropMatrixCaches(server)
 		}
 	}()
@@ -384,6 +387,7 @@ func (s *DropMatrix) RefreshGlobalDropMatrixCaches(ctx context.Context, server s
 			})
 		}
 	}
+	refreshed = true
 	return nil
 }
 

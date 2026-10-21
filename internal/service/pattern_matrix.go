@@ -152,10 +152,13 @@ func (s *PatternMatrix) RunCalcPatternMatrixJob(ctx context.Context, server stri
 
 // RefreshGlobalPatternMatrixCaches recalculates the global pattern matrices of server and replaces the cached ones
 // (for every source category, with all and with the top patterns). Requests keep getting the previous ones in the
-// meantime instead of all waiting for a recalculation. If the recalculation fails, the cached ones are dropped.
-func (s *PatternMatrix) RefreshGlobalPatternMatrixCaches(ctx context.Context, server string) (err error) {
+// meantime instead of all waiting for a recalculation. If the recalculation fails, the cached ones are dropped, also
+// if it panics (the worker recovers the panic): the source categories cached before it must not keep matrices of
+// this refresh while the others keep those of an earlier one.
+func (s *PatternMatrix) RefreshGlobalPatternMatrixCaches(ctx context.Context, server string) error {
+	refreshed := false
 	defer func() {
-		if err != nil {
+		if !refreshed {
 			s.deleteGlobalPatternMatrixCaches(server)
 		}
 	}()
@@ -184,6 +187,7 @@ func (s *PatternMatrix) RefreshGlobalPatternMatrixCaches(ctx context.Context, se
 			})
 		}
 	}
+	refreshed = true
 	return nil
 }
 
