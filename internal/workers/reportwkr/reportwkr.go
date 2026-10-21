@@ -2,6 +2,7 @@ package reportwkr
 
 import (
 	"context"
+	"database/sql"
 	"runtime"
 	"strconv"
 	"time"
@@ -230,9 +231,10 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 	err := w.DB.RunInTx(pstCtx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := w.persist(ctx, tx, reportTask, taskCreatedAt, violations); err != nil {
 			// rolled back here rather than by RunInTx, which drops the error of a failed rollback. A failed commit
-			// is not rolled back: it has already ended the transaction.
+			// is not rolled back: it has already ended the transaction. Neither has a transaction database/sql
+			// rolled back as its context ended (the task's deadline), which is not a failed rollback.
 			L.Warn().Msg("rolling back transaction due to error")
-			if err := tx.Rollback(); err != nil {
+			if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
 				L.Error().Err(err).Msg("failed to rollback transaction")
 			}
 			return err
