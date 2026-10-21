@@ -2,6 +2,7 @@ package infra
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -50,19 +51,40 @@ func ensureStream(js nats.JetStreamContext, cfg *nats.StreamConfig) error {
 }
 
 // drainNATS drains the connection, delivering what its subscriptions hold and flushing what it publishes, and waits
-// until it is closed or ctx ends.
+// until it is closed or ctx ends. The client drains in the background and closes the connection however the drain
+// went, reporting a subscription that did not drain in time or a final flush that failed only to the error handler, so
+// drainNATS returns the first error the connection reports from the start of the drain until it is closed: the closed
+// handler runs after the error handlers of every error reported before the close, in order.
 func drainNATS(ctx context.Context, nc *nats.Conn) error {
+	var (
+		mu       sync.Mutex
+		drainErr error
+	)
+	logErr := nc.ErrorHandler()
+	nc.SetErrorHandler(func(c *nats.Conn, sub *nats.Subscription, err error) {
+		if logErr != nil {
+			logErr(c, sub, err)
+		}
+		mu.Lock()
+		if drainErr == nil {
+			drainErr = err
+		}
+		mu.Unlock()
+	})
+	closed := make(chan struct{})
+	nc.SetClosedHandler(func(*nats.Conn) { close(closed) })
+
 	if err := nc.Drain(); err != nil {
 		return err
 	}
-	for !nc.IsClosed() {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(10 * time.Millisecond):
-		}
+	select {
+	case <-closed:
+		mu.Lock()
+		defer mu.Unlock()
+		return errors.Wrap(drainErr, "failed to drain the NATS connection")
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-	return nil
 }
 
 func NATS(lc fx.Lifecycle, conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
