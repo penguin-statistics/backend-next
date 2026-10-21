@@ -63,12 +63,6 @@ func (r *Account) CreateAccountWithRandomPenguinId(ctx context.Context) (*model.
 	return nil, pgerr.ErrInternalError.Msg("failed to create account")
 }
 
-func (r *Account) GetAccountById(ctx context.Context, accountId string) (*model.Account, error) {
-	return r.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.Where("account_id = ?", accountId)
-	})
-}
-
 func (r *Account) GetAccountByPenguinId(ctx context.Context, penguinId string) (*model.Account, error) {
 	return r.sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.Where("penguin_id = ?", penguinId)
