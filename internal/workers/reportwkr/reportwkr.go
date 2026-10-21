@@ -38,6 +38,7 @@ type WorkerDeps struct {
 	DB                     *bun.DB
 	Redis                  *redis.Client
 	NatsJS                 nats.JetStreamContext
+	NatsConn               *nats.Conn
 	StageService           *service.Stage
 	DropReportRepo         *repo.DropReport
 	DropPatternRepo        *repo.DropPattern
@@ -231,6 +232,10 @@ func (w *Worker) consume(sub *nats.Subscription) {
 		default:
 		}
 
+		if !w.waitConnected() {
+			return
+		}
+
 		msgs, err := sub.Fetch(1, nats.MaxWait(w.conf.fetchWait))
 		if errors.Is(err, nats.ErrTimeout) {
 			// no task queued
@@ -251,6 +256,23 @@ func (w *Worker) consume(sub *nats.Subscription) {
 			log.Err(err).Msg("failed to ingest preprocess")
 		}
 	}
+}
+
+// waitConnected waits while the connection is down, and reports false if the worker is stopped meanwhile. While it is
+// down, the client buffers the request of a fetch and the fetch times out all the same, so a worker fetching meanwhile
+// would buffer a request per fetchWait; on reconnect they would all reach the server at once and deliver a task each
+// to this one worker, the tasks waiting in the client while their AckWait runs, to be delivered again to another
+// worker. Waiting leaves at most the request sent as the connection dropped: a second task, which waits for at most
+// taskTimeout, far less than AckWait. NatsConn is nil in the tests that never lose the connection.
+func (w *Worker) waitConnected() bool {
+	for w.NatsConn != nil && w.NatsConn.IsReconnecting() {
+		select {
+		case <-w.stopping:
+			return false
+		case <-time.After(w.conf.fetchWait / 10):
+		}
+	}
+	return true
 }
 
 func (w *Worker) ingestPreprocess(ctx context.Context, msg *nats.Msg) error {
