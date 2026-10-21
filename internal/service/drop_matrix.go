@@ -609,29 +609,31 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 		return nil, err
 	}
 
-	var combinedResults []*model.CombinedResultForDropMatrix
+	stageItemFilter := util.GetStageIdItemIdMapFromDropInfos(dropInfos)
+	queryCtxs := make([]*model.DropReportQueryContext, 0, len(timeRanges))
 	for _, timeRange := range timeRanges {
-		stageItemFilter := util.GetStageIdItemIdMapFromDropInfos(dropInfos)
-		queryCtx := &model.DropReportQueryContext{
+		queryCtxs = append(queryCtxs, &model.DropReportQueryContext{
 			Server:             server,
 			StartTime:          timeRange.StartTime,
 			EndTime:            timeRange.EndTime,
 			AccountID:          accountId,
 			StageItemFilter:    &stageItemFilter,
-			SourceCategory:     sourceCategory,
 			ExcludeNonOneTimes: false,
-		}
-		timesResults, err := s.DropReportService.CalcTotalTimesForDropMatrix(ctx, queryCtx)
+		})
+	}
+	var combinedResults []*model.CombinedResultForDropMatrix
+	// scan drop_reports once for all time ranges instead of twice per time range (a personal matrix has ~190); with no
+	// time range (e.g. a server without any yet), there is nothing to scan
+	if len(queryCtxs) > 0 {
+		timesResults, quantityUniqCountResults, err := s.DropReportService.CalcDropMatrixForIntervalsBySourceCategories(ctx, queryCtxs, []string{sourceCategory})
 		if err != nil {
 			return nil, err
 		}
-		quantityUniqCountResults, err := s.DropReportService.CalcQuantityUniqCount(ctx, queryCtx)
-		if err != nil {
-			return nil, err
+		for i, timeRange := range timeRanges {
+			quantityResults := calcTotalQuantityForDropMatrix(quantityUniqCountResults[i][sourceCategory])
+			oneBatch := s.combineQuantityAndTimesResults(quantityResults, timesResults[i][sourceCategory], quantityUniqCountResults[i][sourceCategory], timeRange)
+			combinedResults = append(combinedResults, oneBatch...)
 		}
-		quantityResults := calcTotalQuantityForDropMatrix(quantityUniqCountResults)
-		oneBatch := s.combineQuantityAndTimesResults(quantityResults, timesResults, quantityUniqCountResults, timeRange)
-		combinedResults = append(combinedResults, oneBatch...)
 	}
 
 	// save stage times for later use

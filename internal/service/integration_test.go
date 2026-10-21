@@ -423,6 +423,109 @@ func TestCalcDropMatrixByGivenDateMatchesLegacy(t *testing.T) {
 	requireCompared(t, compared, 200)
 }
 
+// personalDropMatrixElementLines are the lines of drop matrix elements of time ranges: those of a customized time
+// range (range id 0) carry it.
+func personalDropMatrixElementLines(elements []*model.DropMatrixElement) []string {
+	lines := make([]string, 0, len(elements))
+	for _, el := range elements {
+		keys := make([]int, 0, len(el.QuantityBuckets))
+		for k := range el.QuantityBuckets {
+			keys = append(keys, k)
+		}
+		sort.Ints(keys)
+		var b strings.Builder
+		for _, k := range keys {
+			fmt.Fprintf(&b, "%d:%d,", k, el.QuantityBuckets[k])
+		}
+		timeRange := ""
+		if el.TimeRange != nil {
+			timeRange = timeRangeLine(el.TimeRange)
+		}
+		lines = append(lines, fmt.Sprintf("%s|%s|%d|%d|%d|%d|%d|%s|%s", el.Server, el.SourceCategory, el.StageID, el.ItemID,
+			el.RangeID, el.Quantity, el.Times, timeRange, b.String()))
+	}
+	sort.Strings(lines)
+	return lines
+}
+
+func TestCalcDropMatrixForTimeRangesMatchesLegacy(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+	sourceCategories := []string{constant.SourceCategoryAll, constant.SourceCategoryManual, constant.SourceCategoryAutomated}
+	compared := 0
+	for seed := int64(1); seed <= 3; seed++ {
+		mustExec(t, db, "TRUNCATE time_ranges, drop_infos, drop_reports, drop_pattern_elements")
+		r := rand.New(rand.NewSource(seed))
+		seedMatrixData(t, r, db)
+		s := newMatrixServices(db)
+		for _, server := range testServers {
+			// a personal matrix: every max accumulable time range, as getDropMatrixElements collects them
+			maxAccumulableTimeRanges, err := s.timeRange.GetMaxAccumulableTimeRangesByServer(ctx, server)
+			if err != nil {
+				t.Fatal(err)
+			}
+			timeRangesMap := make(map[int]*model.TimeRange)
+			for _, byItem := range maxAccumulableTimeRanges {
+				for _, timeRanges := range byItem {
+					for _, timeRange := range timeRanges {
+						timeRangesMap[timeRange.RangeID] = timeRange
+					}
+				}
+			}
+			personal := make([]*model.TimeRange, 0, len(timeRangesMap))
+			for _, timeRange := range timeRangesMap {
+				personal = append(personal, timeRange)
+			}
+			// customized time ranges (advanced queries) at millisecond precision, one of them inverted
+			customized := make([][]*model.TimeRange, 0)
+			for i := 0; i < 3; i++ {
+				start := testBaseTime.Add(time.Duration(r.Int63n(int64(4*24*time.Hour))) / time.Millisecond * time.Millisecond)
+				end := start.Add(time.Duration(1+r.Intn(48)) * time.Hour).Add(time.Duration(r.Intn(1000)) * time.Millisecond)
+				if i == 2 {
+					start, end = end, start
+				}
+				customized = append(customized, []*model.TimeRange{{StartTime: &start, EndTime: &end}})
+			}
+
+			for _, accountId := range []null.Int{{}, null.IntFrom(1), null.IntFrom(2), null.IntFrom(3)} {
+				for _, sourceCategory := range sourceCategories {
+					what := fmt.Sprintf("seed %d %s account %v %s", seed, server, accountId.Int64, sourceCategory)
+					// the legacy loop runs two queries per time range: compare the personal matrices on one seed and
+					// two accounts only
+					if seed == 1 && accountId.Int64 <= 1 {
+						want, err := legacyCalcDropMatrixForTimeRanges(ctx, s.dropMatrix, server, personal, nil, nil, accountId, sourceCategory)
+						if err != nil {
+							t.Fatal(err)
+						}
+						got, err := s.dropMatrix.calcDropMatrixForTimeRanges(ctx, server, personal, nil, nil, accountId, sourceCategory)
+						if err != nil {
+							t.Fatal(err)
+						}
+						compared += assertSameLines(t, what+" personal", personalDropMatrixElementLines(want), personalDropMatrixElementLines(got))
+					}
+
+					for i, timeRanges := range customized {
+						for _, itemIdFilter := range [][]int{nil, {10, 12, 14}} {
+							stageIdFilter := []int{1 + r.Intn(6)}
+							what := fmt.Sprintf("%s customized %d stages %v items %v", what, i, stageIdFilter, itemIdFilter)
+							want, err := legacyCalcDropMatrixForTimeRanges(ctx, s.dropMatrix, server, timeRanges, stageIdFilter, itemIdFilter, accountId, sourceCategory)
+							if err != nil {
+								t.Fatal(err)
+							}
+							got, err := s.dropMatrix.calcDropMatrixForTimeRanges(ctx, server, timeRanges, stageIdFilter, itemIdFilter, accountId, sourceCategory)
+							if err != nil {
+								t.Fatal(err)
+							}
+							compared += assertSameLines(t, what, personalDropMatrixElementLines(want), personalDropMatrixElementLines(got))
+						}
+					}
+				}
+			}
+		}
+	}
+	requireCompared(t, compared, 500)
+}
+
 func TestCalcPatternMatrixForTimeRangesMatchesLegacy(t *testing.T) {
 	db := newTestDB(t)
 	ctx := context.Background()

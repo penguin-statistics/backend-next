@@ -36,12 +36,12 @@ func NewDropReport(db *bun.DB) *DropReport {
 type statementDeadlineKey struct{}
 
 // RunWithStatementTimeout runs fn with a context in which the drop report aggregations (CalcQuantityUniqCount,
-// CalcTotalTimes, CalcTotalQuantityForTrend and CalcTotalTimesForTrend) end at most timeout after it was called:
-// each of them runs in a transaction of its own, with what is left of timeout as its statement timeout, after which
-// PostgreSQL cancels it. pgdriver does not cancel a statement on the server when its context ends, so this is what
-// bounds the work of a statement on the server. It does so only while the read timeout of the connection (see
-// infra.Postgres) is longer than timeout: otherwise the driver gives up on the statement first, and it keeps running on
-// the server.
+// CalcTotalTimes, CalcDropMatrixForIntervalsBySourceCategories, CalcTotalQuantityForTrend and CalcTotalTimesForTrend)
+// end at most timeout after it was called: each of them runs in a transaction of its own, with what is left of timeout
+// as its statement timeout, after which PostgreSQL cancels it. pgdriver does not cancel a statement on the server when
+// its context ends, so this is what bounds the work of a statement on the server. It does so only while the read
+// timeout of the connection (see infra.Postgres) is longer than timeout: otherwise the driver gives up on the statement
+// first, and it keeps running on the server.
 //
 // No connection is held between those statements, so fn can run other queries on the pool, even one of a single
 // connection; they run without a statement timeout.
@@ -233,7 +233,8 @@ func (r *DropReport) CalcDropMatrixForIntervalsBySourceCategories(
 	r.handleStages(perPattern, stageIds)
 	perPattern = perPattern.Group("dr.stage_id", "dr.pattern_id", "is_manual", "segment")
 
-	if err := r.db.NewRaw(`WITH a AS MATERIALIZED (?)
+	if err := r.runWithStatementDeadline(ctx, func(ctx context.Context, db bun.IConn) error {
+		return r.db.NewRaw(`WITH a AS MATERIALIZED (?)
 		SELECT 'quantity' AS kind, a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment, SUM(a.count) AS value
 		FROM a JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = a.pattern_id
 		GROUP BY a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment
@@ -241,7 +242,9 @@ func (r *DropReport) CalcDropMatrixForIntervalsBySourceCategories(
 		SELECT 'times' AS kind, a.stage_id, 0, 0, a.is_manual, a.segment, SUM(a.times) AS value
 		FROM a
 		GROUP BY a.stage_id, a.is_manual, a.segment`, perPattern).
-		Scan(ctx, &rows); err != nil {
+			Conn(db).
+			Scan(ctx, &rows)
+	}); err != nil {
 		return nil, nil, err
 	}
 

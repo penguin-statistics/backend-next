@@ -396,6 +396,138 @@ func legacyCalcPatternMatrixForTimeRanges(
 	return results, nil
 }
 
+// the v3.14.18 drop matrix of time ranges (personal and customized): two queries per time range
+func legacyCalcDropMatrixForTimeRanges(
+	ctx context.Context, s *DropMatrix, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int, accountId null.Int, sourceCategory string,
+) ([]*model.DropMatrixElement, error) {
+	dropInfos, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, timeRanges, stageIdFilter, itemIdFilter)
+	if err != nil {
+		return nil, err
+	}
+
+	var combinedResults []*model.CombinedResultForDropMatrix
+	for _, timeRange := range timeRanges {
+		stageItemFilter := util.GetStageIdItemIdMapFromDropInfos(dropInfos)
+		queryCtx := &model.DropReportQueryContext{
+			Server:             server,
+			StartTime:          timeRange.StartTime,
+			EndTime:            timeRange.EndTime,
+			AccountID:          accountId,
+			StageItemFilter:    &stageItemFilter,
+			SourceCategory:     sourceCategory,
+			ExcludeNonOneTimes: false,
+		}
+		timesResults, err := s.DropReportService.CalcTotalTimesForDropMatrix(ctx, queryCtx)
+		if err != nil {
+			return nil, err
+		}
+		quantityUniqCountResults, err := s.DropReportService.CalcQuantityUniqCount(ctx, queryCtx)
+		if err != nil {
+			return nil, err
+		}
+		quantityResults := calcTotalQuantityForDropMatrix(quantityUniqCountResults)
+		oneBatch := legacyCombineDropMatrixQuantityAndTimesResults(quantityResults, timesResults, quantityUniqCountResults)
+		for _, result := range oneBatch {
+			result.TimeRange = timeRange
+		}
+		combinedResults = append(combinedResults, oneBatch...)
+	}
+
+	// save stage times for later use
+	stageTimesMap := map[int]int{}
+
+	// grouping results by stage id
+	var groupedResults []linq.Group
+	linq.From(combinedResults).
+		GroupByT(
+			func(el *model.CombinedResultForDropMatrix) int { return el.StageID },
+			func(el *model.CombinedResultForDropMatrix) *model.CombinedResultForDropMatrix { return el }).ToSlice(&groupedResults)
+
+	dropMatrixElements := make([]*model.DropMatrixElement, 0)
+	for _, el := range groupedResults {
+		stageId := el.Key.(int)
+		var groupedResults2 []linq.Group
+		linq.From(el.Group).
+			GroupByT(
+				func(el *model.CombinedResultForDropMatrix) int { return el.TimeRange.RangeID },
+				func(el *model.CombinedResultForDropMatrix) *model.CombinedResultForDropMatrix { return el }).
+			ToSlice(&groupedResults2)
+		for _, el2 := range groupedResults2 {
+			rangeId := el2.Key.(int)
+			timeRange := el2.Group[0].(*model.CombinedResultForDropMatrix).TimeRange
+
+			// get all item ids which are dropped in this stage and in this time range
+			var dropItemIds []int
+			if rangeId == 0 {
+				// rangeId == 0 means it is a customized time range instead of a time range from the database
+				dropInfosForSpecialTimeRange, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, []*model.TimeRange{el2.Group[0].(*model.CombinedResultForDropMatrix).TimeRange}, []int{stageId}, itemIdFilter)
+				if err != nil {
+					return nil, err
+				}
+				linq.From(dropInfosForSpecialTimeRange).
+					WhereT(func(el *model.DropInfo) bool { return el.ItemID.Valid }).
+					SelectT(func(el *model.DropInfo) int { return int(el.ItemID.Int64) }).
+					ToSlice(&dropItemIds)
+			} else {
+				dropItemIds, _ = s.DropInfoService.GetItemDropSetByStageIdAndRangeId(ctx, server, stageId, rangeId)
+			}
+
+			// if item id filter is applied, then filter the drop item ids
+			if len(itemIdFilter) > 0 {
+				linq.From(dropItemIds).WhereT(func(itemId int) bool { return linq.From(itemIdFilter).Contains(itemId) }).ToSlice(&dropItemIds)
+			}
+
+			// use a fake hashset to save item ids
+			dropSet := make(map[int]struct{}, len(dropItemIds))
+			for _, itemId := range dropItemIds {
+				dropSet[itemId] = struct{}{}
+			}
+
+			for _, el3 := range el2.Group {
+				itemId := el3.(*model.CombinedResultForDropMatrix).ItemID
+				quantity := el3.(*model.CombinedResultForDropMatrix).Quantity
+				times := el3.(*model.CombinedResultForDropMatrix).Times
+				quantityBuckets := el3.(*model.CombinedResultForDropMatrix).QuantityBuckets
+				dropMatrixElement := model.DropMatrixElement{
+					StageID:         stageId,
+					ItemID:          itemId,
+					RangeID:         rangeId,
+					Quantity:        quantity,
+					QuantityBuckets: quantityBuckets,
+					Times:           times,
+					Server:          server,
+					SourceCategory:  sourceCategory,
+				}
+				if rangeId == 0 {
+					dropMatrixElement.TimeRange = timeRange
+				}
+				dropMatrixElements = append(dropMatrixElements, &dropMatrixElement)
+				delete(dropSet, itemId)        // remove existing item ids from drop set
+				stageTimesMap[stageId] = times // record stage times into a map
+			}
+			// add those items which do not show up in the matrix (quantity is 0)
+			for itemId := range dropSet {
+				times := stageTimesMap[stageId]
+				dropMatrixElementWithZeroQuantity := model.DropMatrixElement{
+					StageID:         stageId,
+					ItemID:          itemId,
+					RangeID:         rangeId,
+					Quantity:        0,
+					QuantityBuckets: map[int]int{0: times},
+					Times:           times,
+					Server:          server,
+					SourceCategory:  sourceCategory,
+				}
+				if rangeId == 0 {
+					dropMatrixElementWithZeroQuantity.TimeRange = timeRange
+				}
+				dropMatrixElements = append(dropMatrixElements, &dropMatrixElementWithZeroQuantity)
+			}
+		}
+	}
+	return dropMatrixElements, nil
+}
+
 func legacyCombinePatternQuantityAndTimesResults(
 	quantityResults []*model.TotalQuantityResultForPatternMatrix, timesResults []*model.TotalTimesResult,
 ) []*model.CombinedResultForDropPattern {
