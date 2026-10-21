@@ -125,10 +125,6 @@ func (s *Stage) GetShimStageByArkId(ctx context.Context, arkStageId string, serv
 	return nil, pgerr.ErrNotFound
 }
 
-func (s *Stage) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId string) (null.String, error) {
-	return s.StageRepo.GetStageExtraProcessTypeByArkId(ctx, arkStageId)
-}
-
 // Cache: (singular) stagesMapById, 1 hr
 func (s *Stage) GetStagesMapById(ctx context.Context) (map[int]*model.Stage, error) {
 	var stagesMapById map[int]*model.Stage

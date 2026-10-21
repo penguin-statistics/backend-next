@@ -184,11 +184,12 @@ func (s *Report) PipelineTaskId(ctx *fiber.Ctx) string {
 
 func (s *Report) PipelineAggregateGachaboxDrops(ctx context.Context, singleReport *types.ReportTaskSingleReport) error {
 	// for gachabox drop, we need to aggregate `times` according to `quantity` for report.Drops
-	category, err := s.StageService.GetStageExtraProcessTypeByArkId(ctx, singleReport.StageID)
+	// cached: a report is accepted without a query of the database, as long as the stage was looked up recently
+	stage, err := s.StageService.GetStageByArkId(ctx, singleReport.StageID)
 	if err != nil {
 		return err
 	}
-	if category.Valid && category.String == constant.ExtraProcessTypeGachaBox {
+	if stage.ExtraProcessType.Valid && stage.ExtraProcessType.String == constant.ExtraProcessTypeGachaBox {
 		reportutil.AggregateGachaBoxDrops(singleReport)
 	}
 
@@ -204,26 +205,34 @@ func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.Re
 		return "", err
 	}
 
+	// Wait for the stream to store the task. An asynchronous publish leaks the ack of a task given up on, and once
+	// such acks reach the limit of pending ones, every publish stalls. The connection makes each request on an inbox
+	// of its own (infra.NATSOptions), so a publish whose send fails at once leaks nothing either.
 	start := time.Now()
-	pub, err := s.NatsJS.PublishAsync(subject, reportTaskJsonBytes)
-	if err != nil {
-		observeReportPublish(start, "error")
-		return "", err
+	pubCtx, cancel := context.WithTimeout(ctx.UserContext(), natsPublishTimeout)
+	defer cancel()
+	opts := []nats.PubOpt{nats.Context(pubCtx)}
+	// A request retried with its idempotency key after a timeout publishes the task again; the stream stores only the
+	// first copy published within its duplicate window, unless the server restarted after a worker consumed that copy:
+	// a restarted server knows the ids of the tasks it still holds only. The task id is unique per request, so it
+	// cannot be the id.
+	if key, ok := ctx.Locals(constant.IdempotencyKeyLocalsKey).(string); ok && key != "" {
+		opts = append(opts, nats.MsgId(key))
 	}
-
-	select {
-	case err := <-pub.Err():
-		observeReportPublish(start, "error")
-		return "", err
-	case <-pub.Ok():
+	_, err = s.NatsJS.Publish(subject, reportTaskJsonBytes, opts...)
+	switch {
+	case err == nil:
 		observeReportPublish(start, "ok")
 		return taskId, nil
-	case <-ctx.UserContext().Done():
+	case ctx.UserContext().Err() != nil:
 		observeReportPublish(start, "ctx_cancelled")
 		return "", ctx.UserContext().Err()
-	case <-time.After(natsPublishTimeout):
+	case errors.Is(err, context.DeadlineExceeded):
 		observeReportPublish(start, "timeout")
 		return "", ErrNatsTimeout
+	default:
+		observeReportPublish(start, "error")
+		return "", err
 	}
 }
 

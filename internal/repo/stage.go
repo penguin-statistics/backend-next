@@ -8,7 +8,6 @@ import (
 	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
-	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
@@ -113,17 +112,6 @@ func (r *Stage) GetShimStagesForFakeTime(ctx context.Context, server string, fak
 	}
 
 	return stages, nil
-}
-
-func (r *Stage) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId string) (null.String, error) {
-	stage, err := r.v3sel.SelectOne(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.Column("st.extra_process_type").Where("st.ark_stage_id = ?", arkStageId)
-	})
-	if err != nil {
-		return null.NewString("", false), err
-	}
-
-	return stage.ExtraProcessType, nil
 }
 
 func (r *Stage) SearchStageByCode(ctx context.Context, code string) (*model.Stage, error) {

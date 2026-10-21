@@ -531,7 +531,8 @@ func (w *Worker) deadLetter(msg *nats.Msg, metadata *nats.MsgMetadata, cause err
 
 	// synchronous, bounded by taskTimeout: an asynchronous future whose ack never arrives (lost to a reconnect) stays
 	// pending in the JetStream context, which report publishing shares, until the connection closes, while a request
-	// that times out is removed from the connection
+	// that times out is removed from the connection. The connection subscribes to an inbox per request, so a send that
+	// fails at once leaves nothing behind either (infra.NATSOptions).
 	ctx, cancel := context.WithTimeout(context.Background(), w.conf.taskTimeout)
 	defer cancel()
 	if _, err := w.NatsJS.PublishMsg(dead, nats.Context(ctx)); err != nil {
