@@ -29,6 +29,15 @@ var (
 		Name: prometheus.BuildFQName(ServiceName, "report", "reliability"),
 		Help: "Reliability distribution of report consumption",
 	}, []string{"reliability", "source_name"})
+	ReportPublishDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    prometheus.BuildFQName(ServiceName, "report", "publish_duration_seconds"),
+		Help:    "Duration of publishing a report task until it is acknowledged, fails or is abandoned in seconds",
+		Buckets: prometheus.ExponentialBuckets(0.001, 2, 15),
+	})
+	ReportPublishTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "report", "publish_total"),
+		Help: "Report task publishes by result (ok, error, timeout, ctx_cancelled)",
+	}, []string{"result"})
 	WorkerCalcDuration = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: prometheus.BuildFQName(ServiceName, "worker", "calc_duration_seconds"),
 		Help: "Duration of last worker calculation in seconds",

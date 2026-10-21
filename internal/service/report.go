@@ -15,6 +15,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/observability"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/pkg/pgid"
 	"exusiai.dev/backend-next/internal/repo"
@@ -28,6 +29,10 @@ var (
 	ErrAccountMissing = pgerr.ErrInvalidReq.Msg("account missing")
 	ErrNatsTimeout    = errors.New("timeout waiting for NATS response")
 )
+
+// natsPublishTimeout bounds how long commitReportTask waits for NATS to acknowledge a report task. It is a variable so
+// that tests can shorten it.
+var natsPublishTimeout = time.Second * 10
 
 type Report struct {
 	DB                     *bun.DB
@@ -202,21 +207,32 @@ func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.Re
 		return "", err
 	}
 
+	start := time.Now()
 	pub, err := s.NatsJS.PublishAsync(subject, reportTaskJsonBytes)
 	if err != nil {
+		observeReportPublish(start, "error")
 		return "", err
 	}
 
 	select {
 	case err := <-pub.Err():
+		observeReportPublish(start, "error")
 		return "", err
 	case <-pub.Ok():
+		observeReportPublish(start, "ok")
 		return taskId, nil
 	case <-ctx.UserContext().Done():
+		observeReportPublish(start, "ctx_cancelled")
 		return "", ctx.UserContext().Err()
-	case <-time.After(time.Second * 10):
+	case <-time.After(natsPublishTimeout):
+		observeReportPublish(start, "timeout")
 		return "", ErrNatsTimeout
 	}
+}
+
+func observeReportPublish(start time.Time, result string) {
+	observability.ReportPublishDuration.Observe(time.Since(start).Seconds())
+	observability.ReportPublishTotal.WithLabelValues(result).Inc()
 }
 
 // returns taskID and error, if any
