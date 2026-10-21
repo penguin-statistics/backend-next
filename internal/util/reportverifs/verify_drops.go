@@ -3,9 +3,7 @@ package reportverifs
 import (
 	"context"
 	"fmt"
-	"strings"
 
-	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
@@ -22,71 +20,6 @@ var (
 	ErrUnknownItemID        = errors.New("unknown item id")
 	ErrUnknownDropInfoTuple = errors.New("unknown drop type + item id tuple")
 )
-
-type DropVerifier struct {
-	DropInfoRepo *repo.DropInfo
-}
-
-// ensure DropVerifier conforms to pipelineVerifier
-var _ pipelineVerifier = (*DropVerifier)(nil)
-
-func NewDropVerifier(dropInfoRepo *repo.DropInfo) *DropVerifier {
-	return &DropVerifier{
-		DropInfoRepo: dropInfoRepo,
-	}
-}
-
-func (d *DropVerifier) Name() string {
-	return "drop"
-}
-
-func (d *DropVerifier) Verify(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) *Rejection {
-	itemDropInfos, typeDropInfos, err := d.DropInfoRepo.GetForCurrentTimeRangeWithDropTypes(ctx, &repo.DropInfoQuery{
-		Server:     reportTask.Server,
-		ArkStageId: report.StageID,
-	})
-	if err != nil {
-		return &Rejection{
-			Reliability: constant.ViolationReliabilityDrop,
-			Message:     err.Error(),
-		}
-	}
-
-	adjustDropInfosByTimes(itemDropInfos, typeDropInfos, report.Times)
-
-	if l := log.Trace(); l.Enabled() {
-		l.Interface("itemDropInfos", itemDropInfos).
-			Interface("typeDropInfos", typeDropInfos).
-			Msg("verifying drop")
-	}
-
-	var errs []error
-
-	if innerErrs := verifyDropType(report, typeDropInfos); innerErrs != nil {
-		errs = append(errs, innerErrs...)
-	}
-
-	if innerErrs := verifyDropItem(report, itemDropInfos); innerErrs != nil {
-		errs = append(errs, innerErrs...)
-	}
-
-	if len(errs) > 0 {
-		var b strings.Builder
-		for i, err := range errs {
-			b.WriteString(err.Error())
-			if i < len(errs)-1 {
-				b.WriteString(", ")
-			}
-		}
-
-		return &Rejection{
-			Reliability: constant.ViolationReliabilityDrop,
-			Message:     b.String(),
-		}
-	}
-
-	return nil
-}
 
 // verifyDrops returns how the drops of the report do not fit the drop infos of its stage, if they do not.
 func (v *Verifier) verifyDrops(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) ([]error, error) {

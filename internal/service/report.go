@@ -20,7 +20,6 @@ import (
 	"exusiai.dev/backend-next/internal/repo"
 	"exusiai.dev/backend-next/internal/util"
 	"exusiai.dev/backend-next/internal/util/reportutil"
-	"exusiai.dev/backend-next/internal/util/reportverifs"
 )
 
 var (
@@ -43,10 +42,9 @@ type Report struct {
 	DropPatternRepo        *repo.DropPattern
 	DropReportExtraRepo    *repo.DropReportExtra
 	DropPatternElementRepo *repo.DropPatternElement
-	ReportVerifier         *reportverifs.ReportVerifiers
 }
 
-func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *Item, stageService *Stage, stageRepo *repo.Stage, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *Account, timeRangeService *TimeRange, reportVerifier *reportverifs.ReportVerifiers) *Report {
+func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamContext, itemService *Item, stageService *Stage, stageRepo *repo.Stage, dropInfoRepo *repo.DropInfo, dropReportRepo *repo.DropReport, dropReportExtraRepo *repo.DropReportExtra, dropPatternRepo *repo.DropPattern, dropPatternElementRepo *repo.DropPatternElement, accountService *Account, timeRangeService *TimeRange) *Report {
 	service := &Report{
 		DB:                     db,
 		Redis:                  redisClient,
@@ -61,7 +59,6 @@ func NewReport(db *bun.DB, redisClient *redis.Client, natsJs nats.JetStreamConte
 		DropPatternRepo:        dropPatternRepo,
 		DropReportExtraRepo:    dropReportExtraRepo,
 		DropPatternElementRepo: dropPatternElementRepo,
-		ReportVerifier:         reportVerifier,
 	}
 	return service
 }
