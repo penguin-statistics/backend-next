@@ -11,7 +11,7 @@ Where the files live:
   files and never read S3.
 - A private AWS S3 bucket (`ap-southeast-1`) keeps a backup copy. It is written far more often than it is read.
   Only three things touch it: the uploads at archive time (`backfill.sh --upload` here, the monthly archiving
-  later), wal-g, and manual restores (`coldstore-pull`, coming in a later PR). Nothing downloads from it to check an
+  later), wal-g, and manual restores (`coldstore-pull`, see Restoring files from the bucket). Nothing downloads from it to check an
   upload. Uploads are confirmed by comparing hashes with the bucket's (see Upload).
 - The box's local cold store is first filled by an rsync from the backfill machine, not by a download from the
   bucket.
@@ -42,6 +42,7 @@ monthly archiving.
 | `coldstore-patch --dir DIR ...` | Applies an admin fix (reports deleted, reliability changed) to archived months and rewrites their files. |
 | `coldstore-recover --dir DIR [--month M]` | Completes or undoes a patch that stopped partway, from its journal and the manifest, without PostgreSQL. |
 | `coldstore-prodcheck --dir DIR` | Counts every archived month in the production database by UTC day and lists the months whose count differs from the manifest. |
+| `coldstore-pull --dir DIR --month M \| --dims \| --all` | Restores missing or corrupt files of the local copy from the bucket, checking their sha256 before moving them into place. The only command that reads the bucket. |
 | `scripts/coldstore/backfill.sh` | Runs export, verify and upload for many months in parallel, resumably. |
 
 The commands read the app's configuration from the environment without starting the app (no Redis or NATS needed).
@@ -332,6 +333,89 @@ backend run-script coldstore-patch --dir /data/coldstore-v1 --delete 123458 --fi
 - Then upload: `scripts/coldstore/backfill.sh --bin ./backend --out /data/coldstore-v1 --upload M`. Patched months
   are recognized and uploaded again, then the manifest.
 
+## Serving the cold storage (the app)
+
+With `PENGUIN_V3_COLDSTORE_ENABLED=true`, the app opens the local copy in `PENGUIN_V3_COLDSTORE_DIRECTORY` at startup
+(`coldstore.Reader`). Nothing queries it yet; the query routing comes in later PRs.
+
+| Setting (`PENGUIN_V3_...`) | Default | |
+|---|---|---|
+| `COLDSTORE_ENABLED` | `false` | |
+| `COLDSTORE_DIRECTORY` | | the local cold storage directory; required when enabled |
+| `COLDSTORE_THREADS` | `2` | DuckDB threads |
+| `COLDSTORE_MEMORY_LIMIT` | `1GB` | DuckDB memory limit |
+| `COLDSTORE_TEMP_DIRECTORY` | system temp | DuckDB's spill files (in a directory of its own) and the time of the last integrity check |
+| `COLDSTORE_RELOAD_INTERVAL` | `1m` | how often the manifest is checked for a change; `0` never |
+| `COLDSTORE_INTEGRITY_CHECK_INTERVAL` | `168h` | how often every file is hashed again; `0` never |
+
+- The app never reads the bucket. DuckDB is confined to the cold storage directory and its temp directory: external
+  access is off (`enable_external_access = false`, with only those two in `allowed_directories`), extensions are
+  never installed or loaded, and the configuration is locked, so a query cannot read `s3://`, `http://` or any
+  other path. Symbolic links in the directory (the directory itself and its `drop_reports`, `recruit`, ... subdirectories)
+  are resolved when the app starts; restart the app after pointing them elsewhere. The files themselves must not be
+  links: DuckDB would refuse to read them, so the app does not start, and `coldstore-manifest` refuses to index them.
+- At startup, every file of the manifest must be in the directory with the manifest's size (a `stat` of each file,
+  no reading), the manifest must hold `pre` and every month from 2019-05 to its last month without a gap, and no
+  patch may have stopped partway. Otherwise the app does not start, and the error names each bad month and the
+  `coldstore-pull` command that restores it.
+- The hot boundary is the first instant after the last archived month. Queries read `[start, boundary)` from the
+  cold storage and `[boundary, end)` from PostgreSQL, and add the counts. After the migration, PostgreSQL's
+  earliest partition starts at the boundary: drop a month's partition only after the app serves a manifest that
+  holds the month (`penguinbackend_coldstore_hot_boundary_timestamp_seconds` has moved past it). Before the migration
+  (shadow mode on the old database), PostgreSQL holds every month, more than the queries read from it.
+- The manifest is checked every `COLDSTORE_RELOAD_INTERVAL`. A changed manifest (a month archived, a month patched)
+  is served once all its files pass the startup checks. Until then the app keeps serving the previous one, logs
+  `coldstore.reader.reload_failed` and counts `penguinbackend_coldstore_manifest_reload_failures_total` at every
+  attempt. Put the files in place before the manifest (the export and the patch do).
+- A patch, a pull or an export replaces a month's files under the month's lock (`.locks/`), a patch one file after
+  the other once its manifest entry is committed. Each query holds a shared lock on the months (and the dims) whose
+  files it reads, from its start until its rows are read, so it never reads two generations of a month: a
+  publication waits for the queries of its month to end, and the queries that start meanwhile wait for it (until
+  their context ends). While a patch of a month has stopped partway (its journal is in `.journal/`), the queries
+  that read the month fail and name the `coldstore-recover` command; the other months are served. The app creates
+  the lock files, so `.locks/` must be writable by it.
+- The integrity check hashes every file, one at a time, on a thread at the lowest CPU and I/O priority, and compares
+  it with the manifest's sha256. It never repairs or downloads anything: it logs `coldstore.integrity.bad_file`
+  with the restore command and counts `penguinbackend_coldstore_integrity_files_total{result="mismatch"|"missing"}`;
+  `penguinbackend_coldstore_integrity_last_bad_files` is the count of the last completed check. Alert on it.
+  Each month (and the dims) is hashed under the queries' shared lock and against `manifest.json` as it is then, not
+  the manifest the app serves: a month patched since the last reload is not reported, and a publication of the
+  month waits for its hashing (and the hashing for a running publication). A month whose patch stopped partway is
+  skipped (`coldstore.integrity.skipped`). A check stopped by a shutdown, even within a file, is not completed:
+  neither the metrics nor the recorded time change. A check that fails (`coldstore.integrity.failed`, e.g. an
+  unreadable manifest) is not recorded either and runs again an hour later; if the time cannot be recorded, the
+  process still waits the interval. The first check after a start runs an hour later, unless the
+  last check recorded in the temp directory is more recent.
+
+## Restoring files from the bucket
+
+`coldstore-pull` is the only thing that reads the bucket, and only an operator runs it.
+
+```sh
+export COLDSTORE_S3_BUCKET=<bucket>
+export COLDSTORE_S3_ACCESS_KEY_ID=<key> COLDSTORE_S3_SECRET_ACCESS_KEY=<secret>
+backend run-script coldstore-pull --dir /data/coldstore-v1 --month 2023-10    # or --dims, or --all
+```
+
+- The local manifest says what the files must be. Files already in place (size and sha256) are skipped; the others
+  are downloaded next to their destination, hashed while they are written, and moved into place only if they match.
+  A bucket copy that does not match the local manifest (a month patched and not uploaded again) is refused.
+- Without a local manifest (a new machine), `--all` downloads the bucket's manifest and every file it lists, and
+  installs the manifest last, so a half-restored directory is never served. Prefer an rsync from a machine that has
+  the files: it costs nothing.
+- Before downloading, it refuses if a disk would be left with less than `--min-free-gib` (default 10) GiB free:
+  each disk the files are written to, the one of `--dir` or, for a subdirectory that is a link, the one it leads to.
+  The app refuses to start without its files rather than reading them remotely: grow the disk instead.
+- A file that is itself a symbolic link is replaced by the file, even when the link leads to the right content: the
+  app refuses linked files.
+- Each month is restored under the month's lock, so a patch or an export of the month never runs alongside, and
+  it refuses a month whose patch stopped partway (run `coldstore-recover`).
+- `COLDSTORE_S3_REGION` (default `ap-southeast-1`), `COLDSTORE_S3_PREFIX` (default `coldstore/v1`) and
+  `COLDSTORE_S3_ENDPOINT` (an S3-compatible server, path-style) are read as in `backfill.sh`. Without the two key
+  variables, the AWS SDK's default credentials are used.
+- A running app picks a restored file up by itself (DuckDB checks the cached footers against the files); a restored
+  manifest is picked up at the next reload.
+
 ## Verification, summarized
 
 | Check | Where | Catches |
@@ -343,6 +427,8 @@ backend run-script coldstore-patch --dir /data/coldstore-v1 --delete 123458 --fi
 | Files vs PostgreSQL read again | `coldstore-verify` | a bad read, a change in PostgreSQL after the export |
 | Daily counts vs production | `coldstore-prodcheck` | reports added or removed in production after the restore, outside the app; not reliability changes |
 | Daily reliable counts vs production | `coldstore-prodcheck --reliability`, for the months of the reevaluations applied after the restore | reliability changes that change the number of reliable reports |
+| Local files vs manifest (size) | the app's startup and every reload of the manifest | a missing or truncated file, before it is served |
+| Local files vs manifest (sha256 only) | the app's integrity check (weekly), `coldstore-pull` | a file corrupted on the box's disk |
 
 Row counts alone are never enough. A changed value, or another process's data mixed into a file, keeps every count
 and is caught only by the content hashes.
