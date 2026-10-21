@@ -187,8 +187,14 @@ type ConfigSpec struct {
 	// ColdstoreEnabled opens the local cold storage (#752) at startup with coldstore.Reader, so that queries can read
 	// the archived months from it. The app then refuses to start unless every file of the manifest in
 	// ColdstoreDirectory is there with its size; restore missing ones with run-script coldstore-pull. The app never
-	// reads the bucket. Nothing queries the cold storage yet.
+	// reads the bucket. Queries read from it only with ColdstoreQueriesEnabled.
 	ColdstoreEnabled bool `split_words:"true" default:"false"`
+
+	// ColdstoreQueriesEnabled reads the archived part (before the cold storage's hot boundary) of the time ranges of
+	// the personal drop matrix and of the drop matrix queries of /result/advanced from the cold storage, and only
+	// the rest from PostgreSQL; the two are added up. Requires ColdstoreEnabled. While PostgreSQL still holds every
+	// report (before the migration of #752), the results are the same either way.
+	ColdstoreQueriesEnabled bool `split_words:"true" default:"false"`
 
 	// ColdstoreDirectory is the local cold storage directory (manifest.json and the files it lists), on the disk of
 	// the machine the app runs on. Required when ColdstoreEnabled. DuckDB may read nothing else.

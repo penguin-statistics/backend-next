@@ -174,6 +174,60 @@ func (r *DropReport) CalcDropMatrixForIntervalsBySourceCategories(
 		return nil, nil, nil
 	}
 
+	plan := newDropMatrixPlan(queryCtxs)
+	first, last := plan.thresholds[0], plan.thresholds[len(plan.thresholds)-1]
+
+	var rows []dropMatrixRow
+
+	// There are far fewer distinct patterns than reports (CN: ~100k vs ~1.8M a day), so patterns are only
+	// expanded into their elements after counting.
+	perPattern := r.db.NewSelect().
+		TableExpr("drop_reports AS dr").
+		Column("dr.stage_id", "dr.pattern_id").
+		ColumnExpr(isManualSourceExpr, bun.In(constant.ManualSources)).
+		ColumnExpr("width_bucket(dr.created_at, ?::timestamptz[]) AS segment", pgdialect.Array(plan.thresholds)).
+		ColumnExpr("COUNT(*) AS count").
+		ColumnExpr("SUM(dr.times) AS times")
+	r.handleAccountAndReliability(perPattern, queryCtxs[0].AccountID)
+	if queryCtxs[0].ExcludeNonOneTimes {
+		r.handleTimes(perPattern, 1)
+	}
+	r.handleCreatedAtWithTime(perPattern, &first, &last)
+	r.handleServer(perPattern, queryCtxs[0].Server)
+	r.handleStages(perPattern, plan.stageIds)
+	perPattern = perPattern.Group("dr.stage_id", "dr.pattern_id", "is_manual", "segment")
+
+	if err := r.runWithStatementDeadline(ctx, func(ctx context.Context, db bun.IConn) error {
+		return r.db.NewRaw(`WITH a AS MATERIALIZED (?)
+		SELECT 'quantity' AS kind, a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment, SUM(a.count) AS value
+		FROM a JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = a.pattern_id
+		GROUP BY a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment
+		UNION ALL
+		SELECT 'times' AS kind, a.stage_id, 0, 0, a.is_manual, a.segment, SUM(a.times) AS value
+		FROM a
+		GROUP BY a.stage_id, a.is_manual, a.segment`, perPattern).
+			Conn(db).
+			Scan(ctx, &rows)
+	}); err != nil {
+		return nil, nil, err
+	}
+
+	timesResults, quantityUniqCountResults := plan.results(queryCtxs, rows, sourceCategories)
+	return timesResults, quantityUniqCountResults, nil
+}
+
+// dropMatrixPlan is how CalcDropMatrixForIntervalsBySourceCategories counts reports for several intervals at once:
+// per segment between consecutive interval boundaries, of the stages any interval needs.
+type dropMatrixPlan struct {
+	// thresholds are the interval boundaries, in whole seconds as handleCreatedAtWithTime compares them, in order.
+	// Segment i+1 is [thresholds[i], thresholds[i+1]), as width_bucket numbers it.
+	thresholds        []time.Time
+	segmentByBoundary map[int64]int
+	// stageIds are the stages to count, or none for every stage.
+	stageIds []int
+}
+
+func newDropMatrixPlan(queryCtxs []*model.DropReportQueryContext) dropMatrixPlan {
 	// interval boundaries in seconds, as handleCreatedAtWithTime compares them
 	boundarySet := make(map[int64]struct{})
 	stageIdSet := make(map[int]struct{})
@@ -195,69 +249,45 @@ func (r *DropReport) CalcDropMatrixForIntervalsBySourceCategories(
 		boundaries = append(boundaries, boundary)
 	}
 	sort.Slice(boundaries, func(i, j int) bool { return boundaries[i] < boundaries[j] })
-	thresholds := make([]time.Time, len(boundaries))
-	segmentByBoundary := make(map[int64]int, len(boundaries))
-	for i, boundary := range boundaries {
-		thresholds[i] = time.Unix(boundary, 0)
-		// width_bucket numbers the segment starting at thresholds[i] as i+1
-		segmentByBoundary[boundary] = i + 1
+	p := dropMatrixPlan{
+		thresholds:        make([]time.Time, len(boundaries)),
+		segmentByBoundary: make(map[int64]int, len(boundaries)),
+		stageIds:          make([]int, 0, len(stageIdSet)),
 	}
-	stageIds := make([]int, 0, len(stageIdSet))
+	for i, boundary := range boundaries {
+		p.thresholds[i] = time.Unix(boundary, 0)
+		// width_bucket numbers the segment starting at thresholds[i] as i+1
+		p.segmentByBoundary[boundary] = i + 1
+	}
 	if !allStages {
 		for stageId := range stageIdSet {
-			stageIds = append(stageIds, stageId)
+			p.stageIds = append(p.stageIds, stageId)
 		}
 	}
-	first, last := thresholds[0], thresholds[len(thresholds)-1]
+	return p
+}
 
-	var rows []struct {
-		Kind     string `bun:"kind"`
-		StageID  int    `bun:"stage_id"`
-		ItemID   int    `bun:"item_id"`
-		Quantity int    `bun:"quantity"`
-		IsManual bool   `bun:"is_manual"`
-		Segment  int    `bun:"segment"`
-		Value    int    `bun:"value"`
-	}
+// dropMatrixRow is a count of the reports of a segment: the reports ("times", SUM(times)) of a stage, or how many
+// of them dropped an item in a quantity ("quantity", COUNT(*)), of manual or automated sources.
+type dropMatrixRow struct {
+	Kind     string `bun:"kind"`
+	StageID  int    `bun:"stage_id"`
+	ItemID   int    `bun:"item_id"`
+	Quantity int    `bun:"quantity"`
+	IsManual bool   `bun:"is_manual"`
+	Segment  int    `bun:"segment"`
+	Value    int    `bun:"value"`
+}
 
-	// There are far fewer distinct patterns than reports (CN: ~100k vs ~1.8M a day), so patterns are only
-	// expanded into their elements after counting.
-	perPattern := r.db.NewSelect().
-		TableExpr("drop_reports AS dr").
-		Column("dr.stage_id", "dr.pattern_id").
-		ColumnExpr(isManualSourceExpr, bun.In(constant.ManualSources)).
-		ColumnExpr("width_bucket(dr.created_at, ?::timestamptz[]) AS segment", pgdialect.Array(thresholds)).
-		ColumnExpr("COUNT(*) AS count").
-		ColumnExpr("SUM(dr.times) AS times")
-	r.handleAccountAndReliability(perPattern, queryCtxs[0].AccountID)
-	if queryCtxs[0].ExcludeNonOneTimes {
-		r.handleTimes(perPattern, 1)
-	}
-	r.handleCreatedAtWithTime(perPattern, &first, &last)
-	r.handleServer(perPattern, queryCtxs[0].Server)
-	r.handleStages(perPattern, stageIds)
-	perPattern = perPattern.Group("dr.stage_id", "dr.pattern_id", "is_manual", "segment")
-
-	if err := r.runWithStatementDeadline(ctx, func(ctx context.Context, db bun.IConn) error {
-		return r.db.NewRaw(`WITH a AS MATERIALIZED (?)
-		SELECT 'quantity' AS kind, a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment, SUM(a.count) AS value
-		FROM a JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = a.pattern_id
-		GROUP BY a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment
-		UNION ALL
-		SELECT 'times' AS kind, a.stage_id, 0, 0, a.is_manual, a.segment, SUM(a.times) AS value
-		FROM a
-		GROUP BY a.stage_id, a.is_manual, a.segment`, perPattern).
-			Conn(db).
-			Scan(ctx, &rows)
-	}); err != nil {
-		return nil, nil, err
-	}
-
+// results adds the rows of the segments of each interval up, per source category, in the order of queryCtxs.
+func (p dropMatrixPlan) results(
+	queryCtxs []*model.DropReportQueryContext, rows []dropMatrixRow, sourceCategories []string,
+) ([]map[string][]*model.TotalTimesResult, []map[string][]*model.QuantityUniqCountResultForDropMatrix) {
 	timesResults := make([]map[string][]*model.TotalTimesResult, len(queryCtxs))
 	quantityUniqCountResults := make([]map[string][]*model.QuantityUniqCountResultForDropMatrix, len(queryCtxs))
 	for i, queryCtx := range queryCtxs {
-		fromSegment := segmentByBoundary[queryCtx.StartTime.Unix()]
-		toSegment := segmentByBoundary[queryCtx.EndTime.Unix()]
+		fromSegment := p.segmentByBoundary[queryCtx.StartTime.Unix()]
+		toSegment := p.segmentByBoundary[queryCtx.EndTime.Unix()]
 		intervalStageIds := queryCtx.GetStageIds()
 		intervalStageIdSet := make(map[int]struct{}, len(intervalStageIds))
 		for _, stageId := range intervalStageIds {
@@ -281,7 +311,7 @@ func (r *DropReport) CalcDropMatrixForIntervalsBySourceCategories(
 		}
 		timesResults[i], quantityUniqCountResults[i] = splitDropMatrixRowsBySourceCategories(timesRows, quantityRows, sourceCategories)
 	}
-	return timesResults, quantityUniqCountResults, nil
+	return timesResults, quantityUniqCountResults
 }
 
 type dropMatrixTimesRow struct {

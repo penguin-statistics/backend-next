@@ -336,7 +336,9 @@ backend run-script coldstore-patch --dir /data/coldstore-v1 --delete 123458 --fi
 ## Serving the cold storage (the app)
 
 With `PENGUIN_V3_COLDSTORE_ENABLED=true`, the app opens the local copy in `PENGUIN_V3_COLDSTORE_DIRECTORY` at startup
-(`coldstore.Reader`). Nothing queries it yet; the query routing comes in later PRs.
+(`coldstore.Reader`). With `PENGUIN_V3_COLDSTORE_QUERIES_ENABLED=true` as well, the personal drop matrix and the drop
+matrix queries of `/result/advanced` read the archived part of their time ranges from it (see below); the other
+queries come in later PRs.
 
 | Setting (`PENGUIN_V3_...`) | Default | |
 |---|---|---|
@@ -347,6 +349,7 @@ With `PENGUIN_V3_COLDSTORE_ENABLED=true`, the app opens the local copy in `PENGU
 | `COLDSTORE_TEMP_DIRECTORY` | system temp | DuckDB's spill files (in a directory of its own) and the time of the last integrity check |
 | `COLDSTORE_RELOAD_INTERVAL` | `1m` | how often the manifest is checked for a change; `0` never |
 | `COLDSTORE_INTEGRITY_CHECK_INTERVAL` | `168h` | how often every file is hashed again; `0` never |
+| `COLDSTORE_QUERIES_ENABLED` | `false` | read the archived part of the drop matrix queries from the cold storage; requires `COLDSTORE_ENABLED` |
 
 - The app never reads the bucket. DuckDB is confined to the cold storage directory and its temp directory: external
   access is off (`enable_external_access = false`, with only those two in `allowed_directories`), extensions are
@@ -363,6 +366,15 @@ With `PENGUIN_V3_COLDSTORE_ENABLED=true`, the app opens the local copy in `PENGU
   earliest partition starts at the boundary: drop a month's partition only after the app serves a manifest that
   holds the month (`penguinbackend_coldstore_hot_boundary_timestamp_seconds` has moved past it). Before the migration
   (shadow mode on the old database), PostgreSQL holds every month, more than the queries read from it.
+- How the drop matrix queries read the cold storage (`repo.ColdDropReport`): the reports of an account (personal
+  matrix, personal advanced queries) from `drop_reports` files, whose sort by server and account skips most row
+  groups; the other queries the whole UTC hours of their time ranges from `rollup` and only the first and last
+  partial hours from `drop_reports`. The recruit stage, which those files leave out, is read from `recruit` in
+  both cases when the query covers it (every personal matrix does): its files are sorted by time, so a personal
+  query reads the account column of every recruit file of its range (about 1.5 s for a typical account, 5 s of the
+  8 s of the heaviest account over the full history on the prototype). The counts are those of PostgreSQL for the
+  same reports, and are added to PostgreSQL's for the part from the boundary on. Query durations:
+  `penguinbackend_coldstore_query_duration_seconds{query="drop_matrix"}`.
 - The manifest is checked every `COLDSTORE_RELOAD_INTERVAL`. A changed manifest (a month archived, a month patched)
   is served once all its files pass the startup checks. Until then the app keeps serving the previous one, logs
   `coldstore.reader.reload_failed` and counts `penguinbackend_coldstore_manifest_reload_failures_total` at every
