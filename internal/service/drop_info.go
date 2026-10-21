@@ -90,23 +90,18 @@ func (s *DropInfo) GetAppearStageIdsByServer(ctx context.Context, server string)
 	return stageIds, nil
 }
 
-func (s *DropInfo) GetCurrentDropInfosByServer(ctx context.Context, server string) ([]*model.DropInfo, error) {
-	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
-	if err != nil {
-		return nil, err
-	}
+// GetOpeningStageIdsByServer returns the distinct ids of the stages of server with a drop info in a current time
+// range, reading only those stage ids instead of every drop info of server.
+func (s *DropInfo) GetOpeningStageIdsByServer(ctx context.Context, server string) ([]int, error) {
 	currentTimeRanges, err := s.TimeRangeService.GetCurrentTimeRangesByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
-	currentTimeRangesMap := make(map[int]*model.TimeRange)
+	rangeIds := make([]int, 0, len(currentTimeRanges))
 	for _, timeRange := range currentTimeRanges {
-		currentTimeRangesMap[timeRange.RangeID] = timeRange
+		rangeIds = append(rangeIds, timeRange.RangeID)
 	}
-	linq.From(dropInfos).WhereT(func(dropInfo *model.DropInfo) bool {
-		return currentTimeRangesMap[dropInfo.RangeID] != nil
-	}).ToSlice(&dropInfos)
-	return dropInfos, nil
+	return s.DropInfoRepo.GetStageIdsByServerAndRangeIds(ctx, server, rangeIds)
 }
 
 func (s *DropInfo) CloneDropInfosFromCN(ctx context.Context, originRangeId int, destRangeId int, server string) error {
