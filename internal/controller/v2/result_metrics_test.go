@@ -19,6 +19,7 @@ import (
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/pkg/observability"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/repo"
 	"exusiai.dev/backend-next/internal/server/httpserver"
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
@@ -186,6 +187,44 @@ func TestObserveAdvancedQueryPanic(t *testing.T) {
 	}
 }
 
+func TestObserveAdvancedQueryTimeout(t *testing.T) {
+	const took = 50 * time.Millisecond
+	app := newAdvancedQueryMetricsTestApp(observeAdvancedQuery, func(ctx *fiber.Ctx) error {
+		time.Sleep(took)
+		return ErrAdvancedQueryTimeout
+	})
+
+	timeouts := observability.AdvancedQueryRequests.WithLabelValues(advancedQueryOutcomeTimeout)
+	clientErrors := observability.AdvancedQueryRequests.WithLabelValues(advancedQueryOutcomeClientError)
+	before, clientErrorsBefore := testutil.ToFloat64(timeouts), testutil.ToFloat64(clientErrors)
+	observer := observability.AdvancedQueryDuration.WithLabelValues(advancedQueryOutcomeTimeout)
+	beforeCount, beforeSum := histogramCountAndSum(t, observer)
+
+	// the client is still answered with a 400, but the request counts as a timeout, not as a client error
+	resp := postAdvanced(t, app, "{}")
+	if resp.StatusCode != fiber.StatusBadRequest {
+		t.Errorf("status: got %d, want %d", resp.StatusCode, fiber.StatusBadRequest)
+	}
+	if got := testutil.ToFloat64(timeouts); got != before+1 {
+		t.Errorf("requests with outcome %q: got %v, want %v", advancedQueryOutcomeTimeout, got, before+1)
+	}
+	if got := testutil.ToFloat64(clientErrors); got != clientErrorsBefore {
+		t.Errorf("requests with outcome %q: got %v, want %v", advancedQueryOutcomeClientError, got, clientErrorsBefore)
+	}
+	count, sum := histogramCountAndSum(t, observer)
+	if count != beforeCount+1 {
+		t.Errorf("timeout duration samples: got %d, want %d", count, beforeCount+1)
+	}
+	if sum-beforeSum < took.Seconds() {
+		t.Errorf("observed timeout duration %vs, want at least %vs", sum-beforeSum, took.Seconds())
+	}
+
+	// any other invalid request stays a client error
+	if got := advancedQueryOutcome(nil, pgerr.ErrInvalidReq.Msg("query timed out")); got != advancedQueryOutcomeClientError {
+		t.Errorf("outcome of another invalid request: got %q, want %q", got, advancedQueryOutcomeClientError)
+	}
+}
+
 func TestRejectAdvancedQuery(t *testing.T) {
 	const wait = 50 * time.Millisecond
 	entered := make(chan struct{})
@@ -260,8 +299,12 @@ func TestRejectAdvancedQuery(t *testing.T) {
 func TestAdvancedQueryRoute(t *testing.T) {
 	app := fiber.New(fiber.Config{ErrorHandler: httpserver.ErrorHandler})
 	app.Use(middlewares.InjectI18n())
-	// personal queries without a PenguinID are rejected before any lookup, so no other service is needed
-	RegisterResult(&svr.V2{Router: app.Group("/PenguinStats/api/v2")}, Result{AccountService: &service.Account{}})
+	// personal queries without a PenguinID are rejected before any lookup, so no other service is needed; setting the
+	// statement timeout of a query does not touch the database
+	RegisterResult(&svr.V2{Router: app.Group("/PenguinStats/api/v2")}, Result{
+		AccountService:    &service.Account{},
+		DropReportService: &service.DropReport{DropReportRepo: &repo.DropReport{}},
+	})
 	const path = "/PenguinStats/api/v2/result/advanced"
 	query := `{"server":"CN","stageId":"main_01-07","isPersonal":true}`
 

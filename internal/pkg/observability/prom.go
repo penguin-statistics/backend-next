@@ -89,7 +89,7 @@ var (
 	}, []string{"outcome"})
 	AdvancedQueryRequests = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: prometheus.BuildFQName(ServiceName, "advanced_query", "requests_total"),
-		Help: "Number of advanced query requests handled, by outcome (ok, client_error, error, rejected)",
+		Help: "Number of advanced query requests handled, by outcome (ok, client_error, error, rejected, timeout)",
 	}, []string{"outcome"})
 	AdvancedQueryQueriesPerRequest = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    prometheus.BuildFQName(ServiceName, "advanced_query", "queries_per_request"),

@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"context"
 	"strconv"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	cachemiddleware "github.com/gofiber/fiber/v2/middleware/cache"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/utils"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
@@ -29,6 +31,9 @@ import (
 // ErrIntervalLengthTooSmall is returned when the interval length is invalid
 var ErrIntervalLengthTooSmall = pgerr.ErrInvalidReq.Msg("interval length must be greater than 1 hour")
 
+// ErrAdvancedQueryTimeout is returned when an advanced query request ran out of advancedQueryTimeout
+var ErrAdvancedQueryTimeout = pgerr.ErrInvalidReq.Msg("query timed out: the request ran longer than %d seconds and was cancelled. Please narrow down the time ranges of its queries", int(advancedQueryTimeout.Seconds()))
+
 const (
 	// advancedQueryConcurrency is how many advanced query requests the process runs at the same time. Each of them
 	// scans drop reports for as long as its time range requires, and a few running together saturate the database
@@ -38,12 +43,19 @@ const (
 	// advancedQueryConcurrencyWait is how long an advanced query request waits for a running one to finish before it
 	// is rejected.
 	advancedQueryConcurrencyWait = 5 * time.Second
+
+	// advancedQueryTimeout is how long the queries of an advanced query request run in total. Each of them runs with
+	// what is left of it as the statement timeout, after which PostgreSQL cancels a statement: neither a client
+	// disconnecting nor a context ending stops a running statement on the server. As each statement of a query can
+	// take what is left, and a query runs two aggregations, a request runs for at most about twice as long.
+	advancedQueryTimeout = 60 * time.Second
 )
 
 type Result struct {
 	fx.In
 
 	DropMatrixService    *service.DropMatrix
+	DropReportService    *service.DropReport
 	PatternMatrixService *service.PatternMatrix
 	TrendService         *service.Trend
 	AccountService       *service.Account
@@ -271,8 +283,9 @@ func (c *Result) AdvancedQuery(ctx *fiber.Ctx) error {
 	result := &modelv2.AdvancedQueryResult{
 		AdvancedResults: make([]any, 0),
 	}
+	deadline := time.Now().Add(advancedQueryTimeout)
 	for _, query := range request.Queries {
-		oneResult, err := c.handleAdvancedQuery(ctx, query)
+		oneResult, err := c.runAdvancedQuery(ctx, query, deadline)
 		if err != nil {
 			return err
 		}
@@ -287,6 +300,9 @@ const (
 	advancedQueryOutcomeError       = "error"
 	// advancedQueryOutcomeRejected is a request turned away by the concurrency limit in front of observeAdvancedQuery
 	advancedQueryOutcomeRejected = "rejected"
+	// advancedQueryOutcomeTimeout is a request answered with ErrAdvancedQueryTimeout, a 400 told apart from the other
+	// client errors as the request did not fit in advancedQueryTimeout
+	advancedQueryOutcomeTimeout = "timeout"
 )
 
 // rejectAdvancedQuery answers an advanced query request that found every slot of the concurrency limit busy for
@@ -327,8 +343,11 @@ func observeAdvancedQuery(ctx *fiber.Ctx) (err error) {
 
 // advancedQueryOutcome classifies a request by the status its client is answered with: the status already written
 // when no error is returned, or else the status httpserver.ErrorHandler answers err with. A 4xx is a client error,
-// a 5xx is an error.
+// a 5xx is an error. ErrAdvancedQueryTimeout, though a 400, is a timeout.
 func advancedQueryOutcome(ctx *fiber.Ctx, err error) string {
+	if errors.Is(err, ErrAdvancedQueryTimeout) {
+		return advancedQueryOutcomeTimeout
+	}
 	status := fiber.StatusInternalServerError
 	switch e := err.(type) {
 	case nil:
@@ -348,7 +367,26 @@ func advancedQueryOutcome(ctx *fiber.Ctx, err error) string {
 	}
 }
 
-func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery) (any, error) {
+// runAdvancedQuery runs one query of an advanced query request, with the time left until deadline as its statement
+// timeout.
+func (c *Result) runAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery, deadline time.Time) (any, error) {
+	timeout := time.Until(deadline)
+	if timeout <= 0 {
+		return nil, ErrAdvancedQueryTimeout
+	}
+	var result any
+	err := c.DropReportService.RunWithStatementTimeout(ctx.UserContext(), timeout, func(qctx context.Context) (err error) {
+		result, err = c.handleAdvancedQuery(ctx, qctx, query)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// handleAdvancedQuery runs one query of an advanced query request. qctx is the context its queries run with.
+func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, qctx context.Context, query *types.AdvancedQuery) (any, error) {
 	// handle isPersonal (might be null) and account
 	isPersonal := false
 	if query.IsPersonal.Valid {
@@ -379,7 +417,7 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 	endTime := time.UnixMilli(endTimeMilli)
 
 	// handle ark stage id
-	stage, err := c.StageService.GetStageByArkId(ctx.UserContext(), query.StageID)
+	stage, err := c.StageService.GetStageByArkId(qctx, query.StageID)
 	if err != nil {
 		return nil, err
 	}
@@ -387,7 +425,7 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 	// handle item ids
 	itemIds := make([]int, 0)
 	for _, arkItemID := range query.ItemIDs {
-		item, err := c.ItemService.GetItemByArkId(ctx.UserContext(), arkItemID)
+		item, err := c.ItemService.GetItemByArkId(qctx, arkItemID)
 		if err != nil {
 			return nil, err
 		}
@@ -406,7 +444,7 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 			StartTime: &startTime,
 			EndTime:   &endTime,
 		}
-		return c.DropMatrixService.GetShimCustomizedDropMatrixResults(ctx.UserContext(), query.Server, timeRange, []int{stage.StageID}, itemIds, accountId, sourceCategory)
+		return c.DropMatrixService.GetShimCustomizedDropMatrixResults(qctx, query.Server, timeRange, []int{stage.StageID}, itemIds, accountId, sourceCategory)
 	} else {
 		// interval originally is in milliseconds, so we need to convert it to nanoseconds
 		intervalLength := time.Duration(query.Interval.Int64 * 1e6).Round(time.Hour)
@@ -418,7 +456,7 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery)
 			return nil, pgerr.ErrInvalidReq.Msg("too many sections: interval number is %d sections, which is larger than %d sections", intervalNum, constant.MaxIntervalNum)
 		}
 
-		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(ctx.UserContext(), query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, accountId, sourceCategory)
+		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(qctx, query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, accountId, sourceCategory)
 		if err != nil {
 			return nil, err
 		}
