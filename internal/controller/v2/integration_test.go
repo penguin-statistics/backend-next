@@ -168,7 +168,7 @@ func TestGetStagesLastModifiedRecalculated(t *testing.T) {
 
 	// calculated during the first request, whose response is sent without a last modified time
 	get(t, app, target, "")
-	resp, body := get(t, app, target, "")
+	resp, body := getCacheable(t, app, target)
 	lastModified := resp.Header.Get(fiber.HeaderLastModified)
 	if resp.StatusCode != fiber.StatusOK || !strings.Contains(body, `"1-7"`) || lastModified == "" {
 		t.Fatalf("status %d, Last-Modified %q, body %s", resp.StatusCode, lastModified, body)

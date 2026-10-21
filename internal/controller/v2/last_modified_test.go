@@ -47,6 +47,20 @@ func get(t *testing.T, app *fiber.App, target string, modifiedSince string) (*ht
 	return resp, string(body)
 }
 
+// getCacheable is get, repeated while the response has no Last-Modified, for up to 5 seconds: a response calculated a
+// moment ago is sent without one until the Date reaches its last modified time (see sendCacheable).
+func getCacheable(t *testing.T, app *fiber.App, target string) (*http.Response, string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		resp, body := get(t, app, target, "")
+		if resp.Header.Get(fiber.HeaderLastModified) != "" || time.Now().After(deadline) {
+			return resp, body
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
 // the stages are served from the cache, which the tests fill instead of a database
 func TestGetStagesWithoutLastModified(t *testing.T) {
 	app := newCacheTestApp(t)

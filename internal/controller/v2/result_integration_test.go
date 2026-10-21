@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -72,7 +73,14 @@ func TestPersonalMatricesAreNotCacheable(t *testing.T) {
 	}
 	for _, tt := range tests {
 		get(tt.path)
-		if got := get(tt.path).Header.Get(fiber.HeaderCacheControl); got != tt.want {
+		got := get(tt.path).Header.Get(fiber.HeaderCacheControl)
+		// a global matrix calculated a moment ago is sent without caching headers until the Date reaches its last
+		// modified time (see sendCacheable)
+		for deadline := time.Now().Add(5 * time.Second); got == "" && time.Now().Before(deadline); {
+			time.Sleep(50 * time.Millisecond)
+			got = get(tt.path).Header.Get(fiber.HeaderCacheControl)
+		}
+		if got != tt.want {
 			t.Errorf("%s: Cache-Control %q, want %q", tt.path, got, tt.want)
 		}
 	}
