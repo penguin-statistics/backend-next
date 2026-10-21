@@ -44,13 +44,15 @@ jobs:
           --health-retries 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           # the toolchain the Dockerfile builds with
           go-version: "1.24.5"
+          # setup-go v6+ keys the module cache on go.mod by default; keep keying it on go.sum
+          cache-dependency-path: go.sum
 
       - name: Vet
         run: |
