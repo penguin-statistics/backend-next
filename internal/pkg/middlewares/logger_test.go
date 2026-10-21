@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"exusiai.dev/gommon/constant"
 	"github.com/gofiber/fiber/v2"
@@ -16,11 +18,13 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const testReadTimeout = 200 * time.Millisecond
+
 // newLoggedApp returns an app with the request logger and, inside it, the panic
 // recoverer installed, writing to buf, and a pointer to the number of times the
 // app's error handler ran. Unlike the service app there is no otelfiber, so a
 // route's error reaches the logger as an error from an inner middleware would.
-func newLoggedApp(t *testing.T, buf *bytes.Buffer) (*fiber.App, *int) {
+func newLoggedApp(t *testing.T, buf io.Writer) (*fiber.App, *int) {
 	t.Helper()
 
 	// injectLogger copies the global logger when the middleware is created
@@ -30,6 +34,10 @@ func newLoggedApp(t *testing.T, buf *bytes.Buffer) (*fiber.App, *int) {
 
 	errorHandlerCalls := 0
 	app := fiber.New(fiber.Config{
+		DisableStartupMessage: true,
+		// as in production (20s there), so that a request handled for longer has
+		// its read deadline in the past when the request logger runs
+		ReadTimeout: testReadTimeout,
 		// as in production, without the trusted proxy check
 		ProxyHeader: "X-Original-Forwarded-For",
 		ErrorHandler: func(ctx *fiber.Ctx, err error) error {
