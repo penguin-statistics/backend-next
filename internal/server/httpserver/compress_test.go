@@ -127,6 +127,9 @@ func representationHeaders(resp *http.Response) http.Header {
 	return h
 }
 
+// wantVary is the Vary of each response compression may encode, whether it encodes it or not
+const wantVary = "Origin, Accept-Encoding"
+
 func TestServiceAppCompressesByAcceptEncoding(t *testing.T) {
 	app, payload, _ := newCompressTestApp(t)
 
@@ -144,8 +147,9 @@ func TestServiceAppCompressesByAcceptEncoding(t *testing.T) {
 	if got := identity.Header.Get(fiber.HeaderContentLength); got != strconv.Itoa(len(payload)) {
 		t.Errorf("Content-Length without Accept-Encoding %s, want %d", got, len(payload))
 	}
-	if got := identity.Header.Get(fiber.HeaderVary); got != fiber.HeaderOrigin {
-		t.Errorf("Vary without Accept-Encoding %q, want %q", got, fiber.HeaderOrigin)
+	// the identity response varies on Accept-Encoding as well, or a shared cache could send it to every client
+	if got := identity.Header.Get(fiber.HeaderVary); got != wantVary {
+		t.Errorf("Vary without Accept-Encoding %q, want %q", got, wantVary)
 	}
 	for _, k := range []string{fiber.HeaderLastModified, fiber.HeaderCacheControl, fiber.HeaderContentType, fiber.HeaderAccessControlAllowOrigin} {
 		if identity.Header.Get(k) == "" {
@@ -171,13 +175,11 @@ func TestServiceAppCompressesByAcceptEncoding(t *testing.T) {
 			if got := resp.Header.Get(fiber.HeaderContentEncoding); got != tt.want {
 				t.Fatalf("Content-Encoding %q, want %q", got, tt.want)
 			}
-			if tt.want != "" {
-				if len(body)*5 > len(payload) {
-					t.Errorf("compressed to %d of %d bytes, want under a fifth", len(body), len(payload))
-				}
-				if got := resp.Header.Get(fiber.HeaderVary); got != "Origin,Accept-Encoding" {
-					t.Errorf("Vary %q, want Origin,Accept-Encoding", got)
-				}
+			if tt.want != "" && len(body)*5 > len(payload) {
+				t.Errorf("compressed to %d of %d bytes, want under a fifth", len(body), len(payload))
+			}
+			if got := resp.Header.Get(fiber.HeaderVary); got != wantVary {
+				t.Errorf("Vary %q, want %q", got, wantVary)
 			}
 			if got := resp.Header.Get(fiber.HeaderContentLength); got != strconv.Itoa(len(body)) {
 				t.Errorf("Content-Length %s, want %d", got, len(body))
@@ -229,6 +231,9 @@ func TestServiceAppCompressesResultCacheHits(t *testing.T) {
 			}
 			if got := resp.Header.Get(fiber.HeaderContentEncoding); got != wantEncoding {
 				t.Errorf("%s %q: Content-Encoding %q, want %q", path, acceptEncoding, got, wantEncoding)
+			}
+			if got := resp.Header.Get(fiber.HeaderVary); got != wantVary {
+				t.Errorf("%s %q: Vary %q, want %q", path, acceptEncoding, got, wantVary)
 			}
 			if !bytes.Equal(decode(t, resp, body), payload) {
 				t.Errorf("%s %q: decoded body differs from the handler's JSON", path, acceptEncoding)

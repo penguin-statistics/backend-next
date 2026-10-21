@@ -90,6 +90,16 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 	app.Use(compress.New(compress.Config{
 		Level: compress.LevelBestSpeed,
 	}))
+	// fasthttp adds Vary: Accept-Encoding only to the responses it compresses, but the identity response to a request
+	// without Accept-Encoding varies on it too: without the header a shared cache could serve that uncompressed body
+	// to clients that accept compression. Errors are left to ErrorHandler and are not compressed, so they do not vary.
+	app.Use(func(c *fiber.Ctx) error {
+		if err := c.Next(); err != nil {
+			return err
+		}
+		c.Vary(fiber.HeaderAcceptEncoding)
+		return nil
+	})
 
 	app.Use(func(c *fiber.Ctx) error {
 		// Use custom error handler to return customized error responses
