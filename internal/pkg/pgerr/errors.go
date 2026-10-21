@@ -10,6 +10,8 @@ const (
 	CodeNotFound       = "NOT_FOUND"
 	CodeInvalidRequest = "INVALID_REQUEST"
 	CodeInternalError  = "INTERNAL_ERROR"
+
+	CodeServiceUnavailable = "SERVICE_UNAVAILABLE"
 )
 
 var (
