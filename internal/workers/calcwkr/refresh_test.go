@@ -164,24 +164,24 @@ func TestGlobalCachesWarmUpIsOffWithoutRequestsToServe(t *testing.T) {
 	})
 }
 
-func TestGlobalCachesRefreshRunsEveryRefreshDespiteFailures(t *testing.T) {
-	var refreshed []string
-	refresh := func(name string, err error) cacheRefresh {
-		return cacheRefresh{name, func(_ context.Context, server string) error {
-			refreshed = append(refreshed, name+" "+server)
+func TestGlobalCachesWarmUpRunsEveryWarmUpDespiteFailures(t *testing.T) {
+	var warmed []string
+	warmUp := func(name string, err error) cacheWarmUp {
+		return cacheWarmUp{name, func(_ context.Context, server string) error {
+			warmed = append(warmed, name+" "+server)
 			return err
 		}}
 	}
-	err := refreshEach(context.Background(), "CN", []cacheRefresh{
-		refresh("globalDropMatrix", errors.New("failed")), refresh("globalPatternMatrix", nil), refresh("shimTrend", errors.New("failed")),
+	err := warmUpEach(context.Background(), "CN", []cacheWarmUp{
+		warmUp("globalDropMatrix", errors.New("failed")), warmUp("globalPatternMatrix", nil), warmUp("shimTrend", errors.New("failed")),
 	})
-	if got, want := strings.Join(refreshed, ", "), "globalDropMatrix CN, globalPatternMatrix CN, shimTrend CN"; got != want {
-		t.Errorf("refreshed %s, want %s", got, want)
+	if got, want := strings.Join(warmed, ", "), "globalDropMatrix CN, globalPatternMatrix CN, shimTrend CN"; got != want {
+		t.Errorf("warmed up %s, want %s", got, want)
 	}
-	if err == nil || err.Error() != "failed to refresh globalDropMatrix, shimTrend" {
-		t.Errorf("got error %v, want one naming every failed refresh", err)
+	if err == nil || err.Error() != "failed to warm up globalDropMatrix, shimTrend" {
+		t.Errorf("got error %v, want one naming every failed warm-up", err)
 	}
-	if err := refreshEach(context.Background(), "CN", []cacheRefresh{refresh("globalDropMatrix", nil)}); err != nil {
+	if err := warmUpEach(context.Background(), "CN", []cacheWarmUp{warmUp("globalDropMatrix", nil)}); err != nil {
 		t.Errorf("got error %v, want none", err)
 	}
 }

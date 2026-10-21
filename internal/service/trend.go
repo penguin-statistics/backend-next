@@ -57,6 +57,13 @@ func (s *Trend) GetShimTrend(ctx context.Context, server string) (*modelv2.Trend
 	return &shimResult, nil
 }
 
+// WarmUpShimTrend fills the cached trend of server as a request does: it skips it if it is cached, and waits for a
+// calculation a request runs instead of running another one. RefreshShimTrend recalculates it instead.
+func (s *Trend) WarmUpShimTrend(ctx context.Context, server string) error {
+	_, err := s.GetShimTrend(ctx, server)
+	return err
+}
+
 // RefreshShimTrend recalculates the trend of server from the drop matrix elements and replaces the cached one.
 // Requests keep getting the previous one in the meantime instead of waiting for a recalculation, unless the cache is
 // cold: then they wait for the refresh, see cache.Set.Refresh. The trend is not cached if it was dropped or replaced

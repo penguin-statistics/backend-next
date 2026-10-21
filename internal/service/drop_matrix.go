@@ -91,6 +91,20 @@ func (s *DropMatrix) GetShimDropMatrix(
 	return &results, nil
 }
 
+// WarmUpGlobalDropMatrixCaches fills the cached global drop matrices of server (for every source category, raw and
+// shim with and without closed zones) as requests do: it skips those cached, and waits for a calculation a request
+// runs instead of running another one. RefreshGlobalDropMatrixCaches recalculates them instead.
+func (s *DropMatrix) WarmUpGlobalDropMatrixCaches(ctx context.Context, server string) error {
+	for _, sourceCategory := range s.Config.MatrixWorkerSourceCategories {
+		for _, showClosedZones := range []bool{true, false} {
+			if _, err := s.GetShimDropMatrix(ctx, server, showClosedZones, "", "", null.Int{}, sourceCategory); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // =========== Global Max Accumulable ===========
 
 // Calc today's drop matrix elements and save to DB
