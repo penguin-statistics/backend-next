@@ -27,11 +27,26 @@ func natsErrorHandler(conn *nats.Conn, sub *nats.Subscription, err error) {
 	ev.Msg("nats error")
 }
 
+// NATSOptions are the options of the NATS connection of the app.
+func NATSOptions() []nats.Option {
+	return []nats.Option{
+		nats.PingInterval(time.Second * 20),
+		nats.ErrorHandler(natsErrorHandler),
+		// keep reconnecting for as long as NATS is down: with the default of 60 attempts 2s apart the connection
+		// closes for good after about 2 minutes, and every report publish fails until the pod restarts
+		nats.MaxReconnects(-1),
+		// A request (a synchronous JetStream publish, AckSync, a JetStream API call) subscribes to an inbox of its own
+		// and unsubscribes however it ends. The default style shares one inbox subscription and keeps a response entry
+		// per request in the connection, which the client (v1.24.0, and v1.41.2 still) never removes when the send
+		// fails at once, such as with a full reconnect buffer or a payload over the limit: each such report would leak
+		// one until the connection closes. The cost is a SUB and an UNSUB per request.
+		nats.UseOldRequestStyle(),
+	}
+}
+
 // natsConnect connects to NATS and registers the connection metrics.
 func natsConnect(url string) (*nats.Conn, error) {
-	// keep reconnecting for as long as NATS is down: with the default of 60 attempts 2s apart the connection closes
-	// for good after about 2 minutes, and every report publish fails until the pod restarts
-	nc, err := nats.Connect(url, nats.PingInterval(time.Second*20), nats.ErrorHandler(natsErrorHandler), nats.MaxReconnects(-1))
+	nc, err := nats.Connect(url, NATSOptions()...)
 	if err != nil {
 		return nil, err
 	}

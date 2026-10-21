@@ -205,7 +205,8 @@ func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.Re
 	}
 
 	// Wait for the stream to store the task. An asynchronous publish leaks the ack of a task given up on, and once
-	// such acks reach the limit of pending ones, every publish stalls.
+	// such acks reach the limit of pending ones, every publish stalls. The connection makes each request on an inbox
+	// of its own (infra.NATSOptions), so a publish whose send fails at once leaks nothing either.
 	start := time.Now()
 	pubCtx, cancel := context.WithTimeout(ctx.UserContext(), natsPublishTimeout)
 	defer cancel()
