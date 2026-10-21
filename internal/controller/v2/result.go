@@ -44,11 +44,16 @@ const (
 	// is rejected.
 	advancedQueryConcurrencyWait = 5 * time.Second
 
-	// advancedQueryTimeout is how long the queries of an advanced query request run in total. Each of them runs with
-	// what is left of it as the statement timeout, after which PostgreSQL cancels a statement: neither a client
-	// disconnecting nor a context ending stops a running statement on the server. As each statement of a query can
-	// take what is left, and a query runs two aggregations, a request runs for at most about twice as long.
+	// advancedQueryTimeout is how long the queries of an advanced query request run in total. Each drop report
+	// aggregation runs with what is left of it as its statement timeout, after which PostgreSQL cancels it: neither a
+	// client disconnecting nor a context ending stops a running statement on the server.
 	advancedQueryTimeout = 60 * time.Second
+
+	// advancedQueryLookupGrace is how much longer than advancedQueryTimeout the context of the queries of a request
+	// lasts. That context bounds what the statement timeout does not: the stage, item, drop info and time range
+	// lookups, and the waits for a pool connection. It lasts longer so that PostgreSQL, not the driver, ends an
+	// aggregation at the deadline, which keeps the connection usable and the error a statement timeout.
+	advancedQueryLookupGrace = 2 * time.Second
 )
 
 type Result struct {
@@ -367,19 +372,24 @@ func advancedQueryOutcome(ctx *fiber.Ctx, err error) string {
 	}
 }
 
-// runAdvancedQuery runs one query of an advanced query request, with the time left until deadline as its statement
-// timeout.
+// runAdvancedQuery runs one query of an advanced query request, with the time left until deadline as the statement
+// timeout of its aggregations, and a context ending advancedQueryLookupGrace after deadline for its other queries.
 func (c *Result) runAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery, deadline time.Time) (any, error) {
 	timeout := time.Until(deadline)
 	if timeout <= 0 {
 		return nil, ErrAdvancedQueryTimeout
 	}
+	lookupCtx, cancel := context.WithDeadline(ctx.UserContext(), deadline.Add(advancedQueryLookupGrace))
+	defer cancel()
 	var result any
-	err := c.DropReportService.RunWithStatementTimeout(ctx.UserContext(), timeout, func(qctx context.Context) (err error) {
+	err := c.DropReportService.RunWithStatementTimeout(lookupCtx, timeout, func(qctx context.Context) (err error) {
 		result, err = c.handleAdvancedQuery(ctx, qctx, query)
 		return err
 	})
 	if err != nil {
+		if lookupCtx.Err() == context.DeadlineExceeded {
+			return nil, ErrAdvancedQueryTimeout
+		}
 		return nil, err
 	}
 	return result, nil

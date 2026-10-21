@@ -165,9 +165,9 @@ func newAdvancedQueryTestResult(t *testing.T) (*Result, *bun.DB) {
 	}, db
 }
 
-// lockDropReports holds a lock on drop_reports for 5 seconds, or until the test ends, so that every aggregation waits for
-// as long.
-func lockDropReports(t *testing.T, db *bun.DB) {
+// lockTable holds a lock on table for 5 seconds, or until the test ends, so that every query reading it waits for as
+// long.
+func lockTable(t *testing.T, db *bun.DB, table string) {
 	t.Helper()
 	ctx := context.Background()
 	conn, err := db.Conn(ctx)
@@ -181,7 +181,7 @@ func lockDropReports(t *testing.T, db *bun.DB) {
 	}
 	t.Cleanup(func() { _ = locker.Rollback() })
 	time.AfterFunc(5*time.Second, func() { _ = locker.Rollback() })
-	if _, err := locker.ExecContext(ctx, "LOCK TABLE drop_reports IN ACCESS EXCLUSIVE MODE"); err != nil {
+	if _, err := locker.ExecContext(ctx, "LOCK TABLE "+table+" IN ACCESS EXCLUSIVE MODE"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -227,7 +227,7 @@ func TestRunAdvancedQueryCancelsStatementsAtDeadline(t *testing.T) {
 	app := fiber.New()
 	for name, query := range advancedQueryTestQueries {
 		t.Run(name, func(t *testing.T) {
-			lockDropReports(t, db)
+			lockTable(t, db, "drop_reports")
 			ctx := app.AcquireCtx(&fasthttp.RequestCtx{})
 			defer app.ReleaseCtx(ctx)
 
@@ -247,7 +247,7 @@ func TestRunAdvancedQueryCancelsStatementsAtDeadline(t *testing.T) {
 
 func TestRunAdvancedQueryAfterDeadline(t *testing.T) {
 	c, db := newAdvancedQueryTestResult(t)
-	lockDropReports(t, db)
+	lockTable(t, db, "drop_reports")
 	app := fiber.New()
 	ctx := app.AcquireCtx(&fasthttp.RequestCtx{})
 	defer app.ReleaseCtx(ctx)
@@ -259,5 +259,47 @@ func TestRunAdvancedQueryAfterDeadline(t *testing.T) {
 	}
 	if elapsed := time.Since(begin); elapsed > time.Second {
 		t.Fatalf("query ran for %v", elapsed)
+	}
+}
+
+func TestRunAdvancedQueryBoundsLookups(t *testing.T) {
+	app := fiber.New()
+	// the stage is looked up before the aggregations, the drop infos inside the matrix and the trend queries
+	for _, table := range []string{"stages", "drop_infos"} {
+		for name, query := range advancedQueryTestQueries {
+			t.Run(table+"/"+name, func(t *testing.T) {
+				c, db := newAdvancedQueryTestResult(t)
+				lockTable(t, db, table)
+				ctx := app.AcquireCtx(&fasthttp.RequestCtx{})
+				defer app.ReleaseCtx(ctx)
+
+				// the lookup waits 5 seconds for the lock, unless its context ends advancedQueryLookupGrace after the
+				// deadline
+				begin := time.Now()
+				_, err := c.runAdvancedQuery(ctx, query, time.Now().Add(100*time.Millisecond))
+				if err != ErrAdvancedQueryTimeout {
+					t.Fatalf("got error %v, want ErrAdvancedQueryTimeout", err)
+				}
+				if elapsed := time.Since(begin); elapsed > advancedQueryLookupGrace+time.Second {
+					t.Fatalf("query ran for %v", elapsed)
+				}
+			})
+		}
+	}
+}
+
+func TestRunAdvancedQueryOnOneConnection(t *testing.T) {
+	c, db := newAdvancedQueryTestResult(t)
+	// a query holding the connection across its lookups would make them wait for it until the context ends
+	db.SetMaxOpenConns(1)
+	app := fiber.New()
+	for name, query := range advancedQueryTestQueries {
+		t.Run(name, func(t *testing.T) {
+			ctx := app.AcquireCtx(&fasthttp.RequestCtx{})
+			defer app.ReleaseCtx(ctx)
+			if _, err := c.runAdvancedQuery(ctx, query, time.Now().Add(5*time.Second)); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
