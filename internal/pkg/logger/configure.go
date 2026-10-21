@@ -24,7 +24,8 @@ func Configure(conf *appconfig.Config) {
 	if conf.DevMode {
 		level = zerolog.TraceLevel
 	} else {
-		level = zerolog.DebugLevel
+		// debug logs are most of the volume and are not read in production
+		level = zerolog.InfoLevel
 	}
 
 	var writer io.Writer
