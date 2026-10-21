@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -20,18 +21,19 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 
+	"exusiai.dev/backend-next/internal/infra"
 	"exusiai.dev/backend-next/internal/model/types"
 )
 
-// newTestPublisher connects to PENGUIN_TEST_NATS_URL and returns a Report publishing with it, and a prefix of
-// subjects no other test uses.
+// newTestPublisher connects to PENGUIN_TEST_NATS_URL with the options of the app and returns a Report publishing with
+// it, and a prefix of subjects no other test uses.
 func newTestPublisher(t *testing.T) (s *Report, nc *nats.Conn, prefix string) {
 	t.Helper()
 	url := os.Getenv("PENGUIN_TEST_NATS_URL")
 	if url == "" {
 		t.Skip("PENGUIN_TEST_NATS_URL is not set")
 	}
-	nc, err := nats.Connect(url)
+	nc, err := nats.Connect(url, infra.NATSOptions()...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,13 +71,19 @@ func addTestStream(t *testing.T, s *Report, prefix string) (name string) {
 // commitInRequest runs commitReportTask in a request handler, after setup, as the report controller does.
 func commitInRequest(t *testing.T, s *Report, subject string, setup func(c *fiber.Ctx)) (taskId string, err error) {
 	t.Helper()
+	return commitTaskInRequest(t, s, subject, &types.ReportTask{AccountID: 1}, setup)
+}
+
+// commitTaskInRequest is commitInRequest of task.
+func commitTaskInRequest(t *testing.T, s *Report, subject string, task *types.ReportTask, setup func(c *fiber.Ctx)) (taskId string, err error) {
+	t.Helper()
 	app := fiber.New()
 	app.Post("/", func(c *fiber.Ctx) error {
 		c.Locals(constant.ContextKeyRequestID, "req")
 		if setup != nil {
 			setup(c)
 		}
-		taskId, err = s.commitReportTask(c, subject, &types.ReportTask{AccountID: 1})
+		taskId, err = s.commitReportTask(c, subject, task)
 		return nil
 	})
 	if _, testErr := app.Test(httptest.NewRequest("POST", "/", nil), -1); testErr != nil {
@@ -173,5 +181,41 @@ func TestCommitReportTaskCanceled(t *testing.T) {
 	}
 	if n := s.NatsJS.PublishAsyncPending(); n != 0 {
 		t.Errorf("%d acks pending after the publish was given up on, want 0", n)
+	}
+}
+
+// TestCommitReportTaskLeavesNoRequestState publishes tasks whose send fails at once (over the maximum payload) and a
+// task whose client goes away: no response entry or subscription of the connection is left behind. With the default
+// request style, the client (v1.24.0) keeps the response entry of each send that failed at once.
+func TestCommitReportTaskLeavesNoRequestState(t *testing.T) {
+	s, nc, prefix := newTestPublisher(t)
+	addTestStream(t, s, prefix)
+	silenceSubject(t, nc, prefix+"_SILENT.SINGLE")
+	// a publish that succeeds first, so that whatever the connection keeps for every request already exists
+	if _, err := commitInRequest(t, s, prefix+".SINGLE", nil); err != nil {
+		t.Fatal(err)
+	}
+	subs := nc.NumSubscriptions()
+
+	big := &types.ReportTask{AccountID: 1, IP: strings.Repeat("x", int(nc.MaxPayload()))}
+	for i := 0; i < 5; i++ {
+		if _, err := commitTaskInRequest(t, s, prefix+".SINGLE", big, nil); !errors.Is(err, nats.ErrMaxPayload) {
+			t.Fatalf("got %v, want %v", err, nats.ErrMaxPayload)
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(50*time.Millisecond, cancel)
+	defer cancel()
+	if _, err := commitInRequest(t, s, prefix+"_SILENT.SINGLE", func(c *fiber.Ctx) { c.SetUserContext(ctx) }); !errors.Is(err, context.Canceled) {
+		t.Fatalf("got %v, want %v", err, context.Canceled)
+	}
+
+	// the response entries of the connection, read as the client does not export them; nothing else writes them
+	// here, as no response is on its way
+	if n := reflect.ValueOf(nc).Elem().FieldByName("respMap").Len(); n != 0 {
+		t.Errorf("%d response entries left in the connection, want 0", n)
+	}
+	if n := nc.NumSubscriptions(); n != subs {
+		t.Errorf("%d subscriptions, want the %d before", n, subs)
 	}
 }

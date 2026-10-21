@@ -81,14 +81,25 @@ func drainNATS(ctx context.Context, nc *nats.Conn) error {
 	}
 }
 
-func NATS(lc fx.Lifecycle, conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
-	nc, err := nats.Connect(conf.NatsURL,
-		nats.PingInterval(time.Second*20),
+// NATSOptions are the options of the NATS connection of the app.
+func NATSOptions() []nats.Option {
+	return []nats.Option{
+		nats.PingInterval(time.Second * 20),
 		// keep reconnecting however long NATS is down: by default the client gives up after 60 attempts (about 2
 		// minutes), and the process then neither publishes nor consumes reports until it is restarted
 		nats.MaxReconnects(-1),
 		nats.ErrorHandler(natsErrorHandler),
-	)
+		// A request (a synchronous JetStream publish, AckSync, a JetStream API call) subscribes to an inbox of its own
+		// and unsubscribes however it ends. The default style shares one inbox subscription and keeps a response entry
+		// per request in the connection, which the client (v1.24.0, and v1.41.2 still) never removes when the send
+		// fails at once, such as with a full reconnect buffer or a payload over the limit: each such report would leak
+		// one until the connection closes. The cost is a SUB and an UNSUB per request.
+		nats.UseOldRequestStyle(),
+	}
+}
+
+func NATS(lc fx.Lifecycle, conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
+	nc, err := nats.Connect(conf.NatsURL, NATSOptions()...)
 	if err != nil {
 		log.Error().Err(err).Msg("infra: nats: failed to connect to NATS")
 		return nil, nil, err
