@@ -191,9 +191,10 @@ type ConfigSpec struct {
 	ColdstoreEnabled bool `split_words:"true" default:"false"`
 
 	// ColdstoreQueriesEnabled reads the archived part (before the cold storage's hot boundary) of the time ranges of
-	// the personal drop and pattern matrices and of the drop matrix queries of /result/advanced from the cold
-	// storage, and only the rest from PostgreSQL; the two are added up. Requires ColdstoreEnabled. While PostgreSQL
-	// still holds every report (before the migration of #752), the results are the same either way.
+	// the personal drop and pattern matrices, of the drop matrix queries of /result/advanced and of the customized
+	// trend (its buckets) from the cold storage, and only the rest from PostgreSQL; the two are added up. Requires
+	// ColdstoreEnabled. While PostgreSQL still holds every report (before the migration of #752), the results are the
+	// same either way.
 	ColdstoreQueriesEnabled bool `split_words:"true" default:"false"`
 
 	// ColdstoreDirectory is the local cold storage directory (manifest.json and the files it lists), on the disk of

@@ -15,9 +15,9 @@ import (
 
 type DropReport struct {
 	DropReportRepo *repo.DropReport
-	// ColdDropReportRepo, when not nil, serves the archived part of the time ranges of the drop matrix and of the
-	// pattern matrix (see CalcDropMatrixForIntervalsBySourceCategories and
-	// CalcTotalQuantityForPatternMatrixBySourceCategories).
+	// ColdDropReportRepo, when not nil, serves the archived part of the time ranges of the drop matrix, of the
+	// pattern matrix and of the customized trend (see CalcDropMatrixForIntervalsBySourceCategories,
+	// CalcTotalQuantityForPatternMatrixBySourceCategories and CalcTotalQuantityForTrend).
 	ColdDropReportRepo *repo.ColdDropReport
 }
 
@@ -280,16 +280,113 @@ func (s *DropReport) CalcTotalTimesForPatternMatrix(
 
 // Trend
 
+// CalcTotalQuantityForTrend, with the cold storage enabled for queries (ColdDropReportRepo), reads the reports before
+// the hot boundary from the cold storage and the rest from PostgreSQL, and adds the two up per bucket. A bucket that
+// straddles the boundary is counted from both.
 func (s *DropReport) CalcTotalQuantityForTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int, sourceCategory string,
 ) ([]*model.TotalQuantityResultForTrend, error) {
-	return s.DropReportRepo.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIdItemIdMap, accountId, sourceCategory)
+	if s.ColdDropReportRepo == nil || len(stageIdItemIdMap) == 0 {
+		return s.DropReportRepo.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIdItemIdMap, accountId, sourceCategory)
+	}
+	view := s.ColdDropReportRepo.View()
+	cold, hot, ok := splitTrend(view, server, *startTime, intervalLength, intervalNum)
+	if !ok {
+		return s.DropReportRepo.CalcTotalQuantityForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIdItemIdMap, accountId, sourceCategory)
+	}
+
+	results, err := s.ColdDropReportRepo.CalcTotalQuantityForTrend(ctx, view, cold.Start, cold.End, server, startTime, intervalLength, intervalNum, stageIdItemIdMap, accountId, sourceCategory)
+	if err != nil {
+		return nil, err
+	}
+	if !hot.Empty() {
+		hotResults, err := s.DropReportRepo.CalcTotalQuantityForTrendWithin(ctx, hot.Start, hot.End, server, startTime, intervalLength, intervalNum, stageIdItemIdMap, accountId, sourceCategory)
+		if err != nil {
+			return nil, err
+		}
+		results = addTrendQuantityResults(results, hotResults)
+	}
+	return results, nil
 }
 
+// CalcTotalTimesForTrend splits the trend at the hot boundary as CalcTotalQuantityForTrend.
 func (s *DropReport) CalcTotalTimesForTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId null.Int, sourceCategory string,
 ) ([]*model.TotalTimesResultForTrend, error) {
-	return s.DropReportRepo.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, accountId, sourceCategory)
+	if s.ColdDropReportRepo == nil || len(stageIds) == 0 {
+		return s.DropReportRepo.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, accountId, sourceCategory)
+	}
+	view := s.ColdDropReportRepo.View()
+	cold, hot, ok := splitTrend(view, server, *startTime, intervalLength, intervalNum)
+	if !ok {
+		return s.DropReportRepo.CalcTotalTimesForTrend(ctx, server, startTime, intervalLength, intervalNum, stageIds, accountId, sourceCategory)
+	}
+
+	results, err := s.ColdDropReportRepo.CalcTotalTimesForTrend(ctx, view, cold.Start, cold.End, server, startTime, intervalLength, intervalNum, stageIds, accountId, sourceCategory)
+	if err != nil {
+		return nil, err
+	}
+	if !hot.Empty() {
+		hotResults, err := s.DropReportRepo.CalcTotalTimesForTrendWithin(ctx, hot.Start, hot.End, server, startTime, intervalLength, intervalNum, stageIds, accountId, sourceCategory)
+		if err != nil {
+			return nil, err
+		}
+		results = addTrendTimesResults(results, hotResults)
+	}
+	return results, nil
+}
+
+// splitTrend splits the time range of the buckets of a trend at the hot boundary of view, in whole seconds as
+// PostgreSQL compares them. It returns false when no part is cold, or when the interval length is shorter than an
+// hour (PostgreSQL then fails the query as before).
+func splitTrend(view *coldstore.View, server string, startTime time.Time, intervalLength time.Duration, intervalNum int) (cold, hot coldstore.TimeRange, ok bool) {
+	if int(intervalLength.Hours()) <= 0 {
+		return cold, hot, false
+	}
+	start, end := repo.TrendTimeRange(server, startTime, intervalLength, intervalNum)
+	cold, hot = view.Split(time.Unix(start.Unix(), 0), time.Unix(end.Unix(), 0))
+	return cold, hot, !cold.Empty()
+}
+
+// addTrendQuantityResults adds the quantities of b to those of the same bucket, stage and item in a, and appends the
+// others of b.
+func addTrendQuantityResults(a, b []*model.TotalQuantityResultForTrend) []*model.TotalQuantityResultForTrend {
+	type key struct{ groupId, stageId, itemId int }
+	byKey := make(map[key]*model.TotalQuantityResultForTrend, len(a))
+	for _, result := range a {
+		byKey[key{result.GroupID, result.StageID, result.ItemID}] = result
+	}
+	for _, result := range b {
+		k := key{result.GroupID, result.StageID, result.ItemID}
+		if sum, ok := byKey[k]; ok {
+			sum.TotalQuantity += result.TotalQuantity
+			continue
+		}
+		sum := *result
+		byKey[k] = &sum
+		a = append(a, &sum)
+	}
+	return a
+}
+
+// addTrendTimesResults adds the times of b to those of the same bucket and stage in a, and appends the others of b.
+func addTrendTimesResults(a, b []*model.TotalTimesResultForTrend) []*model.TotalTimesResultForTrend {
+	type key struct{ groupId, stageId int }
+	byKey := make(map[key]*model.TotalTimesResultForTrend, len(a))
+	for _, result := range a {
+		byKey[key{result.GroupID, result.StageID}] = result
+	}
+	for _, result := range b {
+		k := key{result.GroupID, result.StageID}
+		if sum, ok := byKey[k]; ok {
+			sum.TotalTimes += result.TotalTimes
+			continue
+		}
+		sum := *result
+		byKey[k] = &sum
+		a = append(a, &sum)
+	}
+	return a
 }
 
 // Sitestats
