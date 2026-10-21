@@ -80,6 +80,8 @@ func RegisterResult(v2 *svr.V2, c Result) {
 		CacheHeader:  constant.CacheHeader,
 		CacheControl: true,
 		Expiration:   time.Minute * 5,
+		// StoreResponseHeaders must stay off: a hit would replay the Access-Control-* headers of the request that
+		// filled the entry (the cache ignores Vary: Origin) over the ones CORS set for this one
 		KeyGenerator: func(c *fiber.Ctx) string {
 			return utils.CopyString(c.OriginalURL())
 		},

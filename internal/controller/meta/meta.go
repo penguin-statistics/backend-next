@@ -24,6 +24,7 @@ func RegisterMeta(meta *svr.Meta, c Meta) {
 
 	meta.Get("/health", cache.New(cache.Config{
 		// cache it for a second to mitigate potential DDoS
+		// StoreResponseHeaders must stay off, or a hit replays another request's Access-Control-* headers
 		Expiration:  time.Second,
 		CacheHeader: constant.CacheHeader,
 	}), c.Health)

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	cachemiddleware "github.com/gofiber/fiber/v2/middleware/cache"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
@@ -223,6 +224,46 @@ func TestServiceAppIgnoresCookieOfCrossSiteForms(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The /result and /health cache middlewares keep StoreResponseHeaders off, so a hit carries the CORS headers set for
+// the current request, not those of the request that filled the entry. fiber's cache ignores Vary.
+func TestServiceAppCacheHitKeepsCurrentCORS(t *testing.T) {
+	conf := &appconfig.Config{}
+	conf.CORSCredentialedOrigins = defaultCredentialedOrigins(t)
+	app := CreateServiceApp(conf)
+	// the relevant part of the /result group cache config
+	app.Get("/cached", cachemiddleware.New(cachemiddleware.Config{
+		CacheHeader:  "X-Cache",
+		CacheControl: true,
+		Expiration:   time.Minute,
+	}), func(c *fiber.Ctx) error {
+		return c.SendString("ok")
+	})
+
+	get := func(t *testing.T, origin string) *http.Response {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, "/cached", nil)
+		req.Header.Set(fiber.HeaderOrigin, origin)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { resp.Body.Close() })
+		return resp
+	}
+
+	if resp := get(t, "https://penguin-stats.io"); resp.Header.Get("X-Cache") != "miss" {
+		t.Fatalf("first request: X-Cache = %q, want miss", resp.Header.Get("X-Cache"))
+	}
+	resp := get(t, "https://evil.example")
+	if resp.Header.Get("X-Cache") != "hit" {
+		t.Fatalf("second request: X-Cache = %q, want hit", resp.Header.Get("X-Cache"))
+	}
+	assertCORS(t, resp, "https://evil.example", false)
+
+	resp = get(t, "capacitor://localhost")
+	assertCORS(t, resp, "capacitor://localhost", true)
 }
 
 func assertCORS(t *testing.T, resp *http.Response, origin string, credentialed bool) {
