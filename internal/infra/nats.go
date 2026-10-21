@@ -1,11 +1,14 @@
 package infra
 
 import (
+	"context"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"go.uber.org/fx"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/pkg/observability"
@@ -47,7 +50,53 @@ func ensureStream(js nats.JetStreamContext, cfg *nats.StreamConfig) error {
 	return err
 }
 
-func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
+// drainNATS drains the connection, delivering what its subscriptions hold and flushing what it publishes, and waits
+// until it is closed or ctx ends. The client drains in the background and closes the connection however the drain
+// went, reporting a subscription that did not drain in time or a final flush that failed only to the error handler, so
+// drainNATS returns the first error the connection reports from the start of the drain until it is closed: the closed
+// handler runs after the error handlers of every error reported before the close, in order.
+//
+// A connection lost during the drain bypasses the error handler: the client (v1.24.0) does not reconnect a draining
+// connection, but records the error as its last error and closes it. So once closed, a last error other than the one
+// the connection had when the drain started is returned too; an error of the connection from before the drain is not.
+func drainNATS(ctx context.Context, nc *nats.Conn) error {
+	var (
+		mu       sync.Mutex
+		drainErr error
+	)
+	logErr := nc.ErrorHandler()
+	nc.SetErrorHandler(func(c *nats.Conn, sub *nats.Subscription, err error) {
+		if logErr != nil {
+			logErr(c, sub, err)
+		}
+		mu.Lock()
+		if drainErr == nil {
+			drainErr = err
+		}
+		mu.Unlock()
+	})
+	closed := make(chan struct{})
+	nc.SetClosedHandler(func(*nats.Conn) { close(closed) })
+
+	before := nc.LastError()
+	if err := nc.Drain(); err != nil {
+		return err
+	}
+	select {
+	case <-closed:
+		mu.Lock()
+		err := drainErr
+		mu.Unlock()
+		if last := nc.LastError(); err == nil && last != nil && !errors.Is(last, before) {
+			err = last
+		}
+		return errors.Wrap(err, "failed to drain the NATS connection")
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func NATS(lc fx.Lifecycle, conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
 	nc, err := natsConnect(conf.NatsURL)
 	if err != nil {
 		log.Error().Err(err).Msg("infra: nats: failed to connect to NATS")
@@ -98,6 +147,14 @@ func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
 		log.Error().Err(err).Msg("infra: nats: failed to create or update the dead-letter jetstream stream")
 		return nil, nil, err
 	}
+
+	// Stop hooks run in the reverse order of their registration, so the report workers, which need the connection,
+	// are stopped before it is drained. They bind to their durable, so draining their subscriptions keeps it.
+	lc.Append(fx.Hook{
+		OnStop: func(ctx context.Context) error {
+			return drainNATS(ctx, nc)
+		},
+	})
 
 	return nc, js, nil
 }
