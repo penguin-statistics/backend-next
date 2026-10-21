@@ -57,8 +57,9 @@ func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
 			"REPORT.*",
 		},
 		Retention: nats.WorkQueuePolicy,
-		// the stream has no limits, so nothing is discarded today; if a limit is ever set, refuse new reports
-		// (the publisher answers an error) rather than silently drop queued ones
+		// the stream has no limits, so nothing is discarded today; if a count or size limit (MaxMsgs, MaxBytes)
+		// is ever set, refuse new reports (the publisher answers an error) rather than silently drop queued ones.
+		// A MaxAge is different: it expires queued reports whatever the discard policy, so it would lose accepted ones.
 		Discard:    nats.DiscardNew,
 		Storage:    nats.FileStorage,
 		Replicas:   1,
