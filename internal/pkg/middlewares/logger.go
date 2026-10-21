@@ -40,9 +40,22 @@ func requestLogger() func(ctx *fiber.Ctx) error {
 		route := ctx.Route().Path
 		status := ctx.Response().StatusCode()
 		bytesWritten := len(ctx.Response().Body())
+		level := requestLogLevel(status)
+		// fasthttp does not tell the handler that the client went away, and writes
+		// the response only after this returns, so check the connection here: the
+		// status logged was never delivered to a peer that has already closed it.
+		// Behind ingress-nginx that is a 499 (client gave up) or a 504 (ingress
+		// upstream timeout); the ingress log has which.
+		closed := peerClosed(ctx.Context().Conn())
+		if closed && level < zerolog.WarnLevel {
+			level = zerolog.WarnLevel
+		}
 
-		evt := flog.FromFiberCtx(ctx).WithLevel(requestLogLevel(status)).
+		evt := flog.FromFiberCtx(ctx).WithLevel(level).
 			Str("evt.name", "http.request")
+		if closed {
+			evt = evt.Bool("http.peer_closed", true)
+		}
 		// usr.id is the internal account id, for the routes that resolve the account into
 		// ctx.Locals (the report routes). Never log the PenguinID: it is the login credential.
 		if accountId, ok := ctx.Locals(constant.LocalsAccountIDKey).(int); ok {
