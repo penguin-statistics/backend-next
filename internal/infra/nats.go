@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
@@ -37,6 +38,15 @@ func natsConnect(url string) (*nats.Conn, error) {
 	return nc, nil
 }
 
+// ensureStream creates the stream, or updates it to cfg when it exists with another configuration.
+func ensureStream(js nats.JetStreamContext, cfg *nats.StreamConfig) error {
+	_, err := js.AddStream(cfg)
+	if errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
+		_, err = js.UpdateStream(cfg)
+	}
+	return err
+}
+
 func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
 	nc, err := natsConnect(conf.NatsURL)
 	if err != nil {
@@ -50,7 +60,7 @@ func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
 		return nil, nil, err
 	}
 
-	_, err = js.AddStream(&nats.StreamConfig{
+	err = ensureStream(js, &nats.StreamConfig{
 		Name: "penguin-reports",
 		Subjects: []string{
 			"REPORT.*",
@@ -61,11 +71,10 @@ func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
 		Replicas:   1,
 		Duplicates: time.Minute * 10,
 	})
-
-	// MaxAckPending should equal to (worker count * worker channel buffer size)
-
 	if err != nil {
-		log.Warn().Err(err).Msg("infra: nats: failed to create jetstream stream: is it already created?")
+		// a process accepting reports it cannot queue or consume is worse than one failing to start
+		log.Error().Err(err).Msg("infra: nats: failed to create or update jetstream stream")
+		return nil, nil, err
 	}
 
 	return nc, js, nil
