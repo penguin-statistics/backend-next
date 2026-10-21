@@ -7,24 +7,38 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/pkg/observability"
 )
 
-func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
-	errorHandler := func(conn *nats.Conn, sub *nats.Subscription, err error) {
-		ev := log.Error().
-			Str("evt.name", "nats.error").
-			Err(err).
-			Str("conn.url", conn.ConnectedUrlRedacted())
-		// connection-level errors come without a subscription
-		if sub != nil {
-			ev = ev.Str("sub.subject", sub.Subject)
-		}
-		ev.Msg("nats error")
+func natsErrorHandler(conn *nats.Conn, sub *nats.Subscription, err error) {
+	observability.NatsAsyncErrors.Inc()
+	ev := log.Error().
+		Str("evt.name", "nats.error").
+		Err(err).
+		Str("conn.url", conn.ConnectedUrlRedacted())
+	// connection-level errors come without a subscription
+	if sub != nil {
+		ev = ev.Str("sub.subject", sub.Subject)
 	}
+	ev.Msg("nats error")
+}
 
+// natsConnect connects to NATS and registers the connection metrics.
+func natsConnect(url string) (*nats.Conn, error) {
 	// keep reconnecting for as long as NATS is down: with the default of 60 attempts 2s apart the connection closes
 	// for good after about 2 minutes, and every report publish fails until the pod restarts
-	nc, err := nats.Connect(conf.NatsURL, nats.PingInterval(time.Second*20), nats.ErrorHandler(errorHandler), nats.MaxReconnects(-1))
+	nc, err := nats.Connect(url, nats.PingInterval(time.Second*20), nats.ErrorHandler(natsErrorHandler), nats.MaxReconnects(-1))
+	if err != nil {
+		return nil, err
+	}
+
+	registerMetrics("nats", metricsRegisterer, newNatsConnCollector(nc))
+
+	return nc, nil
+}
+
+func NATS(conf *appconfig.Config) (*nats.Conn, nats.JetStreamContext, error) {
+	nc, err := natsConnect(conf.NatsURL)
 	if err != nil {
 		log.Error().Err(err).Msg("infra: nats: failed to connect to NATS")
 		return nil, nil, err
