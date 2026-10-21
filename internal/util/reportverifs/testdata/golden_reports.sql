@@ -1,6 +1,6 @@
 -- Exports golden_reports.json, the fixture of TestReliabilityGolden, from a copy of the production database:
 --
---	psql -At -v top=<the highest report_id> < golden_reports.sql > golden_reports.json
+--	psql -qAt -v top=<the highest report_id> < golden_reports.sql > golden_reports.json
 --
 -- The reports are the last 1000 and those with a reliability above 0 among the last 20000, with the drop infos of
 -- the time ranges current when they were created and the reject rules. Every read is by primary key or index.
