@@ -26,6 +26,9 @@ func TestColdstoreSettings(t *testing.T) {
 	if defaults.ColdstoreEnabled || defaults.ColdstoreDirectory != "" || defaults.ColdstoreTempDirectory != "" {
 		t.Errorf("cold storage reader enabled by default: %v %q %q", defaults.ColdstoreEnabled, defaults.ColdstoreDirectory, defaults.ColdstoreTempDirectory)
 	}
+	if defaults.ColdstoreQueriesEnabled {
+		t.Error("cold storage queries enabled by default")
+	}
 	if defaults.ColdstoreThreads != 2 || defaults.ColdstoreMemoryLimit != "1GB" {
 		t.Errorf("ColdstoreThreads = %d, ColdstoreMemoryLimit = %q, want 2, 1GB", defaults.ColdstoreThreads, defaults.ColdstoreMemoryLimit)
 	}

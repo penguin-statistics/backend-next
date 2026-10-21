@@ -1,6 +1,8 @@
 package coldstore
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
@@ -28,4 +30,18 @@ var (
 		Name: prometheus.BuildFQName(observability.ServiceName, "coldstore", "integrity_last_completed_timestamp_seconds"),
 		Help: "Time the last integrity check of the cold storage completed",
 	})
+	metricQueryDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    prometheus.BuildFQName(observability.ServiceName, "coldstore", "query_duration_seconds"),
+		Help:    "Duration of the queries on the cold storage by query and result (ok, error) in seconds",
+		Buckets: prometheus.ExponentialBuckets(0.01, 2, 14),
+	}, []string{"query", "result"})
 )
+
+// ObserveQuery records the duration of a query on the cold storage that started at started and ended with err.
+func ObserveQuery(query string, started time.Time, err error) {
+	result := "ok"
+	if err != nil {
+		result = "error"
+	}
+	metricQueryDuration.WithLabelValues(query, result).Observe(time.Since(started).Seconds())
+}
