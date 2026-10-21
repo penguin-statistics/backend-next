@@ -107,21 +107,18 @@ func (s *Stage) GetShimStagesForFakeTime(ctx context.Context, server string, t t
 	return stages, nil
 }
 
-// Cache: shimStage#server|arkStageId:{server}|{arkStageId}, 1 hr
+// Cache: shimStages#server:{server}, through GetShimStages
 func (s *Stage) GetShimStageByArkId(ctx context.Context, arkStageId string, server string) (*modelv2.Stage, error) {
-	var stage modelv2.Stage
-	err := cache.ShimStageByArkID.Get(arkStageId, &stage)
-	if err == nil {
-		return &stage, nil
-	}
-
-	dbStage, err := s.StageRepo.GetShimStageByArkId(ctx, arkStageId, server)
+	stages, err := s.GetShimStages(ctx, server)
 	if err != nil {
 		return nil, err
 	}
-	s.applyShim(dbStage)
-	cache.ShimStageByArkID.Set(arkStageId, *dbStage, time.Minute*5)
-	return dbStage, nil
+	for _, stage := range stages {
+		if stage.ArkStageID == arkStageId {
+			return stage, nil
+		}
+	}
+	return nil, pgerr.ErrNotFound
 }
 
 func (s *Stage) GetStageExtraProcessTypeByArkId(ctx context.Context, arkStageId string) (null.String, error) {
