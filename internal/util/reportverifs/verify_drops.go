@@ -86,9 +86,14 @@ func verifyDropType(report *types.ReportTaskSingleReport, dropInfos []*model.Dro
 
 func adjustDropInfosByTimes(itemDropInfos []*model.DropInfo, typeDropInfos []*model.DropInfo, times int) {
 	dropTypeItemTypeCountMap := make(map[string]int)
+	// dropTypeGuaranteedCountMap: key is drop type, value is how many types of items of this drop type drop every time (item lower bound above 0)
+	dropTypeGuaranteedCountMap := make(map[string]int)
 
 	for _, dropInfo := range itemDropInfos {
 		dropTypeItemTypeCountMap[dropInfo.DropType] += 1
+		if dropInfo.Bounds.Lower > 0 {
+			dropTypeGuaranteedCountMap[dropInfo.DropType] += 1
+		}
 		// for item drop info, we need to adjust multiple the original bounds by times
 		dropInfo.Bounds.Lower *= times
 		dropInfo.Bounds.Upper *= times
@@ -100,15 +105,24 @@ func adjustDropInfosByTimes(itemDropInfos []*model.DropInfo, typeDropInfos []*mo
 
 	for _, dropInfo := range typeDropInfos {
 		// The lower bound remains the same, because no matter how many times you play, you can always get at least as many types as the lower bound
-		// For upper bound, if times < item_type_count_for_this_drop_type, it means it's impossible to get each type at least once, so we adjust upper bound to be max(oldUpper, times)
-		// if times > item_type_count_for_this_drop_type, it means you are able to get each type at lease once, so we adjust upper bound to be max(oldUpper, item_type_count_for_this_drop_type)
-		// newUpper = max(oldUpper, min(times, item_type_count_for_this_drop_type))
-		minBetweenTimesAndItemTypeCount := times
-		if dropTypeItemTypeCountMap[dropInfo.DropType] < minBetweenTimesAndItemTypeCount {
-			minBetweenTimesAndItemTypeCount = dropTypeItemTypeCountMap[dropInfo.DropType]
+		// For upper bound, each time gives the guaranteed types (item lower bound above 0) and up to oldUpper - guaranteed other types,
+		// so times times can give up to guaranteed + times * (oldUpper - guaranteed) types, and at most item_type_count_for_this_drop_type.
+		// The upper bound was max(oldUpper, min(times, item_type_count_for_this_drop_type)) before, and it is kept as a floor, so no report accepted before is rejected
+		// (for example for an oldUpper of 0, or an oldUpper below guaranteed), and the new term only counts for times above 1, so times 0 and 1 keep the old bound:
+		// newUpper = max(oldUpper, min(times, item_type_count_for_this_drop_type), min(guaranteed + times * (oldUpper - guaranteed), item_type_count_for_this_drop_type))
+		itemTypeCount := dropTypeItemTypeCountMap[dropInfo.DropType]
+		guaranteed := dropTypeGuaranteedCountMap[dropInfo.DropType]
+		upper := times
+		if times > 1 {
+			if possible := guaranteed + times*(dropInfo.Bounds.Upper-guaranteed); possible > upper {
+				upper = possible
+			}
 		}
-		if minBetweenTimesAndItemTypeCount > dropInfo.Bounds.Upper {
-			dropInfo.Bounds.Upper = minBetweenTimesAndItemTypeCount
+		if itemTypeCount < upper {
+			upper = itemTypeCount
+		}
+		if upper > dropInfo.Bounds.Upper {
+			dropInfo.Bounds.Upper = upper
 		}
 		if dropInfo.Bounds.Exceptions != nil {
 			dropInfo.Bounds.Exceptions = nil
