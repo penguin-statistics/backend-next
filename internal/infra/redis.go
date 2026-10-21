@@ -23,15 +23,14 @@ func Redis(conf *appconfig.Config) (*redis.Client, error) {
 		return nil, err
 	}
 
-	// Open a Redis Client
-	client := redis.NewClient(u)
-
 	// check redis connection
-	if err := pingRedis(client, redisBootTimeout); err != nil {
+	if err := pingRedis(u, redisBootTimeout); err != nil {
 		log.Error().Err(err).Msg("infra: redis: failed to ping database")
-		client.Close()
 		return nil, err
 	}
+
+	// Open a Redis Client
+	client := redis.NewClient(u)
 
 	registerMetrics("redis", metricsRegisterer, newRedisPoolCollector(client))
 
@@ -39,11 +38,25 @@ func Redis(conf *appconfig.Config) (*redis.Client, error) {
 }
 
 // pingRedis pings until Redis answers, retrying with exponential backoff (500 ms to 5 s) until timeout has passed.
-func pingRedis(client *redis.Client, timeout time.Duration) error {
+//
+// It pings with a client of its own that has ContextTimeoutEnabled set: go-redis ignores the deadline of the context
+// otherwise, so a Redis that accepts connections but does not reply would hold each attempt for its whole read timeout
+// and run past the timeout. Setting it on the client the app uses would change the timeouts of every later command.
+func pingRedis(opts *redis.Options, timeout time.Duration) error {
+	bootOpts := *opts
+	bootOpts.ContextTimeoutEnabled = true
+	client := redis.NewClient(&bootOpts)
+	defer client.Close()
+
 	deadline := time.Now().Add(timeout)
 	backoff := 500 * time.Millisecond
 	for {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		// each attempt gets at most 5 s, and never more than what is left of the timeout
+		attemptDeadline := time.Now().Add(5 * time.Second)
+		if deadline.Before(attemptDeadline) {
+			attemptDeadline = deadline
+		}
+		ctx, cancel := context.WithDeadline(context.Background(), attemptDeadline)
 		err := client.Ping(ctx).Err()
 		cancel()
 		if err == nil {
