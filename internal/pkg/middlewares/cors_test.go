@@ -21,6 +21,9 @@ var testCredentialedOrigins = []string{
 	"null",                     // ignored
 	"https://a.*.example.com",  // ignored
 	"https://example.com/path", // ignored
+	"https://*.pages.dev",      // ignored: public suffix
+	"https://*.github.io",      // ignored: public suffix
+	"https://*.com",            // ignored: public suffix
 	"",                         // ignored
 }
 
@@ -224,7 +227,10 @@ func TestOriginAllowlistIgnoresInvalidEntries(t *testing.T) {
 	if len(l.exact) != 3 || len(l.subdomains) != 1 {
 		t.Errorf("allowlist = %+v, want 3 exact origins and 1 wildcard", l)
 	}
-	for _, origin := range []string{"*", "null", "https://example.com", "https://example.com/path", "https://a.x.example.com"} {
+	for _, origin := range []string{
+		"*", "null", "https://example.com", "https://example.com/path", "https://a.x.example.com",
+		"https://evil.pages.dev", "https://evil.github.io", "https://evil.com",
+	} {
 		if l.allows(origin) {
 			t.Errorf("allows(%q) = true, want false", origin)
 		}
