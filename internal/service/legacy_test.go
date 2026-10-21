@@ -5,6 +5,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"exusiai.dev/gommon/constant"
@@ -14,6 +15,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/util"
 )
 
@@ -856,4 +858,89 @@ type legacyGlobalPatternMatrixQuantity struct {
 	StageID   int `bun:"stage_id"`
 	PatternID int `bun:"pattern_id"`
 	Quantity  int `bun:"quantity"`
+}
+
+// the shim of v3.14.18: loads the current drop infos of server for the opening stages on every call
+func legacyApplyShimForDropMatrixQuery(ctx context.Context, s *DropMatrix, server string, showClosedZones bool, stageFilterStr, itemFilterStr string, queryResult *model.DropMatrixQueryResult) (*modelv2.DropMatrixQueryResult, error) {
+	itemsMapById, err := s.ItemService.GetItemsMapById(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stagesMapById, err := s.StageService.GetStagesMapById(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// get opening stages from dropinfos
+	var openingStageIds []int
+	if !showClosedZones {
+		currentDropInfos, err := s.DropInfoService.GetCurrentDropInfosByServer(ctx, server)
+		if err != nil {
+			return nil, err
+		}
+		linq.From(currentDropInfos).SelectT(func(el *model.DropInfo) int { return el.StageID }).Distinct().ToSlice(&openingStageIds)
+	}
+
+	// convert comma-splitted stage filter param to a hashset
+	stageFilter := make([]string, 0)
+	if stageFilterStr != "" {
+		stageFilter = strings.Split(stageFilterStr, ",")
+	}
+	stageFilterSet := make(map[string]struct{}, len(stageFilter))
+	for _, stageIdStr := range stageFilter {
+		stageFilterSet[stageIdStr] = struct{}{}
+	}
+
+	// convert comma-splitted item filter param to a hashset
+	itemFilter := make([]string, 0)
+	if itemFilterStr != "" {
+		itemFilter = strings.Split(itemFilterStr, ",")
+	}
+	itemFilterSet := make(map[string]struct{}, len(itemFilter))
+	for _, itemIdStr := range itemFilter {
+		itemFilterSet[itemIdStr] = struct{}{}
+	}
+
+	results := &modelv2.DropMatrixQueryResult{
+		Matrix: make([]*modelv2.OneDropMatrixElement, 0),
+	}
+	for _, el := range queryResult.Matrix {
+		if !showClosedZones && !linq.From(openingStageIds).Contains(el.StageID) {
+			continue
+		}
+
+		stage := stagesMapById[el.StageID]
+		if len(stageFilterSet) > 0 {
+			if _, ok := stageFilterSet[stage.ArkStageID]; !ok {
+				continue
+			}
+		}
+
+		item := itemsMapById[el.ItemID]
+		if len(itemFilterSet) > 0 {
+			if _, ok := itemFilterSet[item.ArkItemID]; !ok {
+				continue
+			}
+		}
+
+		// if end time is after now, set it to be null, so that the frontend will show it as "till now"
+		var endTime null.Int
+		if el.TimeRange.EndTime.After(time.Now()) {
+			endTime = null.NewInt(0, false)
+		} else {
+			endTime = null.NewInt(el.TimeRange.EndTime.UnixMilli(), true)
+		}
+		oneDropMatrixElement := modelv2.OneDropMatrixElement{
+			StageID:   stage.ArkStageID,
+			ItemID:    item.ArkItemID,
+			Quantity:  el.Quantity,
+			Times:     el.Times,
+			StdDev:    el.StdDev,
+			StartTime: el.TimeRange.StartTime.UnixMilli(),
+			EndTime:   endTime,
+		}
+		results.Matrix = append(results.Matrix, &oneDropMatrixElement)
+	}
+	return results, nil
 }

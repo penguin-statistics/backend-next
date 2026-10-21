@@ -184,6 +184,7 @@ func newGlobalMatrixTestData(t *testing.T) (*bun.DB, *DropMatrix, *PatternMatrix
 
 func TestGlobalMatrixRefresh(t *testing.T) {
 	db, dropMatrix, patternMatrix := newGlobalMatrixTestData(t)
+	seedOpeningStages(t, db)
 	ctx := context.Background()
 
 	// what requests calculate from an empty cache
@@ -248,6 +249,50 @@ func TestGlobalMatrixRefresh(t *testing.T) {
 		}
 		if v.server != "CN" && (!dropStale || !patternStale) {
 			t.Errorf("%+v: a failed refresh of CN dropped the matrices of another server", v)
+		}
+	}
+
+	// a refresh of a server reads its opening stages once, for every source category
+	counter := &dropInfosQueryCounter{}
+	db.AddQueryHook(counter)
+
+	// with the time ranges calculated, as they are after a batch
+	if _, err := dropMatrix.TimeRangeService.GetAllMaxAccumulableTimeRangesByServer(ctx, "CN"); err != nil {
+		t.Fatal(err)
+	}
+	queries := counter.count()
+	if err := dropMatrix.RefreshGlobalDropMatrixCaches(ctx, "CN"); err != nil {
+		t.Fatal(err)
+	}
+	if read := counter.since(queries); len(read) != 1 {
+		t.Errorf("a refresh of %d source categories read drop_infos %d times, want 1", len(allSourceCategories), len(read))
+	}
+
+	// a request with filters (not cached) reads them only when it hides closed zones
+	for _, showClosedZones := range []bool{true, false} {
+		queries := counter.count()
+		if _, err := dropMatrix.GetShimDropMatrix(ctx, "CN", showClosedZones, "stage_1,stage_2", "", null.Int{}, constant.SourceCategoryAll); err != nil {
+			t.Fatal(err)
+		}
+		want := 0
+		if !showClosedZones {
+			want = 1
+		}
+		if read := counter.since(queries); len(read) != want {
+			t.Errorf("a request with filters and showClosedZones %v read drop_infos %d times, want %d", showClosedZones, len(read), want)
+		}
+	}
+
+	// a refresh that fails to read the opening stages drops the cached matrices
+	setStaleGlobalMatrices()
+	mustExec(t, db, "ALTER TABLE drop_infos RENAME TO drop_infos_away")
+	if err := dropMatrix.RefreshGlobalDropMatrixCaches(ctx, "CN"); err == nil {
+		t.Fatal("refreshing without drop_infos succeeded")
+	}
+	mustExec(t, db, "ALTER TABLE drop_infos_away RENAME TO drop_infos")
+	for _, v := range globalMatrixVariants() {
+		if dropStale, _ := isStale(t, v); dropStale != (v.server != "CN") {
+			t.Errorf("%+v: after a failed refresh of CN, the drop matrix is stale: %v", v, dropStale)
 		}
 	}
 
@@ -379,6 +424,7 @@ func TestGlobalMatrixRefreshPanic(t *testing.T) {
 
 func TestGlobalMatricesMatchLegacy(t *testing.T) {
 	db, dropMatrix, patternMatrix := newGlobalMatrixTestData(t)
+	seedOpeningStages(t, db)
 	ctx := context.Background()
 	compared := 0
 	for _, server := range testServers {
@@ -412,6 +458,78 @@ func TestGlobalMatricesMatchLegacy(t *testing.T) {
 		}
 	}
 	requireCompared(t, compared, 100)
+
+	// the shims, of the refresh, of requests with filters and of personal requests
+	for _, server := range testServers {
+		if err := dropMatrix.RefreshGlobalDropMatrixCaches(ctx, server); err != nil {
+			t.Fatal(err)
+		}
+	}
+	filtered := 0
+	for _, v := range globalMatrixVariants() {
+		var global model.DropMatrixQueryResult
+		if err := cache.GlobalDropMatrix.Get(v.server+constant.CacheSep+v.sourceCategory, &global); err != nil {
+			t.Fatal(err)
+		}
+		want, err := legacyApplyShimForDropMatrixQuery(ctx, dropMatrix, v.server, v.flag, "", "", &global)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var refreshed modelv2.DropMatrixQueryResult
+		if err := cache.ShimGlobalDropMatrix.Get(v.dropKey(), &refreshed); err != nil {
+			t.Fatal(err)
+		}
+		if got := mustJSON(t, refreshed); got != mustJSON(t, want) {
+			t.Errorf("%+v: refreshed drop matrix differs from v3.14.18\ngot  %.300s\nwant %.300s", v, got, mustJSON(t, want))
+		}
+		if !v.flag {
+			withClosed, err := legacyApplyShimForDropMatrixQuery(ctx, dropMatrix, v.server, true, "", "", &global)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(want.Matrix) > 0 && len(want.Matrix) < len(withClosed.Matrix) {
+				filtered++
+			}
+		}
+
+		// requests with filters calculate the shim of the cached global drop matrix
+		for _, filter := range [][2]string{{"stage_2,stage_3,stage_4", ""}, {"", "item_10,item_12"}, {"stage_1,stage_5", "item_11,item_13,item_15"}} {
+			want, err := legacyApplyShimForDropMatrixQuery(ctx, dropMatrix, v.server, v.flag, filter[0], filter[1], &global)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := dropMatrix.GetShimDropMatrix(ctx, v.server, v.flag, filter[0], filter[1], null.Int{}, v.sourceCategory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if mustJSON(t, got) != mustJSON(t, want) {
+				t.Errorf("%+v %v: drop matrix with filters differs from v3.14.18\ngot  %.300s\nwant %.300s", v, filter, mustJSON(t, got), mustJSON(t, want))
+			}
+		}
+
+		// personal requests
+		for _, accountId := range []int64{1, 2} {
+			personal, err := dropMatrix.getMaxAccumulableDropMatrixResults(ctx, v.server, null.IntFrom(accountId), v.sourceCategory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, err := legacyApplyShimForDropMatrixQuery(ctx, dropMatrix, v.server, v.flag, "", "", personal)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := dropMatrix.GetShimDropMatrix(ctx, v.server, v.flag, "", "", null.IntFrom(accountId), v.sourceCategory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if canonicalJSON(t, got.Matrix) != canonicalJSON(t, want.Matrix) {
+				t.Errorf("%+v account %d: personal drop matrix differs from v3.14.18\ngot  %.300s\nwant %.300s", v, accountId,
+					canonicalJSON(t, got.Matrix), canonicalJSON(t, want.Matrix))
+			}
+		}
+	}
+	if filtered == 0 {
+		t.Fatal("no matrix without closed zones has some but not all elements: the data does not exercise the opening stages")
+	}
 }
 
 func globalDropMatrixLines(result *model.DropMatrixQueryResult) []string {
@@ -825,4 +943,77 @@ func TestGlobalMatrixWarmUpJoinsRequestsAndSkipsCachedMatrices(t *testing.T) {
 			t.Errorf("%+v: warmed-up matrices differ from those calculated on request\ngot  %.300s\nwant %.300s", v, got[v], w)
 		}
 	}
+}
+
+// seedOpeningStages adds time ranges around now with drop infos of no item, which open stages without changing the
+// matrices: CN stage 2 (twice) and 5 are open, CN stage 3 opens later, 4 closed earlier and 6 has a drop info in a
+// range of US, where only stage 1 is open. The seeded ranges may be open as well, depending on the date.
+func seedOpeningStages(t *testing.T, db *bun.DB) {
+	t.Helper()
+	now := time.Now()
+	for _, r := range []struct {
+		server     string
+		start, end time.Duration
+		stageIds   []int
+	}{
+		{"CN", -time.Hour, time.Hour, []int{2, 5}},
+		{"CN", -2 * time.Hour, 2 * time.Hour, []int{2}},
+		{"CN", time.Hour, 2 * time.Hour, []int{3}},
+		{"CN", -2 * time.Hour, -time.Hour, []int{4}},
+		{"US", -time.Hour, time.Hour, []int{1}},
+	} {
+		var rangeId int64
+		if err := db.NewRaw("INSERT INTO time_ranges (name, start_time, end_time, server) VALUES ('opening', ?, ?, ?) RETURNING range_id",
+			now.Add(r.start), now.Add(r.end), r.server).Scan(context.Background(), &rangeId); err != nil {
+			t.Fatal(err)
+		}
+		for _, stageId := range r.stageIds {
+			mustExec(t, db, "INSERT INTO drop_infos (server, stage_id, item_id, drop_type, range_id, accumulable) VALUES (?, ?, NULL, 'REGULAR', ?, true)",
+				r.server, stageId, rangeId)
+		}
+		if r.server == "US" {
+			mustExec(t, db, "INSERT INTO drop_infos (server, stage_id, item_id, drop_type, range_id, accumulable) VALUES ('CN', 6, NULL, 'REGULAR', ?, true)", rangeId)
+		}
+	}
+	flushCaches(t)
+}
+
+func mustJSON(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// dropInfosQueryCounter records the queries of drop_infos
+type dropInfosQueryCounter struct {
+	mu      sync.Mutex
+	queries []string
+}
+
+func (c *dropInfosQueryCounter) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	return ctx
+}
+
+func (c *dropInfosQueryCounter) AfterQuery(_ context.Context, event *bun.QueryEvent) {
+	if strings.Contains(event.Query, "drop_infos") {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		c.queries = append(c.queries, event.Query)
+	}
+}
+
+func (c *dropInfosQueryCounter) count() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.queries)
+}
+
+// since returns the queries of drop_infos after the first n
+func (c *dropInfosQueryCounter) since(n int) []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]string(nil), c.queries[n:]...)
 }
