@@ -81,11 +81,9 @@ func (s *DropMatrix) GetShimDropMatrix(
 	var results modelv2.DropMatrixQueryResult
 	if !accountId.Valid && stageFilterStr == "" && itemFilterStr == "" {
 		key := server + constant.CacheSep + strconv.FormatBool(showClosedZones) + constant.CacheSep + sourceCategory
-		calculated, err := cache.ShimGlobalDropMatrix.MutexGetSet(key, &results, valueFunc, 24*time.Hour)
-		if err != nil {
+		publish := cache.PublishingLastModifiedTime[modelv2.DropMatrixQueryResult]("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:" + key + "]")
+		if _, err := cache.ShimGlobalDropMatrix.MutexGetSetPublishing(key, &results, valueFunc, 24*time.Hour, publish); err != nil {
 			return nil, err
-		} else if calculated {
-			cache.LastModifiedTime.Set("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", time.Now(), 0)
 		}
 	} else {
 		return valueFunc()
@@ -370,8 +368,9 @@ func (s *DropMatrix) RefreshGlobalDropMatrixCaches(ctx context.Context, server s
 		cache.GlobalDropMatrix.Set(server+constant.CacheSep+sourceCategory, *global, 24*time.Hour)
 		for showClosedZones, shim := range shims {
 			key := server + constant.CacheSep + strconv.FormatBool(showClosedZones) + constant.CacheSep + sourceCategory
-			cache.ShimGlobalDropMatrix.Set(key, *shim, 24*time.Hour)
-			cache.LastModifiedTime.Set("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", time.Now(), 0)
+			cache.SetLastModifiedTime("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", *shim, func() {
+				cache.ShimGlobalDropMatrix.Set(key, *shim, 24*time.Hour)
+			})
 		}
 	}
 	return nil

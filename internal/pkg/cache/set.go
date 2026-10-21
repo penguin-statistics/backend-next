@@ -92,7 +92,20 @@ func (c *Set[T]) MutexGetSet(key string, dest *T, valueFunc func() (*T, error), 
 	}
 	// onwards, cache key does not exist
 
-	return true, c.slowMutexGetSet(key, dest, valueFunc, expire)
+	return true, c.slowMutexGetSet(key, dest, valueFunc, expire, nil)
+}
+
+// MutexGetSetPublishing is MutexGetSet, except that a calculated value is cached through publish, which is called
+// with the value and must call cacheValue: cacheValue caches the value, unless the key was written meanwhile, and
+// reports whether the value is the one MutexGetSet returns (it is not if a newer value is cached instead). publish
+// can thus do something atomically with caching the value, such as recording when the cached value changed.
+func (c *Set[T]) MutexGetSetPublishing(key string, dest *T, valueFunc func() (*T, error), expire time.Duration, publish func(value *T, cacheValue func() bool)) (bool, error) {
+	err := c.get(key, dest)
+	if err == nil {
+		c.metrics.lookup(true)
+		return false, nil
+	}
+	return true, c.slowMutexGetSet(key, dest, valueFunc, expire, publish)
 }
 
 // keyLock is the lock of a key, removed once no MutexGetSet holds or waits for it (keys such as account ids are
@@ -123,7 +136,7 @@ func (c *Set[T]) lockKey(key string) func() {
 	}
 }
 
-func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, error), expire time.Duration) error {
+func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, error), expire time.Duration, publish func(value *T, cacheValue func() bool)) error {
 	defer c.lockKey(key)()
 	err := c.get(key, dest)
 
@@ -141,21 +154,38 @@ func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, erro
 	start := time.Now()
 	value, err := valueFunc()
 	c.metrics.calculated(start)
-
-	// publish the value unless the key was written meanwhile (e.g. refreshed by the worker): then the value may have
-	// been calculated from older data, and the newer one is returned instead, if it is still there
-	c.writeMu.Lock()
-	published := err == nil && !c.calculating[c.key(key)]
-	delete(c.calculating, c.key(key))
-	if published {
-		c.c.Set(c.key(key), *value, expire)
-	}
-	c.writeMu.Unlock()
 	if err != nil {
+		c.writeMu.Lock()
+		delete(c.calculating, c.key(key))
+		c.writeMu.Unlock()
 		log.Error().Err(err).Str("key", key).Msg("failed to get value from valueFunc() in MutexGetSet")
 		return err
 	}
-	if !published && c.get(key, dest) == nil {
+
+	// publish the value unless the key was written meanwhile (e.g. refreshed by the worker): then the value may have
+	// been calculated from older data, and the newer one is returned instead, if it is still there. Which value is
+	// returned is decided, and the newer one copied to dest, along with publishing: a later read could miss the newer
+	// value (deleted meanwhile) after publish was told it is the one returned.
+	var called, returned bool
+	cacheValue := func() bool {
+		c.writeMu.Lock()
+		defer c.writeMu.Unlock()
+		if called {
+			return returned
+		}
+		called = true
+		published := !c.calculating[c.key(key)]
+		delete(c.calculating, c.key(key))
+		if published {
+			c.c.Set(c.key(key), *value, expire)
+		}
+		returned = published || c.get(key, dest) != nil
+		return returned
+	}
+	if publish != nil {
+		publish(value, cacheValue)
+	}
+	if !cacheValue() { // if publish did not call it
 		return nil
 	}
 
