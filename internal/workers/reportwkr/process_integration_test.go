@@ -387,3 +387,24 @@ func TestProcessRollsBackWithoutRecallKey(t *testing.T) {
 		t.Error("recall key set for a rolled back task")
 	}
 }
+
+// TestProcessStoresReportWithoutDrops stores a report of no drops when its pattern does not exist yet, as it does in
+// production (pattern 12, of no elements), and once it does.
+func TestProcessStoresReportWithoutDrops(t *testing.T) {
+	w := newTestWorker(t)
+	createdAt := time.UnixMicro(1760600000123456)
+	for i := 0; i < 2; i++ {
+		report := testReport("main_01-07", 30012)
+		report.Drops = nil
+		if err := processTask(t, w, newTestTask(t, w, 42, createdAt.Add(time.Duration(i)*time.Second), "203.0.113.7", report)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	assertRows(t, w.DB, dumpDropReports, []string{
+		"1|1|1|1|1760600000123456|0|CN|42|MeoAssistant|v4.0.0",
+		"2|1|1|1|1760600001123456|0|CN|42|MeoAssistant|v4.0.0",
+	})
+	assertRows(t, w.DB, dumpDropPatterns, []string{"1|2d06800538d394c2|"})
+	assertRows(t, w.DB, dumpDropPatternElements, []string{})
+}
