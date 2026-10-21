@@ -275,7 +275,7 @@ func (c AdminController) GetFakeTimeStages(ctx *fiber.Ctx) error {
 
 	fakeTime, err := time.Parse(time.RFC3339, fakeTimeStr)
 	if err != nil {
-		return pgerr.ErrInvalidReq.Msg("fakeTime is invalid: " + err.Error())
+		return pgerr.ErrInvalidReq.Msg("fakeTime is invalid: %s", err.Error())
 	}
 
 	stages, err := c.StageService.GetShimStagesForFakeTime(ctx.UserContext(), server, fakeTime)
@@ -510,9 +510,7 @@ func (c *AdminController) RejectRulesReevaluationApply(ctx *fiber.Ctx) error {
 	})
 
 	if err != nil {
-		return pgerr.ErrInternalError.Msg(
-			fmt.Sprintf("failed to apply reevaluation: %s; all changes have been rolled back", err.Error()),
-		)
+		return pgerr.ErrInternalError.Msg("failed to apply reevaluation: %s; all changes have been rolled back", err.Error())
 	}
 
 	type rejectRulesReevaluationApplyResponse struct {
