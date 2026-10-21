@@ -265,9 +265,14 @@ func (b *builder) zoneName(zone *service.SEOZone) string {
 	return zone.ArkID
 }
 
-// stageName is the code of the stage and the name of its zone: stages have no name of their own
+// stageName is the code of the stage and the name of its zone: stages have no name of their own. A stage named like
+// its zone (the recruitment statistics) is named once.
 func (b *builder) stageName(stage *service.SEOStage) string {
-	return strings.TrimSpace(b.stageCode(stage) + " " + b.zoneName(stage.Zone))
+	code, zone := b.stageCode(stage), b.zoneName(stage.Zone)
+	if zone == "" || zone == code {
+		return code
+	}
+	return code + " " + zone
 }
 
 func (b *builder) stageLink(stageID string) Link {

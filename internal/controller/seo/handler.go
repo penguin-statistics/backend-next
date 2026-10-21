@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"exusiai.dev/gommon/constant"
@@ -79,6 +80,8 @@ type Handler struct {
 	maxAge time.Duration
 	shells ShellSource
 	data   Data
+	// lists holds the list pages rendered last, by listKey
+	lists sync.Map
 }
 
 func NewHandler(siteURL string, maxAge time.Duration, shells ShellSource, data Data) *Handler {
@@ -179,7 +182,24 @@ func (h *Handler) Serve(c *fiber.Ctx) error {
 		return nil
 	}
 
-	p, head, body, ok := h.build(r, catalog)
+	var matrix *service.SEOMatrix
+	if r.server != "" {
+		matrix = h.data.Matrix(r.server)
+	}
+
+	// the list pages are the largest, and the same until the data or the shell changes
+	var key listKey
+	if r.kind == kindItemList || r.kind == kindStageList {
+		key = listKey{lang: r.lang, server: r.server, kind: r.kind}
+		if e, ok := h.lists.Load(key); ok {
+			if e := e.(*listEntry); e.catalog == catalog && e.matrix == matrix && e.shell == shell {
+				h.send(c, shell, e.page, e.html)
+				return nil
+			}
+		}
+	}
+
+	p, html, ok := h.build(r, catalog, matrix, shell)
 	if !ok {
 		h.sendRaw(c, shell, r, "error", false)
 		return nil
@@ -188,12 +208,29 @@ func (h *Handler) Serve(c *fiber.Ctx) error {
 		h.redirect(c, p.Kind, p.Redirect)
 		return nil
 	}
-	h.send(c, shell, p, head, body)
+	if key.kind != "" {
+		h.lists.Store(key, &listEntry{catalog: catalog, matrix: matrix, shell: shell, page: p, html: html})
+	}
+	h.send(c, shell, p, html)
 	return nil
 }
 
+// listKey and listEntry hold a list page rendered from a catalog, matrix and shell
+type listKey struct {
+	lang, server string
+	kind         pageKind
+}
+
+type listEntry struct {
+	catalog *service.SEOCatalog
+	matrix  *service.SEOMatrix
+	shell   *spashell.Shell
+	page    *Page
+	html    []byte
+}
+
 // build builds and renders the page of r; ok is false if that failed
-func (h *Handler) build(r route, catalog *service.SEOCatalog) (p *Page, head, body []byte, ok bool) {
+func (h *Handler) build(r route, catalog *service.SEOCatalog, matrix *service.SEOMatrix, shell *spashell.Shell) (p *Page, html []byte, ok bool) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			log.Error().
@@ -204,10 +241,7 @@ func (h *Handler) build(r route, catalog *service.SEOCatalog) (p *Page, head, bo
 			ok = false
 		}
 	}()
-	b := &builder{site: h.site, t: textsByLang[r.lang], r: r, catalog: catalog}
-	if r.server != "" {
-		b.matrix = h.data.Matrix(r.server)
-	}
+	b := &builder{site: h.site, t: textsByLang[r.lang], r: r, catalog: catalog, matrix: matrix}
 	switch r.kind {
 	case kindItem:
 		p = b.itemPage()
@@ -221,7 +255,7 @@ func (h *Handler) build(r route, catalog *service.SEOCatalog) (p *Page, head, bo
 		p = b.notFound()
 	}
 	if p.Redirect != "" {
-		return p, nil, nil, true
+		return p, nil, true
 	}
 	head, body, err := renderMarkup(p)
 	if err != nil {
@@ -229,9 +263,11 @@ func (h *Handler) build(r route, catalog *service.SEOCatalog) (p *Page, head, bo
 			Str("evt.name", "seo.page.render_failed").
 			Err(err).
 			Msg("failed to render a stats page; serving the app as is")
-		return nil, nil, nil, false
+		return nil, nil, false
 	}
-	return p, head, body, true
+	var buf bytes.Buffer
+	shell.Render(&buf, p.Head.Lang, head, body)
+	return p, buf.Bytes(), true
 }
 
 func count(kind pageKind, outcome string) {
@@ -285,7 +321,7 @@ func (h *Handler) sendRaw(c *fiber.Ctx, shell *spashell.Shell, r route, outcome 
 	_ = c.Send(shell.Raw())
 }
 
-func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, p *Page, head, body []byte) {
+func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, p *Page, html []byte) {
 	count(p.Kind, p.Outcome)
 	setHTML(c, p.Head.Lang)
 	if p.Status == fiber.StatusOK && p.Cacheable {
@@ -303,10 +339,8 @@ func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, p *Page, head, body 
 	if !lastModified.IsZero() {
 		c.Response().Header.SetLastModified(lastModified)
 	}
-	var buf bytes.Buffer
-	shell.Render(&buf, p.Head.Lang, head, body)
 	c.Status(p.Status)
-	_ = c.Send(buf.Bytes())
+	_ = c.Send(html)
 }
 
 // unavailable answers a request while there is no index.html to serve. The ingress routes the stats paths here

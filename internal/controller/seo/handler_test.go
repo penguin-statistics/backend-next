@@ -492,6 +492,9 @@ func TestNoindexPages(t *testing.T) {
 			t.Errorf("%s: status %d, X-Robots-Tag %q", path, r.status, r.header.Get("X-Robots-Tag"))
 		}
 		assertOnce(t, r.body, `<meta name="robots" content="noindex,follow">`)
+		if strings.Contains(path, "recruit") {
+			assertOnce(t, r.body, `<title>Recruit Drop Rates (CN server) | Penguin Statistics</title>`)
+		}
 		for _, absent := range []string{`rel="canonical"`, `hreflang=`, `application/ld+json`} {
 			if strings.Contains(r.body, absent) {
 				t.Errorf("%s: %s on a page not indexed", path, absent)
@@ -573,6 +576,36 @@ func TestListPages(t *testing.T) {
 	stages := regexp.MustCompile(`/ko/result/us/stage/[^/]+/([^"]+)"`).FindAllStringSubmatch(ssrRe.FindString(r.body), -1)
 	if len(stages) != 1 || stages[0][1] != "main_01-07" {
 		t.Errorf("US stage list %v", stages)
+	}
+}
+
+func TestListPagesAreRenderedOncePerData(t *testing.T) {
+	e := newTestEnv(t)
+	first := e.get(t, "/en/result/cn/item")
+	if again := e.get(t, "/en/result/cn/item"); again.body != first.body || again.header.Get("Cache-Control") != "public, max-age=300" {
+		t.Error("the list page changed without the data changing")
+	}
+	if !strings.Contains(first.body, "/en/result/cn/item/evil") {
+		t.Fatal("item list without evil")
+	}
+
+	// the worker refreshed the matrix: evil dropped no more
+	e.data.matrices = map[string]*service.SEOMatrix{"CN": service.NewSEOMatrix("CN", []*modelv2.OneDropMatrixElement{
+		{StageID: "main_01-07", ItemID: "30012", Times: 10, Quantity: 12, StartTime: 1556676000000},
+	}, lastModified.Add(30*time.Minute))}
+	r := e.get(t, "/en/result/cn/item")
+	if strings.Contains(r.body, "/en/result/cn/item/evil") || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 11:00:00 GMT" {
+		t.Errorf("list page not rendered again for the new matrix (Last-Modified %q)", r.header.Get("Last-Modified"))
+	}
+
+	// a frontend release
+	s, err := spashell.Parse([]byte(strings.Replace(string(e.shells.shell.Raw()), "app.2f494de9.js", "app.00000000.js", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.shells.shell = s
+	if r := e.get(t, "/en/result/cn/item"); !strings.Contains(r.body, "app.00000000.js") {
+		t.Error("list page not rendered again for the new shell")
 	}
 }
 
