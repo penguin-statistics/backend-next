@@ -313,3 +313,29 @@ func TestRunAdvancedQueryOnOneConnection(t *testing.T) {
 		})
 	}
 }
+
+func TestRunAdvancedQueryAfterATimedOutStageListLookup(t *testing.T) {
+	app := fiber.New()
+	for name, query := range advancedQueryTestQueries {
+		t.Run(name, func(t *testing.T) {
+			c, db := newAdvancedQueryTestResult(t)
+			ctx := app.AcquireCtx(&fasthttp.RequestCtx{})
+			defer app.ReleaseCtx(ctx)
+			// with the stage of the query cached, the first query reading stages is the stage list lookup of the result
+			// conversion, after the aggregations
+			if _, err := c.StageService.GetStageByArkId(context.Background(), query.StageID); err != nil {
+				t.Fatal(err)
+			}
+			lockTable(t, db, "stages")
+
+			if _, err := c.runAdvancedQuery(ctx, query, time.Now().Add(100*time.Millisecond)); err != ErrAdvancedQueryTimeout {
+				t.Fatalf("got error %v, want ErrAdvancedQueryTimeout", err)
+			}
+			// the failed lookup must not leave an empty stage list in the cache: the next query reads the stages once
+			// the lock is released
+			if _, err := c.runAdvancedQuery(ctx, query, time.Now().Add(time.Minute)); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
