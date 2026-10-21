@@ -419,12 +419,7 @@ func (r *DropReport) CalcTotalQuantityForPatternMatrix(
 func (r *DropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
 	ctx context.Context, queryCtx *model.DropReportQueryContext, sourceCategories []string,
 ) (map[string][]*model.TotalQuantityResultForPatternMatrix, error) {
-	var rows []struct {
-		StageID       int  `bun:"stage_id"`
-		PatternID     int  `bun:"pattern_id"`
-		IsManual      bool `bun:"is_manual"`
-		TotalQuantity int  `bun:"total_quantity"`
-	}
+	var rows []patternMatrixRow
 
 	subq1 := r.db.NewSelect().
 		TableExpr("drop_reports AS dr").
@@ -445,6 +440,21 @@ func (r *DropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
 		return nil, err
 	}
 
+	return splitPatternMatrixRowsBySourceCategories(rows, sourceCategories), nil
+}
+
+// patternMatrixRow is the count of reports of a stage and pattern, of manual or automated sources.
+type patternMatrixRow struct {
+	StageID       int  `bun:"stage_id"`
+	PatternID     int  `bun:"pattern_id"`
+	IsManual      bool `bun:"is_manual"`
+	TotalQuantity int  `bun:"total_quantity"`
+}
+
+// splitPatternMatrixRowsBySourceCategories sums classified pattern matrix rows up per source category.
+func splitPatternMatrixRowsBySourceCategories(
+	rows []patternMatrixRow, sourceCategories []string,
+) map[string][]*model.TotalQuantityResultForPatternMatrix {
 	type key struct{ stageId, patternId int }
 	resultsBySourceCategory := make(map[string][]*model.TotalQuantityResultForPatternMatrix, len(sourceCategories))
 	for _, sourceCategory := range sourceCategories {
@@ -470,7 +480,7 @@ func (r *DropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
 		}
 		resultsBySourceCategory[sourceCategory] = results
 	}
-	return resultsBySourceCategory, nil
+	return resultsBySourceCategory
 }
 
 func (r *DropReport) CalcTotalQuantityForTrend(

@@ -336,9 +336,9 @@ backend run-script coldstore-patch --dir /data/coldstore-v1 --delete 123458 --fi
 ## Serving the cold storage (the app)
 
 With `PENGUIN_V3_COLDSTORE_ENABLED=true`, the app opens the local copy in `PENGUIN_V3_COLDSTORE_DIRECTORY` at startup
-(`coldstore.Reader`). With `PENGUIN_V3_COLDSTORE_QUERIES_ENABLED=true` as well, the personal drop matrix and the drop
-matrix queries of `/result/advanced` read the archived part of their time ranges from it (see below); the other
-queries come in later PRs.
+(`coldstore.Reader`). With `PENGUIN_V3_COLDSTORE_QUERIES_ENABLED=true` as well, the personal drop and pattern
+matrices and the drop matrix queries of `/result/advanced` read the archived part of their time ranges from it (see
+below); the other queries come in later PRs.
 
 | Setting (`PENGUIN_V3_...`) | Default | |
 |---|---|---|
@@ -349,7 +349,7 @@ queries come in later PRs.
 | `COLDSTORE_TEMP_DIRECTORY` | system temp | DuckDB's spill files (in a directory of its own) and the time of the last integrity check |
 | `COLDSTORE_RELOAD_INTERVAL` | `1m` | how often the manifest is checked for a change; `0` never |
 | `COLDSTORE_INTEGRITY_CHECK_INTERVAL` | `168h` | how often every file is hashed again; `0` never |
-| `COLDSTORE_QUERIES_ENABLED` | `false` | read the archived part of the drop matrix queries from the cold storage; requires `COLDSTORE_ENABLED` |
+| `COLDSTORE_QUERIES_ENABLED` | `false` | read the archived part of the drop and pattern matrix queries from the cold storage; requires `COLDSTORE_ENABLED` |
 
 - The app never reads the bucket. DuckDB is confined to the cold storage directory and its temp directory: external
   access is off (`enable_external_access = false`, with only those two in `allowed_directories`), extensions are
@@ -375,6 +375,12 @@ queries come in later PRs.
   8 s of the heaviest account over the full history on the prototype). The counts are those of PostgreSQL for the
   same reports, and are added to PostgreSQL's for the part from the boundary on. Query durations:
   `penguinbackend_coldstore_query_duration_seconds{query="drop_matrix"}`.
+- The pattern matrix queries (the personal pattern matrix, and the pattern matrix job's day when it is archived)
+  count the reports with `times = 1` per stage and pattern from the same files (`one_time` rows of `rollup`), one
+  query per time range, and never need the recruit stage, which the pattern matrix leaves out. On the prototype, a
+  personal pattern matrix (161 time ranges of CN, up to seven years each) takes 6 to 7 s
+  from the files, 35 to 45 ms per range, also for the heaviest account. Query durations:
+  `penguinbackend_coldstore_query_duration_seconds{query="pattern_matrix"}`.
 - The manifest is checked every `COLDSTORE_RELOAD_INTERVAL`. A changed manifest (a month archived, a month patched)
   is served once all its files pass the startup checks. Until then the app keeps serving the previous one, logs
   `coldstore.reader.reload_failed` and counts `penguinbackend_coldstore_manifest_reload_failures_total` at every
