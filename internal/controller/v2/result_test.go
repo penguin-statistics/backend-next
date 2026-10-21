@@ -12,11 +12,13 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	pkgerrors "github.com/pkg/errors"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/driver/pgdriver"
@@ -244,9 +246,8 @@ func TestRunAdvancedQueryCancelsStatementsAtDeadline(t *testing.T) {
 			// the aggregations wait 5 seconds for the lock, unless PostgreSQL cancels them at the deadline
 			begin := time.Now()
 			_, err := c.runAdvancedQuery(ctx, query, time.Now().Add(500*time.Millisecond))
-			var pgErr pgdriver.Error
-			if !errors.As(err, &pgErr) || !pgErr.StatementTimeout() {
-				t.Fatalf("got error %v, want a statement timeout", err)
+			if err != ErrAdvancedQueryTimeout {
+				t.Fatalf("got error %v, want ErrAdvancedQueryTimeout", err)
 			}
 			if elapsed := time.Since(begin); elapsed > 2500*time.Millisecond {
 				t.Fatalf("query was cancelled after %v", elapsed)
@@ -337,5 +338,55 @@ func TestRunAdvancedQueryAfterATimedOutStageListLookup(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestAdvancedQueryErrorMapsStatementTimeout(t *testing.T) {
+	_, db := newAdvancedQueryTestResult(t)
+	ctx := context.Background()
+
+	timeoutErr := db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if _, err := tx.ExecContext(ctx, "SET LOCAL statement_timeout = 100"); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, "SELECT pg_sleep(5)")
+		return err
+	})
+	if timeoutErr == nil {
+		t.Fatal("pg_sleep was not cancelled")
+	}
+	if got := advancedQueryError(timeoutErr); got != ErrAdvancedQueryTimeout {
+		t.Errorf("advancedQueryError(%v) = %v, want ErrAdvancedQueryTimeout", timeoutErr, got)
+	}
+	if got := advancedQueryError(pkgerrors.Wrap(timeoutErr, "calc")); got != ErrAdvancedQueryTimeout {
+		t.Errorf("advancedQueryError of a wrapped statement timeout = %v, want ErrAdvancedQueryTimeout", got)
+	}
+
+	// a statement cancelled by pg_cancel_backend has the SQLSTATE of a statement timeout too
+	marker := fmt.Sprintf("cancel test %d", time.Now().UnixNano())
+	go func() {
+		for i := 0; i < 50; i++ {
+			time.Sleep(100 * time.Millisecond)
+			var cancelled int
+			if err := db.NewRaw("SELECT count(pg_cancel_backend(pid)) FROM pg_stat_activity WHERE query LIKE ? AND pid <> pg_backend_pid()", "%"+marker).Scan(ctx, &cancelled); err != nil || cancelled > 0 {
+				return
+			}
+		}
+	}()
+	_, cancelErr := db.ExecContext(ctx, "SELECT pg_sleep(5) -- "+marker)
+	var pgErr pgdriver.Error
+	if !errors.As(cancelErr, &pgErr) || !pgErr.StatementTimeout() {
+		t.Fatalf("got error %v, want a statement cancelled with SQLSTATE 57014", cancelErr)
+	}
+
+	// any other error, from the database or not, is returned as it is
+	_, otherErr := db.ExecContext(ctx, "SELECT * FROM table_that_does_not_exist")
+	if otherErr == nil {
+		t.Fatal("query of a missing table succeeded")
+	}
+	for _, err := range []error{cancelErr, otherErr, fmt.Errorf("not a database error"), nil} {
+		if got := advancedQueryError(err); !reflect.DeepEqual(got, err) {
+			t.Errorf("advancedQueryError(%v) = %v, want it unchanged", err, got)
+		}
 	}
 }

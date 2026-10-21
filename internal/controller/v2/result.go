@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2/utils"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"github.com/uptrace/bun/driver/pgdriver"
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
@@ -31,7 +32,8 @@ import (
 // ErrIntervalLengthTooSmall is returned when the interval length is invalid
 var ErrIntervalLengthTooSmall = pgerr.ErrInvalidReq.Msg("interval length must be greater than 1 hour")
 
-// ErrAdvancedQueryTimeout is returned when an advanced query request ran out of advancedQueryTimeout
+// ErrAdvancedQueryTimeout is returned when an advanced query request ran out of advancedQueryTimeout, before a query
+// or while PostgreSQL ran it
 var ErrAdvancedQueryTimeout = pgerr.ErrInvalidReq.Msg("query timed out: the request ran longer than %d seconds and was cancelled. Please narrow down the time ranges of its queries", int(advancedQueryTimeout.Seconds()))
 
 const (
@@ -395,9 +397,25 @@ func (c *Result) runAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery, de
 		if !time.Now().Before(lookupDeadline) {
 			return nil, ErrAdvancedQueryTimeout
 		}
-		return nil, err
+		return nil, advancedQueryError(err)
 	}
 	return result, nil
+}
+
+// advancedQueryError returns ErrAdvancedQueryTimeout for a statement PostgreSQL cancelled for its statement timeout,
+// and err otherwise.
+func advancedQueryError(err error) error {
+	// SQLSTATE 57014 is also what a statement cancelled by pg_cancel_backend gets: only the message, in the language of
+	// lc_messages of the server, tells them apart
+	var pgErr pgdriver.Error
+	if errors.As(err, &pgErr) && pgErr.StatementTimeout() && pgErr.Field('M') == "canceling statement due to statement timeout" {
+		log.Warn().
+			Str("evt.name", "result.advanced_query.timeout").
+			Err(err).
+			Msg("advanced query cancelled by statement timeout")
+		return ErrAdvancedQueryTimeout
+	}
+	return err
 }
 
 // handleAdvancedQuery runs one query of an advanced query request. qctx is the context its queries run with.
