@@ -96,6 +96,20 @@ func (s *PatternMatrix) GetShimPatternMatrix(ctx context.Context, server string,
 	}
 }
 
+// WarmUpGlobalPatternMatrixCaches fills the cached global pattern matrices of server (for every source category, with
+// all and with the top patterns) as requests do: it skips those cached, and waits for a calculation a request runs
+// instead of running another one. RefreshGlobalPatternMatrixCaches recalculates them instead.
+func (s *PatternMatrix) WarmUpGlobalPatternMatrixCaches(ctx context.Context, server string) error {
+	for _, sourceCategory := range s.Config.MatrixWorkerSourceCategories {
+		for _, showAllPatterns := range []bool{true, false} {
+			if _, err := s.GetShimPatternMatrix(ctx, server, null.Int{}, sourceCategory, showAllPatterns); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // =========== Global ===========
 
 // Calc today's pattern matrix elements and save to DB

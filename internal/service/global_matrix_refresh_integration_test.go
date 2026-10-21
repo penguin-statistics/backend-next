@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -624,5 +625,111 @@ func TestShimTrendRefreshAfterAPurge(t *testing.T) {
 	}
 	if trendJSON(cached) != trendJSON(want) {
 		t.Errorf("cached after the refresh\n%s\nwant the recalculated\n%s", trendJSON(cached), trendJSON(want))
+	}
+}
+
+// tableQueryCounter counts the queries that read table.
+type tableQueryCounter struct {
+	table string
+	n     atomic.Int32
+}
+
+func (c *tableQueryCounter) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	return ctx
+}
+
+func (c *tableQueryCounter) AfterQuery(_ context.Context, event *bun.QueryEvent) {
+	if strings.Contains(event.Query, c.table) {
+		c.n.Add(1)
+	}
+}
+
+// The worker's warm-up after a start must not calculate a global matrix a request is already calculating, nor those
+// requests already cached: CN's global drop matrices take about 48 s each.
+func TestGlobalMatrixWarmUpJoinsRequestsAndSkipsCachedMatrices(t *testing.T) {
+	db, dropMatrix, patternMatrix := newGlobalMatrixTestData(t)
+	ctx := context.Background()
+
+	// what requests calculate from an empty cache
+	flushCaches(t)
+	want := shimGlobalMatrices(t, dropMatrix, patternMatrix)
+	flushCaches(t)
+
+	dropReads := &tableQueryCounter{table: "drop_matrix_elements"}
+	patternReads := &tableQueryCounter{table: "pattern_matrix_elements"}
+	pause := &pauseAfterReading{table: "drop_matrix_elements", read: make(chan struct{}), release: make(chan struct{})}
+	db.AddQueryHook(dropReads)
+	db.AddQueryHook(patternReads)
+	db.AddQueryHook(pause)
+
+	// a request calculates CN's global drop matrix of every source, and is still at it when the warm-up starts
+	requested := make(chan error, 1)
+	go func() {
+		_, err := dropMatrix.GetShimDropMatrix(context.WithValue(ctx, pauseAfterReadingKey{}, pause), "CN", true, "", "", null.Int{}, constant.SourceCategoryAll)
+		requested <- err
+	}()
+	select {
+	case <-pause.read:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the request never read the elements")
+	}
+	warmedUp := make(chan error, 1)
+	go func() { warmedUp <- dropMatrix.WarmUpGlobalDropMatrixCaches(ctx, "CN") }()
+	time.Sleep(200 * time.Millisecond) // the warm-up waits for the request
+	close(pause.release)
+	for _, done := range []chan error{requested, warmedUp} {
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(30 * time.Second):
+			t.Fatal("the request or the warm-up never finished")
+		}
+	}
+	// one statement per source category: the request's for "all", the warm-up's for the others
+	if n := dropReads.n.Load(); n != int32(len(allSourceCategories)) {
+		t.Errorf("the request and the warm-up read the drop matrix elements %d times, want %d (once per source category)", n, len(allSourceCategories))
+	}
+
+	// the warm-up of the other servers and of the pattern matrices; a second warm-up reads nothing
+	for round := 0; round < 2; round++ {
+		dropBefore, patternBefore := dropReads.n.Load(), patternReads.n.Load()
+		for _, server := range testServers {
+			if err := dropMatrix.WarmUpGlobalDropMatrixCaches(ctx, server); err != nil {
+				t.Fatal(err)
+			}
+			if err := patternMatrix.WarmUpGlobalPatternMatrixCaches(ctx, server); err != nil {
+				t.Fatal(err)
+			}
+		}
+		dropRead, patternRead := dropReads.n.Load()-dropBefore, patternReads.n.Load()-patternBefore
+		if round == 0 && patternRead == 0 {
+			t.Error("the first warm-up never calculated the pattern matrices")
+		}
+		if round == 1 && (dropRead != 0 || patternRead != 0) {
+			t.Errorf("a warm-up of cached matrices read the drop matrix elements %d and the pattern matrix elements %d times, want none", dropRead, patternRead)
+		}
+	}
+
+	// what the warm-up cached is what requests calculate, with its last modified time
+	dropBefore, patternBefore := dropReads.n.Load(), patternReads.n.Load()
+	for _, v := range globalMatrixVariants() {
+		var lastModified time.Time
+		if err := cache.LastModifiedTime.Get("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+v.dropKey()+"]", &lastModified); err != nil {
+			t.Errorf("%+v: no last modified time for the warmed-up drop matrix", v)
+		}
+		if err := cache.LastModifiedTime.Get("[shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns:"+v.patternKey()+"]", &lastModified); err != nil {
+			t.Errorf("%+v: no last modified time for the warmed-up pattern matrix", v)
+		}
+	}
+	got := shimGlobalMatrices(t, dropMatrix, patternMatrix)
+	if dropReads.n.Load() != dropBefore || patternReads.n.Load() != patternBefore {
+		t.Error("requests after the warm-up calculated matrices it should have cached")
+	}
+	for v, w := range want {
+		if got[v] != w {
+			t.Errorf("%+v: warmed-up matrices differ from those calculated on request\ngot  %.300s\nwant %.300s", v, got[v], w)
+		}
 	}
 }

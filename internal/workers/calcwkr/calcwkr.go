@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -172,6 +173,67 @@ func (w *Worker) globalMatrixRefresh(batchCtx context.Context, name, server stri
 	}()
 }
 
+// warmUpGlobalCaches fills the caches of the global matrices and trends of every server, empty after the process
+// started, with fill (fillGlobalCaches), from the matrix elements earlier batches saved: requests then do not each
+// wait for a calculation until the first batch has refreshed them. fill goes through the caches as requests do, so
+// it joins a calculation a request already runs and skips what requests already cached, instead of calculating it
+// once more. The first batch runs it before its jobs, holding the worker lock, so that it does not read the matrix
+// elements while another process's batch replaces them, and holding refreshMu, one server at a time. A server that
+// fails is left to the requests, as before.
+func (w *Worker) warmUpGlobalCaches(ctx context.Context, fill func(ctx context.Context, server string) error) {
+	if !w.refreshGlobalMatrices {
+		return
+	}
+	w.refreshMu.Lock()
+	defer w.refreshMu.Unlock()
+	for _, server := range constant.Servers {
+		server := server
+		// microtask keeps the worker lock and logs the error
+		_ = w.microtask(ctx, "globalCachesWarmUp", server, func(ctx context.Context) (err error) {
+			// a panic would end the process on every start: fail the server instead
+			defer func() {
+				if r := recover(); r != nil {
+					err = errors.Errorf("panic: %v\n%s", r, debug.Stack())
+				}
+			}()
+			return fill(ctx, server)
+		})
+	}
+}
+
+// cacheWarmUp is a warm-up of cached results of a server, named in the logs.
+type cacheWarmUp struct {
+	name   string
+	warmUp func(ctx context.Context, server string) error
+}
+
+// fillGlobalCaches fills the cached global matrices and trend of server through the cached getters, as requests do:
+// those already cached are skipped, and a calculation a request has in flight is waited for instead of run again.
+func (w *Worker) fillGlobalCaches(ctx context.Context, server string) error {
+	return warmUpEach(ctx, server, []cacheWarmUp{
+		{"globalDropMatrix", w.DropMatrixService.WarmUpGlobalDropMatrixCaches},
+		{"globalPatternMatrix", w.PatternMatrixService.WarmUpGlobalPatternMatrixCaches},
+		{"shimTrend", w.TrendService.WarmUpShimTrend},
+	})
+}
+
+// warmUpEach runs every warm-up of server, also after one failed. It logs every failure and returns an error naming
+// the failed warm-ups.
+func warmUpEach(ctx context.Context, server string, warmUps []cacheWarmUp) error {
+	var failed []string
+	for _, wu := range warmUps {
+		if err := wu.warmUp(ctx, server); err != nil {
+			log.Ctx(ctx).Error().Str("evt.name", "worker.calcwkr.globalCachesWarmUp").Str("server", server).Str("cache", wu.name).Err(err).
+				Msg("failed to warm up the cached global results: requests calculate them")
+			failed = append(failed, wu.name)
+		}
+	}
+	if len(failed) > 0 {
+		return errors.Errorf("failed to warm up %s", strings.Join(failed, ", "))
+	}
+	return nil
+}
+
 // calcStats runs every stats calculation of a single server.
 func (w *Worker) calcStats(ctx context.Context, server string) (err error) {
 	ctx, span := tracer.Start(ctx, "calcwkr.server", trace.WithAttributes(attribute.String("server", server)))
@@ -299,7 +361,11 @@ func (w *Worker) batch(parentCtx context.Context, typ WorkerCalcType, f func(ctx
 
 	// buffered: after a timeout nobody receives, and the goroutine must not leak
 	errChan := make(chan error, 1)
+	first := w.count == 0
 	go func() {
+		if first {
+			w.warmUpGlobalCaches(ctx, w.fillGlobalCaches)
+		}
 		errChan <- runForAllServers(ctx, f)
 	}()
 
