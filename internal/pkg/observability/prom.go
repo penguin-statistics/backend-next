@@ -41,7 +41,7 @@ var (
 	})
 	ReportConsumeAckFailures = promauto.NewCounter(prometheus.CounterOpts{
 		Name: prometheus.BuildFQName(ServiceName, "report", "consume_ack_failures_total"),
-		Help: "Acks of consumed report task messages that failed",
+		Help: "Acks, naks and terms of consumed report task messages that failed",
 	})
 	ReportPublishDuration = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    prometheus.BuildFQName(ServiceName, "report", "publish_duration_seconds"),

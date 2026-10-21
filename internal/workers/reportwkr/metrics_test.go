@@ -39,6 +39,19 @@ func newTestMsg(subject string, numDelivered int, data []byte) *nats.Msg {
 	}
 }
 
+// unreachableJS is a JetStream context whose publishes fail, as while NATS is unreachable.
+type unreachableJS struct {
+	nats.JetStreamContext
+}
+
+func (unreachableJS) PublishMsg(*nats.Msg, ...nats.PubOpt) (*nats.PubAck, error) {
+	return nil, nats.ErrConnectionClosed
+}
+
+func (unreachableJS) PublishMsgAsync(*nats.Msg, ...nats.PubOpt) (nats.PubAckFuture, error) {
+	return nil, nats.ErrConnectionClosed
+}
+
 // consumeDeliveries returns the current state of the consume_num_delivered histogram.
 func consumeDeliveries(t *testing.T) *dto.Histogram {
 	t.Helper()
@@ -55,10 +68,9 @@ func TestConsumeMetricsOnUnmarshalFailure(t *testing.T) {
 	ackFailuresBefore := testutil.ToFloat64(observability.ReportConsumeAckFailures)
 	deliveriesBefore := consumeDeliveries(t)
 
-	w := &Worker{}
-	if err := w.ingestPreprocess(context.Background(), newTestMsg("REPORT.SINGLE", 3, []byte("{"))); err == nil {
-		t.Fatal("expected an unmarshal error")
-	}
+	// the move to the dead-letter stream fails, and so does the nak that follows it
+	w := &Worker{WorkerDeps: WorkerDeps{NatsJS: unreachableJS{}}}
+	w.ingestPreprocess(newTestMsg("REPORT.SINGLE", 3, []byte("{")))
 
 	if got := testutil.ToFloat64(consumed) - before; got != 1 {
 		t.Errorf("consume_total{failed_unmarshal,REPORT.SINGLE} increased by %v, want 1", got)
@@ -86,9 +98,7 @@ func TestConsumeMetricsOnProcessFailure(t *testing.T) {
 	db.Close()
 	w := newWorker(WorkerDeps{DB: db, ReportVerifier: &reportverifs.ReportVerifiers{}}, defaultConsumerConfig)
 	data, _ := json.Marshal(&types.ReportTask{TaskID: "test"})
-	if err := w.ingestPreprocess(context.Background(), newTestMsg("REPORT.UNKNOWN", 1, data)); err == nil {
-		t.Fatal("expected a process error")
-	}
+	w.ingestPreprocess(newTestMsg("REPORT.UNKNOWN", 1, data))
 
 	if got := testutil.ToFloat64(consumed) - before; got != 1 {
 		t.Errorf("consume_total{failed_process,other} increased by %v, want 1", got)
@@ -122,11 +132,10 @@ func TestConsumeMetricsOnStore(t *testing.T) {
 		outcome     string
 		storedDelta float64
 		reportsInDB int
-		wantErr     bool
 	}{
-		{"stored", "main_01-07", "stored", 2, 2, false},
+		{"stored", "main_01-07", "stored", 2, 2},
 		// the stage lookup falls back to a stages table the test schema does not have
-		{"rolled back", "main_99-99", "failed_process", 0, 0, true},
+		{"rolled back", "main_99-99", "failed_process", 0, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			db := newTestDB(t, dsn)
@@ -161,9 +170,7 @@ func TestConsumeMetricsOnStore(t *testing.T) {
 				DropPatternElementRepo: repo.NewDropPatternElement(db),
 				ReportVerifier:         &reportverifs.ReportVerifiers{},
 			}, defaultConsumerConfig)
-			if err := w.ingestPreprocess(ctx, newTestMsg("REPORT.BATCH", 1, data)); (err != nil) != tc.wantErr {
-				t.Fatalf("unexpected error %v", err)
-			}
+			w.ingestPreprocess(newTestMsg("REPORT.BATCH", 1, data))
 
 			if got := testutil.ToFloat64(consumed) - consumedBefore; got != 1 {
 				t.Errorf("consume_total{%s,REPORT.BATCH} increased by %v, want 1", tc.outcome, got)
