@@ -219,3 +219,29 @@ func TestCommitReportTaskLeavesNoRequestState(t *testing.T) {
 		t.Errorf("%d subscriptions, want the %d before", n, subs)
 	}
 }
+
+func TestCommitReportTaskDeduplicatesByIdempotencyKey(t *testing.T) {
+	s, _, prefix := newTestPublisher(t)
+	stream := addTestStream(t, s, prefix)
+
+	withKey := func(key string) func(c *fiber.Ctx) {
+		return func(c *fiber.Ctx) {
+			// as the idempotency middleware saves the X-Penguin-Idempotency-Key of the request
+			c.Locals(constant.IdempotencyKeyLocalsKey, key)
+		}
+	}
+	// a request retried with its key (after a timeout, say), another key, and two requests of no key
+	for _, setup := range []func(c *fiber.Ctx){withKey("key1"), withKey("key1"), withKey("key2"), nil, nil} {
+		if _, err := commitInRequest(t, s, prefix+".SINGLE", setup); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	info, err := s.NatsJS.StreamInfo(stream)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.State.Msgs != 4 {
+		t.Errorf("stream holds %d tasks, want 4: one per key, and each of no key", info.State.Msgs)
+	}
+}
