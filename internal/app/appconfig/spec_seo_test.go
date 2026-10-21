@@ -22,7 +22,7 @@ func TestSEOPageSettings(t *testing.T) {
 		t.Error("SEO pages are enabled by default")
 	}
 	if defaults.SEOShellURL != "http://frontend-rollout.default.svc.cluster.local/" || defaults.SEOSiteURL != "https://penguin-stats.io" ||
-		defaults.SEOShellTTL != time.Minute || defaults.SEOShellFetchTimeout != 3*time.Second || defaults.SEOPageMaxAge != 5*time.Minute {
+		defaults.SEOShellTTL != 15*time.Second || defaults.SEOShellFetchTimeout != 3*time.Second || defaults.SEOPageMaxAge != 5*time.Minute {
 		t.Errorf("defaults: %+v", defaults)
 	}
 

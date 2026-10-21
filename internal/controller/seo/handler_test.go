@@ -739,29 +739,47 @@ func TestRegister(t *testing.T) {
 	}))
 	defer shellServer.Close()
 
-	for _, enabled := range []bool{false, true} {
-		conf := &appconfig.Config{ConfigSpec: appconfig.ConfigSpec{
-			SEOPagesEnabled:      enabled,
-			SEOShellURL:          shellServer.URL,
-			SEOShellTTL:          time.Minute,
-			SEOShellFetchTimeout: time.Second,
-			SEOSiteURL:           site,
-			SEOPageMaxAge:        5 * time.Minute,
-		}}
-		lc := fxtest.NewLifecycle(t)
-		data := service.NewSEOData(lc, &appconfig.Config{}, nil, nil, nil)
-		app := fiber.New()
-		Register(lc, app, conf, data)
-		lc.RequireStart()
-		resp, err := app.Test(httptest.NewRequest(fiber.MethodGet, "/zh/result/cn/item", nil), -1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		resp.Body.Close()
+	for _, tc := range []struct {
+		name     string
+		enabled  bool
+		shellURL string
+		ttl      time.Duration
+		status   int
+	}{
+		// off, the stats paths go back to the frontend: the ingress may still route them here
+		{name: "disabled", enabled: false, shellURL: shellServer.URL, ttl: time.Minute, status: 302},
+		{name: "invalid shell URL", enabled: true, shellURL: "frontend-rollout/", ttl: time.Minute, status: 302},
 		// enabled, it serves the app until the catalog is loaded
-		if want := map[bool]int{false: 404, true: 200}[enabled]; resp.StatusCode != want {
-			t.Errorf("enabled %v: status %d, want %d", enabled, resp.StatusCode, want)
-		}
-		lc.RequireStop()
+		{name: "enabled", enabled: true, shellURL: shellServer.URL, ttl: time.Minute, status: 200},
+		// a TTL of 0 used to panic in the goroutine fetching the shell
+		{name: "zero TTL", enabled: true, shellURL: shellServer.URL, ttl: 0, status: 200},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			conf := &appconfig.Config{ConfigSpec: appconfig.ConfigSpec{
+				SEOPagesEnabled:      tc.enabled,
+				SEOShellURL:          tc.shellURL,
+				SEOShellTTL:          tc.ttl,
+				SEOShellFetchTimeout: time.Second,
+				SEOSiteURL:           site,
+				SEOPageMaxAge:        5 * time.Minute,
+			}}
+			lc := fxtest.NewLifecycle(t)
+			data := service.NewSEOData(lc, &appconfig.Config{}, nil, nil, nil)
+			app := fiber.New()
+			Register(lc, app, conf, data)
+			lc.RequireStart()
+			defer lc.RequireStop()
+			resp, err := app.Test(httptest.NewRequest(fiber.MethodGet, "/zh/result/cn/item?a=1", nil), -1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != tc.status {
+				t.Errorf("status %d, want %d", resp.StatusCode, tc.status)
+			}
+			if tc.status == 302 && resp.Header.Get("Location") != "/ZH/result/cn/item?a=1" {
+				t.Errorf("Location %q", resp.Header.Get("Location"))
+			}
+		})
 	}
 }

@@ -51,8 +51,20 @@ var isolationHeaders = []string{
 }
 
 // Register registers the stats pages if they are enabled, and keeps the frontend's index.html they are made of.
+// Disabled, or with a shell URL that cannot be fetched, the stats paths are still registered, to send their requests
+// back to the frontend (see unavailable): the ingress may route them here while the pages are off, when it was
+// switched on before this flag, or the flag was switched off or the backend rolled back without switching it off.
 func Register(lc fx.Lifecycle, app *fiber.App, conf *appconfig.Config, data *service.SEOData) {
 	if !conf.SEOPagesEnabled {
+		MountDisabled(app)
+		return
+	}
+	if err := spashell.ValidateURL(conf.SEOShellURL); err != nil {
+		log.Error().
+			Str("evt.name", "seo.pages.invalid_shell_url").
+			Err(err).
+			Msg("PENGUIN_V3_SEO_SHELL_URL is not an absolute http(s) URL: leaving the stats pages to the frontend")
+		MountDisabled(app)
 		return
 	}
 	src := spashell.New(spashell.Config{URL: conf.SEOShellURL, TTL: conf.SEOShellTTL, Timeout: conf.SEOShellFetchTimeout})
@@ -68,11 +80,33 @@ func Register(lc fx.Lifecycle, app *fiber.App, conf *appconfig.Config, data *ser
 		},
 	})
 	NewHandler(conf.SEOSiteURL, conf.SEOPageMaxAge, src, data).Mount(app)
-	log.Info().
+	effective := src.Config()
+	evt := log.Info()
+	if effective.TTL != conf.SEOShellTTL || effective.Timeout != conf.SEOShellFetchTimeout {
+		evt = log.Warn()
+	}
+	evt.
 		Str("evt.name", "seo.pages.enabled").
 		Str("shellURL", conf.SEOShellURL).
+		Dur("shellTTL", effective.TTL).
+		Dur("shellFetchTimeout", effective.Timeout).
 		Str("siteURL", conf.SEOSiteURL).
-		Msg("serving the stats pages with server-rendered metadata and data")
+		Msg("serving the stats pages with server-rendered metadata and data (a shell TTL or fetch timeout that is " +
+			"not positive is replaced by its default)")
+}
+
+// MountDisabled registers the routes of the pages to send their requests back to the frontend, while the pages are
+// off.
+func MountDisabled(r fiber.Router) {
+	disabled := func(c *fiber.Ctx) error {
+		path := c.Path()
+		(&Handler{}).unavailable(c, parseRoute(path), path, "disabled_redirect")
+		return nil
+	}
+	for _, lang := range langs {
+		r.Get("/"+lang+"/result", disabled)
+		r.Get("/"+lang+"/result/*", disabled)
+	}
 }
 
 type Handler struct {
@@ -160,7 +194,7 @@ func (h *Handler) Serve(c *fiber.Ctx) error {
 
 	shell, err := h.shells.Get(c.UserContext())
 	if err != nil {
-		h.unavailable(c, r, path)
+		h.unavailable(c, r, path, "unavailable_redirect")
 		return nil
 	}
 
@@ -343,16 +377,16 @@ func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, p *Page, html []byte
 	_ = c.Send(html)
 }
 
-// unavailable answers a request while there is no index.html to serve. The ingress routes the stats paths here
+// unavailable answers a request while there is no index.html to serve, or the pages are off. The ingress routes the stats paths here
 // case-sensitively, so the same path with the language in upper case (/ZH/result/...) is served by the frontend,
 // whose router matches it case-insensitively and replaces it with the lower case one without reloading: the app
 // works, with the language, server and page asked for. A request with the language in upper case was not routed
 // so; it gets a 503 instead of a redirect loop.
-func (h *Handler) unavailable(c *fiber.Ctx, r route, path string) {
+func (h *Handler) unavailable(c *fiber.Ctx, r route, path, redirectOutcome string) {
 	c.Set(fiber.HeaderCacheControl, "no-store")
 	segs := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 2)
 	if r.lang != "" && segs[0] == r.lang {
-		count(r.kind, "unavailable_redirect")
+		count(r.kind, redirectOutcome)
 		location := "/" + strings.ToUpper(r.lang)
 		if len(segs) == 2 {
 			// as requested: escaped

@@ -158,17 +158,19 @@ type ConfigSpec struct {
 	// SEOPagesEnabled serves the stats pages of the frontend (/{zh,en,ja,ko}/result/...) from here: the frontend's
 	// index.html with the page's title, description, canonical and hreflang links, structured data and a plain HTML
 	// table of its data, for search engines and link previews. The ingress has to route those paths here. When
-	// false, the routes are not registered at all.
+	// false, requests to those paths are redirected back to the frontend (the same path with the language in upper
+	// case, which the ingress does not route here).
 	SEOPagesEnabled bool `split_words:"true" default:"false"`
 
 	// SEOShellURL is the URL of the frontend's index.html, which the stats pages are made of.
 	SEOShellURL string `split_words:"true" default:"http://frontend-rollout.default.svc.cluster.local/"`
 
-	// SEOShellTTL is how often the index.html is fetched again. Keep it short: a copy from before a frontend
-	// release refers to scripts the release removed. The last copy fetched is served while a fetch fails.
-	SEOShellTTL time.Duration `split_words:"true" default:"1m"`
+	// SEOShellTTL is how often the index.html is fetched again (revalidated with ETag/Last-Modified). Keep it well
+	// below the time the frontend keeps its old pods after a release (30s): a copy from before a release refers to
+	// scripts the release removed. The last copy fetched is served while a fetch fails. Not positive: 15s.
+	SEOShellTTL time.Duration `split_words:"true" default:"15s"`
 
-	// SEOShellFetchTimeout is the timeout of a single fetch of the index.html.
+	// SEOShellFetchTimeout is the timeout of a single fetch of the index.html. Not positive: 3s.
 	SEOShellFetchTimeout time.Duration `split_words:"true" default:"3s"`
 
 	// SEOSiteURL is the origin of the canonical URLs of the stats pages, whichever host the request was sent to.
