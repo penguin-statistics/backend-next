@@ -109,6 +109,10 @@ func TestRunWithStatementTimeoutCancelsAggregationsOnServer(t *testing.T) {
 			_, err := repo.CalcQuantityUniqCount(ctx, queryCtx)
 			return err
 		},
+		"CalcDropMatrixForIntervalsBySourceCategories": func(ctx context.Context) error {
+			_, _, err := repo.CalcDropMatrixForIntervalsBySourceCategories(ctx, []*model.DropReportQueryContext{queryCtx}, []string{constant.SourceCategoryAll})
+			return err
+		},
 		"CalcTotalQuantityForTrend": func(ctx context.Context) error {
 			_, err := repo.CalcTotalQuantityForTrend(ctx, "CN", &start, time.Hour, 2, map[int][]int{1: {11}}, null.Int{}, constant.SourceCategoryAll)
 			return err
