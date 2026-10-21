@@ -501,4 +501,27 @@ func TestShimTrendRefresh(t *testing.T) {
 	if !isStale("US") {
 		t.Error("a failed refresh of CN dropped the trend of another server")
 	}
+
+	// a refresh that panics (an element of an item the items map does not have yet, e.g. during a metadata update)
+	// drops the stale trend too, and only that of its server
+	for _, server := range testServers {
+		cache.ShimTrend.Set(server, stale, time.Hour)
+	}
+	today := util.GetDayNum(&now, "CN")
+	mustExec(t, db, `INSERT INTO drop_matrix_elements (stage_id, item_id, quantity, times, server, source_category, day_num)
+		VALUES (1, 999, 1, 1, 'CN', ?, ?)`, constant.SourceCategoryAll, today)
+	func() {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Error("the refresh did not panic: the test does not exercise a panic")
+			}
+		}()
+		_ = trend.RefreshShimTrend(ctx, "CN")
+	}()
+	if isStale("CN") {
+		t.Error("a refresh that panicked kept the stale trend")
+	}
+	if !isStale("US") {
+		t.Error("a refresh of CN that panicked dropped the trend of another server")
+	}
 }
