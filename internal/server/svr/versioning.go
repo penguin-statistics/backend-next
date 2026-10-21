@@ -9,14 +9,9 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
-	"exusiai.dev/backend-next/internal/pkg/pgerr"
 )
 
 type V2 struct {
-	fiber.Router
-}
-
-type V3 struct {
 	fiber.Router
 }
 
@@ -28,22 +23,10 @@ type Meta struct {
 	fiber.Router
 }
 
-func CreateEndpointGroups(app *fiber.App, conf *appconfig.Config) (*V2, *V3, *Admin, *Meta) {
+func CreateEndpointGroups(app *fiber.App, conf *appconfig.Config) (*V2, *Admin, *Meta) {
 	v2 := app.Group("/PenguinStats/api/v2", func(c *fiber.Ctx) error {
 		// add compatibility versioning header for v2 shims
 		c.Set(constant.ShimCompatibilityHeaderKey, constant.ShimCompatibilityHeaderValue)
-		return c.Next()
-	})
-
-	v3 := app.Group("/api/v3alpha", func(c *fiber.Ctx) error {
-		msg := "The v3 API is in alpha and may change in the future. Please report any issues and/or suggestions to https://github.com/penguin-statistics/backend-next/issues."
-		c.Set("X-Penguin-Notes", msg)
-
-		accepts := c.Get(fiber.HeaderAccept)
-		if !strings.Contains(accepts, "application/vnd.penguin.v3+json") {
-			return pgerr.ErrInvalidReq.Msg(msg + " To use the v3 API, please use the application/vnd.penguin.v3+json Accept header to explicitly opt-in to the alpha version of API.")
-		}
-
 		return c.Next()
 	})
 
@@ -63,5 +46,5 @@ func CreateEndpointGroups(app *fiber.App, conf *appconfig.Config) (*V2, *V3, *Ad
 
 	meta := app.Group("/api/_")
 
-	return &V2{Router: v2}, &V3{Router: v3}, &Admin{Router: admin}, &Meta{Router: meta}
+	return &V2{Router: v2}, &Admin{Router: admin}, &Meta{Router: meta}
 }
