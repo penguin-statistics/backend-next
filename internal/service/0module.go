@@ -35,5 +35,6 @@ func Module() fx.Option {
 		NewExport,
 		NewDropReportExtra,
 		NewArchive,
+		NewSEOData,
 	))
 }

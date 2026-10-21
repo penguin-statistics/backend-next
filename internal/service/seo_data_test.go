@@ -1,0 +1,117 @@
+package service
+
+import (
+	"testing"
+	"time"
+
+	"gopkg.in/guregu/null.v3"
+
+	"exusiai.dev/backend-next/internal/model"
+	"exusiai.dev/backend-next/internal/model/cache"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
+)
+
+func TestSEOI18nFallsBackLikeTheFrontend(t *testing.T) {
+	s := SEOI18n{"zh": "固源岩", "en": "Orirock Cube", "ja": ""}
+	for lang, want := range map[string]string{"zh": "固源岩", "en": "Orirock Cube", "ja": "Orirock Cube", "ko": "Orirock Cube"} {
+		if got := s.In(lang); got != want {
+			t.Errorf("In(%s) = %q, want %q", lang, got, want)
+		}
+	}
+	if got := (SEOI18n{"zh": "昨日海"}).In("ko"); got != "昨日海" {
+		t.Errorf("zh only: %q", got)
+	}
+	if got := SEOI18n(nil).In("en"); got != "" {
+		t.Errorf("nil: %q", got)
+	}
+}
+
+func TestNewSEOCatalog(t *testing.T) {
+	c := NewSEOCatalog(
+		[]*model.Item{
+			{ArkItemID: "30013", Type: "MATERIAL", SortID: 2, Name: []byte(`{"zh":"固源岩组","en":"Orirock Cluster"}`), Existence: []byte(`{"CN":{"exist":true},"US":{"exist":false}}`), Group: null.StringFrom("orirock")},
+			{ArkItemID: "30012", Type: "MATERIAL", SortID: 1, Name: []byte(`{"zh":"固源岩"}`), Existence: []byte(`not json`)},
+		},
+		[]*model.Stage{
+			{ArkStageID: "main_01-07", StageID: 2, ZoneID: 1, Code: []byte(`{"zh":"1-7"}`), Sanity: null.IntFrom(6), Existence: []byte(`{"CN":{"exist":true,"openTime":1556676000000}}`)},
+			{ArkStageID: "orphan", StageID: 1, ZoneID: 99},
+		},
+		[]*model.Zone{{ArkZoneID: "main_1", ZoneID: 1, Category: "MAINLINE", Name: []byte(`{"en":"Chapter 1"}`)}},
+	)
+	if c.ItemList[0].ArkID != "30012" || c.StageList[0].ArkID != "orphan" {
+		t.Error("lists not ordered by sort ID and stage ID")
+	}
+	cluster := c.Items["30013"]
+	if cluster.Name.In("ja") != "Orirock Cluster" || !cluster.Existence.In("CN") || cluster.Existence.In("US") || cluster.Group != "orirock" {
+		t.Errorf("item: %+v", cluster)
+	}
+	if c.Items["30012"].Existence.In("CN") {
+		t.Error("malformed existence exists")
+	}
+	stage := c.Stages["main_01-07"]
+	if stage.Zone == nil || stage.Zone.ArkID != "main_1" || stage.Existence["CN"].OpenTime.Int64 != 1556676000000 {
+		t.Errorf("stage: %+v", stage)
+	}
+	if c.Stages["orphan"].Zone != nil {
+		t.Error("stage of an unknown zone has a zone")
+	}
+}
+
+func TestNewSEOMatrixOrdersLikeTheFrontend(t *testing.T) {
+	rows := []*modelv2.OneDropMatrixElement{
+		{StageID: "a", ItemID: "x", Times: 100, Quantity: 50},
+		{StageID: "b", ItemID: "x", Times: 1000, Quantity: 500},
+		{StageID: "c", ItemID: "x", Times: 10, Quantity: 23},
+		{StageID: "d", ItemID: "x", Times: 0, Quantity: 0},
+		{StageID: "0", ItemID: "x", Times: 100, Quantity: 50},
+		{StageID: "a", ItemID: "y", Times: 100, Quantity: 1},
+	}
+	m := NewSEOMatrix("CN", rows, time.Unix(1, 0))
+	var order []string
+	for _, r := range m.ByItem["x"] {
+		order = append(order, r.StageID)
+	}
+	if got := order; len(got) != 5 || got[0] != "c" || got[1] != "b" || got[2] != "0" || got[3] != "a" || got[4] != "d" {
+		t.Errorf("order %v, want [c b 0 a d]", got)
+	}
+	if r := m.ByItem["x"][0]; r.Rate != 2.3 {
+		t.Errorf("rate %v, want 2.3 (above 1 for more than one drop per run)", r.Rate)
+	}
+	if got := m.ByStage["a"]; len(got) != 2 || got[0].ItemID != "x" || got[1].Rate != 0.01 {
+		t.Errorf("stage a: %+v", got)
+	}
+}
+
+func TestSEODataMatrixPeeksTheCache(t *testing.T) {
+	cache.Initialize()
+	d := &SEOData{matrices: make(map[string]*seoMatrixMemo)}
+	key := "KR|true|all"
+	lmKey := "[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:" + key + "]"
+	t.Cleanup(func() {
+		_ = cache.ShimGlobalDropMatrix.Delete(key)
+		_ = cache.LastModifiedTime.Delete(lmKey)
+	})
+	_ = cache.ShimGlobalDropMatrix.Delete(key)
+
+	if d.Matrix("KR") != nil {
+		t.Fatal("matrix without a cached one")
+	}
+
+	rows := []*modelv2.OneDropMatrixElement{{StageID: "s", ItemID: "i", Times: 2, Quantity: 1}}
+	cache.ShimGlobalDropMatrix.Set(key, modelv2.DropMatrixQueryResult{Matrix: rows}, time.Hour)
+	cache.LastModifiedTime.Set(lmKey, time.Unix(100, 0), 0)
+	m := d.Matrix("KR")
+	if m == nil || len(m.ByItem["i"]) != 1 || !m.LastModified.Equal(time.Unix(100, 0)) {
+		t.Fatalf("matrix %+v", m)
+	}
+	if d.Matrix("KR") != m {
+		t.Error("index built again for the same cached matrix")
+	}
+
+	// the worker refreshed the matrix
+	cache.ShimGlobalDropMatrix.Set(key, modelv2.DropMatrixQueryResult{Matrix: []*modelv2.OneDropMatrixElement{{StageID: "s", ItemID: "j", Times: 2, Quantity: 2}}}, time.Hour)
+	cache.LastModifiedTime.Set(lmKey, time.Unix(200, 0), 0)
+	if m2 := d.Matrix("KR"); m2 == m || len(m2.ByItem["j"]) != 1 || len(m2.ByItem["i"]) != 0 {
+		t.Errorf("matrix not rebuilt after refresh: %+v", m2)
+	}
+}
