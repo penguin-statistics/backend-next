@@ -8,8 +8,12 @@ import (
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"exusiai.dev/backend-next/internal/pkg/observability"
 )
 
 // newRouteLoggedApp returns an app with the request logger writing to buf and
@@ -115,6 +119,54 @@ func TestRequestLoggerLogsRouteTemplate(t *testing.T) {
 				if _, ok := line[k]; !ok {
 					t.Errorf("logged fields lack %s: %v", k, line)
 				}
+			}
+		})
+	}
+}
+
+// responseSize returns the sample count and sum of the response size histogram
+// for the given labels.
+func responseSize(t *testing.T, route, method, statusClass string) (uint64, float64) {
+	t.Helper()
+
+	var m dto.Metric
+	h := observability.HTTPResponseSize.WithLabelValues(route, method, statusClass).(prometheus.Metric)
+	if err := h.Write(&m); err != nil {
+		t.Fatal(err)
+	}
+	return m.GetHistogram().GetSampleCount(), m.GetHistogram().GetSampleSum()
+}
+
+func TestRequestLoggerObservesResponseSizeByRoute(t *testing.T) {
+	tests := []struct {
+		name        string
+		method      string
+		url         string
+		route       string
+		statusClass string
+		body        string
+	}{
+		{"2xx", "GET", "/stages/main_01-07", "/stages/:stageId", "2xx", "ok"},
+		{"4xx", "GET", "/stages/missing", "/stages/:stageId", "4xx", "not found"},
+		{"POST", "POST", "/stages/main_01-07", "/stages/:stageId", "2xx", "ok"},
+		{"group middleware answered", "GET", "/cached/items/30012", "/cached", "2xx", "hit"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			app := newRouteLoggedApp(t, &buf)
+
+			countBefore, sumBefore := responseSize(t, tt.route, tt.method, tt.statusClass)
+			if _, err := app.Test(httptest.NewRequest(tt.method, tt.url, nil)); err != nil {
+				t.Fatal(err)
+			}
+			countAfter, sumAfter := responseSize(t, tt.route, tt.method, tt.statusClass)
+
+			if got := countAfter - countBefore; got != 1 {
+				t.Errorf("response count increased by %d, want 1", got)
+			}
+			if got := sumAfter - sumBefore; got != float64(len(tt.body)) {
+				t.Errorf("response size sum increased by %v, want %d", got, len(tt.body))
 			}
 		})
 	}

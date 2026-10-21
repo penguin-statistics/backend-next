@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"exusiai.dev/backend-next/internal/pkg/flog"
+	"exusiai.dev/backend-next/internal/pkg/observability"
 )
 
 func Logger(app *fiber.App) {
@@ -35,14 +36,20 @@ func requestLogger() func(ctx *fiber.Ctx) error {
 		// for a cache hit or limiter rejection there, or / or a group prefix for a path
 		// no route matches.
 		route := ctx.Route().Path
+		status := ctx.Response().StatusCode()
+		bytesWritten := len(ctx.Response().Body())
 
 		flog.InfoFrom(ctx, "http.request").
 			Bytes("http.useragent", ctx.Request().Header.UserAgent()).
 			Str("http.route", route).
-			Int("http.status_code", ctx.Response().StatusCode()).
+			Int("http.status_code", status).
 			Int("network.bytes_read", len(ctx.Request().Body())).
-			Int("network.bytes_written", len(ctx.Response().Body())).
+			Int("network.bytes_written", bytesWritten).
 			Dur("duration", duration).
 			Msg("received request")
+
+		observability.HTTPResponseSize.
+			WithLabelValues(route, ctx.Method(), observability.HTTPStatusClass(status)).
+			Observe(float64(bytesWritten))
 	})
 }

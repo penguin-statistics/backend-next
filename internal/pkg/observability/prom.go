@@ -96,6 +96,14 @@ var (
 		Help:    "Number of queries in a valid advanced query request",
 		Buckets: prometheus.LinearBuckets(1, 1, 5),
 	})
+	// HTTPResponseSize also counts responses: its _count series is the number of
+	// responses by route, method and status class. The route is the last matched
+	// route as logged in http.route: see middlewares.requestLogger.
+	HTTPResponseSize = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    prometheus.BuildFQName(ServiceName, "http", "response_size_bytes"),
+		Help:    "Size of HTTP response bodies in bytes by matched route, method and status class",
+		Buckets: prometheus.ExponentialBuckets(1024, 8, 5),
+	}, []string{"route", "method", "status_class"})
 )
 
 // ReportSubjectLabel bounds the subject label of the report metrics to the subjects reports are published to.
@@ -116,6 +124,25 @@ func ReportSourceLabel(source string) string {
 		return "maa"
 	case constant.FrontendV2, constant.FrontendV1, constant.FrontendV1Internal:
 		return "frontend"
+	default:
+		return "other"
+	}
+}
+
+// HTTPStatusClass returns the class of an HTTP status code ("2xx", "4xx", ...),
+// or "other" for a code outside 100-599, to keep metric labels bounded.
+func HTTPStatusClass(code int) string {
+	switch code / 100 {
+	case 1:
+		return "1xx"
+	case 2:
+		return "2xx"
+	case 3:
+		return "3xx"
+	case 4:
+		return "4xx"
+	case 5:
+		return "5xx"
 	default:
 		return "other"
 	}
