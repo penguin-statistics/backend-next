@@ -58,9 +58,9 @@ func (s *Account) GetAccountFromRequest(ctx *fiber.Ctx) (*model.Account, error) 
 	// check PenguinID validity
 	account, err := s.GetAccountByPenguinId(ctx.UserContext(), penguinId)
 	if err != nil {
+		// never log the PenguinID: on a database error it is a valid login credential
 		flog.WarnFrom(ctx, "account.invalid.notfound").
 			Err(err).
-			Str("penguinIdProvided", penguinId).
 			Msg("failed to get account from request")
 		return nil, pgerr.ErrInvalidReq.Msg("PenguinID is invalid")
 	}
