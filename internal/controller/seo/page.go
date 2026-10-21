@@ -557,26 +557,22 @@ func (b *builder) itemPage() *Page {
 }
 
 // itemHighlights quotes the rows with the highest rates among those still open with many samples, then the rows
-// with the highest rates
+// with the most samples: the highest rates of the others are often those of a handful of runs
 func (b *builder) itemHighlights(rows []service.SEORow) string {
-	var picked []service.SEORow
-	used := map[string]bool{}
+	var picked, rest []service.SEORow
 	for _, row := range rows {
-		if len(picked) == highlights {
-			break
-		}
-		if !row.EndTime.Valid && row.Times >= highlightMinTimes {
+		if len(picked) < highlights && !row.EndTime.Valid && row.Times >= highlightMinTimes {
 			picked = append(picked, row)
-			used[row.StageID] = true
+		} else {
+			rest = append(rest, row)
 		}
 	}
-	for _, row := range rows {
-		if len(picked) == highlights {
-			break
+	if n := highlights - len(picked); n > 0 {
+		sort.SliceStable(rest, func(i, j int) bool { return rest[i].Times > rest[j].Times })
+		if n > len(rest) {
+			n = len(rest)
 		}
-		if !used[row.StageID] {
-			picked = append(picked, row)
-		}
+		picked = append(picked, rest[:n]...)
 	}
 	parts := make([]string, len(picked))
 	for i, row := range picked {

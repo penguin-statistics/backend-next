@@ -808,3 +808,18 @@ func TestRegister(t *testing.T) {
 		})
 	}
 }
+
+func TestItemDescriptionQuotesWellSampledRows(t *testing.T) {
+	e := newTestEnv(t)
+	// no open row with many samples: the description falls back to the rows with the most samples, not to the
+	// 100% of a few runs
+	e.data.matrices = map[string]*service.SEOMatrix{"CN": service.NewSEOMatrix("CN", []*modelv2.OneDropMatrixElement{
+		{StageID: "act1_02", ItemID: "30012", Times: 2, Quantity: 2, StartTime: 1688025600000},
+		{StageID: "act1_01", ItemID: "30012", Times: 1, Quantity: 1, StartTime: 1688025600000},
+		{StageID: "main_01-07", ItemID: "30012", Times: 900, Quantity: 450, StartTime: 1556676000000},
+	}, lastModified)}
+	r := e.get(t, "/en/result/cn/item/30012")
+	if !strings.Contains(r.body, `<meta name="description" content="Orirock Cube drop rates on the CN server: 1-7 50.00% (900 samples), EV-2 100.00% (2), `) {
+		t.Errorf("description: %s", regexp.MustCompile(`<meta name="description"[^>]*>`).FindString(r.body))
+	}
+}
