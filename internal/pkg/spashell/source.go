@@ -154,6 +154,10 @@ func (s *Source) Refresh(ctx context.Context) error {
 
 // Run fetches the shell, then fetches it again every TTL until ctx is done.
 func (s *Source) Run(ctx context.Context) {
+	if s.cur.Load() == nil {
+		// the age of the shell counts from now until one is fetched
+		observability.SEOShellFresh(s.now())
+	}
 	_ = s.Refresh(ctx)
 	ticker := time.NewTicker(s.conf.TTL)
 	defer ticker.Stop()
@@ -209,7 +213,9 @@ func (s *Source) fetch(ctx context.Context) (err error) {
 
 	if resp.StatusCode == http.StatusNotModified && cur != nil {
 		outcome = "not_modified"
-		s.cur.CompareAndSwap(cur, cur.revalidated(s.now()))
+		now := s.now()
+		s.cur.CompareAndSwap(cur, cur.revalidated(now))
+		observability.SEOShellFresh(now)
 		return nil
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -252,5 +258,6 @@ func (s *Source) fetch(ctx context.Context) (err error) {
 		outcome = "ok_unspliceable"
 	}
 	s.cur.Store(shell)
+	observability.SEOShellFresh(now)
 	return nil
 }

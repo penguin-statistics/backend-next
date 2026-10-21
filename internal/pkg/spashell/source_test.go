@@ -10,6 +10,10 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus/testutil"
+
+	"exusiai.dev/backend-next/internal/pkg/observability"
 )
 
 type upstream struct {
@@ -359,5 +363,26 @@ func TestValidateURL(t *testing.T) {
 		if err := ValidateURL(raw); (err == nil) != ok {
 			t.Errorf("ValidateURL(%q) = %v", raw, err)
 		}
+	}
+}
+
+func TestSourceReportsShellAge(t *testing.T) {
+	u := &upstream{status: 200, contentType: "text/html", body: shellV1}
+	srv := httptest.NewServer(u)
+	t.Cleanup(srv.Close)
+	s := New(Config{URL: srv.URL + "/"})
+	s.now = func() time.Time { return time.Now().Add(-time.Hour) }
+	if _, err := s.Get(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if age := testutil.ToFloat64(observability.SEOShellAgeSeconds); age < 3599 || age > 3700 {
+		t.Errorf("age %v after a fetch an hour ago", age)
+	}
+	s.now = time.Now
+	if err := s.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if age := testutil.ToFloat64(observability.SEOShellAgeSeconds); age > 60 {
+		t.Errorf("age %v right after a fetch", age)
 	}
 }
