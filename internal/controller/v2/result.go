@@ -29,6 +29,17 @@ import (
 // ErrIntervalLengthTooSmall is returned when the interval length is invalid
 var ErrIntervalLengthTooSmall = pgerr.ErrInvalidReq.Msg("interval length must be greater than 1 hour")
 
+const (
+	// advancedQueryConcurrency is how many advanced query requests the process runs at the same time. Each of them
+	// scans drop reports for as long as its time range requires, and a few running together saturate the database
+	// I/O, which stalls report ingestion.
+	advancedQueryConcurrency = 2
+
+	// advancedQueryConcurrencyWait is how long an advanced query request waits for a running one to finish before it
+	// is rejected.
+	advancedQueryConcurrencyWait = 5 * time.Second
+)
+
 type Result struct {
 	fx.In
 
@@ -99,7 +110,7 @@ func RegisterResult(v2 *svr.V2, c Result) {
 		},
 		Max:        30,
 		Expiration: time.Minute * 5,
-	}), observeAdvancedQuery, c.AdvancedQuery)
+	}), middlewares.ConcurrencyLimit(advancedQueryConcurrency, advancedQueryConcurrencyWait, rejectAdvancedQuery), observeAdvancedQuery, c.AdvancedQuery)
 }
 
 //	@Summary	Get Drop Matrix
@@ -276,10 +287,26 @@ const (
 	advancedQueryOutcomeOK          = "ok"
 	advancedQueryOutcomeClientError = "client_error"
 	advancedQueryOutcomeError       = "error"
+	// advancedQueryOutcomeRejected is a request turned away by the concurrency limit in front of observeAdvancedQuery
+	advancedQueryOutcomeRejected = "rejected"
 )
+
+// rejectAdvancedQuery answers an advanced query request that found every slot of the concurrency limit busy for
+// advancedQueryConcurrencyWait with a 429. It never reaches observeAdvancedQuery, so it is counted here, with the time
+// since the request came in, most of it spent waiting for a slot, as its duration.
+func rejectAdvancedQuery(ctx *fiber.Ctx) error {
+	observability.AdvancedQueryDuration.WithLabelValues(advancedQueryOutcomeRejected).Observe(time.Since(ctx.Context().Time()).Seconds())
+	observability.AdvancedQueryRequests.WithLabelValues(advancedQueryOutcomeRejected).Inc()
+	return ctx.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+		"code":    "TOO_MANY_REQUESTS",
+		"message": "The Penguin Stats advanced query API is busy serving other queries. Please retry later.",
+	})
+}
 
 // observeAdvancedQuery records the advanced query requests in flight, and the duration and outcome of each of them.
 // A request counts as in flight from here on, including any time it spends in later middlewares before the handler.
+// The concurrency limit goes in front of it, so a request waiting for a slot is not in flight yet and its wait is not
+// part of its duration.
 func observeAdvancedQuery(ctx *fiber.Ctx) (err error) {
 	observability.AdvancedQueryInFlight.Inc()
 	start := time.Now()

@@ -186,6 +186,75 @@ func TestObserveAdvancedQueryPanic(t *testing.T) {
 	}
 }
 
+func TestRejectAdvancedQuery(t *testing.T) {
+	const wait = 50 * time.Millisecond
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseHandler := func() { releaseOnce.Do(func() { close(release) }) }
+	t.Cleanup(releaseHandler)
+	// the order RegisterResult uses: the concurrency limit, then observeAdvancedQuery
+	app := newAdvancedQueryMetricsTestApp(middlewares.ConcurrencyLimit(1, wait, rejectAdvancedQuery), observeAdvancedQuery, func(ctx *fiber.Ctx) error {
+		close(entered)
+		<-release
+		return ctx.JSON(fiber.Map{})
+	})
+
+	inFlight := testutil.ToFloat64(observability.AdvancedQueryInFlight)
+	okBefore := testutil.ToFloat64(observability.AdvancedQueryRequests.WithLabelValues(advancedQueryOutcomeOK))
+	rejectedBefore := testutil.ToFloat64(observability.AdvancedQueryRequests.WithLabelValues(advancedQueryOutcomeRejected))
+	observer := observability.AdvancedQueryDuration.WithLabelValues(advancedQueryOutcomeRejected)
+	beforeCount, beforeSum := histogramCountAndSum(t, observer)
+
+	first := make(chan int, 1)
+	go func() {
+		resp, err := app.Test(httptest.NewRequest(fiber.MethodPost, "/advanced", nil), -1)
+		if err != nil {
+			t.Error(err)
+			first <- 0
+			return
+		}
+		resp.Body.Close()
+		first <- resp.StatusCode
+	}()
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for the first request to reach the handler")
+	}
+
+	// the second request finds the only slot taken, waits, and is turned away
+	resp := postAdvanced(t, app, "{}")
+	if resp.StatusCode != fiber.StatusTooManyRequests {
+		t.Errorf("status: got %d, want %d", resp.StatusCode, fiber.StatusTooManyRequests)
+	}
+	if got := testutil.ToFloat64(observability.AdvancedQueryRequests.WithLabelValues(advancedQueryOutcomeRejected)); got != rejectedBefore+1 {
+		t.Errorf("requests with outcome %q: got %v, want %v", advancedQueryOutcomeRejected, got, rejectedBefore+1)
+	}
+	count, sum := histogramCountAndSum(t, observer)
+	if count != beforeCount+1 {
+		t.Errorf("rejected duration samples: got %d, want %d", count, beforeCount+1)
+	}
+	if sum-beforeSum < wait.Seconds() {
+		t.Errorf("observed rejected duration %vs, want at least the wait of %vs", sum-beforeSum, wait.Seconds())
+	}
+	// a request waiting for a slot, or turned away, is not in flight
+	if got := testutil.ToFloat64(observability.AdvancedQueryInFlight); got != inFlight+1 {
+		t.Errorf("in flight with one request running: got %v, want %v", got, inFlight+1)
+	}
+
+	releaseHandler()
+	if status := <-first; status != fiber.StatusOK {
+		t.Errorf("first request status: got %d, want %d", status, fiber.StatusOK)
+	}
+	if got := testutil.ToFloat64(observability.AdvancedQueryRequests.WithLabelValues(advancedQueryOutcomeOK)); got != okBefore+1 {
+		t.Errorf("requests with outcome %q: got %v, want %v", advancedQueryOutcomeOK, got, okBefore+1)
+	}
+	if got := testutil.ToFloat64(observability.AdvancedQueryInFlight); got != inFlight {
+		t.Errorf("in flight after handling: got %v, want %v", got, inFlight)
+	}
+}
+
 // TestAdvancedQueryRoute goes through the route RegisterResult sets up, so it also fails if the route stops being
 // observed.
 func TestAdvancedQueryRoute(t *testing.T) {

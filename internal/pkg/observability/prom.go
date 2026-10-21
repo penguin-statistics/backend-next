@@ -80,7 +80,7 @@ var (
 	}, []string{"cache", "op"})
 	AdvancedQueryInFlight = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: prometheus.BuildFQName(ServiceName, "advanced_query", "in_flight_requests"),
-		Help: "Number of advanced query requests being handled, including any waiting in middlewares before the handler",
+		Help: "Number of advanced query requests being handled, not counting any waiting for a slot of the concurrency limit",
 	})
 	AdvancedQueryDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    prometheus.BuildFQName(ServiceName, "advanced_query", "duration_seconds"),
@@ -89,7 +89,7 @@ var (
 	}, []string{"outcome"})
 	AdvancedQueryRequests = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: prometheus.BuildFQName(ServiceName, "advanced_query", "requests_total"),
-		Help: "Number of advanced query requests handled, by outcome (ok, client_error, error)",
+		Help: "Number of advanced query requests handled, by outcome (ok, client_error, error, rejected)",
 	}, []string{"outcome"})
 	AdvancedQueryQueriesPerRequest = promauto.NewHistogram(prometheus.HistogramOpts{
 		Name:    prometheus.BuildFQName(ServiceName, "advanced_query", "queries_per_request"),
