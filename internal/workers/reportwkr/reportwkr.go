@@ -406,10 +406,13 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 
 	switch {
 	case err == nil:
+		// the task is stored: its payload is not logged, unlike a failed or parked one, whose log is its only record
 		log.Info().
 			Str("evt.name", "reportwkr.processed").
 			Str("taskId", reportTask.TaskID).
-			Interface("task", reportTask).
+			Int("task.accountId", reportTask.AccountID).
+			Str("task.source", reportTask.Source).
+			Str("task.version", reportTask.Version).
 			Dur("duration", time.Since(start)).
 			Msg("report task processed successfully")
 
@@ -582,14 +585,6 @@ func term(msg *nats.Msg) {
 }
 
 func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) error {
-	L := log.With().
-		Interface("task", reportTask).
-		Logger()
-
-	L.Info().
-		Str("evt.name", "reportwkr.received").
-		Msg("received report task: processing")
-
 	// reportTask.CreatedAt is in microseconds
 	taskCreatedAt := time.UnixMicro(reportTask.CreatedAt)
 
@@ -614,8 +609,9 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 		rejected = rejected || reliability != 0
 	}
 	if rejected {
-		L.Warn().
+		log.Warn().
 			Str("evt.name", "reportwkr.violations").
+			Interface("task", reportTask).
 			Ints("reliabilities", reliabilities).
 			Msg("report task verification failed on some or all reports")
 	}
