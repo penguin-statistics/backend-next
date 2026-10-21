@@ -54,14 +54,36 @@ func TestRunWithStatementTimeoutCancelsSleepOnServer(t *testing.T) {
 		// the client never cancels: only the server can end the statement before its 5 seconds are up
 		begin := time.Now()
 		err := repo.RunWithStatementTimeout(ctx, timeout, func(ctx context.Context) error {
-			_, err := repo.idb(ctx).ExecContext(ctx, "SELECT pg_sleep(5) -- "+marker)
-			return err
+			return repo.runWithStatementDeadline(ctx, func(ctx context.Context, db bun.IConn) error {
+				_, err := db.ExecContext(ctx, "SELECT pg_sleep(5) -- "+marker)
+				return err
+			})
 		})
 		assertStatementTimeout(t, err, time.Since(begin), 5*time.Second)
 
 		if n := countRows(t, db, "SELECT count(*) FROM pg_stat_activity WHERE query LIKE ? AND pid <> pg_backend_pid()", "%"+marker); n != 0 {
 			t.Fatalf("%d backends still run the statement", n)
 		}
+	}
+}
+
+func TestRunWithStatementTimeoutIsADeadline(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewDropReport(db)
+
+	// the statement starts 800 ms into the timeout of 1 s: PostgreSQL cancels it after what is left, not after 1 s
+	begin := time.Now()
+	err := repo.RunWithStatementTimeout(context.Background(), time.Second, func(ctx context.Context) error {
+		time.Sleep(800 * time.Millisecond)
+		return repo.runWithStatementDeadline(ctx, func(ctx context.Context, db bun.IConn) error {
+			_, err := db.ExecContext(ctx, "SELECT pg_sleep(5)")
+			return err
+		})
+	})
+	elapsed := time.Since(begin)
+	assertStatementTimeout(t, err, elapsed, 5*time.Second)
+	if elapsed > 1500*time.Millisecond {
+		t.Fatalf("statement was cancelled %v after the timeout began, want about 1s", elapsed)
 	}
 }
 
@@ -145,13 +167,14 @@ func sortedJSON[T any](t *testing.T, results []T) []string {
 
 func TestRunWithStatementTimeoutKeepsResultsAndSessions(t *testing.T) {
 	db := newTestDB(t)
-	// a single connection: the statements after the transaction run on the session it used
+	// a single connection: the statements after the transactions run on the session they used, and a query fn runs
+	// between the aggregations waits for that connection until ctx ends if an aggregation still holds it
 	db.SetMaxOpenConns(1)
 	repo := NewDropReport(db)
-	// an aggregation not running in the transaction would wait for the connection the transaction holds until ctx ends
+	f := seedDropReports(t, rand.New(rand.NewSource(3)), db)
+	// started after the seeding, which takes long on a busy database
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	f := seedDropReports(t, rand.New(rand.NewSource(3)), db)
 
 	end := f.boundaries[len(f.boundaries)-1]
 	stageItemFilter := map[int][]int{1: {11, 12}, 2: {}, 3: {13}}
@@ -193,19 +216,26 @@ func TestRunWithStatementTimeoutKeepsResultsAndSessions(t *testing.T) {
 	}
 
 	var got [][]string
-	var timeoutInside string
+	var timeoutInside int
 	err = repo.RunWithStatementTimeout(ctx, time.Minute, func(ctx context.Context) error {
-		if err := repo.idb(ctx).NewRaw("SHOW statement_timeout").Scan(ctx, &timeoutInside); err != nil {
+		if err := repo.runWithStatementDeadline(ctx, func(ctx context.Context, db bun.IConn) error {
+			return db.QueryRowContext(ctx, "SELECT setting::int FROM pg_settings WHERE name = 'statement_timeout'").Scan(&timeoutInside)
+		}); err != nil {
 			return err
 		}
 		got, err = aggregate(ctx)
-		return err
+		if err != nil {
+			return err
+		}
+		// a lookup on the pool, as the advanced queries run between their aggregations
+		var one int
+		return db.NewRaw("SELECT 1").Scan(ctx, &one)
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if timeoutInside != "1min" {
-		t.Errorf("statement_timeout in the transaction is %q, want 1min", timeoutInside)
+	if timeoutInside <= 0 || timeoutInside > int(time.Minute.Milliseconds()) {
+		t.Errorf("statement_timeout in the transaction is %d ms, want the time left of 1 minute", timeoutInside)
 	}
 	for i := range want {
 		if len(want[i]) == 0 {
