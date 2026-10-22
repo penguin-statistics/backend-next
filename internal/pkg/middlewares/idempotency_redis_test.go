@@ -20,11 +20,11 @@ import (
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"exusiai.dev/backend-next/internal/pkg/fiberstore"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 )
 
@@ -71,8 +71,8 @@ func testIdempotencyConfig(client *redis.Client, prefix string) *IdempotencyConf
 		Lifetime:            testIdempotencyLifetime,
 		KeyHeader:           constant.IdempotencyKeyHeader,
 		KeepResponseHeaders: []string{fiber.HeaderContentType, "X-Kept"},
-		Storage:             fiberstore.NewRedis(client, prefix),
-		RedSync:             redsync.New(goredis.NewPool(client)),
+		Redis:               client,
+		KeyPrefix:           prefix,
 	}
 }
 
@@ -438,6 +438,62 @@ func TestIdempotencyReleasesOnlyItsOwnLock(t *testing.T) {
 	}
 }
 
+// replayFirstLockHook runs the first command that takes the lock of key twice and keeps the second reply, as go-redis
+// does when the reply of the first run is lost.
+type replayFirstLockHook struct {
+	lockKey  string
+	replayed atomic.Bool
+}
+
+func (h *replayFirstLockHook) DialHook(next redis.DialHook) redis.DialHook { return next }
+
+func (h *replayFirstLockHook) ProcessPipelineHook(next redis.ProcessPipelineHook) redis.ProcessPipelineHook {
+	return next
+}
+
+func (h *replayFirstLockHook) ProcessHook(next redis.ProcessHook) redis.ProcessHook {
+	return func(ctx context.Context, cmd redis.Cmder) error {
+		name := cmd.Name()
+		if (name == "evalsha" || name == "eval") && len(cmd.Args()) > 4 && cmd.Args()[4] == h.lockKey &&
+			!h.replayed.Load() {
+			// only a run that went through counts: an EVALSHA answered NOSCRIPT (a cold script cache) did nothing,
+			// and go-redis falls back to EVAL
+			if err := next(ctx, cmd); err != nil {
+				return err
+			}
+			h.replayed.Store(true)
+		}
+		return next(ctx, cmd)
+	}
+}
+
+// A try whose reply is lost and that go-redis runs again finds the lock holding its own token: it took the lock, so
+// the request runs instead of failing as locked by another request.
+func TestIdempotencyLockRunAgainAfterALostReply(t *testing.T) {
+	client := newTestIdempotencyRedis(t)
+	prefix := testIdempotencyPrefix(t, client)
+	key := prefix[len("test-idempotency-"):] + "lostreply"
+	lockKey := "mutex:idempotency-request:" + key
+	hook := &replayFirstLockHook{lockKey: lockKey}
+	client.AddHook(hook)
+	var calls atomic.Int32
+	app := newIdempotencyTestApp(testIdempotencyConfig(client, prefix), testIdempotencyHandler(&calls))
+
+	resp := app.post(t, key)
+	if !hook.replayed.Load() {
+		t.Fatalf("the lock command was not run again (status %d %q)", resp.status, resp.body)
+	}
+	if resp.status != fiber.StatusCreated || resp.header.Get(constant.IdempotencyHeader) != "saved" || calls.Load() != 1 {
+		t.Errorf("status %d %s=%q after %d handler calls, want 201 saved after 1", resp.status, constant.IdempotencyHeader, resp.header.Get(constant.IdempotencyHeader), calls.Load())
+	}
+	if got := client.Exists(context.Background(), lockKey).Val(); got != 0 {
+		t.Error("the lock is still held")
+	}
+	if resp := app.post(t, key); resp.status != fiber.StatusCreated || resp.header.Get(constant.IdempotencyHeader) != "hit" {
+		t.Errorf("retry: status %d %s=%q, want 201 hit", resp.status, constant.IdempotencyHeader, resp.header.Get(constant.IdempotencyHeader))
+	}
+}
+
 // A request whose handler fails saves nothing and releases its lock, so a retry runs the handler again.
 func TestIdempotencyHandlerErrorSavesNothing(t *testing.T) {
 	client := newTestIdempotencyRedis(t)
@@ -502,5 +558,110 @@ func TestIdempotencyRefusesTheRequestWithoutRedis(t *testing.T) {
 	}
 	if got := levels["http.idempotency.lock.failed"]; len(got) != 1 {
 		t.Errorf("http.idempotency.lock.failed: logged %v, want once", got)
+	}
+}
+
+// During a rolling deploy the middleware shares its keys with the redsync one it replaced: each respects the lock
+// of the other.
+func TestIdempotencySharesTheLockWithRedsync(t *testing.T) {
+	client := newTestIdempotencyRedis(t)
+	prefix := testIdempotencyPrefix(t, client)
+	key := prefix[len("test-idempotency-"):] + "redsync"
+	rs := redsync.New(goredis.NewPool(client))
+	var redsyncErr error
+	app := newIdempotencyTestApp(testIdempotencyConfig(client, prefix), func(c *fiber.Ctx) error {
+		redsyncErr = rs.NewMutex("mutex:idempotency-request:"+key, redsync.WithTries(1)).Lock()
+		return c.SendString("ok")
+	})
+
+	held := rs.NewMutex("mutex:idempotency-request:"+key, redsync.WithExpiry(time.Minute))
+	if err := held.Lock(); err != nil {
+		t.Fatal(err)
+	}
+	if resp := app.post(t, key); resp.status != fiber.StatusInternalServerError {
+		t.Errorf("while redsync holds the lock: status %d, want the 500 lock error", resp.status)
+	}
+	if ok, err := held.Unlock(); !ok {
+		t.Fatalf("redsync unlock: %v", err)
+	}
+
+	if resp := app.post(t, key); resp.status != fiber.StatusOK || resp.header.Get(constant.IdempotencyHeader) != "saved" {
+		t.Errorf("status %d %s=%q, want 200 saved", resp.status, constant.IdempotencyHeader, resp.header.Get(constant.IdempotencyHeader))
+	}
+	if !errors.Is(redsyncErr, redsync.ErrFailed) && !errors.As(redsyncErr, new(*redsync.ErrTaken)) {
+		t.Errorf("redsync locked the key while the request held it: %v", redsyncErr)
+	}
+}
+
+// failingScripter fails the scripts with the given SHA1s.
+type failingScripter struct {
+	*redis.Client
+	fail map[string]bool
+}
+
+func (s failingScripter) EvalSha(ctx context.Context, sha1 string, keys []string, args ...interface{}) *redis.Cmd {
+	if s.fail[sha1] {
+		cmd := redis.NewCmd(ctx)
+		cmd.SetErr(errors.New("failing script"))
+		return cmd
+	}
+	return s.Client.EvalSha(ctx, sha1, keys, args...)
+}
+
+// When saving the response fails the request returns the error and releases its lock, so a retry runs the handler
+// again.
+func TestIdempotencyReleasesTheLockWhenSavingFails(t *testing.T) {
+	client := newTestIdempotencyRedis(t)
+	prefix := testIdempotencyPrefix(t, client)
+	key := prefix[len("test-idempotency-"):] + "savefails"
+	config := testIdempotencyConfig(client, prefix)
+	config.Redis = failingScripter{client, map[string]bool{saveIdempotencyScript.Hash(): true}}
+	var calls atomic.Int32
+	app := newIdempotencyTestApp(config, testIdempotencyHandler(&calls))
+	logs := captureIdempotencyLogs(t, zerolog.InfoLevel)
+
+	if resp := app.post(t, key); resp.status != fiber.StatusInternalServerError {
+		t.Errorf("status %d, want 500", resp.status)
+	}
+	if errs := app.errors(); len(errs) != 1 || errs[0].Error() != "failing script" {
+		t.Errorf("errors %v, want the saving error", errs)
+	}
+	if got := logs()["http.idempotency.response.save.failed"]; len(got) != 1 || got[0] != zerolog.LevelErrorValue {
+		t.Errorf("http.idempotency.response.save.failed: logged at %v, want once at error", got)
+	}
+	ctx := context.Background()
+	if n := client.Exists(ctx, prefix+":"+key, "mutex:idempotency-request:"+key).Val(); n != 0 {
+		t.Errorf("%d of response and lock left, want none", n)
+	}
+
+	config.Redis = client
+	if resp := app.post(t, key); resp.status != fiber.StatusCreated || resp.body != `{"call":2}` {
+		t.Errorf("retry: %d %q, want the handler run again", resp.status, resp.body)
+	}
+}
+
+// A handler that panics releases the lock as it unwinds.
+func TestIdempotencyReleasesTheLockWhenTheHandlerPanics(t *testing.T) {
+	client := newTestIdempotencyRedis(t)
+	prefix := testIdempotencyPrefix(t, client)
+	key := prefix[len("test-idempotency-"):] + "panics"
+	app := fiber.New()
+	app.Use(recover.New())
+	app.Post("/", Idempotency(testIdempotencyConfig(client, prefix)), func(c *fiber.Ctx) error {
+		panic("handler panics")
+	})
+
+	req := httptest.NewRequest(fiber.MethodPost, "/", nil)
+	req.Header.Set(constant.IdempotencyKeyHeader, key)
+	resp, err := app.Test(req, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != fiber.StatusInternalServerError {
+		t.Errorf("status %d, want 500", resp.StatusCode)
+	}
+	if n := client.Exists(context.Background(), prefix+":"+key, "mutex:idempotency-request:"+key).Val(); n != 0 {
+		t.Errorf("%d of response and lock left, want none", n)
 	}
 }
