@@ -11,6 +11,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // The lock of an idempotency key is taken as redsync took it with WithExpiry(time.Minute), WithTries(5) and
@@ -89,6 +90,27 @@ type idempotencyLock struct {
 	redis redis.Scripter
 	keys  [2]string   // the response, the lock
 	token interface{} // a string, boxed once for the scripts
+	// ctx is the context of the scripts (nil: context.Background()): it carries the request's span if it is sampled
+	// (spanOnly), so that the scripts are traced in the request's trace
+	ctx context.Context
+}
+
+// context returns the context of the scripts.
+func (l *idempotencyLock) context() context.Context {
+	if l.ctx == nil {
+		return context.Background()
+	}
+	return l.ctx
+}
+
+// spanOnly returns a context that carries the span of ctx and nothing else of it, if the span is recording, and
+// context.Background() otherwise, without an allocation: the lock's scripts are traced as children of the request's
+// span, but do not end with the request, as they did not before (the lock is released after the handler).
+func spanOnly(ctx context.Context) context.Context {
+	if span := trace.SpanFromContext(ctx); span.IsRecording() {
+		return trace.ContextWithSpan(context.Background(), span)
+	}
+	return context.Background()
 }
 
 // idempotencyLockTokenPrefix makes the tokens of this process differ from those of other processes, and
@@ -117,7 +139,7 @@ func (l *idempotencyLock) acquire(first bool) (response []byte, locked bool, err
 	if first {
 		firstArg = idempotencyFirstTryArg
 	}
-	res, err := acquireIdempotencyScript.Run(context.Background(), l.redis, l.keys[:], l.token, idempotencyLockExpiryArg, firstArg).Result()
+	res, err := acquireIdempotencyScript.Run(l.context(), l.redis, l.keys[:], l.token, idempotencyLockExpiryArg, firstArg).Result()
 	if err != nil {
 		return nil, false, err
 	}
@@ -132,13 +154,13 @@ func (l *idempotencyLock) acquire(first bool) (response []byte, locked bool, err
 
 // save saves the response for lifetime and releases the lock, reporting whether the lock was still held.
 func (l *idempotencyLock) save(response []byte, lifetime time.Duration) (released bool, err error) {
-	n, err := saveIdempotencyScript.Run(context.Background(), l.redis, l.keys[:], response, lifetimeMs(lifetime), l.token).Int()
+	n, err := saveIdempotencyScript.Run(l.context(), l.redis, l.keys[:], response, lifetimeMs(lifetime), l.token).Int()
 	return n == 1, err
 }
 
 // release releases the lock, reporting whether it was still held.
 func (l *idempotencyLock) release() (bool, error) {
-	n, err := releaseIdempotencyScript.Run(context.Background(), l.redis, l.keys[1:], l.token).Int()
+	n, err := releaseIdempotencyScript.Run(l.context(), l.redis, l.keys[1:], l.token).Int()
 	return n == 1, err
 }
 

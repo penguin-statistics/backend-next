@@ -90,6 +90,7 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 			redis: config.Redis,
 			keys:  [2]string{config.KeyPrefix + ":" + key, "mutex:idempotency-request:" + key},
 			token: newIdempotencyLockToken(),
+			ctx:   spanOnly(c.UserContext()),
 		}
 
 		// Look for the saved response and lock the key in one round trip, retrying while another request holds the

@@ -28,7 +28,8 @@ package reportwkr
 //	                            to /dev/null: a write system call per line, as to stdout in production), off (level
 //	                            disabled)
 //	CONSUMERBENCH_TRACE         prod (default: a tracer provider configured as in production, with a batcher whose
-//	                            exporter drops the spans, and the bunotel query hook), off (no provider, no hook)
+//	                            exporter drops the spans, the bunotel query hook and the redisotel hook), off (no
+//	                            provider, no hooks)
 //	CONSUMERBENCH_TRACE_RATE    the sample rate of prod, default 0.1 as in production; also the share of the tasks
 //	                            published with a sampled trace context (each task carries one, as service.Report
 //	                            publishes it in the trace of its request, which is sampled at that rate)
@@ -56,6 +57,7 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/nats-io/nats.go"
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -299,6 +301,12 @@ func newConsumerBench(b *testing.B) *consumerBench {
 	}
 	redisOpts.Dialer = cb.redis.dial
 	rdb := redis.NewClient(redisOpts)
+	if cb.tp != nil {
+		// infra.Redis with TracingEnabled
+		if err := redisotel.InstrumentTracing(rdb); err != nil {
+			b.Fatal(err)
+		}
+	}
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		b.Fatal(err)
 	}
