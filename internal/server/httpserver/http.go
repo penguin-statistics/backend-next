@@ -167,6 +167,8 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 	))
 	// the ids of the server span in the request log (Logger, which logs after the span ended)
 	app.Use(middlewares.LogTraceIDs())
+	// who made the request and what came of it, on the server span; right after otelfiber, see EnrichServerSpan
+	app.Use(middlewares.EnrichServerSpan())
 
 	prometheusRegisterOnce.Do(func() {
 		fiberprometheus.New(observability.ServiceName).RegisterAt(app, "/metrics")
