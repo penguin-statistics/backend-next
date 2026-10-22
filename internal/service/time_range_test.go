@@ -2,10 +2,10 @@ package service
 
 import (
 	"math/rand"
+	"sort"
 	"testing"
 	"time"
 
-	"github.com/ahmetb/go-linq/v3"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
@@ -38,6 +38,19 @@ func randomDropInfos(r *rand.Rand) ([]*model.DropInfo, map[int]*model.TimeRange)
 	return dropInfos, timeRangesMap
 }
 
+// anySorter is the sorter go-linq's Sort used, on a copy of the items as []any.
+type anySorter struct {
+	items []any
+	less  func(a, b any) bool
+}
+
+func (s anySorter) Len() int           { return len(s.items) }
+func (s anySorter) Swap(i, j int)      { s.items[i], s.items[j] = s.items[j], s.items[i] }
+func (s anySorter) Less(i, j int) bool { return s.less(s.items[i], s.items[j]) }
+
+// TestDropInfoHelpersMatchGoLinq checks the helpers against what the go-linq pipelines they replaced did: a group has
+// the drop infos with an item of its stage in their input order, DistinctBy keeps the first drop info of a range,
+// and Sort ran sort.Sort on a copy of them, which resolves ties in the same way only for the same input order.
 func TestDropInfoHelpersMatchGoLinq(t *testing.T) {
 	for seed := int64(0); seed < 200; seed++ {
 		r := rand.New(rand.NewSource(seed))
@@ -46,36 +59,52 @@ func TestDropInfoHelpersMatchGoLinq(t *testing.T) {
 			return timeRangesMap[a.RangeID].StartTime.Before(*timeRangesMap[b.RangeID].StartTime)
 		}
 
-		// grouping by stage, then item, then distinct by range and sorting, as GetAllMaxAccumulableTimeRangesByServer does
-		var linqGroups []linq.Group
-		linq.From(dropInfos).
-			WhereT(func(dropInfo *model.DropInfo) bool { return dropInfo.ItemID.Valid }).
-			GroupByT(
-				func(dropInfo *model.DropInfo) int { return dropInfo.StageID },
-				func(dropInfo *model.DropInfo) *model.DropInfo { return dropInfo },
-			).
-			ToSlice(&linqGroups)
+		// grouping by stage, then distinct by range and sorting, as GetAllMaxAccumulableTimeRangesByServer does
 		grouped := groupDropInfosWithItemByStageId(dropInfos)
-		if len(grouped) != len(linqGroups) {
-			t.Fatalf("seed %d: %d stage groups, go-linq has %d", seed, len(grouped), len(linqGroups))
+		stages := make(map[int]bool)
+		for _, dropInfo := range dropInfos {
+			if dropInfo.ItemID.Valid {
+				stages[dropInfo.StageID] = true
+			}
 		}
-		for _, group := range linqGroups {
-			stageId := group.Key.(int)
-			var expected []*model.DropInfo
-			linq.From(group.Group).
-				DistinctByT(func(dropInfo *model.DropInfo) int { return dropInfo.RangeID }).
-				SortT(lessByStart).
-				ToSlice(&expected)
+		if len(grouped) != len(stages) {
+			t.Fatalf("seed %d: %d stage groups, want %d", seed, len(grouped), len(stages))
+		}
+		for stageId := range stages {
+			var group []*model.DropInfo
+			for _, dropInfo := range dropInfos {
+				if dropInfo.ItemID.Valid && dropInfo.StageID == stageId {
+					group = append(group, dropInfo)
+				}
+			}
+			if len(grouped[stageId]) != len(group) {
+				t.Fatalf("seed %d stage %d: %d drop infos, want %d", seed, stageId, len(grouped[stageId]), len(group))
+			}
+			for i := range group {
+				if grouped[stageId][i] != group[i] {
+					t.Fatalf("seed %d stage %d: position %d is drop %d, want drop %d", seed, stageId, i, grouped[stageId][i].DropID, group[i].DropID)
+				}
+			}
+
+			var distinct []any
+			seen := make(map[int]bool)
+			for _, dropInfo := range group {
+				if !seen[dropInfo.RangeID] {
+					seen[dropInfo.RangeID] = true
+					distinct = append(distinct, dropInfo)
+				}
+			}
+			sort.Sort(anySorter{items: distinct, less: func(a, b any) bool { return lessByStart(a.(*model.DropInfo), b.(*model.DropInfo)) }})
 
 			actual := distinctDropInfosByRangeId(grouped[stageId])
 			sortDropInfos(actual, lessByStart)
-			if len(actual) != len(expected) {
-				t.Fatalf("seed %d stage %d: %d drop infos, go-linq has %d", seed, stageId, len(actual), len(expected))
+			if len(actual) != len(distinct) {
+				t.Fatalf("seed %d stage %d: %d drop infos, want %d", seed, stageId, len(actual), len(distinct))
 			}
-			for i := range expected {
-				if actual[i] != expected[i] {
-					t.Fatalf("seed %d stage %d: position %d is drop %d, go-linq has drop %d",
-						seed, stageId, i, actual[i].DropID, expected[i].DropID)
+			for i := range distinct {
+				if actual[i] != distinct[i] {
+					t.Fatalf("seed %d stage %d: position %d is drop %d, want drop %d",
+						seed, stageId, i, actual[i].DropID, distinct[i].(*model.DropInfo).DropID)
 				}
 			}
 		}
