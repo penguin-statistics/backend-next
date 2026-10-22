@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 
@@ -33,6 +34,14 @@ func Redis(conf *appconfig.Config) (*redis.Client, error) {
 
 	// Open a Redis Client
 	client := redis.NewClient(u)
+	if conf.TracingEnabled {
+		// a span per command (redis.dial per new connection) under the span of the context it is run with, if that
+		// span is sampled: a command without a sampled span costs a span lookup. The statement is the command with
+		// its first 32 arguments, each cut to 64 bytes (rediscmd); Datadog obfuscates the values.
+		if err := redisotel.InstrumentTracing(client); err != nil {
+			return nil, err
+		}
+	}
 
 	registerMetrics("redis", metricsRegisterer, newRedisPoolCollector(client))
 
