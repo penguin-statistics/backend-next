@@ -22,8 +22,9 @@ var highVolumePaths = []struct{ method, path string }{
 }
 
 // lowVolumeRouteSampler samples the root server span of a request to any other path than highVolumePaths, up to
-// perSecond per second (with a burst of as many), and leaves the others, and every span that is not a request's, to
-// fallback. The reads of the API, the pages and the sitemaps are a few requests per second all together, so that at
+// perSecond per second (with a burst of as many, at least one), and leaves the others, and every span that is not a
+// request's, to fallback. A request over the limit is left to fallback too, as every request was before: the limit
+// bounds what this sampler adds, and no request is sampled less than it used to be. The reads of the API, the pages and the sitemaps are a few requests per second all together, so that at
 // the rate of the report submission (10%) a slow or failed one was rarely traced, and APM's metrics of their routes
 // were made of a handful of requests. The limit bounds what a surge of them (a crawler, a purge of the CDN's cache)
 // costs.
@@ -62,6 +63,10 @@ func isHighVolume(p tracesdk.SamplingParameters) bool {
 			break
 		}
 	}
+	// fiber serves HEAD with the GET handlers (a probe may use either)
+	if method == fiber.MethodHead {
+		method = fiber.MethodGet
+	}
 	for _, hv := range highVolumePaths {
 		if method == hv.method && strings.EqualFold(path, hv.path) {
 			return true
@@ -70,17 +75,23 @@ func isHighVolume(p tracesdk.SamplingParameters) bool {
 	return false
 }
 
-// tokenBucket allows perSecond takes per second on average, and as many at once after a quiet second.
+// tokenBucket allows perSecond takes per second on average, and burst at once after a quiet while: perSecond, or one
+// for a rate below one per second, which could otherwise never fill a whole token.
 type tokenBucket struct {
 	mu        sync.Mutex
 	perSecond float64
+	burst     float64
 	tokens    float64
 	last      time.Time
 	now       func() time.Time
 }
 
 func newTokenBucket(perSecond float64, now func() time.Time) *tokenBucket {
-	return &tokenBucket{perSecond: perSecond, tokens: perSecond, last: now(), now: now}
+	burst := perSecond
+	if burst < 1 {
+		burst = 1
+	}
+	return &tokenBucket{perSecond: perSecond, burst: burst, tokens: burst, last: now(), now: now}
 }
 
 func (b *tokenBucket) take() bool {
@@ -88,8 +99,8 @@ func (b *tokenBucket) take() bool {
 	defer b.mu.Unlock()
 	now := b.now()
 	b.tokens += now.Sub(b.last).Seconds() * b.perSecond
-	if b.tokens > b.perSecond {
-		b.tokens = b.perSecond
+	if b.tokens > b.burst {
+		b.tokens = b.burst
 	}
 	b.last = now
 	if b.tokens < 1 {

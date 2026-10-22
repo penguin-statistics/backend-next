@@ -57,7 +57,8 @@ type ConfigSpec struct {
 
 	// TracingLowVolumeTracesPerSecond is how many requests per second to sample, whatever TracingSampleRate, among
 	// those to the routes other than the report submission and the probes (see lowVolumeRouteSampler): those are few,
-	// so that each is traced. 0 samples them at TracingSampleRate, as every request was before.
+	// so that each is traced. Over the limit they are sampled at TracingSampleRate, as before; 0 samples them all at
+	// TracingSampleRate, as every request was before.
 	TracingLowVolumeTracesPerSecond float64 `split_words:"true" default:"10"`
 
 	// infrastructure components connection instructions

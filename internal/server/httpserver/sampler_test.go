@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"encoding/binary"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -95,6 +96,7 @@ func TestLowVolumeRouteSampler(t *testing.T) {
 		{trace.SpanKindServer, "POST", "/penguinstats/api/v2/report/"},
 		{trace.SpanKindServer, "GET", "/api/_/health"},
 		{trace.SpanKindServer, "GET", "/metrics"},
+		{trace.SpanKindServer, "HEAD", "/api/_/ping"},
 		{trace.SpanKindConsumer, "", "reportwkr.ConsumeTask"},
 		{trace.SpanKindClient, "", ""},
 	} {
@@ -158,5 +160,48 @@ func TestServiceAppSamplesTheLowVolumeRoutes(t *testing.T) {
 			names[i] = s.Name()
 		}
 		t.Errorf("sampled %v, want the read of /items only", names)
+	}
+}
+
+// Over the limit, a request is sampled at the rate, as every request was before: the limit bounds what the sampler
+// adds, it never samples a request less than before.
+func TestLowVolumeRouteSamplerFallsBackToTheRateOverTheLimit(t *testing.T) {
+	clock := &fakeClock{t: time.Unix(1760000000, 0)}
+	sampler := lowVolumeRouteSampler{fallback: tracesdk.TraceIDRatioBased(0.5), limiter: newTokenBucket(1, clock.now)}
+	sampled := 0
+	for i := 0; i < 1000; i++ {
+		var traceID trace.TraceID
+		binary.BigEndian.PutUint64(traceID[8:], uint64(i)*0x9e3779b97f4a7c15)
+		if sampler.ShouldSample(tracesdk.SamplingParameters{
+			TraceID: traceID, Name: "/PenguinStats/api/v2/stages", Kind: trace.SpanKindServer,
+			Attributes: []attribute.KeyValue{semconv.HTTPMethodKey.String("GET")},
+		}).Decision == tracesdk.RecordAndSample {
+			sampled++
+		}
+	}
+	// 1 by the limit, about half of the other 999 by the rate
+	if sampled < 400 || sampled > 600 {
+		t.Errorf("sampled %d of 1000 requests in one instant, want 1 + about half of the rest (rate 0.5)", sampled)
+	}
+}
+
+// A limit below one per second still samples: one request, then one every 1/perSecond seconds.
+func TestTokenBucketFractionalRate(t *testing.T) {
+	clock := &fakeClock{t: time.Unix(1760000000, 0)}
+	b := newTokenBucket(0.5, clock.now)
+	if !b.take() || b.take() {
+		t.Fatal("want one take at start, then none")
+	}
+	clock.t = clock.t.Add(time.Second)
+	if b.take() {
+		t.Error("took after 1 s at 0.5/s")
+	}
+	clock.t = clock.t.Add(time.Second)
+	if !b.take() {
+		t.Error("no take after 2 s at 0.5/s")
+	}
+	clock.t = clock.t.Add(time.Minute)
+	if !b.take() || b.take() {
+		t.Error("want a burst of one after a quiet minute")
 	}
 }
