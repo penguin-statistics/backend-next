@@ -498,7 +498,7 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 // stream does not store it, the task is delivered again later instead, so that it is never dropped. reason labels
 // ReportDeadLetteredTotal.
 func (w *Worker) park(msg *nats.Msg, metadata *nats.MsgMetadata, cause error, reason string) {
-	withHeaders, err := w.deadLetter(msg, metadata, cause)
+	withHeaders, duplicate, err := w.deadLetter(msg, metadata, cause)
 	if err != nil {
 		delay := w.conf.retryDelay(metadata.NumDelivered)
 		log.Error().
@@ -520,7 +520,10 @@ func (w *Worker) park(msg *nats.Msg, metadata *nats.MsgMetadata, cause error, re
 			Uint64("delivered", metadata.NumDelivered).
 			Msg("report task moved to the dead-letter stream without its headers: with them it would exceed the maximum payload")
 	}
-	observability.ReportDeadLetteredTotal.WithLabelValues(reason).Inc()
+	// a duplicate is the copy of an earlier delivery whose Term was lost: the task is counted once
+	if !duplicate {
+		observability.ReportDeadLetteredTotal.WithLabelValues(reason).Inc()
+	}
 	term(msg)
 }
 
@@ -530,8 +533,9 @@ func (w *Worker) park(msg *nats.Msg, metadata *nats.MsgMetadata, cause error, re
 //
 // The maximum payload of NATS counts the headers too, so a task that the stream accepted just under it would not fit
 // with them, and could never be moved: such a task is copied with its payload only (withHeaders false), which fits as
-// the stream accepted it, and its log is the record of the rest.
-func (w *Worker) deadLetter(msg *nats.Msg, metadata *nats.MsgMetadata, cause error) (withHeaders bool, err error) {
+// the stream accepted it, and its log is the record of the rest. duplicate reports that the stream already held the
+// copy, which it then does not store again.
+func (w *Worker) deadLetter(msg *nats.Msg, metadata *nats.MsgMetadata, cause error) (withHeaders, duplicate bool, err error) {
 	dead := nats.NewMsg(w.conf.deadSubject + msg.Subject[strings.LastIndexByte(msg.Subject, '.')+1:])
 	dead.Data = msg.Data
 	dead.Header.Set(nats.MsgIdHdr, fmt.Sprintf("%s:%d", metadata.Stream, metadata.Sequence.Stream))
@@ -551,10 +555,11 @@ func (w *Worker) deadLetter(msg *nats.Msg, metadata *nats.MsgMetadata, cause err
 	// fails at once leaves nothing behind either (infra.NATSOptions).
 	ctx, cancel := context.WithTimeout(context.Background(), w.conf.taskTimeout)
 	defer cancel()
-	if _, err := w.NatsJS.PublishMsg(dead, nats.Context(ctx)); err != nil {
-		return withHeaders, errors.Wrap(err, "the dead-letter stream did not store the task")
+	ack, err := w.NatsJS.PublishMsg(dead, nats.Context(ctx))
+	if err != nil {
+		return withHeaders, false, errors.Wrap(err, "the dead-letter stream did not store the task")
 	}
-	return withHeaders, nil
+	return withHeaders, ack != nil && ack.Duplicate, nil
 }
 
 // headerSize returns the size of h on the wire, as NATS counts it against the maximum payload.

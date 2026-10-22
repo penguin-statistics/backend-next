@@ -759,6 +759,30 @@ func TestMalformedPayloadIsTerminated(t *testing.T) {
 	}
 }
 
+// TestDeadLetterCountedOnce parks the same delivery twice, as when the Term after the first move is lost and the task
+// is delivered again: the dead-letter stream stores one copy, and dead_lettered_total counts the task once.
+func TestDeadLetterCountedOnce(t *testing.T) {
+	s := newTestStream(t)
+	w := newWorker(WorkerDeps{NatsJS: s.js}, s.consumerConfig())
+	deadLettered := deadLetteredCounter("not_found")
+	data := []byte(`{"taskId":"dup"}`)
+	for i := 0; i < 2; i++ {
+		// bound to no connection: its Term fails
+		msg := newTestMsg("REPORT.SINGLE", 1, data)
+		metadata, err := msg.Metadata()
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.park(msg, metadata, errors.New("stage not found"), "not_found")
+	}
+	if dead := s.deadMessages(t); len(dead) != 1 {
+		t.Fatalf("%d messages in the dead-letter stream, want 1", len(dead))
+	}
+	if n := deadLettered(); n != 1 {
+		t.Errorf("dead_lettered_total{not_found} increased by %v, want 1", n)
+	}
+}
+
 // deadLetteredCounter returns how much dead_lettered_total{reason} has increased since it was called.
 func deadLetteredCounter(reason string) func() float64 {
 	c := observability.ReportDeadLetteredTotal.WithLabelValues(reason)
