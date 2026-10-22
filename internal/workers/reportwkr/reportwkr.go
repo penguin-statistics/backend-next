@@ -647,8 +647,9 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 
 	// the transaction is rolled back when persist returns an error, and committed otherwise
 	var reportId int
+	var patterns []*model.DropPattern
 	err := w.DB.RunInTx(pstCtx, nil, func(ctx context.Context, tx bun.Tx) (err error) {
-		reportId, err = w.persist(ctx, tx, reportTask, taskCreatedAt, reliabilities)
+		reportId, patterns, err = w.persist(ctx, tx, reportTask, taskCreatedAt, reliabilities)
 		if err != nil {
 			// rolled back here rather than by RunInTx, which drops the error of a failed rollback. A failed commit
 			// is not rolled back: it has already ended the transaction. Neither has a transaction database/sql
@@ -663,6 +664,8 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 	if err != nil {
 		return err
 	}
+	// committed: the patterns exist now
+	w.DropPatternRepo.Remember(patterns...)
 	observability.ReportStoredTotal.
 		WithLabelValues(observability.ReportSourceLabel(reportTask.Source)).
 		Add(float64(len(reportTask.Reports)))
@@ -684,28 +687,30 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 }
 
 // persist stores the reports of the task in tx with their reliabilities, and returns the id of the last report of
-// the task (0 if it has none).
-func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.ReportTask, taskCreatedAt time.Time, reliabilities []int) (int, error) {
+// the task (0 if it has none) and the drop patterns of its reports.
+func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.ReportTask, taskCreatedAt time.Time, reliabilities []int) (int, []*model.DropPattern, error) {
 	var reportId int
+	patterns := make([]*model.DropPattern, 0, len(reportTask.Reports))
 	// calculate drop pattern hash for each report
 	for idx, report := range reportTask.Reports {
 		report.Drops = reportutil.MergeDropsByItemID(report.Drops)
 
 		dropPattern, created, err := w.DropPatternRepo.GetOrCreateDropPatternFromDrops(ctx, tx, report.Drops)
 		if err != nil {
-			return 0, errors.Wrap(err, "failed to calculate drop pattern hash")
+			return 0, nil, errors.Wrap(err, "failed to calculate drop pattern hash")
 		}
+		patterns = append(patterns, dropPattern)
 		// the pattern of no drops has no elements: inserting none is a syntax error
 		if created && len(report.Drops) > 0 {
 			_, err := w.DropPatternElementRepo.CreateDropPatternElements(ctx, tx, dropPattern.PatternID, report.Drops)
 			if err != nil {
-				return 0, errors.Wrap(err, "failed to create drop pattern elements")
+				return 0, nil, errors.Wrap(err, "failed to create drop pattern elements")
 			}
 		}
 
 		stage, err := w.StageService.GetStageByArkId(ctx, report.StageID)
 		if err != nil {
-			return 0, errors.Wrap(err, "failed to get stage")
+			return 0, nil, errors.Wrap(err, "failed to get stage")
 		}
 
 		reliability := reliabilities[idx]
@@ -722,7 +727,7 @@ func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.Repor
 			Version:     reportTask.Version,
 		}
 		if err = w.DropReportRepo.CreateDropReport(ctx, tx, dropReport); err != nil {
-			return 0, errors.Wrap(err, "failed to create drop report")
+			return 0, nil, errors.Wrap(err, "failed to create drop report")
 		}
 
 		observability.ReportReliability.WithLabelValues(strconv.Itoa(reliability), reportTask.Source).Inc()
@@ -747,11 +752,11 @@ func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.Repor
 			Metadata: report.Metadata,
 			MD5:      null.NewString(md5, md5 != ""),
 		}); err != nil {
-			return 0, errors.Wrap(err, "failed to create drop report extra")
+			return 0, nil, errors.Wrap(err, "failed to create drop report extra")
 		}
 
 		reportId = dropReport.ReportID
 	}
 
-	return reportId, nil
+	return reportId, patterns, nil
 }
