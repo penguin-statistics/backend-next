@@ -133,8 +133,9 @@ func StagePageURL(site, lang, server string, stage *SEOStage) (u string, ok bool
 
 // routablePage tells whether the page of the IDs in lang on server is served as that page: lang is one of the
 // languages of the stats routes, mounted in lower case only, and server one of the servers, in any case; an ID ""
-// would be parsed as another path and redirected, and "." or ".." resolved to another path before routing (the
-// sitemaps check the same with the routes of the pages)
+// would be parsed as another path and redirected, "." or ".." resolved to another path before routing, and a last ID
+// ending in .md (but .md itself) served as the Markdown view of another page (the sitemaps check the same with the
+// routes of the pages)
 func routablePage(lang, server string, ids ...string) bool {
 	if _, ok := constant.ServerMap[strings.ToUpper(server)]; !ok || !slices.Contains(StatsLangs, lang) {
 		return false
@@ -143,6 +144,9 @@ func routablePage(lang, server string, ids ...string) bool {
 		if id == "" || id == "." || id == ".." {
 			return false
 		}
+	}
+	if last := ids[len(ids)-1]; len(last) > len(".md") && strings.HasSuffix(last, ".md") {
+		return false
 	}
 	return true
 }

@@ -51,6 +51,8 @@ type route struct {
 	itemID  string
 	zoneID  string
 	stageID string
+	// md tells whether the path asks for the Markdown view of the page (see markdown.go)
+	md bool
 }
 
 // Page is everything a page is rendered from.
@@ -121,10 +123,14 @@ type Table struct {
 	Caption string
 	Headers []string
 	Rows    []Row
+	// Total is the number of rows of the matrix, of which Rows are the first
+	Total int
 }
 
 type Row struct {
-	Head      Link
+	Head Link
+	// ID is the ID of the stage or item of the row, which the Markdown view shows
+	ID        string
 	HeadExtra string
 	Cells     []string
 	Window    Window
@@ -308,6 +314,22 @@ func (b *builder) servers(kind pageKind, on func(server string) bool, ids ...str
 	return links
 }
 
+// page builds the page of the request
+func (b *builder) page() *Page {
+	switch b.r.kind {
+	case kindItem:
+		return b.itemPage()
+	case kindItemList:
+		return b.itemListPage()
+	case kindStage:
+		return b.stagePage()
+	case kindStageList:
+		return b.stageListPage()
+	default:
+		return b.notFound()
+	}
+}
+
 func (b *builder) notFound() *Page {
 	p := &Page{Kind: kindNone, Outcome: "not_found", Status: 404}
 	p.Head = Head{
@@ -467,9 +489,10 @@ func (b *builder) itemPage() *Page {
 		table := &Table{
 			Caption: fill(b.t.ItemCaption, "name", name, "server", server, "shown", strconv.Itoa(len(shown)), "total", strconv.Itoa(len(rows))),
 			Headers: []string{b.t.HStage, b.t.HQuantity, b.t.HTimes, b.t.HPercentage, b.t.HAPPPR, b.t.HAPCost, b.t.HTimeRange},
+			Total:   len(rows),
 		}
 		for _, row := range shown {
-			r := Row{Head: b.stageLink(row.StageID), Window: b.window(row)}
+			r := Row{Head: b.stageLink(row.StageID), ID: row.StageID, Window: b.window(row)}
 			sanity, hasSanity := int64(0), false
 			if stage := b.catalog.Stages[row.StageID]; stage != nil {
 				r.HeadExtra = stage.Zone.DisplayName(b.t.Lang)
@@ -586,10 +609,12 @@ func (b *builder) stagePage() *Page {
 		table := &Table{
 			Caption: fill(b.t.StageCaption, "stage", name, "server", server),
 			Headers: []string{b.t.HItem, b.t.HQuantity, b.t.HTimes, b.t.HPercentage, b.t.HAPPPR, b.t.HTimeRange},
+			Total:   len(rows),
 		}
 		for _, row := range shown {
 			table.Rows = append(table.Rows, Row{
 				Head:   b.itemLink(row.ItemID),
+				ID:     row.ItemID,
 				Cells:  []string{strconv.Itoa(row.Quantity), strconv.Itoa(row.Times), formatPercent(row.Rate), apPPR(stage.Sanity.Int64, stage.Sanity.Valid, row.Rate)},
 				Window: b.window(row),
 			})

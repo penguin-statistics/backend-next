@@ -311,7 +311,7 @@ func TestSitemapsListExactlyTheIndexablePages(t *testing.T) {
 
 // The links of the MCP server are built with the URL builders of service, which must link the pages as routed here
 func TestSharedPageURLsRouteAsThePages(t *testing.T) {
-	ids := []string{"30012", "a&b", "a/b", "é <x>", "", ".", ".."}
+	ids := []string{"30012", "a&b", "a/b", "é <x>", "", ".", "..", "x.md", ".md", "x.MD"}
 	for _, lang := range service.StatsLangs {
 		for _, server := range []string{"CN", "kr", "XX"} {
 			for _, id := range ids {
@@ -321,7 +321,7 @@ func TestSharedPageURLsRouteAsThePages(t *testing.T) {
 					t.Errorf("item %q on %s in %s: %q, %v; want %v for %s", id, server, lang, u, ok, want, path)
 				}
 				// a zone "" is left out: the stage builder rejects it outright
-				for _, zone := range []string{"main_1", "a/b", ".."} {
+				for _, zone := range []string{"main_1", "a/b", "..", "z.md"} {
 					path := pagePath(lang, server, kindStage, zone, id)
 					u, ok := service.StagePageURL(site, lang, server, &service.SEOStage{ArkID: id, Zone: &service.SEOZone{ArkID: zone}})
 					if want := routable(path, kindStage); ok != want || ok && u != site+path {
