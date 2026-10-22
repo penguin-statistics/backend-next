@@ -55,6 +55,11 @@ type ConfigSpec struct {
 	// Valid values are: 0.0 (disabled), 1.0 (all traces), or a value between 0.0 and 1.0 (sampling rate).
 	TracingSampleRate float64 `split_words:"true" default:"1.0"`
 
+	// TracingLowVolumeTracesPerSecond is how many requests per second to sample, whatever TracingSampleRate, among
+	// those to the routes other than the report submission and the probes (see lowVolumeRouteSampler): those are few,
+	// so that each is traced. 0 samples them at TracingSampleRate, as every request was before.
+	TracingLowVolumeTracesPerSecond float64 `split_words:"true" default:"10"`
+
 	// infrastructure components connection instructions
 
 	// PostgresDSN is the data source name for the PostgreSQL database. See
