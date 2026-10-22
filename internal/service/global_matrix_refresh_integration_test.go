@@ -37,7 +37,7 @@ func newGlobalMatrixServices(db *bun.DB) (*DropMatrix, *PatternMatrix) {
 	dropInfoRepo := repo.NewDropInfo(db)
 	timeRange := NewTimeRange(repo.NewTimeRange(db), dropInfoRepo)
 	dropInfo := NewDropInfo(dropInfoRepo, timeRange)
-	dropReport := NewDropReport(repo.NewDropReport(db))
+	dropReport := NewDropReport(repo.NewDropReport(db), nil)
 	stage := NewStage(repo.NewStage(db))
 	item := NewItem(repo.NewItem(db))
 	return &DropMatrix{

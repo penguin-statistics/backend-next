@@ -73,6 +73,12 @@ CREATE TABLE pattern_matrix_elements (
 // newTestDB connects to PENGUIN_TEST_POSTGRES_DSN with a fresh schema holding testSchema.
 func newTestDB(t *testing.T) *bun.DB {
 	t.Helper()
+	return newTestDBWithSchema(t, testSchema)
+}
+
+// newTestDBWithSchema connects to PENGUIN_TEST_POSTGRES_DSN with a fresh schema in which ddl has been run.
+func newTestDBWithSchema(t *testing.T, ddl string) *bun.DB {
+	t.Helper()
 	dsn := os.Getenv("PENGUIN_TEST_POSTGRES_DSN")
 	if dsn == "" {
 		t.Skip("PENGUIN_TEST_POSTGRES_DSN is not set")
@@ -96,7 +102,7 @@ func newTestDB(t *testing.T) *bun.DB {
 		pgdriver.WithConnParams(map[string]interface{}{"search_path": schema}),
 	)), pgdialect.New())
 	t.Cleanup(func() { db.Close() })
-	if _, err := db.ExecContext(ctx, testSchema); err != nil {
+	if _, err := db.ExecContext(ctx, ddl); err != nil {
 		t.Fatal(err)
 	}
 	return db
