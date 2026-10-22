@@ -61,8 +61,8 @@ jobs:
           docker run -d --name nats -p 4222:4222 nats:2.10-alpine -js
           timeout 30 sh -c 'until nc -z 127.0.0.1 4222; do sleep 1; done'
 
-      # the DuckDB postgres extension for the tests that read PostgreSQL through DuckDB (internal/pkg/duckdbx); the
-      # app never installs extensions itself. Same download as the Dockerfile's duckdb-extensions stage: keep
+      # the DuckDB postgres extension for the tests that read PostgreSQL through DuckDB (internal/pkg/duckdbx,
+      # internal/coldstore); the app never installs extensions itself. Same download as the Dockerfile's duckdb-extensions stage: keep
       # DUCKDB_VERSION equal to its ARG DUCKDB_VERSION
       - name: Download DuckDB extensions
         env:

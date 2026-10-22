@@ -155,6 +155,14 @@ type ConfigSpec struct {
 
 	DeleteDropReportAfterArchive bool `split_words:"true" default:"false"`
 
+	// ColdstoreExtensionDirectory is where the cold storage (#752) loads the DuckDB extensions that are not built
+	// into the binary from: postgres, to export the reports from PostgreSQL (run-script coldstore-export and
+	// coldstore-verify). DuckDB never downloads them. The image preinstalls them in /opt/duckdb/extensions
+	// (duckdbx.ImageExtensionDirectory); elsewhere, put
+	// https://extensions.duckdb.org/v1.5.6/linux_amd64/postgres_scanner.duckdb_extension.gz, gunzipped, at
+	// <dir>/v1.5.6/linux_amd64/postgres_scanner.duckdb_extension.
+	ColdstoreExtensionDirectory string `split_words:"true" default:"/opt/duckdb/extensions"`
+
 	// SEOPagesEnabled serves the stats pages of the frontend (/{zh,en,ja,ko}/result/...) from here: the frontend's
 	// index.html with the page's title, description, canonical and hreflang links, structured data and a plain HTML
 	// table of its data, for search engines and link previews. The ingress has to route those paths here. When
