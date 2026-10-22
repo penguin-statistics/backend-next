@@ -3,10 +3,12 @@ package reportverifs
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"exusiai.dev/gommon/constant"
 	"github.com/antonmedv/expr"
+	"github.com/antonmedv/expr/vm"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/mod/semver"
@@ -15,6 +17,41 @@ import (
 )
 
 var ErrExprMatched = errors.New("reject expr matched")
+
+// programCacheMaxEntries bounds programCache: it is cleared once it holds more. An edited rule has a new text, and so
+// a new entry.
+const programCacheMaxEntries = 256
+
+type compiledProgram struct {
+	prog *vm.Program
+	err  error
+}
+
+var (
+	programCacheMu sync.RWMutex
+	// programCache holds the program, or the compile error, of each reject rule expression by its text
+	programCache = map[string]compiledProgram{}
+)
+
+// compiledRule returns the program of a reject rule expression, compiled once as expr.Eval compiles it (with no
+// options). A compile error is returned again on every call, as expr.Eval would.
+func compiledRule(text string) (*vm.Program, error) {
+	programCacheMu.RLock()
+	c, ok := programCache[text]
+	programCacheMu.RUnlock()
+	if ok {
+		return c.prog, c.err
+	}
+
+	prog, err := expr.Compile(text)
+	programCacheMu.Lock()
+	if len(programCache) >= programCacheMaxEntries {
+		programCache = map[string]compiledProgram{}
+	}
+	programCache[text] = compiledProgram{prog: prog, err: err}
+	programCacheMu.Unlock()
+	return prog, err
+}
 
 type ReportContext struct {
 	Report *types.ReportTaskSingleReport
@@ -56,7 +93,11 @@ func (v *Verifier) rejectRuleReliability(ctx context.Context, report *types.Repo
 			continue
 		}
 
-		result, err := expr.Eval(rejectRule.Expr, reportContext)
+		var result any
+		prog, err := compiledRule(rejectRule.Expr)
+		if err == nil {
+			result, err = expr.Run(prog, reportContext)
+		}
 		if err != nil {
 			log.Error().
 				Str("evt.name", "verifier.reject_rule.expr_eval_error").
