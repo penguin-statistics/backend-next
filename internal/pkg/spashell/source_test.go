@@ -22,7 +22,9 @@ type upstream struct {
 	contentType string
 	body        string
 	etag        string
-	block       chan struct{}
+	// lastModified is the Last-Modified sent; the default if empty
+	lastModified string
+	block        chan struct{}
 
 	hits         atomic.Int32
 	ifNoneMatchs []string
@@ -44,7 +46,11 @@ func (u *upstream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if u.etag != "" {
 		w.Header().Set("ETag", u.etag)
 	}
-	w.Header().Set("Last-Modified", "Wed, 21 Oct 2026 09:09:28 GMT")
+	lastModified := u.lastModified
+	if lastModified == "" {
+		lastModified = "Wed, 21 Oct 2026 09:09:28 GMT"
+	}
+	w.Header().Set("Last-Modified", lastModified)
 	w.WriteHeader(u.status)
 	_, _ = w.Write([]byte(u.body))
 }
@@ -124,6 +130,73 @@ func TestSourceFetchesOnceAndRevalidates(t *testing.T) {
 	}
 	if !strings.Contains(string(mustGet(t, s).Raw()), "v2") {
 		t.Error("new release not picked up")
+	}
+}
+
+func TestSourceLastModifiedNeverGoesBack(t *testing.T) {
+	u := &upstream{status: 200, contentType: "text/html; charset=utf-8", body: shellV2, etag: `"v2"`}
+	s, c := newSource(t, u)
+	if got := mustGet(t, s).LastModified; !got.Equal(time.Date(2026, 10, 21, 9, 9, 28, 0, time.UTC)) {
+		t.Fatalf("LastModified %v", got)
+	}
+
+	// the same index.html sent anew keeps its time
+	c.advance(time.Minute)
+	u.set(200, shellV2, `"v2b"`)
+	if err := s.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustGet(t, s).LastModified; !got.Equal(time.Date(2026, 10, 21, 9, 9, 28, 0, time.UTC)) {
+		t.Errorf("same document: LastModified %v", got)
+	}
+
+	// a rollback to an older release: when it was fetched
+	c.advance(10 * time.Hour)
+	u.mu.Lock()
+	u.lastModified = "Tue, 20 Oct 2026 09:00:00 GMT"
+	u.mu.Unlock()
+	u.set(200, shellV1, `"v1"`)
+	if err := s.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustGet(t, s); !strings.Contains(string(got.Raw()), "v1") || !got.LastModified.Equal(c.now()) {
+		t.Errorf("rollback: LastModified %v, want %v", got.LastModified, c.now())
+	}
+	// and sent anew with another ETag: the time it was given, not that of the origin
+	rolledBackAt := c.now()
+	c.advance(time.Minute)
+	u.set(200, shellV1, `"v1b"`)
+	if err := s.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustGet(t, s).LastModified; !got.Equal(rolledBackAt) {
+		t.Errorf("rollback sent anew: LastModified %v, want %v", got, rolledBackAt)
+	}
+
+	// rolled back again, though the clock is behind: a second after the one at hand
+	rolledBack := mustGet(t, s).LastModified
+	c.advance(-time.Hour)
+	u.mu.Lock()
+	u.lastModified = "Mon, 19 Oct 2026 09:00:00 GMT"
+	u.mu.Unlock()
+	u.set(200, shellV2, `"v0"`)
+	if err := s.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustGet(t, s).LastModified; !got.Equal(rolledBack.Add(time.Second)) {
+		t.Errorf("clock behind: LastModified %v, want %v", got, rolledBack.Add(time.Second))
+	}
+
+	// a newer release: its own time
+	u.mu.Lock()
+	u.lastModified = "Thu, 22 Oct 2026 09:00:00 GMT"
+	u.mu.Unlock()
+	u.set(200, strings.Replace(shellV2, "v2", "v3", 1), `"v3"`)
+	if err := s.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustGet(t, s).LastModified; !got.Equal(time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC)) {
+		t.Errorf("new release: LastModified %v", got)
 	}
 }
 

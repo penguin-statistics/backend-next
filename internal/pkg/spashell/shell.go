@@ -54,7 +54,8 @@ type Shell struct {
 
 	// FetchedAt is when the shell was fetched or revalidated last
 	FetchedAt time.Time
-	// LastModified is the Last-Modified of the response the shell came with, or when it was fetched without one
+	// LastModified is the Last-Modified of the response the shell came with, or when it was fetched without one or
+	// with one not after that of a different shell it replaced; that of the shell it replaced if the same
 	LastModified time.Time
 
 	etag             string

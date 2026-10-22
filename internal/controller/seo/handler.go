@@ -19,6 +19,7 @@ import (
 	"go.uber.org/fx"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/pkg/cachectrl"
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/pkg/observability"
 	"exusiai.dev/backend-next/internal/pkg/spashell"
@@ -142,7 +143,7 @@ type Handler struct {
 	lists sync.Map
 	// sitemaps holds the sitemaps built last, by sitemapKey
 	sitemaps sync.Map
-	// stamps holds the times given the data the sitemaps are made of
+	// stamps holds the times given the data the sitemaps and pages are made of
 	stamps stamps
 }
 
@@ -257,7 +258,7 @@ func (h *Handler) Serve(c *fiber.Ctx) error {
 		key = listKey{lang: r.lang, server: r.server, kind: r.kind}
 		if e, ok := h.lists.Load(key); ok {
 			if e := e.(*listEntry); e.catalog == catalog && e.matrix == matrix && e.shell == shell {
-				h.send(c, shell, e.page, e.html)
+				h.send(c, shell, catalog, matrix, e.page, e.html)
 				return nil
 			}
 		}
@@ -275,7 +276,7 @@ func (h *Handler) Serve(c *fiber.Ctx) error {
 	if key.kind != "" {
 		h.lists.Store(key, &listEntry{catalog: catalog, matrix: matrix, shell: shell, page: p, html: html})
 	}
-	h.send(c, shell, p, html)
+	h.send(c, shell, catalog, matrix, p, html)
 	return nil
 }
 
@@ -408,17 +409,20 @@ func (h *Handler) sendCold(c *fiber.Ctx, shell *spashell.Shell, r route) {
 	_ = c.Send(shell.Raw())
 }
 
-func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, p *Page, html []byte) {
-	count(p.Kind, p.Outcome)
+// send sends a page, or 304 Not Modified without a body to a conditional request for a page made with the matrix
+// that is not older than its Last-Modified: the latest of the times given the matrix, the catalog and the shell it
+// was made of (see stamps), if not later than the Date (see setLastModified)
+func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, catalog *service.SEOCatalog, matrix *service.SEOMatrix, p *Page, html []byte) {
 	// a 404 of a page that does not exist (crawlers keep requesting retired IDs) or a 503 while the data is
-	// calculated after a start is no error of the backend; their outcomes are counted above
+	// calculated after a start is no error of the backend; their outcomes are counted below
 	middlewares.ExpectStatus(c)
 	setHTML(c, p.Head.Lang)
+	cacheable := p.Status == fiber.StatusOK && p.Cacheable
 	switch {
 	case p.Status == fiber.StatusServiceUnavailable:
 		c.Set(fiber.HeaderCacheControl, "no-store")
 		c.Set(fiber.HeaderRetryAfter, strconv.Itoa(int(retryAfterCold.Seconds())))
-	case p.Status == fiber.StatusOK && p.Cacheable:
+	case cacheable:
 		h.cachePage(c)
 	default:
 		h.cacheFor(c, h.shortMaxAge())
@@ -426,13 +430,28 @@ func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, p *Page, html []byte
 	if !p.Indexable {
 		c.Set("X-Robots-Tag", strings.ReplaceAll(p.Head.Robots, ",", ", "))
 	}
-	lastModified := p.LastModified
-	if shell.LastModified.After(lastModified) {
-		lastModified = shell.LastModified
+	// only a 200 made with the matrix (cacheable), indexable or not, has a Last-Modified: that of a 404, a 503 or a
+	// list rendered before the matrix was calculated would be the time of the shell alone, as the first catalog after
+	// a start has no time, which the page made with the matrix can have too (the matrix seen first keeps its own
+	// time, see stamps), and a client having the list without data be answered that it is not modified
+	if cacheable {
+		// the times given the data rather than their own; the catalog's too, for a name changed or a stage moved to
+		// another zone
+		lastModified := h.stamps.at(matrixSlot{server: matrix.Server}, matrix, matrix.LastModified)
+		if at := h.stamps.at(catalogSlot{}, catalog, catalog.ChangedAt); at.After(lastModified) {
+			lastModified = at
+		}
+		// a shell sent anew keeps its time, and a different one has a later one (see spashell.Shell)
+		if at := h.stamps.at(shellSlot{}, shell.LastModified.UnixNano(), shell.LastModified); at.After(lastModified) {
+			lastModified = at
+		}
+		if !lastModified.IsZero() && setLastModified(c, lastModified) && cachectrl.NotModified(c) {
+			count(p.Kind, "not_modified")
+			c.Status(fiber.StatusNotModified)
+			return
+		}
 	}
-	if !lastModified.IsZero() {
-		c.Response().Header.SetLastModified(lastModified)
-	}
+	count(p.Kind, p.Outcome)
 	c.Status(p.Status)
 	_ = c.Send(html)
 }
