@@ -182,8 +182,12 @@ func (d *SEOData) RefreshCatalog(ctx context.Context) error {
 		// the pages rendered from the catalog at hand stay valid (the lists are rendered once per catalog)
 		return nil
 	}
+	catalog := NewSEOCatalog(items, stages, zones)
+	if d.catalog.Load() != nil {
+		catalog.ChangedAt = time.Now()
+	}
 	d.catalogInputs = inputs
-	d.catalog.Store(NewSEOCatalog(items, stages, zones))
+	d.catalog.Store(catalog)
 	return nil
 }
 
@@ -219,12 +223,14 @@ func (d *SEOData) Catalog() *SEOCatalog {
 // looks at the cache, as calculating the matrix takes long.
 func (d *SEOData) Matrix(server string) *SEOMatrix {
 	key := server + constant.CacheSep + "true" + constant.CacheSep + SEOSourceCategory
+	// the time first, as the v2 controllers read it (see cache.GetLastModifiedTime): a matrix cached meanwhile then
+	// looks older than it is, while read after, an older matrix could get the time of a newer one, and the pages
+	// made of it be answered as not modified after the newer one is cached
+	lastModified := cache.GetLastModifiedTime("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:" + key + "]")
 	var result modelv2.DropMatrixQueryResult
 	if err := cache.ShimGlobalDropMatrix.Get(key, &result); err != nil {
 		return nil
 	}
-	var lastModified time.Time
-	_ = cache.LastModifiedTime.Get("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", &lastModified)
 
 	d.matricesMu.Lock()
 	memo, ok := d.matrices[server]
@@ -319,6 +325,9 @@ type SEOCatalog struct {
 	// StageList is ordered by the numerical stage ID
 	StageList []*SEOStage
 	Zones     map[string]*SEOZone
+	// ChangedAt is when the catalog replaced one with other rows, which the rows have no time of their own to tell;
+	// zero for the first one loaded after a start, so that a start does not move the Last-Modified of every page
+	ChangedAt time.Time
 }
 
 func NewSEOCatalog(items []*model.Item, stages []*model.Stage, zones []*model.Zone) *SEOCatalog {

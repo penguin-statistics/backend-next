@@ -1,11 +1,9 @@
 package v2
 
 import (
-	"bytes"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/valyala/fasthttp"
 
 	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/pkg/cachectrl"
@@ -36,7 +34,7 @@ func lastModifiedTime(key string) recordedTime {
 // with 304 then. The time is read again for that: as every change caches the response, then records a later time
 // (cache.GetLastModifiedTime waits for it), it is the same only if body is the response recorded at lastModified.
 func sendCacheable(ctx *fiber.Ctx, lastModified recordedTime, body any) error {
-	if lastModified.time.IsZero() || !notLaterThanDate(lastModified.time) {
+	if lastModified.time.IsZero() || !cachectrl.NotLaterThanDate(lastModified.time) {
 		return ctx.JSON(body)
 	}
 	cachectrl.OptIn(ctx, lastModified.time)
@@ -44,28 +42,4 @@ func sendCacheable(ctx *fiber.Ctx, lastModified recordedTime, body any) error {
 		return ctx.SendStatus(fiber.StatusNotModified)
 	}
 	return ctx.JSON(body)
-}
-
-var dateHeaderLine = []byte("\r\n" + fasthttp.HeaderDate + ": ")
-
-// notLaterThanDate tells if lastModified, sent as Last-Modified, is not later than the Date sent with the response.
-// That Date is not time.Now(): fasthttp sends the time it formats once a second, which can be a second behind. It is
-// read here from a blank response header, whose only header is that Date: the response is written later, so with
-// that Date or a later one. Both headers are in whole seconds. False if the Date cannot be read.
-func notLaterThanDate(lastModified time.Time) bool {
-	var header fasthttp.ResponseHeader
-	raw := header.Header()
-	i := bytes.Index(raw, dateHeaderLine)
-	if i < 0 {
-		return false
-	}
-	value := raw[i+len(dateHeaderLine):]
-	if end := bytes.Index(value, []byte("\r\n")); end >= 0 {
-		value = value[:end]
-	}
-	date, err := fasthttp.ParseHTTPDate(value)
-	if err != nil {
-		return false
-	}
-	return !lastModified.Truncate(time.Second).After(date)
 }

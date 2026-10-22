@@ -119,6 +119,65 @@ func TestSEODataMatrixPeeksTheCache(t *testing.T) {
 	}
 }
 
+func TestSEODataMatrixIsNeverNewerThanItsRows(t *testing.T) {
+	cache.Initialize()
+	d := &SEOData{matrices: make(map[string]*seoMatrixMemo)}
+	key := "JP|true|all"
+	lmKey := "[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:" + key + "]"
+	t.Cleanup(func() {
+		_ = cache.ShimGlobalDropMatrix.Delete(key)
+		_ = cache.LastModifiedTime.Delete(lmKey)
+	})
+	// the version of a matrix is the times of its row; published as the worker does
+	const n = 2000
+	times := make([]time.Time, n)
+	publish := func(v int) {
+		result := modelv2.DropMatrixQueryResult{Matrix: []*modelv2.OneDropMatrixElement{{StageID: "s", ItemID: "i", Times: v}}}
+		cache.SetLastModifiedTime(lmKey, result, func() {
+			cache.ShimGlobalDropMatrix.Set(key, result, time.Hour)
+		})
+		times[v] = cache.GetLastModifiedTime(lmKey)
+	}
+	publish(0)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for v := 1; v < n; v++ {
+			publish(v)
+		}
+	}()
+	type seen struct {
+		v  int
+		at time.Time
+	}
+	seens := make([][]seen, 4)
+	var wg sync.WaitGroup
+	for i := range seens {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			for running := true; running; {
+				select {
+				case <-done:
+					running = false
+				default:
+				}
+				m := d.Matrix("JP")
+				seens[i] = append(seens[i], seen{v: m.ByItem["i"][0].Times, at: m.LastModified})
+			}
+		}(i)
+	}
+	wg.Wait()
+	for _, ss := range seens {
+		for _, s := range ss {
+			if s.at.After(times[s.v]) {
+				t.Fatalf("matrix %d has the time %v of a newer one, its own is %v", s.v, s.at, times[s.v])
+			}
+		}
+	}
+}
+
 func TestSEODataKeepsTheCatalogWhileUnchanged(t *testing.T) {
 	cache.Initialize()
 	t.Cleanup(func() {
@@ -138,6 +197,9 @@ func TestSEODataKeepsTheCatalogWhileUnchanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	first := d.Catalog()
+	if !first.ChangedAt.IsZero() {
+		t.Errorf("first catalog changed at %v, want zero", first.ChangedAt)
+	}
 	if err := d.RefreshCatalog(ctx); err != nil || d.Catalog() != first {
 		t.Fatalf("catalog replaced while the cached rows are the same: %v", err)
 	}
@@ -147,8 +209,12 @@ func TestSEODataKeepsTheCatalogWhileUnchanged(t *testing.T) {
 		t.Fatalf("catalog replaced for equal rows: %v", err)
 	}
 	cache.Items.Set(items("Orirock Cube II"), time.Hour)
+	before := time.Now()
 	if err := d.RefreshCatalog(ctx); err != nil || d.Catalog() == first || d.Catalog().Items["30012"].Name.In("en") != "Orirock Cube II" {
 		t.Fatalf("catalog not replaced for changed rows: %v", err)
+	}
+	if at := d.Catalog().ChangedAt; at.Before(before) || at.After(time.Now()) {
+		t.Errorf("replaced catalog changed at %v, want the time it was replaced", at)
 	}
 }
 
