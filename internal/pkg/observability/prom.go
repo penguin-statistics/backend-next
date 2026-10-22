@@ -1,6 +1,8 @@
 package observability
 
 import (
+	"strconv"
+
 	"exusiai.dev/gommon/constant"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -104,6 +106,14 @@ var (
 		Help:    "Size of HTTP response bodies in bytes by matched route, method and status class",
 		Buckets: prometheus.ExponentialBuckets(1024, 8, 5),
 	}, []string{"route", "method", "status_class"})
+	// HTTPRequestDuration times every request from the request logger, unsampled (the traces are sampled), by the
+	// same route and method as HTTPResponseSize and the exact status code (see HTTPStatusCode). The buckets run from
+	// 1ms to 16s, past the 10s that a report publish waits for NATS at most.
+	HTTPRequestDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    prometheus.BuildFQName(ServiceName, "http", "request_duration_seconds"),
+		Help:    "Duration of HTTP requests in seconds by matched route, method and status code",
+		Buckets: prometheus.ExponentialBuckets(0.001, 2, 15),
+	}, []string{"route", "method", "status_code"})
 	// WorkerCalcBatchDuration and WorkerCalcBatches cover the batches of the calc worker. outcome is one of ok,
 	// error, timeout and lock_not_acquired; a batch that did not acquire the lock has no duration.
 	WorkerCalcBatchDuration = promauto.NewHistogram(prometheus.HistogramOpts{
@@ -177,4 +187,21 @@ func HTTPStatusClass(code int) string {
 	default:
 		return "other"
 	}
+}
+
+// statusCodes holds the label of every status code from 100 to 599, so that labelling a response allocates nothing.
+var statusCodes = func() (codes [600]string) {
+	for code := 100; code < len(codes); code++ {
+		codes[code] = strconv.Itoa(code)
+	}
+	return codes
+}()
+
+// HTTPStatusCode returns the status code as a label ("200", "304", ...), or "other" for a code outside 100-599, to
+// keep metric labels bounded.
+func HTTPStatusCode(code int) string {
+	if code < 100 || code >= len(statusCodes) {
+		return "other"
+	}
+	return statusCodes[code]
 }
