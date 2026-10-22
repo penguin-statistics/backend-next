@@ -416,8 +416,8 @@ func (s *Admin) GetRejectRulesReportContext(ctx context.Context, req types.Rejec
 	evalContexts := make([]RejectRulesReevaluationEvaluationContext, len(dropReports))
 	for i, dropReport := range dropReports {
 		var createdAt int64
-		if dropReport.CreatedAt != nil {
-			createdAt = dropReport.CreatedAt.UnixMicro()
+		if dropReport.DropReport.CreatedAt != nil {
+			createdAt = dropReport.DropReport.CreatedAt.UnixMicro()
 		}
 
 		originalReport := dropReport.DropReport

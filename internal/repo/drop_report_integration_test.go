@@ -28,7 +28,12 @@ type dropReportFixture struct {
 // interval and segment bounds are easiest to get wrong.
 func seedDropReports(t *testing.T, r *rand.Rand, db *bun.DB) dropReportFixture {
 	t.Helper()
-	base := time.Date(2026, 10, 19, 4, 0, 0, 0, time.UTC)
+	return seedDropReportsFrom(t, r, db, time.Date(2026, 10, 19, 4, 0, 0, 0, time.UTC))
+}
+
+// seedDropReportsFrom is seedDropReports with boundaries every 3 hours for 24 hours from base.
+func seedDropReportsFrom(t *testing.T, r *rand.Rand, db *bun.DB, base time.Time) dropReportFixture {
+	t.Helper()
 	f := dropReportFixture{
 		base:       base,
 		accountIds: []int64{1, 2, 3},
