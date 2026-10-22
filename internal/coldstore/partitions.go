@@ -175,6 +175,28 @@ func CreatePartitions(ctx context.Context, db *sql.DB, now time.Time, lockTimeou
 	return true, nil
 }
 
+// lockOrder returns the qualified names of a month's partitions in the order of ReportTables (the reports before
+// their extras), which is the order the report worker writes them in (reportwkr persists a report, then its extra):
+// locking them in another order (MonthPartitions lists them by name, extras first) could deadlock with a late writer
+// of the month that holds the report partition and then asks for the extras one.
+func lockOrder(parts []Partition) []string {
+	rank := func(p Partition) int {
+		for i, t := range ReportTables {
+			if p.Parent == t {
+				return i
+			}
+		}
+		return len(ReportTables)
+	}
+	sorted := append([]Partition{}, parts...)
+	sort.SliceStable(sorted, func(i, k int) bool { return rank(sorted[i]) < rank(sorted[k]) })
+	names := make([]string, len(sorted))
+	for i, p := range sorted {
+		names[i] = p.QualifiedName()
+	}
+	return names
+}
+
 // errLockWaiters is returned by dropPartitions when a query waits for the locks the transaction holds on the
 // partitions.
 var errLockWaiters = errors.New("coldstore: queries wait for the locks on the partitions")

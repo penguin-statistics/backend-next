@@ -620,6 +620,32 @@ func TestArchiveFailuresDropNothing(t *testing.T) {
 			final:   true,
 		},
 		{
+			name: "file of an earlier month missing",
+			setup: func(t *testing.T, a *Archiver, b *fakeBucket, db *sql.DB) {
+				// the bucket still has it, but the readers would refuse a manifest that lists it: the month is not
+				// published
+				if err := os.Remove(filepath.Join(a.opts.Dir, FilePath(KindRollup, "2020-01"))); err != nil {
+					t.Fatal(err)
+				}
+			},
+			outcome: "error",
+			errText: FilePath(KindRollup, "2020-01") + " is missing",
+			final:   true,
+		},
+		{
+			name: "file of an earlier month missing before the drop",
+			setup: func(t *testing.T, a *Archiver, b *fakeBucket, db *sql.DB) {
+				// the readers cannot load the manifest with the month: they keep reading it from PostgreSQL
+				if err := os.Remove(filepath.Join(a.opts.Dir, FilePath(KindRollup, "2020-01"))); err != nil {
+					t.Fatal(err)
+				}
+			},
+			outcome:  "error",
+			errText:  "the readers cannot serve the local manifest, keeping the partitions",
+			recorded: true,
+			final:    true,
+		},
+		{
 			name: "not enough free space",
 			setup: func(t *testing.T, a *Archiver, b *fakeBucket, db *sql.DB) {
 				a.opts.MinFreeBytes = 1 << 60
@@ -997,6 +1023,131 @@ func TestArchiveDropLetsParentWriterFinish(t *testing.T) {
 				t.Errorf("partitions: %s", parts)
 			}
 		})
+	}
+}
+
+// waitForLockWait waits until a query of db's database waits for a lock of mode (any, if empty) on rel.
+func waitForLockWait(ctx context.Context, db *sql.DB, rel, mode string) error {
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		var waiting bool
+		if err := db.QueryRowContext(ctx, `SELECT EXISTS (SELECT FROM pg_locks WHERE NOT granted
+			AND relation = $1::regclass AND ($2 = '' OR mode = $2))`, rel, mode).Scan(&waiting); err != nil {
+			return err
+		}
+		if waiting {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("nothing waits for %s %s", rel, mode)
+		}
+	}
+}
+
+// A late report of the month with a new pattern can come in after the drop pattern elements were exported and before
+// the month is: the month is tried again, and published only with drop pattern elements that hold the new pattern.
+func TestArchiveLatePatternReachesDims(t *testing.T) {
+	ctx := context.Background()
+	d := newTestData()
+	opts, db := newTestNewDB(t, d, "2026-08", "2026-09")
+	b := newFakeBucket()
+	now := time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
+	a := newTestArchiver(t, opts, db, b, &now, "2026-07")
+	if _, err := CreatePartitions(ctx, db, now, time.Second); err != nil {
+		t.Fatal(err)
+	}
+	// the month's lock is held when the run gets to it, after the drop pattern elements were exported: the pattern
+	// and its report come then
+	unlock, err := lockTarget(a.opts.Dir, MonthTarget("2026-08"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	inserted := errors.New("the run did not wait for the month's lock")
+	testHookLockWait = func(target string) {
+		if target != MonthTarget("2026-08") {
+			return
+		}
+		testHookLockWait = nil
+		_, inserted = db.ExecContext(ctx, `WITH p AS (
+				INSERT INTO drop_pattern_elements (drop_pattern_id, item_id, quantity) VALUES (1000, 7, 2) RETURNING drop_pattern_id)
+			INSERT INTO drop_reports (report_id, stage_id, pattern_id, times, created_at, reliability, server, account_id)
+			SELECT 9000001, 1, drop_pattern_id, 1, '2026-08-15', 0, 'CN', 1 FROM p`)
+		unlock()
+	}
+	t.Cleanup(func() { testHookLockWait = nil })
+	verified := 0
+	setArchiveHook(t, func(month, step string) error {
+		if month == "2026-08" && step == "verified" {
+			verified++
+		}
+		return nil
+	})
+
+	res, err := a.Run(ctx)
+	if inserted != nil {
+		t.Fatal(inserted)
+	}
+	if err != nil || strings.Join(res.Pending, " ") != "2026-08" {
+		t.Fatalf("run = %+v, %v", res, err)
+	}
+	if verified != 2 {
+		t.Errorf("2026-08 verified %d times, want 2 (the try with the stale drop pattern elements, then the next)", verified)
+	}
+	r := reader(t)
+	if got := queryStrings(t, r, `SELECT count(*)::VARCHAR FROM read_parquet([`+
+		quote(filepath.Join(a.opts.Dir, DropPatternElementsFile))+`]) WHERE drop_pattern_id = 1000`); got[0] != "1" {
+		t.Errorf("elements of the new pattern in the published drop pattern elements: %s", got[0])
+	}
+	if got := queryStrings(t, r, `SELECT count(*)::VARCHAR FROM read_parquet([`+
+		quote(filepath.Join(a.opts.Dir, FilePath(KindDropReports, "2026-08")))+`]) WHERE pattern_id = 1000`); got[0] != "1" {
+		t.Errorf("reports of the new pattern in the month's file: %s", got[0])
+	}
+}
+
+// A late writer of the month persists a report, then its extra, in one transaction (as reportwkr does): the
+// archiving locks the month's partitions in the same order, so that it waits for the writer instead of deadlocking
+// with it (it would hold the extras' partition while waiting for the reports' one the writer holds).
+func TestArchiveLocksReportsBeforeExtras(t *testing.T) {
+	ctx := context.Background()
+	d := newTestData()
+	opts, db := newTestNewDB(t, d, "2026-08", "2026-09")
+	b := newFakeBucket()
+	now := time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
+	a := newTestArchiver(t, opts, db, b, &now, "2026-07")
+	a.opts.LockTimeout = 5 * time.Second
+	// the writer's deadlock check (deadlock_timeout 1s) runs first: a deadlock fails the writer
+	a.db = sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(opts.PostgresDSN + "&deadlock_timeout=60s")))
+	t.Cleanup(func() { a.db.Close() })
+	if _, err := CreatePartitions(ctx, db, now, time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	writer, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer writer.Rollback() //nolint:errcheck
+	if _, err := writer.ExecContext(ctx, `INSERT INTO drop_reports (report_id, stage_id, pattern_id, times, created_at, reliability, server, account_id)
+		VALUES (9000002, 1, 1, 1, '2026-08-20', 0, 'CN', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	written := make(chan error, 1)
+	go func() {
+		// the archiving waits for the reports' partition, then the writer stores the extra and gives up
+		if err := waitForLockWait(ctx, db, "drop_reports_2026_08", "ShareLock"); err != nil {
+			written <- err
+			return
+		}
+		_, err := writer.ExecContext(ctx, `INSERT INTO drop_report_extras (report_id, ip, created_at) VALUES (9000002, '192.0.2.0/24', '2026-08-20')`)
+		writer.Rollback() //nolint:errcheck
+		written <- err
+	}()
+
+	res, err := a.Run(ctx)
+	if werr := <-written; werr != nil {
+		t.Fatalf("writer: %v", werr)
+	}
+	if err != nil || strings.Join(res.Pending, " ") != "2026-08" {
+		t.Fatalf("run = %+v, %v", res, err)
 	}
 }
 

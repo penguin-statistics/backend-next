@@ -180,6 +180,49 @@ func VerifyDims(ctx context.Context, opts Options, dir string, m *Manifest, agai
 	return nil
 }
 
+// errStaleDims is returned by verifyDimsCoverMonth when the drop pattern elements file lacks elements of a pattern
+// that a report of the month references.
+var errStaleDims = errors.New("coldstore: the drop pattern elements do not cover the month")
+
+// verifyDimsCoverMonth checks that the drop pattern elements file in dir holds every element of the patterns that
+// the reports of the month's files reference, which the cold queries join them with. The file was exported before
+// the month's files: a pattern created in between (by a late or replayed report of the month) is missing from it.
+// The patterns are append-only and a pattern's elements commit with it, before any report of it, and VerifyDims
+// checks the file against PostgreSQL up to its largest element_id: so the elements missing from it are those of
+// PostgreSQL after that element_id, and the month's files must reference none of their patterns. The files must be
+// those of the month in PostgreSQL, with its partitions locked against writes (see Archiver).
+func verifyDimsCoverMonth(ctx context.Context, opts Options, dir string, month Month) error {
+	j, err := newJob(ctx, opts, "dims-cover-"+month.Key, true)
+	if err != nil {
+		return err
+	}
+	defer j.Close()
+	var maxID *int64
+	if err := j.queryRow(ctx, `SELECT max(element_id) FROM read_parquet([`+
+		quote(filepath.Join(dir, filepath.FromSlash(DropPatternElementsFile)))+`])`, &maxID); err != nil {
+		return err
+	}
+	limit := int64(-1)
+	if maxID != nil {
+		limit = *maxID
+	}
+	file := func(kind Kind) string {
+		return quote(filepath.Join(dir, filepath.FromSlash(FilePath(kind, month.Key))))
+	}
+	var missing int64
+	if err := j.queryRow(ctx, `SELECT count(DISTINCT drop_pattern_id)
+		FROM postgres_query('pg', $$SELECT drop_pattern_id FROM drop_pattern_elements WHERE element_id > `+strconv.FormatInt(limit, 10)+`$$)
+		WHERE drop_pattern_id IN (SELECT pattern_id FROM read_parquet([`+file(KindDropReports)+`])
+			UNION ALL SELECT pattern_id FROM read_parquet([`+file(KindRecruit)+`]))`, &missing); err != nil {
+		return err
+	}
+	if missing > 0 {
+		return fmt.Errorf("%w: %d patterns of its reports have elements after element_id %d of %s", errStaleDims, missing, limit,
+			DropPatternElementsFile)
+	}
+	return nil
+}
+
 // IsVerificationError tells whether err is a failed verification, as opposed to an error that kept it from
 // completing.
 func IsVerificationError(err error) bool {

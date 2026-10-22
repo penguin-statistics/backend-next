@@ -37,12 +37,14 @@ import (
 //     same SHA-256 is kept), so that the bucket's manifest never lists an object the bucket does not hold;
 //  5. in a transaction that holds the month's partitions in SHARE mode, so that no row of them can change until they
 //     are dropped, reads the month again from PostgreSQL and compares the files with it (full-column content
-//     hashes);
+//     hashes), and checks that the drop pattern elements of step 2 hold the patterns of the month's reports (a late
+//     report can bring a new pattern after step 2: the month is then tried once more, from step 0);
 //  6. uploads the new manifest.json with the month, after keeping the bucket's previous one under
 //     ManifestVersionsDir, then writes the local manifest atomically; then, the month being in the local manifest,
 //     records the time (MonthEntry.RecordedAt) in both manifests the same way (see recordMonth);
-//  7. once the month has been in the local manifest for DropDelay, detaches and drops the month's partitions in the
-//     same transaction, and commits. A lock conflict in steps 5 to 7 rolls the transaction back, which releases its
+//  7. once the month has been in the local manifest for DropDelay, and if a reader can load that manifest (every
+//     file of it in the directory, see checkServable, which step 6 checks too before publishing), detaches and drops
+//     the month's partitions in the same transaction, and commits. A lock conflict in steps 5 to 7 rolls the transaction back, which releases its
 //     locks, and they are tried again, up to LockTries times.
 //
 // The drop waits for DropDelay because a reader (coldstore.Reader) serves the months of the manifest it last
@@ -217,8 +219,18 @@ func (a *Archiver) Run(ctx context.Context) (*ArchiveResult, error) {
 }
 
 // ArchiveMonth archives one month, and drops its partitions if it has been in the local manifest for DropDelay (see
-// above). dropped tells whether it did.
+// above). dropped tells whether it did. A month whose drop pattern elements turn out stale under its lock
+// (errStaleDims) is tried once more: the try exports them again first.
 func (a *Archiver) ArchiveMonth(ctx context.Context, m Month, parts []Partition) (dropped bool, err error) {
+	dropped, err = a.archiveMonth(ctx, m, parts)
+	if errors.Is(err, errStaleDims) {
+		log.Warn().Err(err).Str("month", m.Key).Msg("coldstore: a pattern came in after the drop pattern elements were exported, trying the month again")
+		dropped, err = a.archiveMonth(ctx, m, parts)
+	}
+	return dropped, err
+}
+
+func (a *Archiver) archiveMonth(ctx context.Context, m Month, parts []Partition) (dropped bool, err error) {
 	started := time.Now()
 	dir := a.opts.Dir
 	mf, err := a.readManifest()
@@ -357,18 +369,15 @@ func (a *Archiver) lockVerifyDrop(ctx context.Context, conn *sql.Conn, m Month, 
 		return false, errors.Wrap(err, "coldstore: begin")
 	}
 	defer tx.Rollback() //nolint:errcheck
-	names := make([]string, len(parts))
-	for i, p := range parts {
-		names[i] = p.QualifiedName()
-	}
 	for _, s := range []string{
 		// the transaction waits, idle, for the verification below
 		"SET LOCAL idle_in_transaction_session_timeout = 0",
 		fmt.Sprintf("SET LOCAL lock_timeout = %d", a.opts.LockTimeout.Milliseconds()),
 		// SHARE: the month can still be read (the verification reads it), but no row of it can change until it is
 		// dropped. Writes to other months take locks only on their partitions (a recall too, see
-		// repo.RecallMaxAge); an UPDATE by report_id alone waits until the transaction ends.
-		"LOCK TABLE " + strings.Join(names, ", ") + " IN SHARE MODE",
+		// repo.RecallMaxAge); an UPDATE by report_id alone waits until the transaction ends. LOCK TABLE takes the
+		// locks one by one, in the order of the report worker's writes (see lockOrder).
+		"LOCK TABLE " + strings.Join(lockOrder(parts), ", ") + " IN SHARE MODE",
 	} {
 		if _, err := tx.ExecContext(ctx, s); err != nil {
 			return false, errors.Wrapf(err, "coldstore: %s", s)
@@ -378,6 +387,11 @@ func (a *Archiver) lockVerifyDrop(ctx context.Context, conn *sql.Conn, m Month, 
 		return false, err
 	}
 	if err := archiveStep(m.Key, "verified"); err != nil {
+		return false, err
+	}
+	// the drop pattern elements were exported before the month's lock: a late report of the month with a new
+	// pattern can have come in between (see errStaleDims)
+	if err := verifyDimsCoverMonth(ctx, a.opts.Options, a.opts.Dir, m); err != nil {
 		return false, err
 	}
 	if err := a.recordMonth(ctx, m, rec); err != nil {
@@ -391,6 +405,12 @@ func (a *Archiver) lockVerifyDrop(ctx context.Context, conn *sql.Conn, m Month, 
 		return false, nil
 	}
 
+	// a reader serves the month only once it loads a manifest that passes its checks: until then it reads the
+	// month from PostgreSQL, so the partitions stay while the local directory could not be served (a file of another
+	// month missing since its upload, which the bucket still holds, a patch stopped partway)
+	if err := a.checkServable(); err != nil {
+		return false, err
+	}
 	if err := dropPartitions(ctx, tx, parts); err != nil {
 		return false, err
 	}
@@ -445,7 +465,11 @@ func (a *Archiver) recordMonth(ctx context.Context, m Month, rec *monthRecording
 			published := *rec.entry
 			published.RecordedAt = time.Time{}
 			mf.PutMonth(published)
-			return checkArchiveCoverage(mf)
+			if err := checkArchiveCoverage(mf); err != nil {
+				return err
+			}
+			// a manifest the readers would refuse is not published (see checkServable)
+			return CheckLocalFiles(a.opts.Dir, mf)
 		}, commit)
 		if err != nil {
 			return err
@@ -484,6 +508,23 @@ func (a *Archiver) readManifest() (*Manifest, error) {
 			"the earlier ones (restore it with run-script coldstore-pull, or check COLDSTORE_DIRECTORY)", a.opts.Dir, ManifestFile)
 	}
 	return mf, err
+}
+
+// checkServable checks that a reader (coldstore.Reader) of the cold storage directory can load its local manifest:
+// the same checks as Reader.Reload (CheckCoverage, then CheckLocalFiles, which reads no file but checks that each
+// one is there with its size). The bucket holding a file is not enough: the app never reads the bucket.
+func (a *Archiver) checkServable() error {
+	mf, err := a.readManifest()
+	if err != nil {
+		return err
+	}
+	if err := CheckCoverage(mf); err != nil {
+		return errors.Wrap(err, "coldstore: the readers cannot serve the local manifest, keeping the partitions")
+	}
+	if err := CheckLocalFiles(a.opts.Dir, mf); err != nil {
+		return errors.Wrap(err, "coldstore: the readers cannot serve the local manifest, keeping the partitions")
+	}
+	return nil
 }
 
 // checkArchiveCoverage checks that mf holds what the app serves: pre and every month from Epoch to its last month,
