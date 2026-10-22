@@ -33,6 +33,9 @@ type Data interface {
 const (
 	serverName  = "penguin-stats"
 	serverTitle = "Penguin Statistics"
+	// serverDescription tells people choosing a server in a client or a directory what this one serves (100 characters
+	// at most, the limit of the MCP Registry)
+	serverDescription = "Crowdsourced Arknights drop rates by stage and item, for the CN, US, JP and KR game servers"
 )
 
 // instructions tell the model what the data is, how to use the tools and how to credit the data (600 characters at
@@ -151,10 +154,16 @@ func NewServer(data Data, site, version string) *sdkmcp.Server {
 // newServer returns the MCP server of t, and its registry for tests to add tools to before it serves.
 func newServer(t *tools, version string) (*sdkmcp.Server, *registry) {
 	s := sdkmcp.NewServer(&sdkmcp.Implementation{
-		Name:       serverName,
-		Title:      serverTitle,
-		Version:    version,
-		WebsiteURL: t.site,
+		Name:        serverName,
+		Title:       serverTitle,
+		Description: serverDescription,
+		Version:     version,
+		WebsiteURL:  t.site,
+		// the icons of the site (frontend-v2 serves them), for clients and directories to show
+		Icons: []sdkmcp.Icon{
+			{Source: t.site + "/favicon/android-chrome-512x512.png", MIMEType: "image/png", Sizes: []string{"512x512"}},
+			{Source: t.site + "/favicon/android-chrome-192x192.png", MIMEType: "image/png", Sizes: []string{"192x192"}},
+		},
 	}, &sdkmcp.ServerOptions{
 		Instructions: instructions,
 		// tools only, and their list never changes while the server runs: a subscriptions/listen of the 2026-07-28

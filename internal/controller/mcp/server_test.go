@@ -8,6 +8,7 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -33,6 +34,20 @@ import (
 const initialize = `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},` +
 	`"clientInfo":{"name":"claude-ai","version":"0.1.0"}}}`
 
+// wantServerInfo is what the server tells of itself: in the result of initialize, and in the _meta of every result of
+// the 2026-07-28 protocol
+var wantServerInfo = &sdkmcp.Implementation{
+	Name:        "penguin-stats",
+	Title:       "Penguin Statistics",
+	Description: "Crowdsourced Arknights drop rates by stage and item, for the CN, US, JP and KR game servers",
+	Version:     "test",
+	WebsiteURL:  site,
+	Icons: []sdkmcp.Icon{
+		{Source: "https://penguin-stats.io/favicon/android-chrome-512x512.png", MIMEType: "image/png", Sizes: []string{"512x512"}},
+		{Source: "https://penguin-stats.io/favicon/android-chrome-192x192.png", MIMEType: "image/png", Sizes: []string{"192x192"}},
+	},
+}
+
 // meta is the _meta every message of the 2026-07-28 protocol carries
 const meta = `"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},` +
 	`"io.modelcontextprotocol/clientInfo":{"name":"claude-code","version":"2.1.0"}}`
@@ -48,12 +63,10 @@ func TestInitialize(t *testing.T) {
 		t.Errorf("Mcp-Session-Id %q", id)
 	}
 	var res struct {
-		ProtocolVersion string          `json:"protocolVersion"`
-		Capabilities    json.RawMessage `json:"capabilities"`
-		ServerInfo      struct {
-			Name, Title, Version, WebsiteURL string
-		} `json:"serverInfo"`
-		Instructions string `json:"instructions"`
+		ProtocolVersion string                 `json:"protocolVersion"`
+		Capabilities    json.RawMessage        `json:"capabilities"`
+		ServerInfo      *sdkmcp.Implementation `json:"serverInfo"`
+		Instructions    string                 `json:"instructions"`
 	}
 	if err := json.Unmarshal(decode(t, b).Result, &res); err != nil {
 		t.Fatal(err)
@@ -65,8 +78,7 @@ func TestInitialize(t *testing.T) {
 	if string(res.Capabilities) != `{"tools":{}}` {
 		t.Errorf("capabilities %s", res.Capabilities)
 	}
-	if res.ServerInfo.Name != "penguin-stats" || res.ServerInfo.Title != "Penguin Statistics" || res.ServerInfo.Version != "test" ||
-		res.ServerInfo.WebsiteURL != site {
+	if !reflect.DeepEqual(res.ServerInfo, wantServerInfo) {
 		t.Errorf("server info %+v", res.ServerInfo)
 	}
 	if n := len(res.Instructions); n > 600 || !strings.Contains(res.Instructions, "CC BY-NC 4.0") {
@@ -638,7 +650,8 @@ func TestClients(t *testing.T) {
 			if got := cs.InitializeResult().ProtocolVersion; got != tc.want {
 				t.Errorf("protocol version %q, want %q", got, tc.want)
 			}
-			if got := cs.InitializeResult().ServerInfo; got == nil || got.Name != "penguin-stats" {
+			// the 2026-07-28 protocol has it in the _meta of the result of server/discover
+			if got := cs.InitializeResult().ServerInfo; !reflect.DeepEqual(got, wantServerInfo) {
 				t.Errorf("server info %+v", got)
 			}
 
