@@ -3,9 +3,12 @@
 package duckdbx
 
 import (
+	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -32,6 +35,18 @@ type Config struct {
 	// ExtensionDirectory is where LOAD looks for extensions that are not built in, such as postgres; empty keeps
 	// DuckDB's default (~/.duckdb/extensions).
 	ExtensionDirectory string
+
+	// TimeZone, if set, is the database's time zone (e.g. "UTC"), which date_trunc and the casts of TIMESTAMPTZ use.
+	TimeZone string
+	// ParquetMetadataCache keeps the footers of the Parquet files read in memory, for a long-lived database that
+	// reads the same files again and again. DuckDB checks a cached footer against the file before using it, so a
+	// file replaced by a rename is read again.
+	ParquetMetadataCache bool
+	// AllowedDirectories, if not empty, confines the database to the local files under these directories and
+	// TempDirectory: enable_external_access is turned off, so every other path, every remote file system (s3://,
+	// http://, ...), and LOAD and INSTALL fail, and then the configuration is locked, so that no query can undo any
+	// of this.
+	AllowedDirectories []string
 }
 
 // Open opens a DuckDB database. Extensions are never installed or loaded behind the caller's back: anything beyond
@@ -46,7 +61,64 @@ func Open(cfg Config) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	return sql.OpenDB(connector), nil
+	db := sql.OpenDB(connector)
+	if stmts := cfg.globalSettings(); len(stmts) > 0 {
+		if err := applyGlobal(db, stmts); err != nil {
+			_ = db.Close()
+			return nil, err
+		}
+	}
+	return db, nil
+}
+
+// globalSettings returns the statements that complete the configuration of the DSN: the settings of extensions,
+// which DuckDB does not take before they are loaded, and the lockdown, whose directories are a list, which the DSN
+// cannot carry. They are global, so they hold for every connection of the pool.
+func (cfg Config) globalSettings() []string {
+	var stmts []string
+	if cfg.TimeZone != "" {
+		stmts = append(stmts, "SET GLOBAL TimeZone = "+quote(cfg.TimeZone))
+	}
+	if cfg.ParquetMetadataCache {
+		stmts = append(stmts, "SET GLOBAL parquet_metadata_cache = true")
+	}
+	if len(cfg.AllowedDirectories) > 0 {
+		dirs := append([]string{}, cfg.AllowedDirectories...)
+		if cfg.TempDirectory != "" {
+			dirs = append(dirs, cfg.TempDirectory)
+		}
+		quoted := make([]string, len(dirs))
+		for i, d := range dirs {
+			// a prefix of paths: without the separator, /data/cs would also allow /data/cs-other
+			quoted[i] = quote(strings.TrimSuffix(filepath.Clean(d), string(filepath.Separator)) + string(filepath.Separator))
+		}
+		stmts = append(stmts,
+			"SET GLOBAL allowed_directories = ["+strings.Join(quoted, ", ")+"]",
+			"SET GLOBAL enable_external_access = false",
+			"SET GLOBAL lock_configuration = true",
+		)
+	}
+	return stmts
+}
+
+func applyGlobal(db *sql.DB, stmts []string) error {
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	for _, stmt := range stmts {
+		if _, err := conn.ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("duckdbx: %s: %w", stmt, err)
+		}
+	}
+	return nil
+}
+
+// quote returns s as a SQL string literal.
+func quote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }
 
 func (cfg Config) dsn() (string, error) {
@@ -55,6 +127,14 @@ func (cfg Config) dsn() (string, error) {
 	}
 	if cfg.Threads < 0 {
 		return "", errors.New("duckdbx: threads must not be negative")
+	}
+	for _, d := range cfg.AllowedDirectories {
+		if !filepath.IsAbs(d) {
+			return "", fmt.Errorf("duckdbx: allowed directory %q is not absolute", d)
+		}
+	}
+	if len(cfg.AllowedDirectories) > 0 && cfg.TempDirectory != "" && !filepath.IsAbs(cfg.TempDirectory) {
+		return "", fmt.Errorf("duckdbx: temp directory %q is not absolute", cfg.TempDirectory)
 	}
 
 	opts := url.Values{}

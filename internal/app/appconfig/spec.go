@@ -184,6 +184,35 @@ type ConfigSpec struct {
 	// every hour (the new database has no default partition).
 	ReportSchemaV2Enabled bool `split_words:"true" default:"false"`
 
+	// ColdstoreEnabled opens the local cold storage (#752) at startup with coldstore.Reader, so that queries can read
+	// the archived months from it. The app then refuses to start unless every file of the manifest in
+	// ColdstoreDirectory is there with its size; restore missing ones with run-script coldstore-pull. The app never
+	// reads the bucket. Nothing queries the cold storage yet.
+	ColdstoreEnabled bool `split_words:"true" default:"false"`
+
+	// ColdstoreDirectory is the local cold storage directory (manifest.json and the files it lists), on the disk of
+	// the machine the app runs on. Required when ColdstoreEnabled. DuckDB may read nothing else.
+	ColdstoreDirectory string `split_words:"true"`
+
+	// ColdstoreThreads caps the threads of the cold storage's DuckDB database.
+	ColdstoreThreads int `split_words:"true" default:"2"`
+
+	// ColdstoreMemoryLimit caps the memory of the cold storage's DuckDB database, in DuckDB's syntax.
+	ColdstoreMemoryLimit string `split_words:"true" default:"1GB"`
+
+	// ColdstoreTempDirectory is where the cold storage's DuckDB database spills (in a directory of its own, removed
+	// at shutdown), and where the time of the last integrity check is kept. Empty is the system's temp directory.
+	ColdstoreTempDirectory string `split_words:"true"`
+
+	// ColdstoreReloadInterval is how often the manifest is checked for a change (a month archived or patched); 0
+	// disables the reload.
+	ColdstoreReloadInterval time.Duration `split_words:"true" default:"1m"`
+
+	// ColdstoreIntegrityCheckInterval is how often every local cold storage file is hashed again, one at a time at
+	// the lowest CPU and I/O priority, and compared with the manifest's sha256. Mismatches are logged and counted
+	// (penguinbackend_coldstore_integrity_files_total{result!="ok"}), never repaired. 0 disables the check.
+	ColdstoreIntegrityCheckInterval time.Duration `split_words:"true" default:"168h"`
+
 	// SEOPagesEnabled serves the stats pages of the frontend (/{zh,en,ja,ko}/result/...) from here: the frontend's
 	// index.html with the page's title, description, canonical and hreflang links, structured data and a plain HTML
 	// table of its data, for search engines and link previews. The ingress has to route those paths here. When
