@@ -162,6 +162,8 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 		otelfiber.WithServerName("pgbackend"),
 		otelfiber.WithPropagators(otel.GetTextMapPropagator()),
 	))
+	// the ids of the server span in the request log (Logger, which logs after the span ended)
+	app.Use(middlewares.LogTraceIDs())
 
 	prometheusRegisterOnce.Do(func() {
 		fiberprometheus.New(observability.ServiceName).RegisterAt(app, "/metrics")

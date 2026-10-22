@@ -425,9 +425,11 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 	}
 	span.End()
 
+	// the lines below link to the task's trace, if it is sampled
+	sc := span.SpanContext()
 	switch {
 	case err == nil:
-		log.Info().
+		observability.TraceIDs(log.Info(), sc).
 			Str("evt.name", "reportwkr.processed").
 			Str("taskId", reportTask.TaskID).
 			RawJSON("task", msg.Data).
@@ -448,7 +450,7 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 	case errors.Is(err, pgerr.ErrNotFound):
 		// a stage of the task does not exist (process looks nothing else up by key): no retry can store it. The task
 		// is logged as it was published: process changes its drops and ip in place.
-		log.Error().
+		observability.TraceIDs(log.Error(), sc).
 			Err(err).
 			Str("evt.name", "reportwkr.parked").
 			Str("taskId", reportTask.TaskID).
@@ -460,7 +462,7 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 		// failed at every delivery for over an hour and a half of retries: most likely it can never be stored, and it
 		// would hold a slot of the MaxAckPending window that it shares with the healthy tasks for as long as it is
 		// retried
-		log.Error().
+		observability.TraceIDs(log.Error(), sc).
 			Err(err).
 			Str("evt.name", "reportwkr.dead").
 			Str("taskId", reportTask.TaskID).
@@ -478,7 +480,8 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 		if delivered > 5 {
 			ev = log.Error()
 		}
-		ev.Err(err).
+		observability.TraceIDs(ev, sc).
+			Err(err).
 			Str("evt.name", "reportwkr.failed").
 			Str("taskId", reportTask.TaskID).
 			Uint64("delivered", delivered).
