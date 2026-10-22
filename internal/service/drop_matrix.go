@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"exusiai.dev/gommon/constant"
-	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
@@ -589,18 +588,12 @@ func (s *DropMatrix) convertDropMatrixElementsToDropMatrixQueryResult(ctx contex
 	dropMatrixQueryResult := &model.DropMatrixQueryResult{
 		Matrix: make([]*model.OneDropMatrixElement, 0),
 	}
-	var groupedResults []linq.Group
-	linq.From(dropMatrixElements).
-		GroupByT(
-			func(el *model.DropMatrixElement) int { return el.RangeID },
-			func(el *model.DropMatrixElement) *model.DropMatrixElement { return el },
-		).
-		ToSlice(&groupedResults)
-	for _, group := range groupedResults {
-		rangeId := group.Key.(int)
+	// grouped by range id, in the order the range ids first appear
+	for _, group := range util.GroupBy(dropMatrixElements, func(el *model.DropMatrixElement) int { return el.RangeID }) {
+		rangeId := group.Key
 		var timeRange *model.TimeRange
 		if rangeId == 0 {
-			timeRange = group.Group[0].(*model.DropMatrixElement).TimeRange
+			timeRange = group.Items[0].TimeRange
 		} else {
 			tr, err := s.TimeRangeService.GetTimeRangeById(ctx, rangeId)
 			if err != nil {
@@ -609,8 +602,7 @@ func (s *DropMatrix) convertDropMatrixElementsToDropMatrixQueryResult(ctx contex
 			timeRange = tr
 		}
 
-		for _, el := range group.Group {
-			dropMatrixElement := el.(*model.DropMatrixElement)
+		for _, dropMatrixElement := range group.Items {
 			dropMatrixQueryResult.Matrix = append(dropMatrixQueryResult.Matrix, &model.OneDropMatrixElement{
 				StageID:   dropMatrixElement.StageID,
 				ItemID:    dropMatrixElement.ItemID,
@@ -665,45 +657,34 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 	// save stage times for later use
 	stageTimesMap := map[int]int{}
 
-	// grouping results by stage id
-	var groupedResults []linq.Group
-	linq.From(combinedResults).
-		GroupByT(
-			func(el *model.CombinedResultForDropMatrix) int { return el.StageID },
-			func(el *model.CombinedResultForDropMatrix) *model.CombinedResultForDropMatrix { return el }).ToSlice(&groupedResults)
-
+	// grouping results by stage id, then by range id, in the order the ids first appear
 	dropMatrixElements := make([]*model.DropMatrixElement, 0)
-	for _, el := range groupedResults {
-		stageId := el.Key.(int)
-		var groupedResults2 []linq.Group
-		linq.From(el.Group).
-			GroupByT(
-				func(el *model.CombinedResultForDropMatrix) int { return el.TimeRange.RangeID },
-				func(el *model.CombinedResultForDropMatrix) *model.CombinedResultForDropMatrix { return el }).
-			ToSlice(&groupedResults2)
-		for _, el2 := range groupedResults2 {
-			rangeId := el2.Key.(int)
-			timeRange := el2.Group[0].(*model.CombinedResultForDropMatrix).TimeRange
+	for _, el := range util.GroupBy(combinedResults, func(el *model.CombinedResultForDropMatrix) int { return el.StageID }) {
+		stageId := el.Key
+		for _, el2 := range util.GroupBy(el.Items, func(el *model.CombinedResultForDropMatrix) int { return el.TimeRange.RangeID }) {
+			rangeId := el2.Key
+			timeRange := el2.Items[0].TimeRange
 
 			// get all item ids which are dropped in this stage and in this time range
 			var dropItemIds []int
 			if rangeId == 0 {
 				// rangeId == 0 means it is a customized time range instead of a time range from the database
-				dropInfosForSpecialTimeRange, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, []*model.TimeRange{el2.Group[0].(*model.CombinedResultForDropMatrix).TimeRange}, []int{stageId}, itemIdFilter)
+				dropInfosForSpecialTimeRange, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, []*model.TimeRange{el2.Items[0].TimeRange}, []int{stageId}, itemIdFilter)
 				if err != nil {
 					return nil, err
 				}
-				linq.From(dropInfosForSpecialTimeRange).
-					WhereT(func(el *model.DropInfo) bool { return el.ItemID.Valid }).
-					SelectT(func(el *model.DropInfo) int { return int(el.ItemID.Int64) }).
-					ToSlice(&dropItemIds)
+				for _, dropInfo := range dropInfosForSpecialTimeRange {
+					if dropInfo.ItemID.Valid {
+						dropItemIds = append(dropItemIds, int(dropInfo.ItemID.Int64))
+					}
+				}
 			} else {
 				dropItemIds, _ = s.DropInfoService.GetItemDropSetByStageIdAndRangeId(ctx, server, stageId, rangeId)
 			}
 
 			// if item id filter is applied, then filter the drop item ids
 			if len(itemIdFilter) > 0 {
-				linq.From(dropItemIds).WhereT(func(itemId int) bool { return linq.From(itemIdFilter).Contains(itemId) }).ToSlice(&dropItemIds)
+				dropItemIds = filterItemIds(dropItemIds, itemIdFilter)
 			}
 
 			// use a fake hashset to save item ids
@@ -712,11 +693,11 @@ func (s *DropMatrix) calcDropMatrixForTimeRanges(
 				dropSet[itemId] = struct{}{}
 			}
 
-			for _, el3 := range el2.Group {
-				itemId := el3.(*model.CombinedResultForDropMatrix).ItemID
-				quantity := el3.(*model.CombinedResultForDropMatrix).Quantity
-				times := el3.(*model.CombinedResultForDropMatrix).Times
-				quantityBuckets := el3.(*model.CombinedResultForDropMatrix).QuantityBuckets
+			for _, el3 := range el2.Items {
+				itemId := el3.ItemID
+				quantity := el3.Quantity
+				times := el3.Times
+				quantityBuckets := el3.QuantityBuckets
 				dropMatrixElement := model.DropMatrixElement{
 					StageID:         stageId,
 					ItemID:          itemId,
@@ -975,4 +956,21 @@ func (s *DropMatrix) applyShimForDropMatrixQuery(ctx context.Context, showClosed
 		results.Matrix = append(results.Matrix, &oneDropMatrixElement)
 	}
 	return results, nil
+}
+
+// filterItemIds returns the item ids that are in itemIdFilter, in their order. Unlike the go-linq filter it replaced,
+// it does not write them over itemIds, which may be cached (that never happened, as only a customized time range,
+// which reads its item ids from the database, comes with an item filter).
+func filterItemIds(itemIds []int, itemIdFilter []int) []int {
+	filterSet := make(map[int]struct{}, len(itemIdFilter))
+	for _, itemId := range itemIdFilter {
+		filterSet[itemId] = struct{}{}
+	}
+	var kept []int
+	for _, itemId := range itemIds {
+		if _, ok := filterSet[itemId]; ok {
+			kept = append(kept, itemId)
+		}
+	}
+	return kept
 }
