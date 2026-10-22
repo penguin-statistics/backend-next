@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"exusiai.dev/gommon/constant"
-	"github.com/ahmetb/go-linq/v3"
 	"github.com/antonmedv/expr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -95,18 +94,16 @@ func (s *Admin) SaveRenderedObjects(ctx context.Context, objects *gamedata.Rende
 
 		stageIdMap := make(map[string]int)
 		if len(objects.Stages) > 0 {
-			linq.From(objects.Stages).ForEachT(func(stage *model.Stage) {
+			for _, stage := range objects.Stages {
 				stage.ZoneID = zoneId
-			})
+			}
 			if err := s.AdminRepo.SaveStages(ctx, tx, &objects.Stages); err != nil {
 				innerErr = err
 				return err
 			}
-			linq.From(objects.Stages).
-				ToMapByT(&stageIdMap,
-					func(stage *model.Stage) string { return stage.ArkStageID },
-					func(stage *model.Stage) int { return stage.StageID },
-				)
+			for _, stage := range objects.Stages {
+				stageIdMap[stage.ArkStageID] = stage.StageID
+			}
 		}
 
 		if len(objects.DropInfosMap) > 0 {

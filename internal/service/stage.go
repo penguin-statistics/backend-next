@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"exusiai.dev/gommon/constant"
-	"github.com/ahmetb/go-linq/v3"
 	"github.com/tidwall/gjson"
 	"gopkg.in/guregu/null.v3"
 
@@ -187,19 +186,21 @@ func (s *Stage) applyShim(stage *modelv2.Stage) {
 		stage.Sanity = null.NewInt(constant.DefaultNullSanity, true)
 	}
 
+	// move the recognition only drop infos out of stage.DropInfos (filtered in place) into stage.RecognitionOnly
 	recognitionOnlyArkItemIds := make([]string, 0)
-	linq.From(stage.DropInfos).
-		WhereT(func(dropInfo *modelv2.DropInfo) bool {
-			if dropInfo.DropType == constant.DropTypeRecognitionOnly {
-				extras := gjson.ParseBytes(dropInfo.Extras)
-				if !extras.IsObject() {
-					return false
-				}
-				recognitionOnlyArkItemIds = append(recognitionOnlyArkItemIds, extras.Get("arkItemId").Value().(string))
-			}
-			return dropInfo.DropType != constant.DropTypeRecognitionOnly
-		}).
-		ToSlice(&stage.DropInfos)
+	dropInfos := stage.DropInfos[:0]
+	for _, dropInfo := range stage.DropInfos {
+		if dropInfo.DropType != constant.DropTypeRecognitionOnly {
+			dropInfos = append(dropInfos, dropInfo)
+			continue
+		}
+		extras := gjson.ParseBytes(dropInfo.Extras)
+		if !extras.IsObject() {
+			continue
+		}
+		recognitionOnlyArkItemIds = append(recognitionOnlyArkItemIds, extras.Get("arkItemId").Value().(string))
+	}
+	stage.DropInfos = dropInfos
 	stage.RecognitionOnly = recognitionOnlyArkItemIds
 	stage.IsGacha = stage.ExtraProcessType.String == constant.ExtraProcessTypeGachaBox
 
