@@ -164,7 +164,7 @@ func TestCORSPreflight(t *testing.T) {
 				t.Errorf("Access-Control-Allow-Methods = %q, want %q", got, want)
 			}
 			// Authorization must be listed by name: a "*" in Allow-Headers does not cover it
-			if got, want := resp.Header.Get(fiber.HeaderAccessControlAllowHeaders), "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace"; got != want {
+			if got, want := resp.Header.Get(fiber.HeaderAccessControlAllowHeaders), "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace,traceparent,tracestate"; got != want {
 				t.Errorf("Access-Control-Allow-Headers = %q, want %q", got, want)
 			}
 			if got := resp.Header.Get(fiber.HeaderAccessControlMaxAge); got != "600" {
