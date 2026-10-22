@@ -72,7 +72,7 @@ func TestInitialize(t *testing.T) {
 		t.Errorf("instructions (%d bytes): %s", n, res.Instructions)
 	}
 	// they tell the workflow: every tool
-	for _, tool := range []string{"get_dataset_info", "search_items", "search_stages", "get_item_drop_rates", "get_stage_drops"} {
+	for _, tool := range []string{"get_dataset_info", "search_items", "search_stages", "get_item_drop_rates", "get_stage_drops", "list_events"} {
 		if !strings.Contains(res.Instructions, tool) {
 			t.Errorf("instructions lack %s: %s", tool, res.Instructions)
 		}
@@ -107,7 +107,7 @@ func TestToolsList(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	// meta#20: the order of tools/list is fixed (the SDK sorts it by name)
-	if !slices.Equal(names, []string{"get_dataset_info", "get_item_drop_rates", "get_stage_drops", "search_items", "search_stages"}) {
+	if !slices.Equal(names, []string{"get_dataset_info", "get_item_drop_rates", "get_stage_drops", "list_events", "search_items", "search_stages"}) {
 		t.Errorf("tools %q", names)
 	}
 	for _, tool := range res.Tools {
