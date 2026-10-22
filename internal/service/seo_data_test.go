@@ -7,8 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
+	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
@@ -82,6 +84,29 @@ func TestNewSEOMatrixOrdersLikeTheFrontend(t *testing.T) {
 	}
 	if got := m.ByStage["a"]; len(got) != 2 || got[0].ItemID != "x" || got[1].Rate != 0.01 {
 		t.Errorf("stage a: %+v", got)
+	}
+}
+
+// hookCounter is an fx.Lifecycle that counts the hooks appended to it
+type hookCounter int
+
+func (h *hookCounter) Append(fx.Hook) { *h++ }
+
+func TestSEODataLoadsForThePagesOrTheMCPServer(t *testing.T) {
+	for _, tc := range []struct {
+		pages, mcp bool
+		hooks      int
+	}{
+		{pages: false, mcp: false, hooks: 0},
+		{pages: true, mcp: false, hooks: 1},
+		{pages: false, mcp: true, hooks: 1},
+		{pages: true, mcp: true, hooks: 1},
+	} {
+		var lc hookCounter
+		NewSEOData(&lc, &appconfig.Config{ConfigSpec: appconfig.ConfigSpec{SEOPagesEnabled: tc.pages, MCPEnabled: tc.mcp}}, nil, nil, nil, nil)
+		if int(lc) != tc.hooks {
+			t.Errorf("pages %v, MCP %v: %d hooks, want %d", tc.pages, tc.mcp, lc, tc.hooks)
+		}
 	}
 }
 

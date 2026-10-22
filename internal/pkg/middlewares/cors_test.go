@@ -180,6 +180,65 @@ func TestCORSPreflight(t *testing.T) {
 	}
 }
 
+func TestCORSMCPPathIsPublic(t *testing.T) {
+	app := fiber.New()
+	app.Use(CORS(testCredentialedOrigins))
+	app.All(MCPPath, func(c *fiber.Ctx) error {
+		return c.SendString("ok")
+	})
+	app.Get("/mcpx", func(c *fiber.Ctx) error {
+		return c.SendString("ok")
+	})
+
+	const mcpHeaders = "content-type,mcp-protocol-version,mcp-method,mcp-name,mcp-param-server"
+	for _, tc := range []struct {
+		name, method, path, origin, requestHeaders string
+		wantACAO, wantAllowHeaders                 string
+		wantCredentials                            bool
+	}{
+		// an allow-listed origin gets the public tier on /mcp, and so does the path as fiber routes it
+		{name: "credentialed origin POST", method: fiber.MethodPost, path: "/mcp", origin: "https://penguin-stats.io", wantACAO: "*"},
+		{name: "upper case path", method: fiber.MethodPost, path: "/MCP", origin: "capacitor://localhost", wantACAO: "*"},
+		{name: "trailing slash", method: fiber.MethodPost, path: "/mcp/", origin: "capacitor://localhost", wantACAO: "*"},
+		{name: "foreign origin POST", method: fiber.MethodPost, path: "/mcp", origin: "https://evil.example", wantACAO: "*"},
+		// the MCP headers, Mcp-Param-* included, are allowed as asked for
+		{name: "preflight", method: fiber.MethodOptions, path: "/mcp", origin: "https://penguin-stats.io", requestHeaders: mcpHeaders,
+			wantACAO: "*", wantAllowHeaders: mcpHeaders},
+		{name: "preflight without request headers", method: fiber.MethodOptions, path: "/mcp", origin: "https://inspector.example",
+			wantACAO: "*", wantAllowHeaders: "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace,traceparent,tracestate,Mcp-Protocol-Version,Mcp-Method,Mcp-Name"},
+		// other paths keep the tiers and the fixed list
+		{name: "other path", method: fiber.MethodGet, path: "/mcpx", origin: "https://penguin-stats.io", wantACAO: "https://penguin-stats.io", wantCredentials: true},
+		{name: "other path preflight", method: fiber.MethodOptions, path: "/mcpx", origin: "https://evil.example", requestHeaders: mcpHeaders,
+			wantACAO: "*", wantAllowHeaders: "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace,traceparent,tracestate"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, tc.path, nil)
+			req.Header.Set(fiber.HeaderOrigin, tc.origin)
+			if tc.method == fiber.MethodOptions {
+				req.Header.Set(fiber.HeaderAccessControlRequestMethod, fiber.MethodPost)
+			}
+			if tc.requestHeaders != "" {
+				req.Header.Set(fiber.HeaderAccessControlRequestHeaders, tc.requestHeaders)
+			}
+			resp, err := app.Test(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+
+			if got := resp.Header.Get(fiber.HeaderAccessControlAllowOrigin); got != tc.wantACAO {
+				t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, tc.wantACAO)
+			}
+			if got := resp.Header.Get(fiber.HeaderAccessControlAllowCredentials) == "true"; got != tc.wantCredentials {
+				t.Errorf("Access-Control-Allow-Credentials = %v, want %v", got, tc.wantCredentials)
+			}
+			if got := resp.Header.Get(fiber.HeaderAccessControlAllowHeaders); got != tc.wantAllowHeaders {
+				t.Errorf("Access-Control-Allow-Headers = %q, want %q", got, tc.wantAllowHeaders)
+			}
+		})
+	}
+}
+
 func TestCORSIgnoresCookieOfCrossSiteRequests(t *testing.T) {
 	app := fiber.New()
 	app.Use(CORS(testCredentialedOrigins))

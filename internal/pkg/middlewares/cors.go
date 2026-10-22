@@ -20,7 +20,11 @@ var (
 		// browser's resource to the backend trace
 		"traceparent", "tracestate",
 	}, ",")
-	corsMaxAge = "600"
+	// the headers allowed by a preflight to MCPPath that lists none: the usual ones and those of the MCP clients,
+	// Mcp-Protocol-Version (after the 2025 handshake), Mcp-Method and Mcp-Name (the 2026-07-28 protocol, whose
+	// Mcp-Param-* headers are allowed by echoing the list of a preflight)
+	corsMCPAllowHeaders = corsAllowHeaders + ",Mcp-Protocol-Version,Mcp-Method,Mcp-Name"
+	corsMaxAge          = "600"
 	// response headers outside the CORS-safelisted set must be listed here for cross-origin scripts to read them
 	corsExposeHeaders = strings.Join([]string{
 		fiber.HeaderContentType, fiber.HeaderETag, fiber.HeaderLink, fiber.HeaderRetryAfter,
@@ -35,6 +39,15 @@ const (
 	corsTierCredentialed = "credentialed"
 	corsTierPublic       = "public"
 )
+
+// MCPPath is the path of the MCP server (controller/mcp). It is public, read-only and reads no cookie, so CORS
+// answers its requests in the public tier whatever their Origin, and lets its preflights send any header.
+const MCPPath = "/mcp"
+
+// isMCPPath tells whether path, as requested, is routed to MCPPath: fiber routes ignore case and a trailing slash
+func isMCPPath(path string) bool {
+	return strings.EqualFold(strings.TrimSuffix(path, "/"), MCPPath)
+}
 
 // CORS answers cross-origin requests in two tiers.
 //
@@ -54,15 +67,19 @@ const (
 // fetch with mode no-cors) from being sent and acted on.
 //
 // Every OPTIONS request is answered here as a preflight with 204, for both tiers.
+//
+// The requests to MCPPath are always in the public tier, and their preflights allow the headers they ask for: the
+// 2026-07-28 MCP protocol sends Mcp-Param-* headers named after the arguments of a tool.
 func CORS(credentialedOrigins []string) fiber.Handler {
 	allowlist := newOriginAllowlist(credentialedOrigins)
 
 	return func(c *fiber.Ctx) error {
 		origin := c.Get(fiber.HeaderOrigin)
+		mcp := isMCPPath(c.Path())
 
 		// the answer depends on Origin, whichever tier it falls in
 		c.Vary(fiber.HeaderOrigin)
-		if allowlist.allows(origin) {
+		if !mcp && allowlist.allows(origin) {
 			c.Locals(localsKeyCORSTier, corsTierCredentialed)
 			c.Set(fiber.HeaderAccessControlAllowOrigin, origin)
 			c.Set(fiber.HeaderAccessControlAllowCredentials, "true")
@@ -84,7 +101,15 @@ func CORS(credentialedOrigins []string) fiber.Handler {
 		c.Vary(fiber.HeaderAccessControlRequestMethod)
 		c.Vary(fiber.HeaderAccessControlRequestHeaders)
 		c.Set(fiber.HeaderAccessControlAllowMethods, corsAllowMethods)
-		c.Set(fiber.HeaderAccessControlAllowHeaders, corsAllowHeaders)
+		switch requested := c.Get(fiber.HeaderAccessControlRequestHeaders); {
+		case mcp && requested != "":
+			// never with credentials: any header is safe to allow
+			c.Set(fiber.HeaderAccessControlAllowHeaders, requested)
+		case mcp:
+			c.Set(fiber.HeaderAccessControlAllowHeaders, corsMCPAllowHeaders)
+		default:
+			c.Set(fiber.HeaderAccessControlAllowHeaders, corsAllowHeaders)
+		}
 		// lets browsers reuse a preflight for 10 minutes (Chromium caps it at 2 hours) instead of sending one before
 		// every GET with Authorization, as the iOS/macOS app does
 		c.Set(fiber.HeaderAccessControlMaxAge, corsMaxAge)
