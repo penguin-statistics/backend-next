@@ -16,6 +16,9 @@ var (
 	}, ",")
 	corsAllowHeaders = strings.Join([]string{
 		fiber.HeaderContentType, fiber.HeaderAuthorization, fiber.HeaderXRequestedWith, "X-Penguin-Variant", "sentry-trace",
+		// W3C Trace Context, which the Datadog RUM SDK adds to the requests of its allowedTracingUrls to join the
+		// browser's resource to the backend trace
+		"traceparent", "tracestate",
 	}, ",")
 	corsMaxAge = "600"
 	// response headers outside the CORS-safelisted set must be listed here for cross-origin scripts to read them

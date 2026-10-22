@@ -26,6 +26,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
@@ -150,8 +151,17 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 		)...,
 	)
 	otel.SetTracerProvider(tracerProvider)
+	// W3C Trace Context, as the browser RUM SDK sends with tracecontext propagation: the server span of a request that
+	// carries a traceparent continues the caller's trace, and the ParentBased sampler follows the caller's sampled flag,
+	// so that a RUM resource finds its backend trace. Without a propagator (OTel's default is a no-op) every request
+	// starts a trace of its own. Baggage is not read: nothing here uses it, and it would be parsed from every request
+	// that sends it. otelfiber reads the global propagator once, as it is built: set it before.
+	otel.SetTextMapPropagator(propagation.TraceContext{})
 
-	app.Use(otelfiber.Middleware(otelfiber.WithServerName("pgbackend")))
+	app.Use(otelfiber.Middleware(
+		otelfiber.WithServerName("pgbackend"),
+		otelfiber.WithPropagators(otel.GetTextMapPropagator()),
+	))
 
 	prometheusRegisterOnce.Do(func() {
 		fiberprometheus.New(observability.ServiceName).RegisterAt(app, "/metrics")
