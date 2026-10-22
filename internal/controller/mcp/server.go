@@ -5,7 +5,7 @@
 //
 // Each tool has a file of its own (tool_<name>.go) and a line in tools.register; output.go has what their results
 // share: the credit of the data, the definitions, the server and language arguments, the text content; search.go
-// finds the items and stages by what users and models call them.
+// finds the items and stages by what users and models call them; drops.go has what the two drop tools share.
 package mcp
 
 import (
@@ -35,10 +35,10 @@ const (
 // instructions tell the model what the data is, how to use the tools and how to credit the data (600 characters at
 // most, as clients may cut them)
 const instructions = "Penguin Statistics (penguin-stats.io) publishes crowdsourced Arknights drop statistics: for each " +
-	"game server (CN, US, JP, KR), how often each stage drops each item, from the reports of players. Find the IDs " +
-	"of items and stages with search_items and search_stages (any language, aliases, pinyin, codes like 1-7). Call " +
-	"get_dataset_info for what the numbers mean, how fresh the data of each server is and its caveats. When you use " +
-	"these numbers, name the server, the data-as-of time and credit Penguin Statistics (penguin-stats.io), CC BY-NC 4.0."
+	"game server (CN, US, JP, KR), how often each stage drops each item, from player reports. Find item and stage IDs " +
+	"with search_items and search_stages (any language, aliases, pinyin, codes like 1-7), then get_item_drop_rates " +
+	"(where to farm an item) or get_stage_drops (what a stage drops). get_dataset_info explains the numbers. When you " +
+	"use these numbers, name the server, the data-as-of time and credit Penguin Statistics (penguin-stats.io), CC BY-NC 4.0."
 
 // listTTL is how long clients may keep the list of the tools, which only a release changes
 const listTTL = time.Hour
@@ -59,6 +59,8 @@ func (t *tools) register(r *registry) {
 	add(r, getDatasetInfoTool(), t.getDatasetInfo)
 	add(r, searchItemsTool(), t.searchItems)
 	add(r, searchStagesTool(), t.searchStages)
+	add(r, getItemDropRatesTool(), t.getItemDropRates)
+	add(r, getStageDropsTool(), t.getStageDrops)
 }
 
 // registry adds the tools to a server and keeps their names, the values of the tool label of the metrics.

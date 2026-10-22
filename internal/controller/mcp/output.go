@@ -330,6 +330,14 @@ func cell(s string) string {
 	return cellReplacer.Replace(s)
 }
 
+// count is n nouns in the text content: "1 stage", "2 stages".
+func count(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return strconv.Itoa(n) + " " + noun + "s"
+}
+
 // number formats x in the text content, with no more digits than it has.
 func number(x float64) string {
 	return strconv.FormatFloat(x, 'f', -1, 64)

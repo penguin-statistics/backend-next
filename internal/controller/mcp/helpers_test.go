@@ -82,7 +82,8 @@ var testNow = time.Date(2026, 10, 22, 16, 53, 0, 0, time.UTC)
 // had (the numerical IDs are made up, and the other servers have the times of CN): the four tiers of Orirock, which
 // share aliases, the two items named Carbon Brick in en, items of types not listed (LMD, and D32 Steel, crafted in the
 // workshop); stages whose codes collide (main_ and tough_, an event with its permanent stage and rerun, and another
-// event), the open event, a gacha and the recruitment.
+// event), the open event, a gacha and the recruitment; the best stages for Orirock Cube (see testMatrices), and a past
+// event.
 func testCatalog() *service.SEOCatalog {
 	return service.NewSEOCatalog(
 		[]*model.Item{
@@ -107,6 +108,10 @@ func testCatalog() *service.SEOCatalog {
 				Keywords: keywords([]string{"龙门币1000", "钱"}, nil, []string{"long`men`bi`1000", "qian"}, nil)},
 			{ArkItemID: "30135", Type: "ARKPLANNER", SortID: 100030, Rarity: 4, Name: i18n("D32钢", "D32 Steel", "D32鋼", "D32 강철"), Existence: existence(all...),
 				Keywords: keywords([]string{"D32钢"}, nil, []string{"D32`gang"}, nil)},
+			// in no matrix
+			{ArkItemID: "4005", Type: "LGG_SHD", SortID: 10007, Rarity: 2, Name: i18n("资质凭证", "Commendation Certificate", "一般資格証", "자격증명서"), Existence: existence(all...),
+				Keywords: keywords([]string{"资质凭证", "绿票"}, []string{"一般資格証"}, []string{"zi`zhi`ping`zheng", "lv`piao"}, []string{"ippan`shikaku`shou"})},
+			{ArkItemID: "recruit_tag_senior_operator", Type: "RECRUIT_TAG", SortID: -10000, Name: i18n("资深干员", "Senior Operator", "エリート", "특별채용"), Existence: existence(all...)},
 		},
 		[]*model.Stage{
 			{ArkStageID: "main_01-07", StageID: 7, ZoneID: 1, StageType: "MAIN", Code: i18n("1-7", "1-7", "1-7", "1-7"), Sanity: null.IntFrom(6), Existence: existence(all...)},
@@ -122,6 +127,12 @@ func testCatalog() *service.SEOCatalog {
 			{ArkStageID: "main_11-06", StageID: 450, ZoneID: 12, StageType: "MAIN", Code: i18n("11-7", "11-7", "11-7", "11-7"), Sanity: null.IntFrom(21), Existence: between(1665475200000, 0, all...)},
 			{ArkStageID: "tough_11-06", StageID: 451, ZoneID: 13, StageType: "MAIN", Code: i18n("11-7", "11-7", "11-7", "11-7"), Sanity: null.IntFrom(21), Existence: between(1665475200000, 0, all...)},
 			{ArkStageID: "act52side_04", StageID: 900, ZoneID: 52, StageType: "ACTIVITY", Code: i18n("YW-4", "YW-4", "YW-4", "YW-4"), Sanity: null.IntFrom(12), Existence: between(1791518400000, 1792699200000, "CN")},
+			{ArkStageID: "sub_02-12", StageID: 500, ZoneID: 2, StageType: "SUB", Code: i18n("S2-12", "S2-12", "S2-12", "S2-12"), Sanity: null.IntFrom(15), Existence: existence(all...)},
+			{ArkStageID: "main_14-02", StageID: 510, ZoneID: 14, StageType: "MAIN", Code: i18n("14-3", "14-3", "14-3", "14-3"), Sanity: null.IntFrom(21), Existence: between(1714550400000, 0, all...)},
+			{ArkStageID: "act9d0_05_perm", StageID: 600, ZoneID: 40, StageType: "ACTIVITY", Code: i18n("DM-5", "DM-5", "DM-5", "DM-5"), Sanity: null.IntFrom(15), Existence: between(1618473600000, 0, all...)},
+			{ArkStageID: "act11d0_01_perm", StageID: 610, ZoneID: 41, StageType: "ACTIVITY", Code: i18n("TW-1", "TW-1", "TW-1", "TW-1"), Sanity: null.IntFrom(9), Existence: between(1625083200000, 0, all...)},
+			{ArkStageID: "act19side_05_perm", StageID: 620, ZoneID: 42, StageType: "ACTIVITY", Code: i18n("DV-5", "DV-5", "DV-5", "DV-5"), Sanity: null.IntFrom(15), Existence: between(1690833600000, 0, "CN")},
+			{ArkStageID: "act21mini_05", StageID: 800, ZoneID: 50, StageType: "ACTIVITY", Code: i18n("BD-5", "BD-5", "BD-5", "BD-5"), Sanity: null.IntFrom(15), Existence: between(1783656000000, 1784232000000, "CN")},
 		},
 		[]*model.Zone{
 			{ArkZoneID: "main_1", ZoneID: 1, Index: 1, Category: "MAINLINE", Name: i18n("第一章", "Episode 1", "第一章", "에피소드 1"), Existence: existence(all...)},
@@ -137,6 +148,17 @@ func testCatalog() *service.SEOCatalog {
 			{ArkZoneID: "act52side_zone1", ZoneID: 52, Index: 1118, Category: "ACTIVITY", Name: i18n("昨日海", "昨日海", "昨日海", "昨日海"), Existence: between(1791518400000, 1792699200000, "CN")},
 			{ArkZoneID: "gachabox", ZoneID: 98, Category: "GACHABOX", Name: i18n("物资补给", "Supplies", "補給物資", "보급물자"), Existence: existence(all...)},
 			{ArkZoneID: "recruit", ZoneID: 99, Category: "RECRUIT", Name: i18n("公开招募", "Recruit", "公開求人", "공개모집"), Existence: existence(all...)},
+			{ArkZoneID: "main_2", ZoneID: 2, Index: 2, Category: "MAINLINE", Name: i18n("第二章", "Episode 2", "第二章", "에피소드 2"), Existence: existence(all...)},
+			{ArkZoneID: "main_14", ZoneID: 14, Index: 18, Category: "MAINLINE", Name: i18n("第十四章 (标准)", "Episode 14 (Standard)", "第十四章 (通常)", "에피소드 14 (Standard)"),
+				Existence: between(1714550400000, 0, all...)},
+			{ArkZoneID: "permanent_sub_1_zone1", ZoneID: 40, Index: 2001, Category: "ACTIVITY_PERMANENT", Type: null.StringFrom("INTERLUDE"),
+				Name: i18n("生于黑夜・插曲", "Darknights Memoir - Intermezzi", "闇夜に生きる・エピソード", "흑야의 회고록 에피소드"), Existence: between(1618473600000, 0, all...)},
+			{ArkZoneID: "permanent_sidestory_4_zone1", ZoneID: 41, Index: 3003, Category: "ACTIVITY_PERMANENT", Type: null.StringFrom("SIDESTORY"),
+				Name: i18n("沃伦姆德的薄暮・别传", "Twilight of Wolumonde - Side Story", "ウォルモンドの薄暮・サイドストーリー", "월루몽드의 황혼 사이드"), Existence: between(1625083200000, 0, all...)},
+			{ArkZoneID: "permanent_sidestory_15_zone1", ZoneID: 42, Index: 3014, Category: "ACTIVITY_PERMANENT", Type: null.StringFrom("SIDESTORY"),
+				Name: i18n("绿野幻梦・别传", "Dorothy's Vision - Side Story", "翠玉の夢・サイドストーリー", "도로시의 비전 사이드"), Existence: between(1690833600000, 0, "CN")},
+			{ArkZoneID: "act21mini_zone1", ZoneID: 50, Index: 1113, Category: "ACTIVITY", Name: i18n("丛林症结", "丛林症结", "丛林症结", "丛林症结"),
+				Existence: between(1783656000000, 1784232000000, "CN")},
 		},
 	)
 }
@@ -149,10 +171,30 @@ func weeklyCatalog() *service.SEOCatalog {
 		[]*model.Zone{{ArkZoneID: "weekly_6", ZoneID: 1, Category: "WEEKLY", Name: i18n("空中威胁", "Aerial Threat", "航空脅威", "공중 위협"), Existence: existence(all...)}})
 }
 
+// testMatrices are the matrices of the servers calculated: a part of the matrix of CN of 2026-10-22, with the rows the
+// API had. Orirock Cube, whose best stages by sanity per item were 1-7 (4.819), S2-12, DV-5, DM-5, TW-1 and the event
+// open until 20:00Z (YW-4, 7.198), from a few stages of each kind: the event BD-5 of July 2026 (6.533, closed), a gacha,
+// and a row of few runs (made up) better than 1-7. Rows that ended on stages still open: a bonus drop of an event on
+// 1-7 (of an item the catalog does not have), and Orirock on 14-3, before its drop table changed in May 2024.
 func testMatrices() map[string]*service.SEOMatrix {
 	return map[string]*service.SEOMatrix{
 		"CN": service.NewSEOMatrix("CN", []*modelv2.OneDropMatrixElement{
-			{StageID: "main_01-07", ItemID: "30012", Times: 1061347, Quantity: 1322056, StartTime: 1556676000000},
+			{StageID: "main_01-07", ItemID: "30012", Times: 2168783984, Quantity: 2700151376, StartTime: 1556676000000},
+			{StageID: "sub_02-12", ItemID: "30012", Times: 1028653, Quantity: 2356522, StartTime: 1556676000000},
+			{StageID: "act19side_05_perm", ItemID: "30012", Times: 5778, Quantity: 13159, StartTime: 1690833600000},
+			{StageID: "act9d0_05_perm", ItemID: "30012", Times: 71793, Quantity: 163064, StartTime: 1618430400000},
+			{StageID: "act11d0_01_perm", ItemID: "30012", Times: 816, Quantity: 1023, StartTime: 1625083200000},
+			{StageID: "act52side_04", ItemID: "30012", Times: 6154517, Quantity: 10259729, StartTime: 1791518400000},
+			{StageID: "act21mini_05", ItemID: "30012", Times: 188240, Quantity: 432192, StartTime: 1783656000000, EndTime: null.IntFrom(1784232000000)},
+			{StageID: "main_10-01", ItemID: "30012", Times: 4001, Quantity: 1454, StartTime: 1649923200000},
+			{StageID: "tough_10-01", ItemID: "30012", Times: 1844, Quantity: 661, StartTime: 1649923200000},
+			{StageID: "randomMaterial_1", ItemID: "30012", Times: 19918, Quantity: 1403, StartTime: 1577174400000},
+			{StageID: "act18d3_01_perm", ItemID: "30012", Times: 40, Quantity: 100, StartTime: 1621627200000},
+			{StageID: "main_01-07", ItemID: "30011", Times: 2168783984, Quantity: 257543229, StartTime: 1556676000000},
+			{StageID: "main_01-07", ItemID: "randomMaterial_1", Times: 29655, Quantity: 3619, StartTime: 1577174400000, EndTime: null.IntFrom(1578340800000)},
+			{StageID: "sub_02-12", ItemID: "30011", Times: 1028653, Quantity: 221852, StartTime: 1556676000000},
+			{StageID: "main_14-02", ItemID: "30011", Times: 32992, Quantity: 48079, StartTime: 1714550400000, EndTime: null.IntFrom(1715716800000)},
+			{StageID: "recruit", ItemID: "recruit_tag_senior_operator", Times: 1224363319, Quantity: 1977025, StartTime: 1660593600000},
 		}, lastModified),
 	}
 }
