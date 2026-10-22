@@ -83,9 +83,44 @@ func exportMonth(ctx context.Context, opts Options, month Month, dir string, che
 	return entry, nil
 }
 
-// writeMonth writes the month's files from the tables r and e (see loadSource) below dir. check, if not nil, sees
-// the statistics of r and e before anything is written; an error from it is returned.
+// writeMonth writes the month's files from the tables r and e (see loadSource) below dir, replacing the previous
+// ones (see stageMonth). check, if not nil, sees the statistics of r and e before anything is written; an error from
+// it is returned.
 func (j *job) writeMonth(ctx context.Context, month Month, dir string, recruitStageID int, check func(MonthStats) error) (*MonthEntry, error) {
+	s, err := j.stageMonth(ctx, month, dir, recruitStageID, check)
+	if err != nil {
+		return nil, err
+	}
+	defer s.remove()
+	for _, kind := range Kinds {
+		if err := os.Rename(s.tmp[kind], filepath.Join(dir, filepath.FromSlash(FilePath(kind, month.Key)))); err != nil {
+			return nil, errors.Wrap(err, "coldstore: rename")
+		}
+	}
+	if err := syncDir(dir, s.entry.Files); err != nil {
+		return nil, err
+	}
+	return s.entry, nil
+}
+
+// stagedMonth is a month's files written and checked at temporary names next to their final paths, and the
+// month's entry that describes them.
+type stagedMonth struct {
+	entry *MonthEntry
+	tmp   monthFiles
+}
+
+// remove removes the temporary files that are left.
+func (s *stagedMonth) remove() {
+	for _, f := range s.tmp {
+		_ = os.Remove(f)
+	}
+}
+
+// stageMonth writes the month's files from the tables r and e below dir, at temporary names next to their final
+// paths, reads them back and checks them against r and e. Moving them into place is up to the caller, as is
+// removing them (stagedMonth.remove); on error, nothing is left. check is writeMonth's.
+func (j *job) stageMonth(ctx context.Context, month Month, dir string, recruitStageID int, check func(MonthStats) error) (_ *stagedMonth, err error) {
 	src, err := j.sourceStats(ctx, recruitStageID)
 	if err != nil {
 		return nil, err
@@ -96,21 +131,23 @@ func (j *job) writeMonth(ctx context.Context, month Month, dir string, recruitSt
 		}
 	}
 
-	tmp, final := monthFiles{}, monthFiles{}
+	tmp := monthFiles{}
 	suffix, err := tmpSuffix()
 	if err != nil {
 		return nil, err
 	}
 	for _, kind := range Kinds {
-		final[kind] = filepath.Join(dir, filepath.FromSlash(FilePath(kind, month.Key)))
-		tmp[kind] = final[kind] + suffix
-		if err := os.MkdirAll(filepath.Dir(final[kind]), 0o755); err != nil {
+		final := filepath.Join(dir, filepath.FromSlash(FilePath(kind, month.Key)))
+		tmp[kind] = final + suffix
+		if err := os.MkdirAll(filepath.Dir(final), 0o755); err != nil {
 			return nil, errors.Wrap(err, "coldstore: create directory")
 		}
 	}
 	defer func() {
-		for _, f := range tmp {
-			_ = os.Remove(f)
+		if err != nil {
+			for _, f := range tmp {
+				_ = os.Remove(f)
+			}
 		}
 	}()
 
@@ -173,15 +210,7 @@ func (j *job) writeMonth(ctx context.Context, month Month, dir string, recruitSt
 		}
 		entry.Files = append(entry.Files, fe)
 	}
-	for _, kind := range Kinds {
-		if err := os.Rename(tmp[kind], final[kind]); err != nil {
-			return nil, errors.Wrap(err, "coldstore: rename")
-		}
-	}
-	if err := syncDir(dir, entry.Files); err != nil {
-		return nil, err
-	}
-	return entry, nil
+	return &stagedMonth{entry: entry, tmp: tmp}, nil
 }
 
 // checkFiles reads a month's files back and compares them with the source, and the rollup with the reports.

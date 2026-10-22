@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -305,6 +306,14 @@ func RebuildManifest(ctx context.Context, opts Options, dir string, force bool) 
 		return nil, err
 	}
 	defer unlock()
+	// a month whose patch stopped partway has files of two generations
+	pending, err := journalMonths(dir)
+	if err != nil {
+		return nil, err
+	}
+	if len(pending) > 0 {
+		return nil, fmt.Errorf("coldstore: a patch of %s stopped partway: run coldstore-recover first", strings.Join(pending, ", "))
+	}
 
 	m, err := buildManifest(ctx, opts, dir, months)
 	if err != nil {
