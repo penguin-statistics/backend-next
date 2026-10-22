@@ -2,12 +2,16 @@ package reportwkr
 
 import (
 	"context"
+	"encoding/binary"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/goccy/go-json"
 	"github.com/nats-io/nats.go"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -36,10 +40,15 @@ func recordSpans(t *testing.T) *tracetest.SpanRecorder {
 
 // The consumer span of a task continues the trace of its publisher, whose trace context the task carries in its
 // headers (service.Report sets it, from its publish span): it is that span's child, sampled as it is, and the task is
-// processed under it. A task without one, as published before the publisher set it, starts a trace of its own.
+// processed under it, and its line in the logs carries the ids of that span. A task without one, as published before
+// the publisher set it, starts a trace of its own.
 func TestConsumeContinuesThePublishersTrace(t *testing.T) {
 	s := newTestStream(t)
 	recorder := recordSpans(t)
+	var logs lockedBuffer
+	prev := log.Logger
+	log.Logger = zerolog.New(&logs)
+	t.Cleanup(func() { log.Logger = prev })
 
 	w := newWorker(WorkerDeps{}, s.consumerConfig())
 	w.NatsJS = s.js
@@ -111,6 +120,35 @@ func TestConsumeContinuesThePublishersTrace(t *testing.T) {
 	if got := handled["not-sampled"]; got.TraceID() != traceID || got.IsSampled() {
 		t.Errorf("not sampled task processed under %v, want the publisher's trace, not sampled", got)
 	}
+	// the line of each processed task links to its trace if it is sampled: the ids of its consumer span, as Datadog
+	// correlates logs and traces
+	processed := map[string]map[string]any{}
+	for _, entry := range logEntries(t, &logs, "reportwkr.processed") {
+		processed[entry["taskId"].(string)] = entry
+	}
+	for _, taskId := range []string{"traced", "untraced"} {
+		span, ok := spans[taskId]
+		if !ok {
+			continue
+		}
+		tid, sid := span.SpanContext().TraceID(), span.SpanContext().SpanID()
+		entry := processed[taskId]
+		if got, want := entry["dd.trace_id"], strconv.FormatUint(binary.BigEndian.Uint64(tid[8:]), 10); got != want {
+			t.Errorf("%s logged with dd.trace_id %v, want %s", taskId, got, want)
+		}
+		if got, want := entry["dd.span_id"], strconv.FormatUint(binary.BigEndian.Uint64(sid[:]), 10); got != want {
+			t.Errorf("%s logged with dd.span_id %v, want %s", taskId, got, want)
+		}
+	}
+	if got := processed["traced"]["dd.trace_id"]; got != "5474458728733560230" {
+		t.Errorf("traced task logged with dd.trace_id %v, want the publisher's 4bf92f3577b34da6 in decimal", got)
+	}
+	if entry, ok := processed["not-sampled"]; !ok {
+		t.Error("the task not sampled was not logged as processed")
+	} else if _, ok := entry["dd.trace_id"]; ok {
+		t.Errorf("the task not sampled logged with %v, want no trace id", entry)
+	}
+
 	if span, ok := spans["untraced"]; !ok {
 		t.Error("no consumer span of the task published without trace context")
 	} else if span.Parent().IsValid() || span.SpanContext().TraceID() == traceID {

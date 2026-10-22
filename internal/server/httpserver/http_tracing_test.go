@@ -1,12 +1,18 @@
 package httpserver
 
 import (
+	"bytes"
+	"encoding/binary"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
@@ -170,4 +176,68 @@ func containsFold(values []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// The request log of a sampled request carries the ids of its server span as Datadog correlates logs and traces
+// (dd.trace_id: the lower 64 bits of the trace id, dd.span_id, in decimal), so that the log links to the trace. A request
+// not sampled logs none: its trace is not exported.
+func TestRequestLogCarriesTraceIDs(t *testing.T) {
+	var logs bytes.Buffer
+	prev := log.Logger
+	log.Logger = zerolog.New(&logs)
+	t.Cleanup(func() { log.Logger = prev })
+
+	requestLog := func(t *testing.T) map[string]any {
+		t.Helper()
+		var m map[string]any
+		for _, line := range bytes.Split(bytes.TrimSpace(logs.Bytes()), []byte("\n")) {
+			var entry map[string]any
+			if err := json.Unmarshal(line, &entry); err != nil {
+				t.Fatal(err)
+			}
+			if entry["evt.name"] == "http.request" {
+				m = entry
+			}
+		}
+		if m == nil {
+			t.Fatalf("no request log in %s", logs.String())
+		}
+		return m
+	}
+
+	t.Run("sampled", func(t *testing.T) {
+		logs.Reset()
+		app, recorder := newTracedServiceApp(t, 0)
+		req := httptest.NewRequest(http.MethodGet, "/items", nil)
+		req.Header.Set("traceparent", "00-00000000000000008448eb211c80319c-b7ad6b7169203331-01")
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+
+		span := serverSpan(t, recorder)
+		m := requestLog(t)
+		if got, want := m["dd.trace_id"], "9532127138774266268"; got != want {
+			t.Errorf("dd.trace_id = %v, want %s, the trace id 8448eb211c80319c in decimal", got, want)
+		}
+		sid := span.SpanContext().SpanID()
+		if got, want := m["dd.span_id"], strconv.FormatUint(binary.BigEndian.Uint64(sid[:]), 10); got != want {
+			t.Errorf("dd.span_id = %v, want the server span's %s", got, want)
+		}
+	})
+
+	t.Run("not sampled", func(t *testing.T) {
+		logs.Reset()
+		app, _ := newTracedServiceApp(t, 0)
+		resp, err := app.Test(httptest.NewRequest(http.MethodGet, "/items", nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		m := requestLog(t)
+		if _, ok := m["dd.trace_id"]; ok {
+			t.Errorf("request log %v, want no trace id of a request not sampled", m)
+		}
+	})
 }
