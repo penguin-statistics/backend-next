@@ -37,8 +37,9 @@ const (
 const instructions = "Penguin Statistics (penguin-stats.io) publishes crowdsourced Arknights drop statistics: for each " +
 	"game server (CN, US, JP, KR), how often each stage drops each item, from player reports. Find item and stage IDs " +
 	"with search_items and search_stages (any language, aliases, pinyin, codes like 1-7), then get_item_drop_rates " +
-	"(where to farm an item) or get_stage_drops (what a stage drops). get_dataset_info explains the numbers. When you " +
-	"use these numbers, name the server, the data-as-of time and credit Penguin Statistics (penguin-stats.io), CC BY-NC 4.0."
+	"(where to farm an item) or get_stage_drops (what a stage drops); list_events lists the events open now. " +
+	"get_dataset_info explains the numbers. When you use these numbers, name the server, the data-as-of time and " +
+	"credit Penguin Statistics (penguin-stats.io), CC BY-NC 4.0."
 
 // listTTL is how long clients may keep the list of the tools, which only a release changes
 const listTTL = time.Hour
@@ -61,6 +62,7 @@ func (t *tools) register(r *registry) {
 	add(r, searchStagesTool(), t.searchStages)
 	add(r, getItemDropRatesTool(), t.getItemDropRates)
 	add(r, getStageDropsTool(), t.getStageDrops)
+	add(r, listEventsTool(), t.listEvents)
 }
 
 // registry adds the tools to a server and keeps their names, the values of the tool label of the metrics.
