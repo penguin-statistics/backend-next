@@ -169,6 +169,10 @@ func TestGetItemDropRatesByName(t *testing.T) {
 			t.Errorf("%s: item %+v", id, out.Item)
 		}
 	}
+	// an ID given as a number, as models do
+	if out, _ := getItemDropRates(t, app, `{"item_id":30012}`); out.Item.ItemID != "30012" {
+		t.Errorf("30012 as a number: item %+v", out.Item)
+	}
 	for _, tc := range []struct{ id, want string }{
 		{"石头", `item_id "石头" is the name or alias of 4 items: 30011 (Orirock); 30012 (Orirock Cube); 30013 (Orirock Cluster); ` +
 			`30014 (Orirock Concentration). Ask the user which one is meant, or pick by context, and pass its item ID`},
