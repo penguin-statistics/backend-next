@@ -132,6 +132,17 @@ type ConfigSpec struct {
 	// WorkerEnabled is a flag to indicate whether to enable the worker.
 	WorkerEnabled bool `split_words:"true"`
 
+	// ReportWorkerEnabled runs the report worker (reportwkr), which consumes the report tasks of NATS and stores
+	// them in the database. It is separate from WorkerEnabled, which runs calcwkr. When false, the HTTP API still
+	// accepts reports and publishes them to the penguin-reports stream, a work queue without MaxAge, where they wait
+	// until a report worker runs again: the maintenance window of #752 turns it off to stop the report writes to the
+	// database. The intake still writes one row itself: a report without a known PenguinID (a client's first report)
+	// creates its account first. While the database is read-only in that window, those reports fail with an error
+	// and are not queued; the reports of existing accounts are queued and none is lost. A recall writes too: it
+	// fails for reports stored before the window, and answers not found for queued ones (the worker sets the recall
+	// key only when it stores a report).
+	ReportWorkerEnabled bool `split_words:"true" default:"true"`
+
 	// AdminKey is the key used to authenticate the admin API.
 	AdminKey string `split_words:"true"`
 
