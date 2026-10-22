@@ -36,6 +36,10 @@ import (
 
 var tracer = otel.Tracer("reportwkr")
 
+// rawTaskKey is the context key of the report task as published (a pointer to the message data, which a context
+// holds without an allocation), which process logs rather than encoding the decoded task again
+type rawTaskKey struct{}
+
 type WorkerDeps struct {
 	fx.In
 	DB                     *bun.DB
@@ -405,7 +409,7 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 				semconv.MessagingMessagePayloadSizeBytesKey.Int(len(msg.Data)),
 			))
 
-	err = w.handle(taskCtx, reportTask)
+	err = w.handle(context.WithValue(taskCtx, rawTaskKey{}, &msg.Data), reportTask)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -419,7 +423,7 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 		log.Info().
 			Str("evt.name", "reportwkr.processed").
 			Str("taskId", reportTask.TaskID).
-			Interface("task", reportTask).
+			RawJSON("task", msg.Data).
 			Dur("duration", time.Since(start)).
 			Msg("report task processed successfully")
 
@@ -596,9 +600,13 @@ func term(msg *nats.Msg) {
 }
 
 func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) error {
-	L := log.With().
-		Interface("task", reportTask).
-		Logger()
+	lc := log.With()
+	if raw, ok := ctx.Value(rawTaskKey{}).(*[]byte); ok {
+		lc = lc.RawJSON("task", *raw)
+	} else {
+		lc = lc.Interface("task", reportTask)
+	}
+	L := lc.Logger()
 
 	L.Info().
 		Str("evt.name", "reportwkr.received").
