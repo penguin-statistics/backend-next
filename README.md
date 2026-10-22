@@ -60,6 +60,49 @@ A task that moved after failing at each delivery may have been stored by one of 
 (for example the connection dropped during the commit); check `drop_reports` for its account and time before replaying
 it.
 
+## Benchmarks
+
+### Report consumer CPU
+
+`internal/workers/reportwkr/consumerbench_test.go` (build tag `consumerbench`) drives the report consumer through its
+real code path: each task is published to a JetStream stream of its own, fetched and handed to
+`Worker.ingestPreprocess` (`BenchmarkConsumer/ingest`), which stores it in PostgreSQL and sets its recall key in Redis,
+with logging and tracing configured as in production. `BenchmarkConsumer/process` runs `Worker.process` alone. Besides
+wall time and allocations it reports, per task, the CPU time of the process (`cpu-ns/op`, user + system from
+`getrusage`, which a shared machine disturbs far less than the wall time) and the time spent waiting on PostgreSQL
+(`pg-wait-ns/op`, `pg-wait-%`) and Redis.
+
+The tasks (`internal/workers/reportwkr/testdata/consumerbench/tasks.jsonl.gz`) are encoded as the report handler
+publishes them, drawn from the stages, servers, times, sources, versions and drop patterns of recent production reports,
+with synthetic accounts, IPs and task ids.
+
+It needs a scratch database, Redis and NATS with JetStream. The scratch database holds the schema and the reference
+tables of a restore of production (`penguinprod`, only read) and synthetic accounts; the benchmark truncates its
+`drop_reports` and `drop_report_extras`:
+
+```sh
+scripts/consumerbench/setup-db.sh   # creates penguin_cpubench and the role cpubench on 127.0.0.1:5434
+# regenerate the tasks, if needed: CONSUMERBENCH_TASKS, CONSUMERBENCH_BATCH_PERMILLE, CONSUMERBENCH_SEED
+CONSUMERBENCH_GENERATE=1 go test -tags consumerbench -run TestConsumerBenchGenerate ./internal/workers/reportwkr/
+```
+
+The defaults point at `penguin_cpubench` on 127.0.0.1:5434, Redis DB 14 on 127.0.0.1:16379 and NATS on 127.0.0.1:4222
+(`CONSUMERBENCH_POSTGRES_DSN`, `CONSUMERBENCH_REDIS_URL`, `CONSUMERBENCH_NATS_URL`). Then:
+
+```sh
+# one run
+go test -tags consumerbench -run '^$' -bench BenchmarkConsumer -benchtime 2000x ./internal/workers/reportwkr/
+# interleaved runs of variants, compared with benchstat: logging to a counting io.Discard (prod), to /dev/null
+# (devnull), disabled (logoff); tracing as in production at 10% (prod), off (traceoff), at 100% (trace1); both off (off)
+COUNT=10 scripts/consumerbench/run.sh bench prod logoff traceoff off devnull trace1
+# CPU and allocation profiles of the ingestion, the top functions and the share of each part of the consumer
+scripts/consumerbench/run.sh profile prod
+```
+
+Outputs go to `$OUT` (default a new temporary directory). Each run logs the load average and the queries other sessions
+had active on the cluster to `$OUT/runs.log`. The PostgreSQL connection runs over loopback, where a write system call
+also does the receiving side's TCP work, so the system calls weigh more than against a remote server.
+
 ## Maintainers
 
 This project has mainly being maintained by the following contributors (in alphabetical order):
