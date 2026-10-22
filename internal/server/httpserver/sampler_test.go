@@ -2,10 +2,22 @@ package httpserver
 
 import (
 	"context"
+	"encoding/binary"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/gofiber/fiber/v2"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	"go.opentelemetry.io/otel/trace"
+
+	"exusiai.dev/backend-next/internal/app/appconfig"
 )
 
 func TestAlwaysSampleNamePrefix(t *testing.T) {
@@ -54,3 +66,142 @@ func (r spanNameRecorder) OnEnd(s tracesdk.ReadOnlySpan) {
 }
 func (r spanNameRecorder) Shutdown(context.Context) error   { return nil }
 func (r spanNameRecorder) ForceFlush(context.Context) error { return nil }
+
+// fakeClock is a clock that moves only when told to.
+type fakeClock struct{ t time.Time }
+
+func (c *fakeClock) now() time.Time { return c.t }
+
+// A request to a path other than the report submission and the probes is sampled whatever the rate, up to the limit
+// per second; the report submission, the probes and any span that is not a request's are left to the rate.
+func TestLowVolumeRouteSampler(t *testing.T) {
+	clock := &fakeClock{t: time.Unix(1760000000, 0)}
+	sampler := lowVolumeRouteSampler{fallback: tracesdk.TraceIDRatioBased(0), limiter: newTokenBucket(2, clock.now)}
+	sampled := func(kind trace.SpanKind, method, path string) bool {
+		var traceID trace.TraceID
+		traceID[15] = 1
+		return sampler.ShouldSample(tracesdk.SamplingParameters{
+			TraceID:    traceID,
+			Name:       path,
+			Kind:       kind,
+			Attributes: []attribute.KeyValue{semconv.HTTPSchemeHTTP, semconv.HTTPMethodKey.String(method)},
+		}).Decision == tracesdk.RecordAndSample
+	}
+
+	for _, tt := range []struct {
+		kind         trace.SpanKind
+		method, path string
+	}{
+		{trace.SpanKindServer, "POST", "/PenguinStats/api/v2/report"},
+		{trace.SpanKindServer, "POST", "/penguinstats/api/v2/report/"},
+		{trace.SpanKindServer, "GET", "/api/_/health"},
+		{trace.SpanKindServer, "GET", "/metrics"},
+		{trace.SpanKindServer, "HEAD", "/api/_/ping"},
+		{trace.SpanKindConsumer, "", "reportwkr.ConsumeTask"},
+		{trace.SpanKindClient, "", ""},
+	} {
+		if sampled(tt.kind, tt.method, tt.path) {
+			t.Errorf("%v %s %s sampled, want it left to the rate (0)", tt.kind, tt.method, tt.path)
+		}
+	}
+
+	// the limit: 2 per second
+	if !sampled(trace.SpanKindServer, "GET", "/PenguinStats/api/v2/stages") || !sampled(trace.SpanKindServer, "POST", "/PenguinStats/api/v2/report/recognition") {
+		t.Error("requests to low-volume routes not sampled")
+	}
+	if sampled(trace.SpanKindServer, "GET", "/zh/result/stage/main/main_01-07") {
+		t.Error("third request within a second sampled, over the limit of 2")
+	}
+	clock.t = clock.t.Add(500 * time.Millisecond)
+	if !sampled(trace.SpanKindServer, "GET", "/zh/result/stage/main/main_01-07") {
+		t.Error("request half a second later not sampled: a token is back")
+	}
+	if sampled(trace.SpanKindServer, "GET", "/zh/result/stage/main/main_01-07") {
+		t.Error("second request half a second later sampled, over the limit")
+	}
+	clock.t = clock.t.Add(time.Hour)
+	for i := 0; i < 2; i++ {
+		if !sampled(trace.SpanKindServer, "GET", "/sitemap.xml") {
+			t.Errorf("request %d after a quiet hour not sampled", i)
+		}
+	}
+	if sampled(trace.SpanKindServer, "GET", "/sitemap.xml") {
+		t.Error("the burst after a quiet hour exceeds the limit of a second")
+	}
+}
+
+// Through the middleware chain at rate 0: a read of the API is traced, the report submission is not.
+func TestServiceAppSamplesTheLowVolumeRoutes(t *testing.T) {
+	conf := &appconfig.Config{}
+	conf.CORSCredentialedOrigins = defaultCredentialedOrigins(t)
+	conf.TracingSampleRate = 0
+	conf.TracingLowVolumeTracesPerSecond = 10
+	app := CreateServiceApp(conf)
+	app.Get("/items", func(c *fiber.Ctx) error { return c.SendString("[]") })
+	app.Post("/PenguinStats/api/v2/report", func(c *fiber.Ctx) error { return c.SendString("{}") })
+	provider := otel.GetTracerProvider().(*tracesdk.TracerProvider)
+	recorder := tracetest.NewSpanRecorder()
+	provider.RegisterSpanProcessor(recorder)
+
+	for _, req := range []*http.Request{
+		httptest.NewRequest(http.MethodPost, "/PenguinStats/api/v2/report", strings.NewReader("{}")),
+		httptest.NewRequest(http.MethodGet, "/items", nil),
+	} {
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+	spans := recorder.Ended()
+	if len(spans) != 1 || spans[0].Name() != "/items" {
+		names := make([]string, len(spans))
+		for i, s := range spans {
+			names[i] = s.Name()
+		}
+		t.Errorf("sampled %v, want the read of /items only", names)
+	}
+}
+
+// Over the limit, a request is sampled at the rate, as every request was before: the limit bounds what the sampler
+// adds, it never samples a request less than before.
+func TestLowVolumeRouteSamplerFallsBackToTheRateOverTheLimit(t *testing.T) {
+	clock := &fakeClock{t: time.Unix(1760000000, 0)}
+	sampler := lowVolumeRouteSampler{fallback: tracesdk.TraceIDRatioBased(0.5), limiter: newTokenBucket(1, clock.now)}
+	sampled := 0
+	for i := 0; i < 1000; i++ {
+		var traceID trace.TraceID
+		binary.BigEndian.PutUint64(traceID[8:], uint64(i)*0x9e3779b97f4a7c15)
+		if sampler.ShouldSample(tracesdk.SamplingParameters{
+			TraceID: traceID, Name: "/PenguinStats/api/v2/stages", Kind: trace.SpanKindServer,
+			Attributes: []attribute.KeyValue{semconv.HTTPMethodKey.String("GET")},
+		}).Decision == tracesdk.RecordAndSample {
+			sampled++
+		}
+	}
+	// 1 by the limit, about half of the other 999 by the rate
+	if sampled < 400 || sampled > 600 {
+		t.Errorf("sampled %d of 1000 requests in one instant, want 1 + about half of the rest (rate 0.5)", sampled)
+	}
+}
+
+// A limit below one per second still samples: one request, then one every 1/perSecond seconds.
+func TestTokenBucketFractionalRate(t *testing.T) {
+	clock := &fakeClock{t: time.Unix(1760000000, 0)}
+	b := newTokenBucket(0.5, clock.now)
+	if !b.take() || b.take() {
+		t.Fatal("want one take at start, then none")
+	}
+	clock.t = clock.t.Add(time.Second)
+	if b.take() {
+		t.Error("took after 1 s at 0.5/s")
+	}
+	clock.t = clock.t.Add(time.Second)
+	if !b.take() {
+		t.Error("no take after 2 s at 0.5/s")
+	}
+	clock.t = clock.t.Add(time.Minute)
+	if !b.take() || b.take() {
+		t.Error("want a burst of one after a quiet minute")
+	}
+}
