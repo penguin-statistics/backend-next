@@ -246,6 +246,19 @@ func TestIdempotencyHoldsTheLockForAMinute(t *testing.T) {
 	}
 }
 
+// awaitIdempotencyHandler waits for the first request to enter the handler, failing the test with its response if it
+// answered without entering it (e.g. it could not take the lock), and failing it after 10 s rather than hanging.
+func awaitIdempotencyHandler(t *testing.T, entered <-chan struct{}, firstDone <-chan testIdempotencyResponse) {
+	t.Helper()
+	select {
+	case <-entered:
+	case first := <-firstDone:
+		t.Fatalf("first request answered %d %q without entering the handler", first.status, first.body)
+	case <-time.After(10 * time.Second):
+		t.Fatal("first request did not enter the handler within 10 s")
+	}
+}
+
 // A duplicate that arrives while the first request runs waits for its lock, retrying 4 times 250 ms apart, and
 // answers with the saved response once the first one is done.
 func TestIdempotencyDuplicateWaitsForTheRequestInFlight(t *testing.T) {
@@ -262,9 +275,9 @@ func TestIdempotencyDuplicateWaitsForTheRequestInFlight(t *testing.T) {
 		return c.SendString("first")
 	})
 
-	firstDone := make(chan testIdempotencyResponse)
+	firstDone := make(chan testIdempotencyResponse, 1)
 	go func() { firstDone <- app.post(t, key) }()
-	<-entered
+	awaitIdempotencyHandler(t, entered, firstDone)
 
 	time.AfterFunc(400*time.Millisecond, func() { close(release) })
 	start := time.Now()
@@ -302,9 +315,9 @@ func TestIdempotencyDuplicateFailsWhenTheRequestInFlightTakesTooLong(t *testing.
 	})
 	logs := captureIdempotencyLogs(t, zerolog.InfoLevel)
 
-	firstDone := make(chan testIdempotencyResponse)
+	firstDone := make(chan testIdempotencyResponse, 1)
 	go func() { firstDone <- app.post(t, key) }()
-	<-entered
+	awaitIdempotencyHandler(t, entered, firstDone)
 
 	start := time.Now()
 	second := app.post(t, key)
