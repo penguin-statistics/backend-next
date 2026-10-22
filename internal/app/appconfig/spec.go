@@ -179,6 +179,18 @@ type ConfigSpec struct {
 	// SEOPageMaxAge is the max-age of the stats pages. Pages without data (404s, a matrix not calculated yet) are
 	// cached for a minute at most.
 	SEOPageMaxAge time.Duration `split_words:"true" default:"5m"`
+
+	// MCPEnabled serves a read-only MCP server of the drop data at /mcp (Streamable HTTP, stateless, JSON responses,
+	// no authentication), made of the data of the stats pages, which it loads also while the pages are off. The
+	// ingress has to route /mcp here. When false, /mcp is not routed (404).
+	MCPEnabled bool `split_words:"true" default:"false"`
+
+	// MCPRateLimitMax is how many requests to /mcp a client (an IP, an IPv6 /64) may send per MCPRateLimitWindow to
+	// each replica; past it, it is answered 429 with a Retry-After. Not positive: 120.
+	MCPRateLimitMax int `split_words:"true" default:"120"`
+
+	// MCPRateLimitWindow is the sliding window of MCPRateLimitMax. Not positive: 1m.
+	MCPRateLimitWindow time.Duration `split_words:"true" default:"1m"`
 }
 
 type Config struct {

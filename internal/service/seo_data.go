@@ -68,7 +68,8 @@ func NewSEOData(lc fx.Lifecycle, conf *appconfig.Config, itemService *Item, stag
 		dropMatrixService: dropMatrixService,
 		matrices:          make(map[string]*seoMatrixMemo),
 	}
-	if conf.SEOPagesEnabled {
+	// the stats pages and the MCP server are made of the same data
+	if conf.SEOPagesEnabled || conf.MCPEnabled {
 		ctx, cancel := context.WithCancel(context.Background())
 		lc.Append(fx.Hook{
 			OnStart: func(context.Context) error {
