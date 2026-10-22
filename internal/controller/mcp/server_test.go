@@ -71,11 +71,15 @@ func TestInitialize(t *testing.T) {
 	if n := len(res.Instructions); n > 600 || !strings.Contains(res.Instructions, "CC BY-NC 4.0") {
 		t.Errorf("instructions (%d bytes): %s", n, res.Instructions)
 	}
+	for _, tool := range []string{"get_dataset_info"} {
+		if !strings.Contains(res.Instructions, tool) {
+			t.Errorf("instructions lack %s: %s", tool, res.Instructions)
+		}
+	}
 }
 
 func TestToolsList(t *testing.T) {
-	r, app := testServer(&fakeData{})
-	addProbe(r)
+	_, app := testServer(&fakeData{})
 	resp, b := post(t, app, `{"jsonrpc":"2.0","id":2,"method":"tools/list"}`, "Mcp-Protocol-Version", legacyVersion)
 	if resp.StatusCode != fiber.StatusOK {
 		t.Fatalf("status %d: %s", resp.StatusCode, b)
@@ -102,7 +106,7 @@ func TestToolsList(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	// meta#20: the order of tools/list is fixed (the SDK sorts it by name)
-	if !slices.Equal(names, []string{"probe"}) {
+	if !slices.Equal(names, []string{"get_dataset_info"}) {
 		t.Errorf("tools %q", names)
 	}
 	for _, tool := range res.Tools {
@@ -708,8 +712,18 @@ func TestRegister(t *testing.T) {
 			data := service.NewSEOData(lc, &appconfig.Config{}, nil, nil, nil, nil)
 			app := fiber.New()
 			Register(app, &appconfig.Config{ConfigSpec: appconfig.ConfigSpec{MCPEnabled: tc.enabled, SEOSiteURL: site}}, data)
-			if resp, b := post(t, app, initialize); resp.StatusCode != tc.status {
-				t.Errorf("status %d, want %d: %s", resp.StatusCode, tc.status, b)
+			resp, b := post(t, app, initialize)
+			if resp.StatusCode != tc.status {
+				t.Fatalf("status %d, want %d: %s", resp.StatusCode, tc.status, b)
+			}
+			if !tc.enabled {
+				return
+			}
+			// right after a start: nothing loaded, which the info tells
+			res := callTool(t, app, "get_dataset_info", `{}`)
+			var out datasetInfo
+			if err := json.Unmarshal(res.StructuredContent, &out); err != nil || res.IsError || out.Servers[0].MatrixAvailable {
+				t.Errorf("info %s %v", res.StructuredContent, err)
 			}
 		})
 	}

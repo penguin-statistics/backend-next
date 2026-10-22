@@ -17,7 +17,9 @@ import (
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+	"gopkg.in/guregu/null.v3"
 
+	"exusiai.dev/backend-next/internal/model"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/service"
 )
@@ -33,6 +35,41 @@ type fakeData struct {
 
 func (d *fakeData) Catalog() *service.SEOCatalog            { return d.catalog }
 func (d *fakeData) Matrix(server string) *service.SEOMatrix { return d.matrices[server] }
+
+func i18n(zh, en, ja, ko string) []byte {
+	b, _ := json.Marshal(map[string]string{"zh": zh, "en": en, "ja": ja, "ko": ko})
+	return b
+}
+
+func existence(servers ...string) []byte {
+	m := map[string]map[string]any{}
+	for _, s := range []string{"CN", "US", "JP", "KR"} {
+		m[s] = map[string]any{"exist": false}
+	}
+	for _, s := range servers {
+		m[s] = map[string]any{"exist": true, "openTime": 1556676000000}
+	}
+	b, _ := json.Marshal(m)
+	return b
+}
+
+var all = []string{"CN", "US", "JP", "KR"}
+
+func testCatalog() *service.SEOCatalog {
+	return service.NewSEOCatalog(
+		[]*model.Item{
+			{ArkItemID: "30011", Type: "MATERIAL", SortID: 1, Name: i18n("源岩", "Orirock", "源岩", "원암"), Existence: existence(all...)},
+			{ArkItemID: "30012", Type: "MATERIAL", SortID: 2, Rarity: 1, Name: i18n("固源岩", "Orirock Cube", "初級源岩", "원암 큐브"), Existence: existence(all...),
+				Keywords: []byte("{\"alias\":{\"zh\":[\"石头\",\"土块\"]},\"pron\":{\"zh\":[\"shi`tou\",\"tu`kuai\"]}}")},
+		},
+		[]*model.Stage{
+			{ArkStageID: "main_01-07", StageID: 1, ZoneID: 1, StageType: "MAIN", Code: i18n("1-7", "1-7", "1-7", "1-7"), Sanity: null.IntFrom(6), Existence: existence(all...)},
+		},
+		[]*model.Zone{
+			{ArkZoneID: "main_1", ZoneID: 1, Index: 1, Category: "MAINLINE", Name: i18n("黑暗时代·上", "Evil Time Part 1", "暗黒時代・上", "암흑시대・상"), Existence: existence(all...)},
+		},
+	)
+}
 
 func testMatrices() map[string]*service.SEOMatrix {
 	return map[string]*service.SEOMatrix{
