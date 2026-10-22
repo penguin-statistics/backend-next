@@ -444,6 +444,20 @@ func TestSitemapNotModifiedAfterAChangeInTheSameSecond(t *testing.T) {
 	if r := e.getWith(t, "/sitemap.xml", since("Wed, 21 Oct 2026 10:30:03 GMT")); r.status != 304 {
 		t.Errorf("unchanged index: status %d", r.status)
 	}
+
+	// after a start, a matrix seen first without a time (read between its time and its rows at its first
+	// publication), then with one in the second of the index: the index lists its lastmod from then on
+	start := newTestEnv(t)
+	warmAll(start)
+	start.data.matrices["JP"] = service.NewSEOMatrix("JP", nil, time.Time{})
+	index = start.get(t, "/sitemap.xml")
+	if lm := index.header.Get("Last-Modified"); lm != "Wed, 21 Oct 2026 10:30:00 GMT" {
+		t.Fatalf("index with a matrix without a time: Last-Modified %q", lm)
+	}
+	start.data.matrices["JP"] = service.NewSEOMatrix("JP", nil, lastModified.Add(300*time.Millisecond))
+	if r := start.getWith(t, "/sitemap.xml", since(index.header.Get("Last-Modified"))); r.status != 200 || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 10:30:01 GMT" {
+		t.Errorf("index after the matrix got a time: status %d, Last-Modified %q", r.status, r.header.Get("Last-Modified"))
+	}
 }
 
 func TestSitemapLastModifiedNotLaterThanDate(t *testing.T) {

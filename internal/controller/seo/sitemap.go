@@ -125,9 +125,10 @@ func routable(path string, kind pageKind) bool {
 func (h *Handler) buildSitemap(k sitemapKey, catalog *service.SEOCatalog, matrix *service.SEOMatrix) *sitemapEntry {
 	b := &builder{site: h.site, t: textsByLang[k.lang], r: route{lang: k.lang, server: k.server}, catalog: catalog, matrix: matrix}
 	e := &sitemapEntry{catalog: catalog, matrix: matrix}
-	if !matrix.LastModified.IsZero() {
+	// given a time even without one, so that the time it is published with is given a later second: the index of the
+	// sitemaps lists its lastmod from then on
+	if e.lastModified = h.stamps.at(matrixSlot{server: k.server}, matrix, matrix.LastModified); !e.lastModified.IsZero() {
 		// the catalog changes the sitemap too, when a stage is added or moved to another zone
-		e.lastModified = h.stamps.at(matrixSlot{server: k.server}, matrix, matrix.LastModified)
 		if at := h.stamps.at(catalogSlot{}, catalog, catalog.ChangedAt); at.After(e.lastModified) {
 			e.lastModified = at
 		}
