@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"golang.org/x/mod/semver"
 
+	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/types"
 )
 
@@ -63,9 +64,14 @@ func (ReportContext) SemVerCompare(a, b string) int {
 }
 
 // rejectRuleReliability returns the reliability of the first active reject rule the report matches, by rule id, with
-// the message "reject rule <id> matched", or 0 if it matches none. A rule whose reliability is out of range, or that fails to evaluate, is skipped.
+// the message "reject rule <id> matched", or 0 if it matches none. The rules are those read up to cacheTTL ago. A rule
+// whose reliability is out of range, or that fails to evaluate, is skipped.
 func (v *Verifier) rejectRuleReliability(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) (int, string, error) {
-	rejectRules, err := v.RejectRuleRepo.GetAllActiveRejectRules(ctx)
+	now := v.clock()
+	rejectRules, err := v.rejectRules.get(ctx, now, struct{}{}, func() ([]*model.RejectRule, time.Time, error) {
+		rules, err := v.RejectRuleRepo.GetAllActiveRejectRules(ctx)
+		return rules, now.Add(cacheTTL), err
+	})
 	if err != nil {
 		return 0, "", errors.Wrap(err, "failed to get reject rules")
 	}
