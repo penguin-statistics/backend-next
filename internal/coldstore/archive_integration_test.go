@@ -1045,61 +1045,89 @@ func waitForLockWait(ctx context.Context, db *sql.DB, rel, mode string) error {
 
 // A late report of the month with a new pattern can come in after the drop pattern elements were exported and before
 // the month is: the month is tried again, and published only with drop pattern elements that hold the new pattern.
+// The pattern's elements can also have a smaller element_id than elements committed before the export (the sequence
+// does not order commits).
 func TestArchiveLatePatternReachesDims(t *testing.T) {
 	ctx := context.Background()
 	d := newTestData()
-	opts, db := newTestNewDB(t, d, "2026-08", "2026-09")
-	b := newFakeBucket()
-	now := time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
-	a := newTestArchiver(t, opts, db, b, &now, "2026-07")
-	if _, err := CreatePartitions(ctx, db, now, time.Second); err != nil {
-		t.Fatal(err)
-	}
-	// the month's lock is held when the run gets to it, after the drop pattern elements were exported: the pattern
-	// and its report come then
-	unlock, err := lockTarget(a.opts.Dir, MonthTarget("2026-08"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	inserted := errors.New("the run did not wait for the month's lock")
-	testHookLockWait = func(target string) {
-		if target != MonthTarget("2026-08") {
-			return
-		}
-		testHookLockWait = nil
-		_, inserted = db.ExecContext(ctx, `WITH p AS (
-				INSERT INTO drop_pattern_elements (drop_pattern_id, item_id, quantity) VALUES (1000, 7, 2) RETURNING drop_pattern_id)
-			INSERT INTO drop_reports (report_id, stage_id, pattern_id, times, created_at, reliability, server, account_id)
-			SELECT 9000001, 1, drop_pattern_id, 1, '2026-08-15', 0, 'CN', 1 FROM p`)
-		unlock()
-	}
-	t.Cleanup(func() { testHookLockWait = nil })
-	verified := 0
-	setArchiveHook(t, func(month, step string) error {
-		if month == "2026-08" && step == "verified" {
-			verified++
-		}
-		return nil
-	})
+	for _, reserved := range []bool{false, true} {
+		t.Run(map[bool]string{false: "pattern after the export", true: "element_id reserved before the export"}[reserved], func(t *testing.T) {
+			opts, db := newTestNewDB(t, d, "2026-08", "2026-09")
+			b := newFakeBucket()
+			now := time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
+			a := newTestArchiver(t, opts, db, b, &now, "2026-07")
+			if _, err := CreatePartitions(ctx, db, now, time.Second); err != nil {
+				t.Fatal(err)
+			}
+			// late is the transaction of the late report, which stores its new pattern's elements first
+			late, err := db.BeginTx(ctx, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer late.Rollback() //nolint:errcheck
+			const element = `INSERT INTO drop_pattern_elements (drop_pattern_id, item_id, quantity) VALUES ($1, 7, 2)`
+			if reserved {
+				// its element takes an element_id before another pattern's, which commits (and is exported) first
+				if _, err := late.ExecContext(ctx, element, 1000); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := db.ExecContext(ctx, element, 1001); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// the month's lock is held when the run gets to it, after the drop pattern elements were exported: the
+			// report comes then
+			unlock, err := lockTarget(a.opts.Dir, MonthTarget("2026-08"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			inserted := errors.New("the run did not wait for the month's lock")
+			testHookLockWait = func(target string) {
+				if target != MonthTarget("2026-08") {
+					return
+				}
+				testHookLockWait = nil
+				defer unlock()
+				if !reserved {
+					if _, inserted = late.ExecContext(ctx, element, 1000); inserted != nil {
+						return
+					}
+				}
+				if _, inserted = late.ExecContext(ctx, `INSERT INTO drop_reports (report_id, stage_id, pattern_id, times, created_at, reliability, server, account_id)
+					VALUES (9000001, 1, 1000, 1, '2026-08-15', 0, 'CN', 1)`); inserted != nil {
+					return
+				}
+				inserted = late.Commit()
+			}
+			t.Cleanup(func() { testHookLockWait = nil })
+			verified := 0
+			setArchiveHook(t, func(month, step string) error {
+				if month == "2026-08" && step == "verified" {
+					verified++
+				}
+				return nil
+			})
 
-	res, err := a.Run(ctx)
-	if inserted != nil {
-		t.Fatal(inserted)
-	}
-	if err != nil || strings.Join(res.Pending, " ") != "2026-08" {
-		t.Fatalf("run = %+v, %v", res, err)
-	}
-	if verified != 2 {
-		t.Errorf("2026-08 verified %d times, want 2 (the try with the stale drop pattern elements, then the next)", verified)
-	}
-	r := reader(t)
-	if got := queryStrings(t, r, `SELECT count(*)::VARCHAR FROM read_parquet([`+
-		quote(filepath.Join(a.opts.Dir, DropPatternElementsFile))+`]) WHERE drop_pattern_id = 1000`); got[0] != "1" {
-		t.Errorf("elements of the new pattern in the published drop pattern elements: %s", got[0])
-	}
-	if got := queryStrings(t, r, `SELECT count(*)::VARCHAR FROM read_parquet([`+
-		quote(filepath.Join(a.opts.Dir, FilePath(KindDropReports, "2026-08")))+`]) WHERE pattern_id = 1000`); got[0] != "1" {
-		t.Errorf("reports of the new pattern in the month's file: %s", got[0])
+			res, err := a.Run(ctx)
+			if inserted != nil {
+				t.Fatal(inserted)
+			}
+			if err != nil || strings.Join(res.Pending, " ") != "2026-08" {
+				t.Fatalf("run = %+v, %v", res, err)
+			}
+			if verified != 2 {
+				t.Errorf("2026-08 verified %d times, want 2 (the try with the stale drop pattern elements, then the next)", verified)
+			}
+			r := reader(t)
+			if got := queryStrings(t, r, `SELECT count(*)::VARCHAR FROM read_parquet([`+
+				quote(filepath.Join(a.opts.Dir, DropPatternElementsFile))+`]) WHERE drop_pattern_id = 1000`); got[0] != "1" {
+				t.Errorf("elements of the new pattern in the published drop pattern elements: %s", got[0])
+			}
+			if got := queryStrings(t, r, `SELECT count(*)::VARCHAR FROM read_parquet([`+
+				quote(filepath.Join(a.opts.Dir, FilePath(KindDropReports, "2026-08")))+`]) WHERE pattern_id = 1000`); got[0] != "1" {
+				t.Errorf("reports of the new pattern in the month's file: %s", got[0])
+			}
+		})
 	}
 }
 

@@ -187,38 +187,29 @@ var errStaleDims = errors.New("coldstore: the drop pattern elements do not cover
 // verifyDimsCoverMonth checks that the drop pattern elements file in dir holds every element of the patterns that
 // the reports of the month's files reference, which the cold queries join them with. The file was exported before
 // the month's files: a pattern created in between (by a late or replayed report of the month) is missing from it.
-// The patterns are append-only and a pattern's elements commit with it, before any report of it, and VerifyDims
-// checks the file against PostgreSQL up to its largest element_id: so the elements missing from it are those of
-// PostgreSQL after that element_id, and the month's files must reference none of their patterns. The files must be
-// those of the month in PostgreSQL, with its partitions locked against writes (see Archiver).
+// The elements are compared by element_id, whatever their order: a sequence does not order commits, so an element
+// can commit after the file was exported with a larger element_id (and a pattern of no item has no element). A
+// pattern's elements commit with it, before any report of it. The files must be those of the month in PostgreSQL,
+// with its partitions locked against writes (see Archiver).
 func verifyDimsCoverMonth(ctx context.Context, opts Options, dir string, month Month) error {
 	j, err := newJob(ctx, opts, "dims-cover-"+month.Key, true)
 	if err != nil {
 		return err
 	}
 	defer j.Close()
-	var maxID *int64
-	if err := j.queryRow(ctx, `SELECT max(element_id) FROM read_parquet([`+
-		quote(filepath.Join(dir, filepath.FromSlash(DropPatternElementsFile)))+`])`, &maxID); err != nil {
-		return err
-	}
-	limit := int64(-1)
-	if maxID != nil {
-		limit = *maxID
-	}
-	file := func(kind Kind) string {
-		return quote(filepath.Join(dir, filepath.FromSlash(FilePath(kind, month.Key))))
+	file := func(p string) string {
+		return quote(filepath.Join(dir, filepath.FromSlash(p)))
 	}
 	var missing int64
-	if err := j.queryRow(ctx, `SELECT count(DISTINCT drop_pattern_id)
-		FROM postgres_query('pg', $$SELECT drop_pattern_id FROM drop_pattern_elements WHERE element_id > `+strconv.FormatInt(limit, 10)+`$$)
-		WHERE drop_pattern_id IN (SELECT pattern_id FROM read_parquet([`+file(KindDropReports)+`])
-			UNION ALL SELECT pattern_id FROM read_parquet([`+file(KindRecruit)+`]))`, &missing); err != nil {
+	if err := j.queryRow(ctx, `SELECT count(DISTINCT s.drop_pattern_id)
+		FROM postgres_query('pg', $$SELECT element_id, drop_pattern_id FROM drop_pattern_elements$$) s
+		SEMI JOIN (SELECT pattern_id FROM read_parquet([`+file(FilePath(KindDropReports, month.Key))+`])
+			UNION ALL SELECT pattern_id FROM read_parquet([`+file(FilePath(KindRecruit, month.Key))+`])) r ON r.pattern_id = s.drop_pattern_id
+		ANTI JOIN read_parquet([`+file(DropPatternElementsFile)+`]) f ON f.element_id = s.element_id`, &missing); err != nil {
 		return err
 	}
 	if missing > 0 {
-		return fmt.Errorf("%w: %d patterns of its reports have elements after element_id %d of %s", errStaleDims, missing, limit,
-			DropPatternElementsFile)
+		return fmt.Errorf("%w: %s lacks elements of %d patterns of its reports", errStaleDims, DropPatternElementsFile, missing)
 	}
 	return nil
 }
