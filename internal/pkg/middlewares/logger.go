@@ -102,9 +102,7 @@ func requestLogger() func(ctx *fiber.Ctx) error {
 			Dur("duration", duration).
 			Msg("received request")
 
-		observability.HTTPResponseSize.
-			WithLabelValues(route, ctx.Method(), observability.HTTPStatusClass(status)).
-			Observe(float64(bytesWritten))
+		observability.ObserveHTTPResponse(route, ctx.Method(), status, bytesWritten, duration)
 	})
 }
 
