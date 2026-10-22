@@ -76,10 +76,14 @@ type registry struct {
 	stringArgs map[string][]string
 }
 
-// add adds a tool with the annotations every tool has: it only reads, the same arguments give the same result until
-// the data changes, and it reaches nothing but the data of Penguin Statistics (a closed world).
+// add adds a tool with the annotations every tool has: its title, it only reads and destroys nothing, the same
+// arguments give the same result until the data changes, and it reaches nothing but the data of Penguin Statistics (a
+// closed world). Every hint is given rather than left to the defaults of the specification: directories ask for them
+// (ChatGPT's review wants destructiveHint even of a read-only tool), and some read the title of the annotations rather
+// than that of the tool.
 func add[In, Out any](r *registry, tool *sdkmcp.Tool, h sdkmcp.ToolHandlerFor[In, Out]) {
-	tool.Annotations = &sdkmcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: new(bool)}
+	tool.Annotations = &sdkmcp.ToolAnnotations{Title: tool.Title, ReadOnlyHint: true, DestructiveHint: new(bool),
+		IdempotentHint: true, OpenWorldHint: new(bool)}
 	sdkmcp.AddTool(r.server, tool, h)
 	r.names[tool.Name] = struct{}{}
 	r.stringArgs[tool.Name] = stringProperties(tool.InputSchema)

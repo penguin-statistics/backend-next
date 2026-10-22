@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -90,11 +91,7 @@ func TestToolsList(t *testing.T) {
 			Name, Title, Description string
 			InputSchema              map[string]any `json:"inputSchema"`
 			OutputSchema             map[string]any `json:"outputSchema"`
-			Annotations              *struct {
-				ReadOnlyHint   bool  `json:"readOnlyHint"`
-				IdempotentHint bool  `json:"idempotentHint"`
-				OpenWorldHint  *bool `json:"openWorldHint"`
-			} `json:"annotations"`
+			Annotations              map[string]any `json:"annotations"`
 		} `json:"tools"`
 		TTLMs      int    `json:"ttlMs"`
 		CacheScope string `json:"cacheScope"`
@@ -114,8 +111,10 @@ func TestToolsList(t *testing.T) {
 		if tool.Title == "" || tool.Description == "" {
 			t.Errorf("%s: title %q, description %q", tool.Name, tool.Title, tool.Description)
 		}
-		if a := tool.Annotations; a == nil || !a.ReadOnlyHint || !a.IdempotentHint || a.OpenWorldHint == nil || *a.OpenWorldHint {
-			t.Errorf("%s: annotations %+v", tool.Name, a)
+		// every hint given rather than left to the defaults, and the title there too
+		if want := map[string]any{"title": tool.Title, "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true,
+			"openWorldHint": false}; !maps.Equal(tool.Annotations, want) {
+			t.Errorf("%s: annotations %v, want %v", tool.Name, tool.Annotations, want)
 		}
 		// properties even without arguments: some clients require them of an object
 		if _, ok := tool.InputSchema["properties"]; !ok || tool.InputSchema["type"] != "object" || tool.OutputSchema["type"] != "object" {
