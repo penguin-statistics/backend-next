@@ -14,7 +14,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/uptrace/bun"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
@@ -42,9 +41,6 @@ var (
 var natsPublishTimeout = time.Second * 10
 
 var tracer = otel.Tracer("report")
-
-// attributeTaskID is the id of a report task, on the spans of its publishing and of its processing (reportwkr).
-const attributeTaskID = attribute.Key("report.task_id")
 
 type Report struct {
 	DB                     *bun.DB
@@ -252,8 +248,11 @@ func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.Re
 			semconv.MessagingSystemKey.String("nats"),
 			semconv.MessagingDestinationNameKey.String(subject),
 			semconv.MessagingMessagePayloadSizeBytesKey.Int(len(reportTaskJsonBytes)),
-			attributeTaskID.String(taskId),
+			observability.AttributeReportTaskID.String(taskId),
 		)
+		// what the request reported, on its server span: the root of the trace, where traces are searched and grouped
+		// (sampled whenever this child is)
+		trace.SpanFromContext(ctx.UserContext()).SetAttributes(observability.ReportTaskAttributes(task)...)
 	}
 	msg := &nats.Msg{Subject: subject, Data: reportTaskJsonBytes, Header: nats.Header{}}
 	jetstream.InjectTraceContext(pubCtx, msg.Header)

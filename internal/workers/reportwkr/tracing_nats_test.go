@@ -19,6 +19,7 @@ import (
 
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/pkg/jetstream"
+	"exusiai.dev/backend-next/internal/pkg/observability"
 )
 
 var installTracerProvider sync.Once
@@ -95,7 +96,7 @@ func TestConsumeContinuesThePublishersTrace(t *testing.T) {
 			continue
 		}
 		for _, kv := range span.Attributes() {
-			if kv.Key == attributeTaskID {
+			if kv.Key == observability.AttributeReportTaskID {
 				spans[kv.Value.AsString()] = span
 			}
 		}
@@ -109,6 +110,13 @@ func TestConsumeContinuesThePublishersTrace(t *testing.T) {
 		}
 		if span.SpanKind() != trace.SpanKindConsumer {
 			t.Errorf("consumer span of kind %v, want consumer", span.SpanKind())
+		}
+		attrs := map[string]string{}
+		for _, kv := range span.Attributes() {
+			attrs[string(kv.Key)] = kv.Value.Emit()
+		}
+		if attrs["messaging.nats.num_delivered"] != "1" || attrs["report.queue_latency_ms"] == "" || attrs["report.count"] != "0" {
+			t.Errorf("consumer span attributes %v, want the deliveries (1), the queue latency and the task's description", attrs)
 		}
 		if got := handled["traced"]; got.SpanID() != span.SpanContext().SpanID() {
 			t.Errorf("task processed under span %s, want the consumer span %s", got.SpanID(), span.SpanContext().SpanID())

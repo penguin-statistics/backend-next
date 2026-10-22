@@ -11,6 +11,9 @@ import (
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
+
+	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/observability"
 )
 
 var installTracerProvider sync.Once
@@ -87,7 +90,7 @@ func TestCommitReportTaskCarriesTraceContext(t *testing.T) {
 				}
 				var taskIdAttr string
 				for _, kv := range span.Attributes() {
-					if kv.Key == attributeTaskID {
+					if kv.Key == observability.AttributeReportTaskID {
 						taskIdAttr = kv.Value.AsString()
 					}
 				}
@@ -104,5 +107,63 @@ func TestCommitReportTaskCarriesTraceContext(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The request's server span, the root of the trace, gets what the request reported, when it is sampled: Datadog
+// searches and groups the traces of reports by it.
+func TestCommitReportTaskDescribesTheReportOnTheRequestSpan(t *testing.T) {
+	s, _, prefix := newTestPublisher(t)
+	addTestStream(t, s, prefix)
+	recorder := recordSpans(t)
+
+	task := &types.ReportTask{
+		FragmentReportCommon: types.FragmentReportCommon{Server: "CN", Source: "MeoAssistant", Version: "v5.0.0"},
+		Reports: []*types.ReportTaskSingleReport{{
+			FragmentStageID: types.FragmentStageID{StageID: "main_01-07"},
+			Drops:           []*types.Drop{{ItemID: 1, Quantity: 2}, {ItemID: 2, Quantity: 1}},
+			Times:           3,
+		}},
+		AccountID: 42,
+	}
+	var requestSpan trace.Span
+	taskId, err := commitTaskInRequest(t, s, prefix+".SINGLE", task, func(c *fiber.Ctx) {
+		var ctx = c.UserContext()
+		ctx, requestSpan = otel.Tracer("test").Start(ctx, "request", trace.WithSpanKind(trace.SpanKindServer))
+		c.SetUserContext(ctx)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestSpan.End()
+
+	var request tracesdk.ReadOnlySpan
+	for _, span := range recorder.Ended() {
+		if span.Name() == "request" {
+			request = span
+		}
+	}
+	if request == nil {
+		t.Fatal("request span not recorded")
+	}
+	got := map[string]string{}
+	for _, kv := range request.Attributes() {
+		got[string(kv.Key)] = kv.Value.Emit()
+	}
+	for k, want := range map[string]string{
+		"report.task_id":         taskId,
+		"report.server":          "CN",
+		"report.source":          "MeoAssistant",
+		"report.source_version":  "v5.0.0",
+		"report.source_category": "maa",
+		"report.count":           "1",
+		"report.stage_id":        "main_01-07",
+		"report.drops":           "2",
+		"report.times":           "3",
+		"usr.account_id":         "42",
+	} {
+		if got[k] != want {
+			t.Errorf("%s = %q, want %q", k, got[k], want)
+		}
 	}
 }
