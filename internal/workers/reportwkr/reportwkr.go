@@ -37,8 +37,56 @@ import (
 
 var tracer = otel.Tracer("reportwkr")
 
-// attributeTaskID is the id of the report task, as on the span of its publishing (service.Report)
-const attributeTaskID = attribute.Key("report.task_id")
+// The attributes of the spans of a report task besides observability.ReportTaskAttributes.
+const (
+	// the deliveries of the task's message so far, this one included (messaging.nats.num_delivered)
+	attributeNumDelivered = attribute.Key("messaging.nats.num_delivered")
+	// how long the task waited in the stream before this delivery, in milliseconds
+	attributeQueueLatency = attribute.Key("report.queue_latency_ms")
+	// the verdict of the verifiers on the task's reports: 0 if they accepted every report, else the reliability given
+	// the first one rejected (the reliability of its drop_reports row); and the number of reports rejected
+	attributeReliability = attribute.Key("report.reliability")
+	attributeRejected    = attribute.Key("report.rejected")
+	// why reports were rejected: the messages of the verifiers that rejected them, joined (at most maxViolationsLen)
+	attributeViolations = attribute.Key("report.violations")
+	// the id of the last report the task stored (drop_reports.report_id)
+	attributeReportID = attribute.Key("report.id")
+)
+
+// maxViolationsLen bounds the report.violations attribute: a batch can have many reports rejected.
+const maxViolationsLen = 512
+
+// reliabilityAttributes returns the attributes of the verdict of the verifiers on a task's reports.
+func reliabilityAttributes(reliabilities []int, violations []string) []attribute.KeyValue {
+	reliability := 0
+	for _, r := range reliabilities {
+		if r != 0 {
+			reliability = r
+			break
+		}
+	}
+	attrs := []attribute.KeyValue{attributeReliability.Int(reliability), attributeRejected.Int(len(violations))}
+	if len(violations) > 0 {
+		v := strings.Join(violations, "; ")
+		if len(v) > maxViolationsLen {
+			v = strings.ToValidUTF8(v[:maxViolationsLen], "")
+		}
+		attrs = append(attrs, attributeViolations.String(v))
+	}
+	return attrs
+}
+
+// endSpan ends span with the status of the work it covered: the error, as an exception event and the status
+// description (Datadog's error.message and error.type), if it failed.
+func endSpan(span trace.Span, err error) {
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	} else {
+		span.SetStatus(codes.Ok, "")
+	}
+	span.End()
+}
 
 // rawTaskKey is the context key of the report task as published (a pointer to the message data, which a context
 // holds without an allocation), which process logs rather than encoding the decoded task again
@@ -407,23 +455,24 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 	var span trace.Span
 	taskCtx, span = tracer.
 		Start(jetstream.ExtractTraceContext(taskCtx, msg.Header), "reportwkr.ConsumeTask",
-			trace.WithSpanKind(trace.SpanKindConsumer),
-			trace.WithAttributes(
-				semconv.MessagingSystemKey.String("nats"),
-				semconv.MessagingDestinationNameKey.String(msg.Subject),
-				semconv.MessagingMessageIDKey.String(jetstream.MessageID(metadata.Sequence)),
-				semconv.MessagingMessagePayloadSizeBytesKey.Int(len(msg.Data)),
-				attributeTaskID.String(reportTask.TaskID),
-			))
+			trace.WithSpanKind(trace.SpanKindConsumer))
+	// set only on a sampled span: building them costs the tasks that are not sampled, most of them, allocations
+	if span.IsRecording() {
+		attrs := append(observability.ReportTaskAttributes(reportTask),
+			semconv.MessagingSystemKey.String("nats"),
+			semconv.MessagingDestinationNameKey.String(msg.Subject),
+			semconv.MessagingMessageIDKey.String(jetstream.MessageID(metadata.Sequence)),
+			semconv.MessagingMessagePayloadSizeBytesKey.Int(len(msg.Data)),
+			// 1 for a first delivery; more for a task retried after a failure, or redelivered after AckWait
+			attributeNumDelivered.Int64(int64(metadata.NumDelivered)),
+			// how long the task waited in the stream, from its publishing to this delivery
+			attributeQueueLatency.Float64(float64(time.Since(time.UnixMicro(reportTask.CreatedAt)).Microseconds())/1000),
+		)
+		span.SetAttributes(attrs...)
+	}
 
 	err = w.handle(context.WithValue(taskCtx, rawTaskKey{}, &msg.Data), reportTask)
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
-	} else {
-		span.SetStatus(codes.Ok, "")
-	}
-	span.End()
+	endSpan(span, err)
 
 	// the lines below link to the task's trace, if it is sampled
 	sc := span.SpanContext()
@@ -647,8 +696,9 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 	for idx, report := range reportTask.Reports {
 		reliability, message, err := w.verifier.Reliability(verifyCtx, reportTask, report)
 		if err != nil {
-			verifySpan.End()
-			return errors.Wrap(err, "failed to verify report")
+			err = errors.Wrap(err, "failed to verify report")
+			endSpan(verifySpan, err)
+			return err
 		}
 		reliabilities[idx] = reliability
 		if reliability != 0 {
@@ -662,18 +712,23 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 			Ints("reliabilities", reliabilities).
 			Msg("report task verification failed on some or all reports")
 	}
+	// on the task's span (the parent), where traces are searched: @report.rejected:true
+	if span := trace.SpanFromContext(ctx); span.IsRecording() {
+		span.SetAttributes(reliabilityAttributes(reliabilities, violations)...)
+	}
 
-	verifySpan.End()
+	endSpan(verifySpan, nil)
 
 	pstCtx, pstSpan := tracer.
 		Start(ctx, "reportwkr.process.Persistence",
 			trace.WithSpanKind(trace.SpanKindInternal))
-	defer pstSpan.End()
+	var err error
+	defer func() { endSpan(pstSpan, err) }()
 
 	// the transaction is rolled back when persist returns an error, and committed otherwise
 	var reportId int
 	var patterns []*model.DropPattern
-	err := w.DB.RunInTx(pstCtx, nil, func(ctx context.Context, tx bun.Tx) (err error) {
+	err = w.DB.RunInTx(pstCtx, nil, func(ctx context.Context, tx bun.Tx) (err error) {
 		reportId, patterns, err = w.persist(ctx, tx, reportTask, taskCreatedAt, reliabilities)
 		if err != nil {
 			// rolled back here rather than by RunInTx, which drops the error of a failed rollback. A failed commit
@@ -691,6 +746,9 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 	}
 	// committed: the patterns exist now
 	w.DropPatternRepo.Remember(patterns...)
+	if reportId != 0 && pstSpan.IsRecording() {
+		trace.SpanFromContext(ctx).SetAttributes(attributeReportID.Int(reportId))
+	}
 	server := observability.ReportServerLabel(reportTask.Server)
 	observability.ReportStoredTotal.
 		WithLabelValues(observability.ReportSourceLabel(reportTask.Source), server).
