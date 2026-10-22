@@ -1,9 +1,9 @@
 module exusiai.dev/backend-next
 
-go 1.24.0
+go 1.25.0
 
-// duckdb-go needs the go 1.24 directive; keep the runtime defaults (TLS, x509, panic(nil), rand.Seed, ...) of the
-// go 1.19 the module declared before, so that raising it changes no behavior of the binary
+// go-sdk needs the go 1.25 directive (duckdb-go 1.24); keep the runtime defaults (TLS, x509, panic(nil),
+// rand.Seed, ...) of the go 1.19 the module declared before, so that raising it changes no behavior of the binary
 godebug default=go1.19
 
 require (
@@ -64,9 +64,9 @@ require (
 	go.opentelemetry.io/otel/sdk v1.38.0
 	go.uber.org/fx v1.19.2
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96
-	golang.org/x/mod v0.32.0
-	golang.org/x/sync v0.19.0
-	golang.org/x/text v0.33.0
+	golang.org/x/mod v0.33.0
+	golang.org/x/sync v0.20.0
+	golang.org/x/text v0.34.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/DataDog/dd-trace-go.v1 v1.48.0
 	gopkg.in/guregu/null.v3 v3.5.0
@@ -127,7 +127,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib v1.17.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
-	golang.org/x/telemetry v0.0.0-20260116145544-c6413dc483f5 // indirect
+	golang.org/x/telemetry v0.0.0-20260209163413-e7419c687ee4 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4 // indirect
 	google.golang.org/grpc v1.78.0 // indirect
@@ -173,10 +173,10 @@ require (
 	go.uber.org/dig v1.16.1 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	go.uber.org/zap v1.23.0 // indirect
-	golang.org/x/crypto v0.47.0 // indirect
-	golang.org/x/net v0.49.0
-	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/tools v0.41.0 // indirect
+	golang.org/x/crypto v0.48.0 // indirect
+	golang.org/x/net v0.50.0
+	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/tools v0.42.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	mellium.im/sasl v0.3.1 // indirect
 )
