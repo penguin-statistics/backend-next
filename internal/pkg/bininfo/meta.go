@@ -10,4 +10,8 @@ var (
 
 	// BuildTime is the time at which the application was built.
 	BuildTime = "1970-01-01T00:00:00Z"
+
+	// GitCommit is the full SHA of the commit the binary was built from (the Dockerfile's GIT_COMMIT_SHA), empty if it
+	// was not injected. See Commit.
+	GitCommit = ""
 )

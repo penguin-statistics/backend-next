@@ -22,9 +22,13 @@ COPY . .
 # add gcc for cgo
 RUN apk add --no-cache gcc musl-dev
 
+# the full SHA of the commit built (the image is built from a Git context without .git): spans and profiles carry it
+# for Datadog's source code integration. Declared here, as a change of it invalidates the cache of the steps after it.
+ARG GIT_COMMIT_SHA
+
 # inject versioning information & build the binary
 # appsec: datadog ASM
-RUN export BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ"); export CGO_ENABLED=1; go build -v -tags appsec -o backend -ldflags "-X exusiai.dev/backend-next/internal/pkg/bininfo.Version=$VERSION -X exusiai.dev/backend-next/internal/pkg/bininfo.BuildTime=$BUILD_TIME" .
+RUN export BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ"); export CGO_ENABLED=1; go build -v -tags appsec -o backend -ldflags "-X exusiai.dev/backend-next/internal/pkg/bininfo.Version=$VERSION -X exusiai.dev/backend-next/internal/pkg/bininfo.BuildTime=$BUILD_TIME -X exusiai.dev/backend-next/internal/pkg/bininfo.GitCommit=$GIT_COMMIT_SHA" .
 
 # runner
 FROM base AS runner

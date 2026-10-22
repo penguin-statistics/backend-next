@@ -22,6 +22,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -135,10 +136,12 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 			[]tracesdk.TracerProviderOption{
 				tracesdk.WithResource(resource.NewWithAttributes(
 					semconv.SchemaURL,
-					semconv.ServiceNameKey.String("pgbackend"),
-					semconv.ServiceVersionKey.String(bininfo.Version),
-					semconv.ServiceInstanceIDKey.String(lo.Must(os.Hostname())),
-					semconv.DeploymentEnvironmentKey.String(lo.Ternary(conf.DevMode, "dev", "prod")),
+					append([]attribute.KeyValue{
+						semconv.ServiceNameKey.String("pgbackend"),
+						semconv.ServiceVersionKey.String(bininfo.Version),
+						semconv.ServiceInstanceIDKey.String(lo.Must(os.Hostname())),
+						semconv.DeploymentEnvironmentKey.String(lo.Ternary(conf.DevMode, "dev", "prod")),
+					}, gitAttributes()...)...,
 				)),
 				tracesdk.WithSampler(
 					tracesdk.ParentBased(
@@ -209,6 +212,20 @@ func CreateDevOpsApp(conf *appconfig.Config) *fiber.App {
 	}))
 
 	return app
+}
+
+// gitAttributes returns the commit of the binary and its repository as Datadog's source code integration reads them on
+// spans (the agent turns the resource attributes into span tags), to link a span to its code; none if the commit is
+// unknown.
+func gitAttributes() []attribute.KeyValue {
+	commit := bininfo.Commit()
+	if commit == "" {
+		return nil
+	}
+	return []attribute.KeyValue{
+		attribute.String("git.commit.sha", commit),
+		attribute.String("git.repository_url", bininfo.RepositoryURL),
+	}
 }
 
 func tracingProviderOptions(conf *appconfig.Config) []tracesdk.TracerProviderOption {

@@ -34,6 +34,9 @@ func Datadog(conf *appconfig.Config, lc fx.Lifecycle) {
 					profiler.WithService("pgbackend"),
 					profiler.WithEnv(lo.Ternary(conf.DevMode, "dev", "prod")),
 					profiler.WithVersion(bininfo.Version),
+					// the code of the profiled binary, for Datadog's source code integration (the image is built from
+					// a Git context without .git, so the profiler finds no revision of its own)
+					profiler.WithTags(gitTags()...),
 					profiler.WithAgentAddr(conf.DatadogProfilerAgentAddress),
 					profiler.WithProfileTypes(
 						profiler.CPUProfile,
@@ -62,4 +65,13 @@ func Datadog(conf *appconfig.Config, lc fx.Lifecycle) {
 			},
 		},
 	)
+}
+
+// gitTags returns the commit of the binary and its repository as tags, none if the commit is unknown.
+func gitTags() []string {
+	commit := bininfo.Commit()
+	if commit == "" {
+		return nil
+	}
+	return []string{"git.commit.sha:" + commit, "git.repository_url:" + bininfo.RepositoryURL}
 }
