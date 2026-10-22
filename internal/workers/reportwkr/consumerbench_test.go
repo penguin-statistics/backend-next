@@ -29,14 +29,18 @@ package reportwkr
 //	                            disabled)
 //	CONSUMERBENCH_TRACE         prod (default: a tracer provider configured as in production, with a batcher whose
 //	                            exporter drops the spans, and the bunotel query hook), off (no provider, no hook)
-//	CONSUMERBENCH_TRACE_RATE    the sample rate of prod, default 0.1 as in production
+//	CONSUMERBENCH_TRACE_RATE    the sample rate of prod, default 0.1 as in production; also the share of the tasks
+//	                            published with a sampled trace context (each task carries one, as service.Report
+//	                            publishes it in the trace of its request, which is sampled at that rate)
 //
 // See scripts/consumerbench/run.sh to run it, and README.md.
 
 import (
 	"context"
 	"database/sql"
+	"encoding/binary"
 	"io"
+	"math/rand"
 	"net"
 	"net/url"
 	"os"
@@ -69,6 +73,7 @@ import (
 	"exusiai.dev/backend-next/internal/infra"
 	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/jetstream"
 	"exusiai.dev/backend-next/internal/pkg/observability"
 	"exusiai.dev/backend-next/internal/repo"
 	"exusiai.dev/backend-next/internal/service"
@@ -195,6 +200,8 @@ type consumerBench struct {
 	conf     consumerConfig
 	fixtures []consumerBenchFixture
 	next     int // the next fixture to publish
+	// the share of the tasks published with a sampled trace context
+	traceRate float64
 
 	pg, redis waitCounter
 	logs      *countingWriter
@@ -254,12 +261,13 @@ func newConsumerBench(b *testing.B) *consumerBench {
 	db.SetMaxIdleConns(20)
 
 	// tracing: httpserver.Create and infra.Postgres of production (TracingEnabled)
+	rate, err := strconv.ParseFloat(envOr("CONSUMERBENCH_TRACE_RATE", "0.1"), 64)
+	if err != nil {
+		b.Fatal(err)
+	}
+	cb.traceRate = rate
 	switch mode := envOr("CONSUMERBENCH_TRACE", "prod"); mode {
 	case "prod":
-		rate, err := strconv.ParseFloat(envOr("CONSUMERBENCH_TRACE_RATE", "0.1"), 64)
-		if err != nil {
-			b.Fatal(err)
-		}
 		hostname, _ := os.Hostname()
 		cb.tp = tracesdk.NewTracerProvider(
 			tracesdk.WithResource(resource.NewWithAttributes(
@@ -372,7 +380,22 @@ func (cb *consumerBench) publish(b *testing.B, n int) {
 		fixture := cb.fixtures[cb.next%len(cb.fixtures)]
 		cb.next++
 		subject := prefix + fixture.Subject[len("REPORT."):]
-		f, err := cb.js.PublishAsync(subject, fixture.Data)
+		// the trace context of the publish span, as service.Report sets it: a trace of its own per task, a share
+		// traceRate of them sampled
+		var flags trace.TraceFlags
+		if int(float64(cb.next)*cb.traceRate) > int(float64(cb.next-1)*cb.traceRate) {
+			flags = trace.FlagsSampled
+		}
+		var traceID trace.TraceID
+		var spanID trace.SpanID
+		binary.BigEndian.PutUint64(traceID[:8], rand.Uint64())
+		binary.BigEndian.PutUint64(traceID[8:], rand.Uint64())
+		binary.BigEndian.PutUint64(spanID[:], rand.Uint64()|1)
+		msg := &nats.Msg{Subject: subject, Data: fixture.Data, Header: nats.Header{}}
+		jetstream.InjectTraceContext(trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
+			TraceID: traceID, SpanID: spanID, TraceFlags: flags,
+		})), msg.Header)
+		f, err := cb.js.PublishMsgAsync(msg)
 		if err != nil {
 			b.Fatal(err)
 		}

@@ -13,8 +13,14 @@ import (
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	"github.com/uptrace/bun"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	"go.opentelemetry.io/otel/trace"
 
 	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/jetstream"
 	"exusiai.dev/backend-next/internal/pkg/observability"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/pkg/pgid"
@@ -34,6 +40,11 @@ var (
 // natsPublishTimeout bounds how long commitReportTask waits for NATS to acknowledge a report task. It is a variable so
 // that tests can shorten it.
 var natsPublishTimeout = time.Second * 10
+
+var tracer = otel.Tracer("report")
+
+// attributeTaskID is the id of a report task, on the spans of its publishing and of its processing (reportwkr).
+const attributeTaskID = attribute.Key("report.task_id")
 
 type Report struct {
 	DB                     *bun.DB
@@ -231,7 +242,26 @@ func (s *Report) commitReportTask(ctx *fiber.Ctx, subject string, task *types.Re
 	if key, ok := ctx.Locals(constant.IdempotencyKeyLocalsKey).(string); ok && key != "" {
 		opts = append(opts, nats.MsgId(key))
 	}
-	_, err = s.NatsJS.Publish(subject, reportTaskJsonBytes, opts...)
+	// The task carries the trace context of its publish span, a child of the request's, in its headers (traceparent
+	// and tracestate): the report worker's span of the task continues the request's trace, and is sampled as it is.
+	pubCtx, span := tracer.Start(pubCtx, "report.PublishTask", trace.WithSpanKind(trace.SpanKindProducer))
+	defer span.End()
+	// set only on a sampled span: building them costs the requests that are not sampled, most of them, an allocation
+	if span.IsRecording() {
+		span.SetAttributes(
+			semconv.MessagingSystemKey.String("nats"),
+			semconv.MessagingDestinationNameKey.String(subject),
+			semconv.MessagingMessagePayloadSizeBytesKey.Int(len(reportTaskJsonBytes)),
+			attributeTaskID.String(taskId),
+		)
+	}
+	msg := &nats.Msg{Subject: subject, Data: reportTaskJsonBytes, Header: nats.Header{}}
+	jetstream.InjectTraceContext(pubCtx, msg.Header)
+	_, err = s.NatsJS.PublishMsg(msg, opts...)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	}
 	switch {
 	case err == nil:
 		observeReportPublish(start, "ok")
