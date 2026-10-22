@@ -446,6 +446,19 @@ func TestSitemapNotModifiedAfterAChangeInTheSameSecond(t *testing.T) {
 	}
 }
 
+func TestSitemapLastModifiedNotLaterThanDate(t *testing.T) {
+	e := newTestEnv(t)
+	warmAll(e)
+	// a matrix whose changes were recorded in the next seconds
+	e.data.matrices["CN"] = service.NewSEOMatrix("CN", nil, time.Now().Add(time.Minute))
+	for _, path := range []string{"/sitemap-en-cn.xml", "/sitemap.xml"} {
+		r := e.get(t, path)
+		if r.status != 200 || r.header.Get("Last-Modified") != "" || r.header.Get("Cache-Control") != "public, max-age=60, s-maxage=300" {
+			t.Errorf("%s: status %d, Last-Modified %q, Cache-Control %q", path, r.status, r.header.Get("Last-Modified"), r.header.Get("Cache-Control"))
+		}
+	}
+}
+
 func TestSitemapsCold(t *testing.T) {
 	e := newTestEnv(t)
 	e.data.matrices = map[string]*service.SEOMatrix{}

@@ -235,8 +235,9 @@ func (h *Handler) Sitemap(c *fiber.Ctx) error {
 }
 
 // sendSitemap sends a sitemap last modified at lastModified, cached like the pages with data (zero: for a minute,
-// without Last-Modified), or 304 Not Modified to a conditional request not older than it. It is noindex: the backend
-// serves it on its own hosts too, and a sitemap is no page to find in search results.
+// without Last-Modified), or 304 Not Modified to a conditional request not older than it (none while lastModified is
+// later than the Date, see setLastModified). It is noindex: the backend serves it on its own hosts too, and a sitemap
+// is no page to find in search results.
 func (h *Handler) sendSitemap(c *fiber.Ctx, kind pageKind, body []byte, lastModified time.Time) {
 	c.Set(fiber.HeaderContentType, mimeXML)
 	c.Set("X-Robots-Tag", "noindex")
@@ -244,8 +245,7 @@ func (h *Handler) sendSitemap(c *fiber.Ctx, kind pageKind, body []byte, lastModi
 		h.cacheFor(c, h.shortMaxAge())
 	} else {
 		h.cachePage(c)
-		c.Response().Header.SetLastModified(lastModified)
-		if cachectrl.NotModified(c) {
+		if setLastModified(c, lastModified) && cachectrl.NotModified(c) {
 			count(kind, "not_modified")
 			c.Status(fiber.StatusNotModified)
 			return

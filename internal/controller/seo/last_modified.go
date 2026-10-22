@@ -3,6 +3,10 @@ package seo
 import (
 	"sync"
 	"time"
+
+	"github.com/gofiber/fiber/v2"
+
+	"exusiai.dev/backend-next/internal/pkg/cachectrl"
 )
 
 // stamps gives the data the responses are made of (the catalog, the matrix of each server) the times their
@@ -54,4 +58,16 @@ func (s *stamps) at(slot, of any, t time.Time) time.Time {
 		s.latest = t
 	}
 	return t
+}
+
+// setLastModified sets the Last-Modified of the response to t, unless t is later than the Date of the response, which
+// Last-Modified must not be (RFC 9110 8.8.2.1): a change given a later second (see stamps and
+// cache.SetLastModifiedTime) is sent without one until then. It tells whether it did, and so whether the response may
+// be answered as not modified.
+func setLastModified(c *fiber.Ctx, t time.Time) bool {
+	if !cachectrl.NotLaterThanDate(t) {
+		return false
+	}
+	c.Response().Header.SetLastModified(t)
+	return true
 }

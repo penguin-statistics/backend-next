@@ -1,11 +1,13 @@
 package cachectrl
 
 import (
+	"bytes"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/valyala/fasthttp"
 )
 
 func OptIn(ctx *fiber.Ctx, lastModifiedAt time.Time) {
@@ -50,4 +52,28 @@ func OptOut(ctx *fiber.Ctx) {
 	ctx.Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	ctx.Set("Pragma", "no-cache")
 	ctx.Set("Expires", "0")
+}
+
+var dateHeaderLine = []byte("\r\n" + fasthttp.HeaderDate + ": ")
+
+// NotLaterThanDate tells if lastModified, sent as Last-Modified, is not later than the Date sent with the response.
+// That Date is not time.Now(): fasthttp sends the time it formats once a second, which can be a second behind. It is
+// read here from a blank response header, whose only header is that Date: the response is written later, so with
+// that Date or a later one. Both headers are in whole seconds. False if the Date cannot be read.
+func NotLaterThanDate(lastModified time.Time) bool {
+	var header fasthttp.ResponseHeader
+	raw := header.Header()
+	i := bytes.Index(raw, dateHeaderLine)
+	if i < 0 {
+		return false
+	}
+	value := raw[i+len(dateHeaderLine):]
+	if end := bytes.Index(value, []byte("\r\n")); end >= 0 {
+		value = value[:end]
+	}
+	date, err := fasthttp.ParseHTTPDate(value)
+	if err != nil {
+		return false
+	}
+	return !lastModified.Truncate(time.Second).After(date)
 }
