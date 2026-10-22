@@ -28,10 +28,15 @@ type expiringEntry[V any] struct {
 
 // expiringLoad is a load of a key, which the lookups of the key wait for meanwhile
 type expiringLoad[V any] struct {
-	done  chan struct{}
-	value V
-	err   error
+	done   chan struct{}
+	value  V
+	expiry time.Time
+	err    error
 }
+
+// expiringWaitRetries bounds how often a get that waited for a load whose value had expired by its own now loads again
+// instead: a database clock behind the process clock could otherwise keep it loading.
+const expiringWaitRetries = 2
 
 // expiringCache holds a value per key until the expiry its load gave it. Its zero value is empty and ready to use.
 type expiringCache[K comparable, V any] struct {
@@ -42,28 +47,39 @@ type expiringCache[K comparable, V any] struct {
 
 // get returns the value of key, or, if key holds none or it has expired at now, loads it with load, which returns the
 // value and when it expires. A key is loaded once at a time: a get of a key being loaded waits for that load and returns
-// its value or its error, unless ctx ends first. An error is returned as load returned it, and not cached.
+// its value or its error, unless ctx ends first, or the value expired by now (a load begun before its expiry and
+// finished after it), when it loads again. An error is returned as load returned it, and not cached.
 func (c *expiringCache[K, V]) get(ctx context.Context, now time.Time, key K, load func() (V, time.Time, error)) (V, error) {
+	for retries := 0; ; retries++ {
+		value, expired, err := c.getOnce(ctx, now, key, load)
+		if !expired || retries == expiringWaitRetries {
+			return value, err
+		}
+	}
+}
+
+// getOnce is get, but returns the value of a load it waited for even if it expired by now, reporting it as expired.
+func (c *expiringCache[K, V]) getOnce(ctx context.Context, now time.Time, key K, load func() (V, time.Time, error)) (V, bool, error) {
 	c.mu.RLock()
 	e, ok := c.entries[key]
 	c.mu.RUnlock()
 	if ok && now.Before(e.expiry) {
-		return e.value, nil
+		return e.value, false, nil
 	}
 
 	c.mu.Lock()
 	if e, ok := c.entries[key]; ok && now.Before(e.expiry) {
 		c.mu.Unlock()
-		return e.value, nil
+		return e.value, false, nil
 	}
 	if l, ok := c.loads[key]; ok {
 		c.mu.Unlock()
 		select {
 		case <-l.done:
-			return l.value, l.err
+			return l.value, l.err == nil && !now.Before(l.expiry), l.err
 		case <-ctx.Done():
 			var zero V
-			return zero, ctx.Err()
+			return zero, false, ctx.Err()
 		}
 	}
 	l := &expiringLoad[V]{done: make(chan struct{})}
@@ -74,7 +90,6 @@ func (c *expiringCache[K, V]) get(ctx context.Context, now time.Time, key K, loa
 	c.mu.Unlock()
 
 	loaded := false
-	var expiry time.Time
 	defer func() { // also if load panics: then nothing is cached, and the waiting gets fail
 		c.mu.Lock()
 		delete(c.loads, key)
@@ -85,12 +100,12 @@ func (c *expiringCache[K, V]) get(ctx context.Context, now time.Time, key K, loa
 			if c.entries == nil || len(c.entries) >= expiringCacheMaxEntries {
 				c.entries = map[K]expiringEntry[V]{}
 			}
-			c.entries[key] = expiringEntry[V]{value: l.value, expiry: expiry}
+			c.entries[key] = expiringEntry[V]{value: l.value, expiry: l.expiry}
 		}
 		c.mu.Unlock()
 		close(l.done)
 	}()
-	l.value, expiry, l.err = load()
+	l.value, l.expiry, l.err = load()
 	loaded = l.err == nil
-	return l.value, l.err
+	return l.value, false, l.err
 }

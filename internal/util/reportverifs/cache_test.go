@@ -3,6 +3,7 @@ package reportverifs
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -203,5 +204,53 @@ func TestExpiringCacheIsBounded(t *testing.T) {
 	}
 	if n := len(c.entries); n > expiringCacheMaxEntries {
 		t.Fatalf("the cache holds %d entries, more than %d", n, expiringCacheMaxEntries)
+	}
+}
+
+// A get after the expiry of a value being loaded does not use it: the load began before the expiry and ends after it,
+// so the get loads again.
+func TestExpiringCacheWaitDoesNotUseAnExpiredLoad(t *testing.T) {
+	var c expiringCache[string, int]
+	t0 := time.Unix(1_700_000_000, 0)
+	deadline := t0.Add(time.Second)
+	started, release := make(chan struct{}), make(chan struct{})
+	first := make(chan int, 1)
+	go func() {
+		v, err := c.get(context.Background(), t0, "k", func() (int, time.Time, error) {
+			close(started)
+			<-release
+			return 1, deadline, nil
+		})
+		if err != nil {
+			t.Error(err)
+		}
+		first <- v
+	}()
+	<-started
+
+	second := make(chan int, 1)
+	var loads atomic.Int32
+	go func() {
+		v, err := c.get(context.Background(), deadline, "k", func() (int, time.Time, error) {
+			loads.Add(1)
+			return 2, deadline.Add(cacheTTL), nil
+		})
+		if err != nil {
+			t.Error(err)
+		}
+		second <- v
+	}()
+	// let the second get wait for the first load
+	for i := 0; i < 100; i++ {
+		runtime.Gosched()
+		time.Sleep(time.Millisecond)
+	}
+	close(release)
+
+	if v := <-first; v != 1 {
+		t.Errorf("the get that loaded got %d, want its own load's 1", v)
+	}
+	if v := <-second; v != 2 || loads.Load() != 1 {
+		t.Errorf("the get after the expiry got %d after %d loads of its own, want 2 after 1", v, loads.Load())
 	}
 }
