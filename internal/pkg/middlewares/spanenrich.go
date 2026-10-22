@@ -6,7 +6,6 @@ import (
 	"exusiai.dev/gommon/constant"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/utils"
-	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -72,10 +71,20 @@ func EnrichServerSpan() fiber.Handler {
 				attrs = append(attrs, attributeExpectedStatus.Bool(true))
 				span.SetStatus(codes.Ok, "")
 			} else {
-				span.RecordError(errors.New(strconv.Itoa(status) + " " + utils.StatusMessage(status)))
+				span.RecordError(httpStatusError{status: status})
 			}
 		}
 		span.SetAttributes(attrs...)
 		return err
 	}
+}
+
+// httpStatusError is the error of a 5xx answered without a Go error: its own type (error.type of the span) keeps
+// Datadog's Error Tracking from grouping these with every other error made by errors.New.
+type httpStatusError struct {
+	status int
+}
+
+func (e httpStatusError) Error() string {
+	return strconv.Itoa(e.status) + " " + utils.StatusMessage(e.status)
 }

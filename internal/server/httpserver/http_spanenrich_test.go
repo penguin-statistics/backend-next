@@ -50,7 +50,7 @@ func TestServerSpanNamesTheUser(t *testing.T) {
 
 // A 5xx its route expects (a page asked for while the data is calculated) is no error of the span, while a 5xx
 // answered without a Go error is one with the status as its message; a 5xx of an error keeps the error otelfiber
-// records.
+// records. The exception of a 5xx without an error has a type of its own, for Error Tracking to group it apart.
 func TestServerSpanStatusOf5xx(t *testing.T) {
 	app, recorder := newTracedServiceApp(t, 1)
 	app.Get("/cold", func(c *fiber.Ctx) error {
@@ -65,14 +65,15 @@ func TestServerSpanStatusOf5xx(t *testing.T) {
 	})
 
 	for _, tt := range []struct {
-		path      string
-		code      codes.Code
-		exception string
-		expected  string
+		path          string
+		code          codes.Code
+		exception     string
+		exceptionType string
+		expected      string
 	}{
-		{"/cold", codes.Ok, "", "true"},
-		{"/unavailable", codes.Error, "503 Service Unavailable", ""},
-		{"/failed", codes.Error, "it failed", ""},
+		{"/cold", codes.Ok, "", "", "true"},
+		{"/unavailable", codes.Error, "503 Service Unavailable", "exusiai.dev/backend-next/internal/pkg/middlewares.httpStatusError", ""},
+		{"/failed", codes.Error, "it failed", "", ""},
 	} {
 		t.Run(tt.path, func(t *testing.T) {
 			before := len(recorder.Ended())
@@ -89,16 +90,22 @@ func TestServerSpanStatusOf5xx(t *testing.T) {
 			if span.Status().Code != tt.code {
 				t.Errorf("status %v, want %v", span.Status(), tt.code)
 			}
-			var exceptions []string
+			var exceptions, exceptionTypes []string
 			for _, e := range span.Events() {
 				if e.Name != "exception" {
 					continue
 				}
 				for _, kv := range e.Attributes {
-					if kv.Key == "exception.message" {
+					switch kv.Key {
+					case "exception.message":
 						exceptions = append(exceptions, kv.Value.AsString())
+					case "exception.type":
+						exceptionTypes = append(exceptionTypes, kv.Value.AsString())
 					}
 				}
+			}
+			if tt.exceptionType != "" && (len(exceptionTypes) != 1 || exceptionTypes[0] != tt.exceptionType) {
+				t.Errorf("exception types %q, want %q", exceptionTypes, tt.exceptionType)
 			}
 			if tt.exception == "" && len(exceptions) != 0 || tt.exception != "" && (len(exceptions) != 1 || exceptions[0] != tt.exception) {
 				t.Errorf("exceptions %q, want %q", exceptions, tt.exception)
