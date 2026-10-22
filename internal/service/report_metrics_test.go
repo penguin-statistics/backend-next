@@ -16,14 +16,14 @@ import (
 	"exusiai.dev/backend-next/internal/pkg/observability"
 )
 
-// fakePublisher answers Publish with ack or err, as a publish that the stream stored, or that failed with err.
+// fakePublisher answers PublishMsg with ack or err, as a publish that the stream stored, or that failed with err.
 type fakePublisher struct {
 	nats.JetStreamContext
 	ack *nats.PubAck
 	err error
 }
 
-func (p *fakePublisher) Publish(string, []byte, ...nats.PubOpt) (*nats.PubAck, error) {
+func (p *fakePublisher) PublishMsg(*nats.Msg, ...nats.PubOpt) (*nats.PubAck, error) {
 	return p.ack, p.err
 }
 

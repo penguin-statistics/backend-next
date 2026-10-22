@@ -17,6 +17,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"go.opentelemetry.io/otel/trace"
@@ -35,6 +36,9 @@ import (
 )
 
 var tracer = otel.Tracer("reportwkr")
+
+// attributeTaskID is the id of the report task, as on the span of its publishing (service.Report)
+const attributeTaskID = attribute.Key("report.task_id")
 
 // rawTaskKey is the context key of the report task as published (a pointer to the message data, which a context
 // holds without an allocation), which process logs rather than encoding the decoded task again
@@ -398,15 +402,18 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 			Observe(time.Since(start).Seconds())
 	}()
 
+	// a child of the publish span of the task (the trace context in its headers), in the trace of the request that
+	// published it, and sampled as it is; a task published without one starts a trace of its own
 	var span trace.Span
 	taskCtx, span = tracer.
-		Start(taskCtx, "reportwkr.ConsumeTask",
+		Start(jetstream.ExtractTraceContext(taskCtx, msg.Header), "reportwkr.ConsumeTask",
 			trace.WithSpanKind(trace.SpanKindConsumer),
 			trace.WithAttributes(
 				semconv.MessagingSystemKey.String("nats"),
 				semconv.MessagingDestinationNameKey.String(msg.Subject),
 				semconv.MessagingMessageIDKey.String(jetstream.MessageID(metadata.Sequence)),
 				semconv.MessagingMessagePayloadSizeBytesKey.Int(len(msg.Data)),
+				attributeTaskID.String(reportTask.TaskID),
 			))
 
 	err = w.handle(context.WithValue(taskCtx, rawTaskKey{}, &msg.Data), reportTask)
