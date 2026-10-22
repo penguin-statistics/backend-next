@@ -9,7 +9,6 @@ import (
 
 	"github.com/goccy/go-json"
 
-	"github.com/ahmetb/go-linq/v3"
 	"github.com/tidwall/gjson"
 
 	"exusiai.dev/backend-next/internal/model"
@@ -201,15 +200,14 @@ func (s *Item) applyShim(item *modelv2.Item) {
 	if item.Sprite.Valid {
 		segments := strings.SplitN(item.Sprite.String, ":", 2)
 
-		linq.From(segments).Select(func(i any) any {
-			num, err := strconv.Atoi(i.(string))
-			if err != nil {
-				return -1
+		// the segments that are numbers other than -1 (which stands for a segment that is not a number), nil for none
+		for _, segment := range segments {
+			num, err := strconv.Atoi(segment)
+			if err != nil || num == -1 {
+				continue
 			}
-			return num
-		}).Where(func(i any) bool {
-			return i.(int) != -1
-		}).ToSlice(&coordSegments)
+			coordSegments = append(coordSegments, num)
+		}
 	}
 	if coordSegments != nil {
 		item.SpriteCoord = &coordSegments

@@ -5,11 +5,11 @@ package service
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"time"
 
 	"exusiai.dev/gommon/constant"
-	"github.com/ahmetb/go-linq/v3"
 	"github.com/samber/lo"
 	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
@@ -29,36 +29,15 @@ func legacyGetMaxAccumulableTimeRangesByServer(ctx context.Context, s *TimeRange
 		return nil, err
 	}
 	maxAccumulableTimeRanges := make(map[int]map[int][]*model.TimeRange)
-	var groupedResults []linq.Group
-	linq.From(dropInfos).
-		WhereT(func(dropInfo *model.DropInfo) bool { return dropInfo.ItemID.Valid }).
-		GroupByT(
-			func(dropInfo *model.DropInfo) int { return dropInfo.StageID },
-			func(dropInfo *model.DropInfo) *model.DropInfo { return dropInfo },
-		).
-		ToSlice(&groupedResults)
-	for _, el := range groupedResults {
-		stageId := el.Key.(int)
-		var groupedResults2 []linq.Group
-		linq.From(el.Group).
-			GroupByT(
-				func(dropInfo any) int { return int(dropInfo.(*model.DropInfo).ItemID.Int64) },
-				func(dropInfo any) *model.DropInfo { return dropInfo.(*model.DropInfo) },
-			).
-			ToSlice(&groupedResults2)
+	for _, el := range util.GroupBy(legacyDropInfosWithItem(dropInfos), func(dropInfo *model.DropInfo) int { return dropInfo.StageID }) {
+		stageId := el.Key
 		maxAccumulableTimeRangesForOneStage := make(map[int][]*model.TimeRange)
-		for _, el := range groupedResults2 {
-			itemId := el.Key.(int)
-			var sortedDropInfos []*model.DropInfo
-			linq.From(el.Group).
-				DistinctByT(
-					func(dropInfo *model.DropInfo) int { return dropInfo.RangeID },
-				).
-				SortT(
-					func(a, b *model.DropInfo) bool {
-						return timeRangesMap[a.RangeID].StartTime.After(*timeRangesMap[b.RangeID].StartTime)
-					}).
-				ToSlice(&sortedDropInfos)
+		for _, el := range util.GroupBy(el.Items, func(dropInfo *model.DropInfo) int { return int(dropInfo.ItemID.Int64) }) {
+			itemId := el.Key
+			sortedDropInfos := legacyDistinctBy(el.Items, func(dropInfo *model.DropInfo) int { return dropInfo.RangeID })
+			legacySort(sortedDropInfos, func(a, b *model.DropInfo) bool {
+				return timeRangesMap[a.RangeID].StartTime.After(*timeRangesMap[b.RangeID].StartTime)
+			})
 			startIdx := len(sortedDropInfos) - 1
 			endIdx := 0
 			timeRanges := make([]*model.TimeRange, 0)
@@ -95,36 +74,15 @@ func legacyGetAllMaxAccumulableTimeRangesByServer(ctx context.Context, s *TimeRa
 		return nil, err
 	}
 	maxAccumulableTimeRanges := make(map[int]map[int][]*model.TimeRange)
-	var groupedResults []linq.Group
-	linq.From(dropInfos).
-		WhereT(func(dropInfo *model.DropInfo) bool { return dropInfo.ItemID.Valid }).
-		GroupByT(
-			func(dropInfo *model.DropInfo) int { return dropInfo.StageID },
-			func(dropInfo *model.DropInfo) *model.DropInfo { return dropInfo },
-		).
-		ToSlice(&groupedResults)
-	for _, el := range groupedResults {
-		stageId := el.Key.(int)
-		var groupedResults2 []linq.Group
-		linq.From(el.Group).
-			GroupByT(
-				func(dropInfo any) int { return int(dropInfo.(*model.DropInfo).ItemID.Int64) },
-				func(dropInfo any) *model.DropInfo { return dropInfo.(*model.DropInfo) },
-			).
-			ToSlice(&groupedResults2)
+	for _, el := range util.GroupBy(legacyDropInfosWithItem(dropInfos), func(dropInfo *model.DropInfo) int { return dropInfo.StageID }) {
+		stageId := el.Key
 		maxAccumulableTimeRangesForOneStage := make(map[int][]*model.TimeRange)
-		for _, el := range groupedResults2 {
-			itemId := el.Key.(int)
-			var sortedDropInfos []*model.DropInfo
-			linq.From(el.Group).
-				DistinctByT(
-					func(dropInfo *model.DropInfo) int { return dropInfo.RangeID },
-				).
-				SortT(
-					func(a, b *model.DropInfo) bool {
-						return timeRangesMap[a.RangeID].StartTime.Before(*timeRangesMap[b.RangeID].StartTime)
-					}).
-				ToSlice(&sortedDropInfos)
+		for _, el := range util.GroupBy(el.Items, func(dropInfo *model.DropInfo) int { return int(dropInfo.ItemID.Int64) }) {
+			itemId := el.Key
+			sortedDropInfos := legacyDistinctBy(el.Items, func(dropInfo *model.DropInfo) int { return dropInfo.RangeID })
+			legacySort(sortedDropInfos, func(a, b *model.DropInfo) bool {
+				return timeRangesMap[a.RangeID].StartTime.Before(*timeRangesMap[b.RangeID].StartTime)
+			})
 
 			timeRanges := make([]*model.TimeRange, 0)
 			for _, dropInfo := range sortedDropInfos {
@@ -170,25 +128,14 @@ func legacyGetLatestTimeRangesByServer(ctx context.Context, s *TimeRange, server
 	if err != nil {
 		return nil, err
 	}
-	var groupedResults []linq.Group
-	linq.From(dropInfos).
-		WhereT(func(dropInfo *model.DropInfo) bool { return dropInfo.ItemID.Valid }).
-		GroupByT(
-			func(dropInfo *model.DropInfo) int { return dropInfo.StageID },
-			func(dropInfo *model.DropInfo) *model.DropInfo { return dropInfo },
-		).
-		ToSlice(&groupedResults)
 	results := make(map[int]*model.TimeRange)
-	for _, el := range groupedResults {
-		stageId := el.Key.(int)
-		latestDropInfo := linq.From(el.Group).
-			Distinct().
-			SortT(
-				func(a, b *model.DropInfo) bool {
-					return timeRangesMap[a.RangeID].StartTime.After(*timeRangesMap[b.RangeID].StartTime)
-				}).
-			First().(*model.DropInfo)
-		results[stageId] = timeRangesMap[latestDropInfo.RangeID]
+	for _, el := range util.GroupBy(legacyDropInfosWithItem(dropInfos), func(dropInfo *model.DropInfo) int { return dropInfo.StageID }) {
+		stageId := el.Key
+		sortedDropInfos := legacyDistinctBy(el.Items, func(dropInfo *model.DropInfo) *model.DropInfo { return dropInfo })
+		legacySort(sortedDropInfos, func(a, b *model.DropInfo) bool {
+			return timeRangesMap[a.RangeID].StartTime.After(*timeRangesMap[b.RangeID].StartTime)
+		})
+		results[stageId] = timeRangesMap[sortedDropInfos[0].RangeID]
 	}
 	return results, nil
 }
@@ -271,15 +218,9 @@ func legacyCalcDropMatrix(ctx context.Context, s *DropMatrix, queryCtx *model.Dr
 	stageTimesMap := map[int]int{}
 
 	// grouping results by stage id
-	var groupedResults []linq.Group
-	linq.From(combinedResults).
-		GroupByT(
-			func(el *model.CombinedResultForDropMatrix) int { return el.StageID },
-			func(el *model.CombinedResultForDropMatrix) *model.CombinedResultForDropMatrix { return el }).ToSlice(&groupedResults)
-
 	dropMatrixElements := make([]*model.DropMatrixElement, 0)
-	for _, el := range groupedResults {
-		stageId := el.Key.(int)
+	for _, el := range util.GroupBy(combinedResults, func(el *model.CombinedResultForDropMatrix) int { return el.StageID }) {
+		stageId := el.Key
 		itemIds := (*queryCtx.StageItemFilter)[stageId]
 
 		// get all item ids which are dropped in this stage, save in dropSet
@@ -292,23 +233,24 @@ func legacyCalcDropMatrix(ctx context.Context, s *DropMatrix, queryCtx *model.Dr
 		if err != nil {
 			return nil, err
 		}
+		// the item ids of the drop infos that are in itemIds (none for no itemIds)
 		var dropItemIds []int
-		linq.From(dropInfos).
-			WhereT(func(el *model.DropInfo) bool { return el.ItemID.Valid }).
-			SelectT(func(el *model.DropInfo) int { return int(el.ItemID.Int64) }).
-			ToSlice(&dropItemIds)
-		linq.From(dropItemIds).WhereT(func(itemId int) bool { return linq.From(itemIds).Contains(itemId) }).ToSlice(&dropItemIds)
+		for _, dropInfo := range legacyDropInfosWithItem(dropInfos) {
+			if itemId := int(dropInfo.ItemID.Int64); legacyContains(itemIds, itemId) {
+				dropItemIds = append(dropItemIds, itemId)
+			}
+		}
 		// use a fake hashset to save item ids
 		dropSet := make(map[int]struct{}, len(dropItemIds))
 		for _, itemId := range dropItemIds {
 			dropSet[itemId] = struct{}{}
 		}
 
-		for _, el2 := range el.Group {
-			itemId := el2.(*model.CombinedResultForDropMatrix).ItemID
-			quantity := el2.(*model.CombinedResultForDropMatrix).Quantity
-			times := el2.(*model.CombinedResultForDropMatrix).Times
-			quantityBuckets := el2.(*model.CombinedResultForDropMatrix).QuantityBuckets
+		for _, el2 := range el.Items {
+			itemId := el2.ItemID
+			quantity := el2.Quantity
+			times := el2.Times
+			quantityBuckets := el2.QuantityBuckets
 			dropMatrixElement := model.DropMatrixElement{
 				StageID:         stageId,
 				ItemID:          itemId,
@@ -439,44 +381,37 @@ func legacyCalcDropMatrixForTimeRanges(
 	stageTimesMap := map[int]int{}
 
 	// grouping results by stage id
-	var groupedResults []linq.Group
-	linq.From(combinedResults).
-		GroupByT(
-			func(el *model.CombinedResultForDropMatrix) int { return el.StageID },
-			func(el *model.CombinedResultForDropMatrix) *model.CombinedResultForDropMatrix { return el }).ToSlice(&groupedResults)
-
 	dropMatrixElements := make([]*model.DropMatrixElement, 0)
-	for _, el := range groupedResults {
-		stageId := el.Key.(int)
-		var groupedResults2 []linq.Group
-		linq.From(el.Group).
-			GroupByT(
-				func(el *model.CombinedResultForDropMatrix) int { return el.TimeRange.RangeID },
-				func(el *model.CombinedResultForDropMatrix) *model.CombinedResultForDropMatrix { return el }).
-			ToSlice(&groupedResults2)
-		for _, el2 := range groupedResults2 {
-			rangeId := el2.Key.(int)
-			timeRange := el2.Group[0].(*model.CombinedResultForDropMatrix).TimeRange
+	for _, el := range util.GroupBy(combinedResults, func(el *model.CombinedResultForDropMatrix) int { return el.StageID }) {
+		stageId := el.Key
+		for _, el2 := range util.GroupBy(el.Items, func(el *model.CombinedResultForDropMatrix) int { return el.TimeRange.RangeID }) {
+			rangeId := el2.Key
+			timeRange := el2.Items[0].TimeRange
 
 			// get all item ids which are dropped in this stage and in this time range
 			var dropItemIds []int
 			if rangeId == 0 {
 				// rangeId == 0 means it is a customized time range instead of a time range from the database
-				dropInfosForSpecialTimeRange, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, []*model.TimeRange{el2.Group[0].(*model.CombinedResultForDropMatrix).TimeRange}, []int{stageId}, itemIdFilter)
+				dropInfosForSpecialTimeRange, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, []*model.TimeRange{el2.Items[0].TimeRange}, []int{stageId}, itemIdFilter)
 				if err != nil {
 					return nil, err
 				}
-				linq.From(dropInfosForSpecialTimeRange).
-					WhereT(func(el *model.DropInfo) bool { return el.ItemID.Valid }).
-					SelectT(func(el *model.DropInfo) int { return int(el.ItemID.Int64) }).
-					ToSlice(&dropItemIds)
+				for _, dropInfo := range legacyDropInfosWithItem(dropInfosForSpecialTimeRange) {
+					dropItemIds = append(dropItemIds, int(dropInfo.ItemID.Int64))
+				}
 			} else {
 				dropItemIds, _ = s.DropInfoService.GetItemDropSetByStageIdAndRangeId(ctx, server, stageId, rangeId)
 			}
 
 			// if item id filter is applied, then filter the drop item ids
 			if len(itemIdFilter) > 0 {
-				linq.From(dropItemIds).WhereT(func(itemId int) bool { return linq.From(itemIdFilter).Contains(itemId) }).ToSlice(&dropItemIds)
+				var filtered []int
+				for _, itemId := range dropItemIds {
+					if legacyContains(itemIdFilter, itemId) {
+						filtered = append(filtered, itemId)
+					}
+				}
+				dropItemIds = filtered
 			}
 
 			// use a fake hashset to save item ids
@@ -485,11 +420,11 @@ func legacyCalcDropMatrixForTimeRanges(
 				dropSet[itemId] = struct{}{}
 			}
 
-			for _, el3 := range el2.Group {
-				itemId := el3.(*model.CombinedResultForDropMatrix).ItemID
-				quantity := el3.(*model.CombinedResultForDropMatrix).Quantity
-				times := el3.(*model.CombinedResultForDropMatrix).Times
-				quantityBuckets := el3.(*model.CombinedResultForDropMatrix).QuantityBuckets
+			for _, el3 := range el2.Items {
+				itemId := el3.ItemID
+				quantity := el3.Quantity
+				times := el3.Times
+				quantityBuckets := el3.QuantityBuckets
 				dropMatrixElement := model.DropMatrixElement{
 					StageID:         stageId,
 					ItemID:          itemId,
@@ -533,37 +468,21 @@ func legacyCalcDropMatrixForTimeRanges(
 func legacyCombinePatternQuantityAndTimesResults(
 	quantityResults []*model.TotalQuantityResultForPatternMatrix, timesResults []*model.TotalTimesResult,
 ) []*model.CombinedResultForDropPattern {
-	var firstGroupResults []linq.Group
 	combinedResults := make([]*model.CombinedResultForDropPattern, 0)
-	linq.From(quantityResults).
-		GroupByT(
-			func(result *model.TotalQuantityResultForPatternMatrix) int { return result.StageID },
-			func(result *model.TotalQuantityResultForPatternMatrix) *model.TotalQuantityResultForPatternMatrix {
-				return result
-			}).
-		ToSlice(&firstGroupResults)
+	// stage id -> pattern id -> quantity, the last one of the same ids kept
 	quantityResultsMap := make(map[int]map[int]int)
-	for _, firstGroupElements := range firstGroupResults {
-		stageId := firstGroupElements.Key.(int)
-		resultsMap := make(map[int]int)
-		linq.From(firstGroupElements.Group).
-			ToMapByT(&resultsMap,
-				func(el any) int { return el.(*model.TotalQuantityResultForPatternMatrix).PatternID },
-				func(el any) int { return el.(*model.TotalQuantityResultForPatternMatrix).TotalQuantity })
-		quantityResultsMap[stageId] = resultsMap
+	for _, result := range quantityResults {
+		if quantityResultsMap[result.StageID] == nil {
+			quantityResultsMap[result.StageID] = make(map[int]int)
+		}
+		quantityResultsMap[result.StageID][result.PatternID] = result.TotalQuantity
 	}
 
-	var secondGroupResults []linq.Group
-	linq.From(timesResults).
-		GroupByT(
-			func(result *model.TotalTimesResult) int { return result.StageID },
-			func(result *model.TotalTimesResult) *model.TotalTimesResult { return result }).
-		ToSlice(&secondGroupResults)
-	for _, secondGroupResults := range secondGroupResults {
-		stageId := secondGroupResults.Key.(int)
+	for _, secondGroupResults := range util.GroupBy(timesResults, func(result *model.TotalTimesResult) int { return result.StageID }) {
+		stageId := secondGroupResults.Key
 		quantityResultsMapForOneStage := quantityResultsMap[stageId]
-		for _, el := range secondGroupResults.Group {
-			times := el.(*model.TotalTimesResult).TotalTimes
+		for _, el := range secondGroupResults.Items {
+			times := el.TotalTimes
 			for patternId, quantity := range quantityResultsMapForOneStage {
 				combinedResults = append(combinedResults, &model.CombinedResultForDropPattern{
 					StageID:   stageId,
@@ -584,66 +503,33 @@ func legacyCombineDropMatrixQuantityAndTimesResults(
 ) []*model.CombinedResultForDropMatrix {
 	combinedResults := make([]*model.CombinedResultForDropMatrix, 0)
 
-	var firstGroupResults []linq.Group
-	linq.From(quantityResults).
-		GroupByT(
-			func(result *model.TotalQuantityResultForDropMatrix) int { return result.StageID },
-			func(result *model.TotalQuantityResultForDropMatrix) *model.TotalQuantityResultForDropMatrix {
-				return result
-			}).
-		ToSlice(&firstGroupResults)
+	// stage id -> item id -> quantity, the last one of the same ids kept
 	quantityResultsMap := make(map[int]map[int]int)
-	for _, firstGroupElements := range firstGroupResults {
-		stageId := firstGroupElements.Key.(int)
-		resultsMap := make(map[int]int)
-		linq.From(firstGroupElements.Group).
-			ToMapByT(&resultsMap,
-				func(el any) int { return el.(*model.TotalQuantityResultForDropMatrix).ItemID },
-				func(el any) int { return el.(*model.TotalQuantityResultForDropMatrix).TotalQuantity })
-		quantityResultsMap[stageId] = resultsMap
-	}
-
-	var quantityUniqCountGroupResultsByStageID []linq.Group
-	linq.From(quantityUniqCountResults).
-		GroupByT(func(result *model.QuantityUniqCountResultForDropMatrix) int { return result.StageID },
-			func(result *model.QuantityUniqCountResultForDropMatrix) *model.QuantityUniqCountResultForDropMatrix {
-				return result
-			}).
-		ToSlice(&quantityUniqCountGroupResultsByStageID)
-	quantityUniqCountResultsMap := make(map[int]map[int]map[int]int)
-	for _, quantityUniqCountGroupElements := range quantityUniqCountGroupResultsByStageID {
-		stageId := quantityUniqCountGroupElements.Key.(int)
-		var quantityUniqCountGroupResultsByItemID []linq.Group
-		linq.From(quantityUniqCountGroupElements.Group).
-			GroupByT(func(result *model.QuantityUniqCountResultForDropMatrix) int { return result.ItemID },
-				func(result *model.QuantityUniqCountResultForDropMatrix) *model.QuantityUniqCountResultForDropMatrix {
-					return result
-				}).ToSlice(&quantityUniqCountGroupResultsByItemID)
-		oneItemResultsMap := make(map[int]map[int]int)
-		for _, quantityUniqCountGroupElements2 := range quantityUniqCountGroupResultsByItemID {
-			itemId := quantityUniqCountGroupElements2.Key.(int)
-			subMap := make(map[int]int)
-			linq.From(quantityUniqCountGroupElements2.Group).
-				ToMapByT(&subMap,
-					func(el any) int { return el.(*model.QuantityUniqCountResultForDropMatrix).Quantity },
-					func(el any) int { return el.(*model.QuantityUniqCountResultForDropMatrix).Count })
-			oneItemResultsMap[itemId] = subMap
+	for _, result := range quantityResults {
+		if quantityResultsMap[result.StageID] == nil {
+			quantityResultsMap[result.StageID] = make(map[int]int)
 		}
-		quantityUniqCountResultsMap[stageId] = oneItemResultsMap
+		quantityResultsMap[result.StageID][result.ItemID] = result.TotalQuantity
 	}
 
-	var secondGroupResults []linq.Group
-	linq.From(timesResults).
-		GroupByT(
-			func(result *model.TotalTimesResult) int { return result.StageID },
-			func(result *model.TotalTimesResult) *model.TotalTimesResult { return result }).
-		ToSlice(&secondGroupResults)
-	for _, secondGroupResults := range secondGroupResults {
-		stageId := secondGroupResults.Key.(int)
+	// stage id -> item id -> quantity -> count, the last one of the same ids kept
+	quantityUniqCountResultsMap := make(map[int]map[int]map[int]int)
+	for _, result := range quantityUniqCountResults {
+		if quantityUniqCountResultsMap[result.StageID] == nil {
+			quantityUniqCountResultsMap[result.StageID] = make(map[int]map[int]int)
+		}
+		if quantityUniqCountResultsMap[result.StageID][result.ItemID] == nil {
+			quantityUniqCountResultsMap[result.StageID][result.ItemID] = make(map[int]int)
+		}
+		quantityUniqCountResultsMap[result.StageID][result.ItemID][result.Quantity] = result.Count
+	}
+
+	for _, secondGroupResults := range util.GroupBy(timesResults, func(result *model.TotalTimesResult) int { return result.StageID }) {
+		stageId := secondGroupResults.Key
 		quantityResultsMapForOneStage := quantityResultsMap[stageId]
 		quantityUniqCountResultsMapForOneStage := quantityUniqCountResultsMap[stageId]
-		for _, el := range secondGroupResults.Group {
-			times := el.(*model.TotalTimesResult).TotalTimes
+		for _, el := range secondGroupResults.Items {
+			times := el.TotalTimes
 			for itemId, quantity := range quantityResultsMapForOneStage {
 				combinedResults = append(combinedResults, &model.CombinedResultForDropMatrix{
 					StageID:         stageId,
@@ -874,10 +760,13 @@ func legacyGetCurrentDropInfosByServer(ctx context.Context, s *DropInfo, server 
 	for _, timeRange := range currentTimeRanges {
 		currentTimeRangesMap[timeRange.RangeID] = timeRange
 	}
-	linq.From(dropInfos).WhereT(func(dropInfo *model.DropInfo) bool {
-		return currentTimeRangesMap[dropInfo.RangeID] != nil
-	}).ToSlice(&dropInfos)
-	return dropInfos, nil
+	currentDropInfos := dropInfos[:0]
+	for _, dropInfo := range dropInfos {
+		if currentTimeRangesMap[dropInfo.RangeID] != nil {
+			currentDropInfos = append(currentDropInfos, dropInfo)
+		}
+	}
+	return currentDropInfos, nil
 }
 
 // the shim of v3.14.18: loads the current drop infos of server for the opening stages on every call
@@ -899,7 +788,9 @@ func legacyApplyShimForDropMatrixQuery(ctx context.Context, s *DropMatrix, serve
 		if err != nil {
 			return nil, err
 		}
-		linq.From(currentDropInfos).SelectT(func(el *model.DropInfo) int { return el.StageID }).Distinct().ToSlice(&openingStageIds)
+		for _, dropInfo := range legacyDistinctBy(currentDropInfos, func(dropInfo *model.DropInfo) int { return dropInfo.StageID }) {
+			openingStageIds = append(openingStageIds, dropInfo.StageID)
+		}
 	}
 
 	// convert comma-splitted stage filter param to a hashset
@@ -926,7 +817,7 @@ func legacyApplyShimForDropMatrixQuery(ctx context.Context, s *DropMatrix, serve
 		Matrix: make([]*modelv2.OneDropMatrixElement, 0),
 	}
 	for _, el := range queryResult.Matrix {
-		if !showClosedZones && !linq.From(openingStageIds).Contains(el.StageID) {
+		if !showClosedZones && !legacyContains(openingStageIds, el.StageID) {
 			continue
 		}
 
@@ -963,4 +854,52 @@ func legacyApplyShimForDropMatrixQuery(ctx context.Context, s *DropMatrix, serve
 		results.Matrix = append(results.Matrix, &oneDropMatrixElement)
 	}
 	return results, nil
+}
+
+// The helpers of the references above, in place of the go-linq calls of v3.14.18: group members keep their input
+// order (util.GroupBy), and sorting is sort.Sort, as go-linq's.
+
+func legacyDropInfosWithItem(dropInfos []*model.DropInfo) []*model.DropInfo {
+	var results []*model.DropInfo
+	for _, dropInfo := range dropInfos {
+		if dropInfo.ItemID.Valid {
+			results = append(results, dropInfo)
+		}
+	}
+	return results
+}
+
+// legacyDistinctBy keeps the first of the items with the same key.
+func legacyDistinctBy[T any, K comparable](items []T, key func(T) K) []T {
+	seen := make(map[K]struct{})
+	var results []T
+	for _, item := range items {
+		if _, ok := seen[key(item)]; !ok {
+			seen[key(item)] = struct{}{}
+			results = append(results, item)
+		}
+	}
+	return results
+}
+
+type legacySorter[T any] struct {
+	items []T
+	less  func(a, b T) bool
+}
+
+func (s legacySorter[T]) Len() int           { return len(s.items) }
+func (s legacySorter[T]) Swap(i, j int)      { s.items[i], s.items[j] = s.items[j], s.items[i] }
+func (s legacySorter[T]) Less(i, j int) bool { return s.less(s.items[i], s.items[j]) }
+
+func legacySort[T any](items []T, less func(a, b T) bool) {
+	sort.Sort(legacySorter[T]{items: items, less: less})
+}
+
+func legacyContains(items []int, item int) bool {
+	for _, i := range items {
+		if i == item {
+			return true
+		}
+	}
+	return false
 }

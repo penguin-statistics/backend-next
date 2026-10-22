@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ahmetb/go-linq/v3"
-
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/repo"
@@ -60,9 +58,14 @@ func (s *TimeRange) GetCurrentTimeRangesByServer(ctx context.Context, server str
 		return nil, err
 	}
 
-	linq.From(timeRanges).WhereT(func(timeRange *model.TimeRange) bool {
-		return timeRange.StartTime.Before(time.Now()) && timeRange.EndTime.After(time.Now())
-	}).ToSlice(&timeRanges)
+	// filtered in place, as the repo returns a new slice
+	currentTimeRanges := timeRanges[:0]
+	for _, timeRange := range timeRanges {
+		if timeRange.StartTime.Before(time.Now()) && timeRange.EndTime.After(time.Now()) {
+			currentTimeRanges = append(currentTimeRanges, timeRange)
+		}
+	}
+	timeRanges = currentTimeRanges
 
 	return timeRanges, nil
 }
@@ -80,11 +83,9 @@ func (s *TimeRange) GetTimeRangesMap(ctx context.Context, server string) (map[in
 		return nil, err
 	}
 	timeRangesMap = make(map[int]*model.TimeRange)
-	linq.From(timeRanges).
-		ToMapByT(
-			&timeRangesMap,
-			func(timeRange *model.TimeRange) int { return timeRange.RangeID },
-			func(timeRange *model.TimeRange) *model.TimeRange { return timeRange })
+	for _, timeRange := range timeRanges {
+		timeRangesMap[timeRange.RangeID] = timeRange
+	}
 	cache.TimeRangesMap.Set(server, timeRangesMap, time.Minute*5)
 	return timeRangesMap, nil
 }
@@ -106,36 +107,18 @@ func (s *TimeRange) GetMaxAccumulableTimeRangesByServer(ctx context.Context, ser
 		return nil, err
 	}
 	maxAccumulableTimeRanges = make(map[int]map[int][]*model.TimeRange)
-	var groupedResults []linq.Group
-	linq.From(dropInfos).
-		WhereT(func(dropInfo *model.DropInfo) bool { return dropInfo.ItemID.Valid }).
-		GroupByT(
-			func(dropInfo *model.DropInfo) int { return dropInfo.StageID },
-			func(dropInfo *model.DropInfo) *model.DropInfo { return dropInfo },
-		).
-		ToSlice(&groupedResults)
-	for _, el := range groupedResults {
-		stageId := el.Key.(int)
-		var groupedResults2 []linq.Group
-		linq.From(el.Group).
-			GroupByT(
-				func(dropInfo any) int { return int(dropInfo.(*model.DropInfo).ItemID.Int64) },
-				func(dropInfo any) *model.DropInfo { return dropInfo.(*model.DropInfo) },
-			).
-			ToSlice(&groupedResults2)
+	for stageId, dropInfosForOneStage := range groupDropInfosWithItemByStageId(dropInfos) {
+		dropInfosByItemId := make(map[int][]*model.DropInfo)
+		for _, dropInfo := range dropInfosForOneStage {
+			itemId := int(dropInfo.ItemID.Int64)
+			dropInfosByItemId[itemId] = append(dropInfosByItemId[itemId], dropInfo)
+		}
 		maxAccumulableTimeRangesForOneStage := make(map[int][]*model.TimeRange)
-		for _, el := range groupedResults2 {
-			itemId := el.Key.(int)
-			var sortedDropInfos []*model.DropInfo
-			linq.From(el.Group).
-				DistinctByT(
-					func(dropInfo *model.DropInfo) int { return dropInfo.RangeID },
-				).
-				SortT(
-					func(a, b *model.DropInfo) bool {
-						return timeRangesMap[a.RangeID].StartTime.After(*timeRangesMap[b.RangeID].StartTime)
-					}).
-				ToSlice(&sortedDropInfos)
+		for itemId, dropInfosForOneItem := range dropInfosByItemId {
+			sortedDropInfos := distinctDropInfosByRangeId(dropInfosForOneItem)
+			sortDropInfos(sortedDropInfos, func(a, b *model.DropInfo) bool {
+				return timeRangesMap[a.RangeID].StartTime.After(*timeRangesMap[b.RangeID].StartTime)
+			})
 			startIdx := len(sortedDropInfos) - 1
 			endIdx := 0
 			timeRanges := make([]*model.TimeRange, 0)
@@ -278,9 +261,8 @@ func (s *TimeRange) getDropInfosByServer(ctx context.Context, server string) ([]
 	return dropInfos, nil
 }
 
-// The helpers below replace reflection-based go-linq pipelines on the worker's hot path. They keep go-linq's
-// semantics: group members keep their input order, DistinctBy keeps the first occurrence, and sorting uses
-// sort.Sort, so ties are resolved exactly as before.
+// The helpers below keep the semantics of the go-linq pipelines they replaced: group members keep their input order,
+// DistinctBy keeps the first occurrence, and sorting uses sort.Sort, so ties are resolved exactly as before.
 
 // groupDropInfosWithItemByStageId groups the drop infos that have an item by stage id into newly allocated slices.
 func groupDropInfosWithItemByStageId(dropInfos []*model.DropInfo) map[int][]*model.DropInfo {

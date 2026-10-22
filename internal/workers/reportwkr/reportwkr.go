@@ -420,7 +420,7 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 			Uint64("seq", metadata.Sequence.Stream).
 			Bytes("data", msg.Data).
 			Msg("failed to decode report task; moving it to the dead-letter stream")
-		w.park(msg, metadata, err)
+		w.park(msg, metadata, err, "malformed")
 		return
 	}
 
@@ -436,7 +436,7 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 			Uint64("seq", metadata.Sequence.Stream).
 			RawJSON("reportTask", msg.Data).
 			Msg("report task moving to the dead-letter stream")
-		w.park(msg, metadata, err)
+		w.park(msg, metadata, err, "over_delivered")
 		return
 	}
 
@@ -506,7 +506,7 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 			Uint64("seq", metadata.Sequence.Stream).
 			RawJSON("reportTask", msg.Data).
 			Msg("report task parked: it can never be processed; moving it to the dead-letter stream")
-		w.park(msg, metadata, err)
+		w.park(msg, metadata, err, "not_found")
 	case metadata.NumDelivered >= w.conf.deadLetterAfter:
 		// failed at every delivery for over an hour and a half of retries: most likely it can never be stored, and it
 		// would hold a slot of the MaxAckPending window that it shares with the healthy tasks for as long as it is
@@ -519,7 +519,7 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 			Uint64("seq", metadata.Sequence.Stream).
 			RawJSON("reportTask", msg.Data).
 			Msg("report task failed at its last delivery; moving it to the dead-letter stream")
-		w.park(msg, metadata, err)
+		w.park(msg, metadata, err, "max_deliveries")
 	default:
 		// a database, Redis or network failure, or a commit of unknown outcome (stored again if it did commit, rare
 		// against losing the task): retry later, waiting longer with each delivery, up to deadLetterAfter deliveries
@@ -544,9 +544,10 @@ func (w *Worker) ingestPreprocess(msg *nats.Msg) {
 }
 
 // park moves a task that will not be processed to the dead-letter stream, then terminates it. If the dead-letter
-// stream does not store it, the task is delivered again later instead, so that it is never dropped.
-func (w *Worker) park(msg *nats.Msg, metadata *nats.MsgMetadata, cause error) {
-	withHeaders, err := w.deadLetter(msg, metadata, cause)
+// stream does not store it, the task is delivered again later instead, so that it is never dropped. reason labels
+// ReportDeadLetteredTotal.
+func (w *Worker) park(msg *nats.Msg, metadata *nats.MsgMetadata, cause error, reason string) {
+	withHeaders, duplicate, err := w.deadLetter(msg, metadata, cause)
 	if err != nil {
 		delay := w.conf.retryDelay(metadata.NumDelivered)
 		log.Error().
@@ -568,6 +569,10 @@ func (w *Worker) park(msg *nats.Msg, metadata *nats.MsgMetadata, cause error) {
 			Uint64("delivered", metadata.NumDelivered).
 			Msg("report task moved to the dead-letter stream without its headers: with them it would exceed the maximum payload")
 	}
+	// a duplicate is the copy of an earlier delivery whose Term was lost: the task is counted once
+	if !duplicate {
+		observability.ReportDeadLetteredTotal.WithLabelValues(reason).Inc()
+	}
 	term(msg)
 }
 
@@ -577,8 +582,9 @@ func (w *Worker) park(msg *nats.Msg, metadata *nats.MsgMetadata, cause error) {
 //
 // The maximum payload of NATS counts the headers too, so a task that the stream accepted just under it would not fit
 // with them, and could never be moved: such a task is copied with its payload only (withHeaders false), which fits as
-// the stream accepted it, and its log is the record of the rest.
-func (w *Worker) deadLetter(msg *nats.Msg, metadata *nats.MsgMetadata, cause error) (withHeaders bool, err error) {
+// the stream accepted it, and its log is the record of the rest. duplicate reports that the stream already held the
+// copy, which it then does not store again.
+func (w *Worker) deadLetter(msg *nats.Msg, metadata *nats.MsgMetadata, cause error) (withHeaders, duplicate bool, err error) {
 	dead := nats.NewMsg(w.conf.deadSubject + msg.Subject[strings.LastIndexByte(msg.Subject, '.')+1:])
 	dead.Data = msg.Data
 	dead.Header.Set(nats.MsgIdHdr, fmt.Sprintf("%s:%d", metadata.Stream, metadata.Sequence.Stream))
@@ -598,10 +604,11 @@ func (w *Worker) deadLetter(msg *nats.Msg, metadata *nats.MsgMetadata, cause err
 	// fails at once leaves nothing behind either (infra.NATSOptions).
 	ctx, cancel := context.WithTimeout(context.Background(), w.conf.taskTimeout)
 	defer cancel()
-	if _, err := w.NatsJS.PublishMsg(dead, nats.Context(ctx)); err != nil {
-		return withHeaders, errors.Wrap(err, "the dead-letter stream did not store the task")
+	ack, err := w.NatsJS.PublishMsg(dead, nats.Context(ctx))
+	if err != nil {
+		return withHeaders, false, errors.Wrap(err, "the dead-letter stream did not store the task")
 	}
-	return withHeaders, nil
+	return withHeaders, ack != nil && ack.Duplicate, nil
 }
 
 // headerSize returns the size of h on the wire, as NATS counts it against the maximum payload.
@@ -742,9 +749,15 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 	if reportId != 0 && pstSpan.IsRecording() {
 		trace.SpanFromContext(ctx).SetAttributes(attributeReportID.Int(reportId))
 	}
+	server := observability.ReportServerLabel(reportTask.Server)
 	observability.ReportStoredTotal.
-		WithLabelValues(observability.ReportSourceLabel(reportTask.Source)).
+		WithLabelValues(observability.ReportSourceLabel(reportTask.Source), server).
 		Add(float64(len(reportTask.Reports)))
+	// counted once committed, as stored_total is: a report of a task rolled back is not stored
+	sourceName := observability.ReportSourceNameLabel(reportTask.Source)
+	for _, reliability := range reliabilities {
+		observability.ReportReliability.WithLabelValues(strconv.Itoa(reliability), sourceName, server).Inc()
+	}
 
 	// The recall key holds the last report of the task (only singular reports are recalled), set once it is
 	// committed so that a recall cannot come before the report exists. Best-effort: the task is stored, so this must
@@ -805,8 +818,6 @@ func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.Repor
 		if err = w.DropReportRepo.CreateDropReport(ctx, tx, dropReport); err != nil {
 			return 0, nil, errors.Wrap(err, "failed to create drop report")
 		}
-
-		observability.ReportReliability.WithLabelValues(strconv.Itoa(reliability), reportTask.Source).Inc()
 
 		md5 := ""
 		if report.Metadata != nil && report.Metadata.MD5 != "" {
