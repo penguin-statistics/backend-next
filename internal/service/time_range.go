@@ -90,6 +90,8 @@ func (s *TimeRange) GetTimeRangesMap(ctx context.Context, server string) (map[in
 	return timeRangesMap, nil
 }
 
+// GetMaxAccumulableTimeRangesByServer returns, for every stage and item of server, the time ranges of its latest
+// accumulable segment (see accumulableSegments), newest first. The personal drop matrices are calculated over them.
 // Cache: maxAccumulableTimeRanges#server:{server}, 5 min
 func (s *TimeRange) GetMaxAccumulableTimeRangesByServer(ctx context.Context, server string) (map[int]map[int][]*model.TimeRange, error) {
 	var maxAccumulableTimeRanges map[int]map[int][]*model.TimeRange
@@ -98,55 +100,31 @@ func (s *TimeRange) GetMaxAccumulableTimeRangesByServer(ctx context.Context, ser
 		return maxAccumulableTimeRanges, nil
 	}
 
-	dropInfos, err := s.getDropInfosByServer(ctx, server)
+	segmentsByStageAndItem, err := s.getAccumulableSegmentsByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}
-	timeRangesMap, err := s.GetTimeRangesMap(ctx, server)
-	if err != nil {
-		return nil, err
-	}
-	maxAccumulableTimeRanges = make(map[int]map[int][]*model.TimeRange)
-	for stageId, dropInfosForOneStage := range groupDropInfosWithItemByStageId(dropInfos) {
-		dropInfosByItemId := make(map[int][]*model.DropInfo)
-		for _, dropInfo := range dropInfosForOneStage {
-			itemId := int(dropInfo.ItemID.Int64)
-			dropInfosByItemId[itemId] = append(dropInfosByItemId[itemId], dropInfo)
-		}
-		maxAccumulableTimeRangesForOneStage := make(map[int][]*model.TimeRange)
-		for itemId, dropInfosForOneItem := range dropInfosByItemId {
-			sortedDropInfos := distinctDropInfosByRangeId(dropInfosForOneItem)
-			sortDropInfos(sortedDropInfos, func(a, b *model.DropInfo) bool {
-				return timeRangesMap[a.RangeID].StartTime.After(*timeRangesMap[b.RangeID].StartTime)
-			})
-			startIdx := len(sortedDropInfos) - 1
-			endIdx := 0
-			timeRanges := make([]*model.TimeRange, 0)
-			for idx, dropInfo := range sortedDropInfos {
-				if !dropInfo.Accumulable {
-					startIdx = idx
-					if idx != 0 {
-						startIdx = idx - 1
-					}
-					break
-				}
+	maxAccumulableTimeRanges = make(map[int]map[int][]*model.TimeRange, len(segmentsByStageAndItem))
+	for stageId, segmentsByItem := range segmentsByStageAndItem {
+		maxAccumulableTimeRangesForOneStage := make(map[int][]*model.TimeRange, len(segmentsByItem))
+		for itemId, segments := range segmentsByItem {
+			latest := segments[len(segments)-1]
+			timeRanges := make([]*model.TimeRange, len(latest))
+			for i, timeRange := range latest {
+				timeRanges[len(latest)-1-i] = timeRange
 			}
-			for i := endIdx; i <= startIdx; i++ {
-				timeRanges = append(timeRanges, timeRangesMap[sortedDropInfos[i].RangeID])
-			}
-			if len(timeRanges) > 0 {
-				maxAccumulableTimeRangesForOneStage[itemId] = timeRanges
-			}
+			maxAccumulableTimeRangesForOneStage[itemId] = timeRanges
 		}
-		if len(maxAccumulableTimeRangesForOneStage) > 0 {
-			maxAccumulableTimeRanges[stageId] = maxAccumulableTimeRangesForOneStage
-		}
+		maxAccumulableTimeRanges[stageId] = maxAccumulableTimeRangesForOneStage
 	}
 	cache.MaxAccumulableTimeRanges.Set(server, maxAccumulableTimeRanges, time.Minute*5)
 	return maxAccumulableTimeRanges, nil
 }
 
-// This function will combine time ranges together if they are adjacent
+// GetAllMaxAccumulableTimeRangesByServer returns, for every stage and item of server, all of its accumulable
+// segments (see accumulableSegments) in chronological order, each as one time range from the start of its first
+// time range to the latest end of its time ranges. The global drop matrix is calculated over the last one, and the
+// drop matrix elements of a day are rendered per segment.
 // Cache: allMaxAccumulableTimeRanges#server:{server}, 5 min
 func (s *TimeRange) GetAllMaxAccumulableTimeRangesByServer(ctx context.Context, server string) (map[int]map[int][]*model.TimeRange, error) {
 	var maxAccumulableTimeRanges map[int]map[int][]*model.TimeRange
@@ -155,6 +133,27 @@ func (s *TimeRange) GetAllMaxAccumulableTimeRangesByServer(ctx context.Context, 
 		return maxAccumulableTimeRanges, nil
 	}
 
+	segmentsByStageAndItem, err := s.getAccumulableSegmentsByServer(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	maxAccumulableTimeRanges = make(map[int]map[int][]*model.TimeRange, len(segmentsByStageAndItem))
+	for stageId, segmentsByItem := range segmentsByStageAndItem {
+		maxAccumulableTimeRangesForOneStage := make(map[int][]*model.TimeRange, len(segmentsByItem))
+		for itemId, segments := range segmentsByItem {
+			timeRanges := make([]*model.TimeRange, 0, len(segments))
+			for _, segment := range segments {
+				timeRanges = append(timeRanges, mergeSegment(segment))
+			}
+			maxAccumulableTimeRangesForOneStage[itemId] = timeRanges
+		}
+		maxAccumulableTimeRanges[stageId] = maxAccumulableTimeRangesForOneStage
+	}
+	cache.AllMaxAccumulableTimeRanges.Set(server, maxAccumulableTimeRanges, time.Minute*5)
+	return maxAccumulableTimeRanges, nil
+}
+
+func (s *TimeRange) getAccumulableSegmentsByServer(ctx context.Context, server string) (map[int]map[int][][]*model.TimeRange, error) {
 	dropInfos, err := s.getDropInfosByServer(ctx, server)
 	if err != nil {
 		return nil, err
@@ -163,54 +162,71 @@ func (s *TimeRange) GetAllMaxAccumulableTimeRangesByServer(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	maxAccumulableTimeRanges = make(map[int]map[int][]*model.TimeRange)
+	return accumulableSegments(dropInfos, timeRangesMap), nil
+}
+
+// accumulableSegments splits the time ranges of every stage and item into the segments whose drops are counted
+// together, the same way for the global and the personal drop matrices (#794).
+//
+// The time ranges of a stage and item are those of its drop infos, once each, ordered by start time (then by range
+// id). DropInfo.Accumulable decides whether the drops of a time range are carried into the time ranges after it:
+//   - consecutive accumulable time ranges form one segment;
+//   - a time range that is not accumulable is a segment on its own: it is neither merged into the time range before
+//     it nor carried into the one after it.
+//
+// A gap between two time ranges does not split a segment. Every stage and item gets at least one segment, and the
+// last one is its latest window: A false, B and C true gives [A] [B C]; A and B false, C true gives [A] [B] [C]; A
+// and B true, C false gives [A B] [C]; a single time range that is not accumulable is the latest window by itself.
+//
+// Segments hold the time ranges of timeRangesMap in chronological order; dropInfos is not modified.
+func accumulableSegments(dropInfos []*model.DropInfo, timeRangesMap map[int]*model.TimeRange) map[int]map[int][][]*model.TimeRange {
+	segmentsByStageAndItem := make(map[int]map[int][][]*model.TimeRange)
 	for stageId, dropInfosForOneStage := range groupDropInfosWithItemByStageId(dropInfos) {
 		dropInfosByItemId := make(map[int][]*model.DropInfo)
 		for _, dropInfo := range dropInfosForOneStage {
 			itemId := int(dropInfo.ItemID.Int64)
 			dropInfosByItemId[itemId] = append(dropInfosByItemId[itemId], dropInfo)
 		}
-		maxAccumulableTimeRangesForOneStage := make(map[int][]*model.TimeRange)
+		segmentsByItem := make(map[int][][]*model.TimeRange, len(dropInfosByItemId))
 		for itemId, dropInfosForOneItem := range dropInfosByItemId {
 			sortedDropInfos := distinctDropInfosByRangeId(dropInfosForOneItem)
 			sortDropInfos(sortedDropInfos, func(a, b *model.DropInfo) bool {
-				return timeRangesMap[a.RangeID].StartTime.Before(*timeRangesMap[b.RangeID].StartTime)
+				startA, startB := timeRangesMap[a.RangeID].StartTime, timeRangesMap[b.RangeID].StartTime
+				if !startA.Equal(*startB) {
+					return startA.Before(*startB)
+				}
+				return a.RangeID < b.RangeID
 			})
 
-			timeRanges := make([]*model.TimeRange, 0)
-			for _, dropInfo := range sortedDropInfos {
+			segments := make([][]*model.TimeRange, 0, 1)
+			for i, dropInfo := range sortedDropInfos {
 				timeRange := timeRangesMap[dropInfo.RangeID]
-				if len(timeRanges) == 0 || !dropInfo.Accumulable {
-					pureRange := &model.TimeRange{
-						StartTime: timeRange.StartTime,
-						EndTime:   timeRange.EndTime,
-					}
-					timeRanges = append(timeRanges, pureRange)
+				if i == 0 || !dropInfo.Accumulable || !sortedDropInfos[i-1].Accumulable {
+					segments = append(segments, []*model.TimeRange{timeRange})
 					continue
 				}
-				lastAddedTimeRange := timeRanges[len(timeRanges)-1]
-				if !lastAddedTimeRange.EndTime.Before(*timeRange.StartTime) {
-					if lastAddedTimeRange.EndTime.Before(*timeRange.EndTime) {
-						lastAddedTimeRange.EndTime = timeRange.EndTime
-					}
-				} else {
-					pureRange := &model.TimeRange{
-						StartTime: timeRange.StartTime,
-						EndTime:   timeRange.EndTime,
-					}
-					timeRanges = append(timeRanges, pureRange)
-				}
+				segments[len(segments)-1] = append(segments[len(segments)-1], timeRange)
 			}
-			if len(timeRanges) > 0 {
-				maxAccumulableTimeRangesForOneStage[itemId] = timeRanges
-			}
+			segmentsByItem[itemId] = segments
 		}
-		if len(maxAccumulableTimeRangesForOneStage) > 0 {
-			maxAccumulableTimeRanges[stageId] = maxAccumulableTimeRangesForOneStage
+		segmentsByStageAndItem[stageId] = segmentsByItem
+	}
+	return segmentsByStageAndItem
+}
+
+// mergeSegment returns a new time range from the start of the first time range of segment to the latest end of its
+// time ranges, without a range id.
+func mergeSegment(segment []*model.TimeRange) *model.TimeRange {
+	merged := &model.TimeRange{
+		StartTime: segment[0].StartTime,
+		EndTime:   segment[0].EndTime,
+	}
+	for _, timeRange := range segment[1:] {
+		if timeRange.EndTime.After(*merged.EndTime) {
+			merged.EndTime = timeRange.EndTime
 		}
 	}
-	cache.AllMaxAccumulableTimeRanges.Set(server, maxAccumulableTimeRanges, time.Minute*5)
-	return maxAccumulableTimeRanges, nil
+	return merged
 }
 
 // Cache: latestTimeRanges#server:{server}, 5 min

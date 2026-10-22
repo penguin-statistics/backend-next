@@ -146,8 +146,10 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 				tracesdk.WithSampler(
 					tracesdk.ParentBased(
 						alwaysSampleNamePrefix{
-							prefix:   "calcwkr.",
-							fallback: tracesdk.TraceIDRatioBased(conf.TracingSampleRate),
+							prefix: "calcwkr.",
+							fallback: newLowVolumeRouteSampler(
+								conf.TracingLowVolumeTracesPerSecond,
+								tracesdk.TraceIDRatioBased(conf.TracingSampleRate)),
 						})),
 			},
 			tracingProviderOptions(conf)...,
