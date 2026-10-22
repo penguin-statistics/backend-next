@@ -230,10 +230,9 @@ func TestReliabilityGolden(t *testing.T) {
 }
 
 // TestReliabilityDatabaseError checks that a database error fails the verification, where it gave reliability 6 or 7
-// before Verifier.
+// before Verifier, and is not cached: the verification reads again on the next report.
 func TestReliabilityDatabaseError(t *testing.T) {
 	db, f := loadGolden(t)
-	v := &Verifier{DropInfoRepo: repo.NewDropInfo(db), RejectRuleRepo: repo.NewRejectRule(db)}
 	ctx := context.Background()
 	// the first task of reliability 0 passes the drop check, so that both checks run
 	task := f.task(0)
@@ -245,11 +244,19 @@ func TestReliabilityDatabaseError(t *testing.T) {
 	}
 
 	for _, table := range []string{"reject_rules", "drop_infos"} {
+		// a Verifier of its own, which has read nothing
+		v := &Verifier{DropInfoRepo: repo.NewDropInfo(db), RejectRuleRepo: repo.NewRejectRule(db)}
 		if _, err := db.ExecContext(ctx, "ALTER TABLE "+table+" RENAME TO "+table+"_gone"); err != nil {
 			t.Fatal(err)
 		}
 		if r, _, err := v.Reliability(ctx, task, task.Reports[0]); err == nil {
 			t.Errorf("without %s: reliability %d, want an error", table, r)
+		}
+		if _, err := db.ExecContext(ctx, "ALTER TABLE "+table+"_gone RENAME TO "+table); err != nil {
+			t.Fatal(err)
+		}
+		if r, _, err := v.Reliability(ctx, task, task.Reports[0]); err != nil || r != 0 {
+			t.Errorf("with %s again: reliability %d, %v, want 0", table, r, err)
 		}
 	}
 }

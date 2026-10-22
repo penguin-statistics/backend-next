@@ -8,12 +8,15 @@ import (
 	"github.com/pkg/errors"
 )
 
-// cacheTTL is how long the verification uses the reject rules it read, so that it reads them once a minute rather than
-// for every report: an edit of them is used up to cacheTTL late. Admins edit them rarely, and a minute already makes
-// the read negligible, so a longer TTL would make edits later for no measurable saving.
+// cacheTTL is how long the verification uses the reject rules and the drop infos it read, so that it reads them about
+// once a minute rather than for every report: an edit of them is used up to cacheTTL late. Admins edit them rarely, and
+// a minute already makes the reads negligible (the drop infos of a stage and server are read again for about 1% of
+// the reports of a busy hour of production, 3% of a quiet one), so a longer TTL would make edits later for no
+// measurable saving.
 const cacheTTL = time.Minute
 
-// expiringCacheMaxEntries bounds an expiringCache: it is cleared once it holds more.
+// expiringCacheMaxEntries bounds an expiringCache: it is cleared once it holds more. The drop infos of every stage of
+// every server with a current time range are about 2,200 keys.
 const expiringCacheMaxEntries = 8192
 
 var errLoadPanicked = errors.New("cache load panicked")

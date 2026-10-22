@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"exusiai.dev/gommon/constant"
 	"github.com/uptrace/bun"
 
 	"exusiai.dev/backend-next/internal/model/types"
@@ -105,5 +106,75 @@ func TestRejectRuleEditUsedAfterTTL(t *testing.T) {
 	vt.exec(`ALTER TABLE reject_rules_gone RENAME TO reject_rules`)
 	if r := vt.reliability(); r != 0 {
 		t.Fatalf("reliability %d after the error, want 0", r)
+	}
+}
+
+// stageDropInfosWhere selects the drop infos of the stage and server of the report of vt.
+func (vt *verifierTest) stageDropInfosWhere() (string, []any) {
+	return `server = ? AND stage_id = (SELECT stage_id FROM stages WHERE ark_stage_id = ?)`,
+		[]any{vt.task.Server, vt.task.Reports[0].StageID}
+}
+
+// TestDropInfoEditUsedAfterTTL checks that an edit of the drop infos is used once the drop infos read before it are
+// cacheTTL old, and not before.
+func TestDropInfoEditUsedAfterTTL(t *testing.T) {
+	vt := newVerifierTest(t)
+	where, args := vt.stageDropInfosWhere()
+
+	read := vt.clock.t
+	if r := vt.reliability(); r != 0 {
+		t.Fatalf("reliability %d before the edit, want 0", r)
+	}
+	// none of the drops of the report fits any more
+	vt.exec(`UPDATE drop_infos SET item_id = item_id + 100000 WHERE item_id IS NOT NULL AND `+where, args...)
+	vt.clock.t = read.Add(cacheTTL - time.Nanosecond)
+	if r := vt.reliability(); r != 0 {
+		t.Fatalf("reliability %d before the drop infos read are cacheTTL old, want 0 as read before the edit", r)
+	}
+	vt.clock.t = read.Add(cacheTTL)
+	if r := vt.reliability(); r != constant.ViolationReliabilityDrop {
+		t.Fatalf("reliability %d once the drop infos read are cacheTTL old, want %d", r, constant.ViolationReliabilityDrop)
+	}
+}
+
+// TestDropInfosExpireWithTheirTimeRange checks that drop infos are read again when one of their time ranges ends, before
+// they are cacheTTL old.
+func TestDropInfosExpireWithTheirTimeRange(t *testing.T) {
+	vt := newVerifierTest(t)
+	where, args := vt.stageDropInfosWhere()
+	ctx := context.Background()
+
+	query := &repo.DropInfoQuery{Server: vt.task.Server, ArkStageId: vt.task.Reports[0].StageID}
+	until := func() time.Time {
+		t.Helper()
+		_, _, until, err := vt.v.DropInfoRepo.GetForCurrentTimeRangeWithDropTypesUntil(ctx, query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return until
+	}
+	// the time ranges of the fixture never end
+	if u := until(); !u.IsZero() {
+		t.Fatalf("until %v, want zero", u)
+	}
+	// the time ranges of the stage end soon (by the clock of the database too), within cacheTTL
+	end := vt.clock.t.Add(10 * time.Second).Truncate(time.Microsecond)
+	vt.exec(`UPDATE time_ranges SET end_time = ? WHERE range_id IN (SELECT range_id FROM drop_infos WHERE `+where+`)`,
+		append([]any{end}, args...)...)
+	if u := until(); !u.Equal(end) {
+		t.Fatalf("until %v, want the end of the time ranges %v", u, end)
+	}
+
+	if r := vt.reliability(); r != 0 {
+		t.Fatalf("reliability %d before the edit, want 0", r)
+	}
+	vt.exec(`UPDATE drop_infos SET item_id = item_id + 100000 WHERE item_id IS NOT NULL AND `+where, args...)
+	vt.clock.t = end.Add(-time.Nanosecond)
+	if r := vt.reliability(); r != 0 {
+		t.Fatalf("reliability %d before the time ranges end, want 0 as read before the edit", r)
+	}
+	vt.clock.t = end
+	if r := vt.reliability(); r != constant.ViolationReliabilityDrop {
+		t.Fatalf("reliability %d once the time ranges end, want %d as read again", r, constant.ViolationReliabilityDrop)
 	}
 }

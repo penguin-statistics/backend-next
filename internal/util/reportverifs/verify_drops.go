@@ -3,6 +3,7 @@ package reportverifs
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -21,9 +22,77 @@ var (
 	ErrUnknownDropInfoTuple = errors.New("unknown drop type + item id tuple")
 )
 
+// stageDropInfos are the drop infos of a stage and server, split as GetForCurrentTimeRangeWithDropTypes splits them.
+// Those of Verifier.dropInfos are read-only: verifyDrops adjusts copies of them.
+type stageDropInfos struct {
+	items, types []*model.DropInfo
+}
+
+// currentDropInfos returns copies of the drop infos of query's stage and server in their current time range, as read up
+// to cacheTTL ago, and never after the end of one of their time ranges: a time range ending is seen when it ends, one
+// starting up to cacheTTL late. No drop infos are cached as any others; an error is returned as read, and not cached.
+func (v *Verifier) currentDropInfos(ctx context.Context, query repo.DropInfoQuery) (itemDropInfos, typeDropInfos []*model.DropInfo, err error) {
+	now := v.clock()
+	cached, err := v.dropInfos.get(ctx, now, query, func() (stageDropInfos, time.Time, error) {
+		items, types, until, err := v.DropInfoRepo.GetForCurrentTimeRangeWithDropTypesUntil(ctx, &query)
+		return stageDropInfos{items: items, types: types}, dropInfosExpiry(now, until), err
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	itemDropInfos, typeDropInfos = copyDropInfos(cached.items, cached.types)
+	return itemDropInfos, typeDropInfos, nil
+}
+
+// dropInfosExpiry returns when drop infos read at now expire: cacheTTL later, or at until, the end of the first of their
+// time ranges to end, if it is earlier (until is zero if none ends). Drop infos whose time range ended by now (by the
+// clock of the database, which may be a little behind) are expired already.
+func dropInfosExpiry(now, until time.Time) time.Time {
+	expiry := now.Add(cacheTTL)
+	if !until.IsZero() && until.Before(expiry) {
+		return until
+	}
+	return expiry
+}
+
+// copyDropInfos returns copies of items and types, bounds included, in three allocations. An empty one is nil, as read.
+func copyDropInfos(items, types []*model.DropInfo) (itemCopies, typeCopies []*model.DropInfo) {
+	n := len(items) + len(types)
+	if n == 0 {
+		return nil, nil
+	}
+	values := make([]model.DropInfo, n)
+	bounds := make([]model.Bounds, n)
+	copies := make([]*model.DropInfo, n)
+	copyTo := func(i int, dropInfo *model.DropInfo) {
+		values[i] = *dropInfo
+		if dropInfo.Bounds != nil {
+			bounds[i] = *dropInfo.Bounds
+			if dropInfo.Bounds.Exceptions != nil {
+				bounds[i].Exceptions = append([]int(nil), dropInfo.Bounds.Exceptions...)
+			}
+			values[i].Bounds = &bounds[i]
+		}
+		copies[i] = &values[i]
+	}
+	for i, dropInfo := range items {
+		copyTo(i, dropInfo)
+	}
+	for i, dropInfo := range types {
+		copyTo(len(items)+i, dropInfo)
+	}
+	if len(items) > 0 {
+		itemCopies = copies[:len(items):len(items)]
+	}
+	if len(types) > 0 {
+		typeCopies = copies[len(items):]
+	}
+	return itemCopies, typeCopies
+}
+
 // verifyDrops returns how the drops of the report do not fit the drop infos of its stage, if they do not.
 func (v *Verifier) verifyDrops(ctx context.Context, report *types.ReportTaskSingleReport, reportTask *types.ReportTask) ([]error, error) {
-	itemDropInfos, typeDropInfos, err := v.DropInfoRepo.GetForCurrentTimeRangeWithDropTypes(ctx, &repo.DropInfoQuery{
+	itemDropInfos, typeDropInfos, err := v.currentDropInfos(ctx, repo.DropInfoQuery{
 		Server:     reportTask.Server,
 		ArkStageId: report.StageID,
 	})
