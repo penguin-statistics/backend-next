@@ -13,9 +13,6 @@ import (
 	"exusiai.dev/backend-next/internal/service"
 )
 
-// licenseURL is the license of the drop data (meta.footer.copyright of the frontend)
-const licenseURL = "https://creativecommons.org/licenses/by-nc/4.0/"
-
 const (
 	// itemRowsShown caps the rows of an item page: most items drop in about 10 stages, but some in hundreds
 	itemRowsShown = 50
@@ -28,9 +25,6 @@ const (
 	// highlightMinTimes is the number of samples a row needs to be quoted first in the description of an item
 	highlightMinTimes = 1000
 )
-
-// validItemTypes are the types of the items the frontend lists (src/utils/getters.js)
-var validItemTypes = []string{"MATERIAL", "CARD_EXP", "CHIP", "FURN", "ACTIVITY_ITEM"}
 
 // zoneCategories are the zone categories in the order the stage list shows them
 var zoneCategories = []string{"MAINLINE", "ACTIVITY_PERMANENT", "ACTIVITY", "WEEKLY", "GACHABOX"}
@@ -158,6 +152,7 @@ type Notes struct {
 	Data         *Link
 	LicenseLabel string
 	LicenseURL   string
+	LicenseName  string
 }
 
 type Group struct {
@@ -189,17 +184,14 @@ func (b *builder) path(lang string, kind pageKind, ids ...string) string {
 }
 
 func pagePath(lang, server string, kind pageKind, ids ...string) string {
-	p := "/" + lang + "/result/" + strings.ToLower(server)
+	var section string
 	switch kind {
 	case kindItem, kindItemList:
-		p += "/item"
+		section = service.StatsSectionItem
 	case kindStage, kindStageList:
-		p += "/stage"
+		section = service.StatsSectionStage
 	}
-	for _, id := range ids {
-		p += "/" + url.PathEscape(id)
-	}
-	return p
+	return service.StatsPagePath(lang, server, section, ids...)
 }
 
 func (b *builder) abs(path string) string {
@@ -210,69 +202,13 @@ func (b *builder) serverName(server string) string {
 	return b.t.Servers[server]
 }
 
-func isValidItemType(t string) bool {
-	for _, v := range validItemTypes {
-		if v == t {
-			return true
-		}
-	}
-	return false
-}
-
-// itemOnServer tells whether the item has a page on the server: an item the frontend lists that exists there or
-// has drops there
+// itemOnServer tells whether the item has a page on the server of the request (see service.ItemOnServer)
 func (b *builder) itemOnServer(item *service.SEOItem) bool {
-	if item == nil || !isValidItemType(item.Type) {
-		return false
-	}
-	return item.Existence.In(b.r.server) || (b.matrix != nil && len(b.matrix.ByItem[item.ArkID]) > 0)
+	return service.ItemOnServer(item, b.r.server, b.matrix)
 }
 
 func (b *builder) stageOnServer(stage *service.SEOStage) bool {
-	if stage == nil || stage.Zone == nil {
-		return false
-	}
-	return stage.Existence.In(b.r.server) || (b.matrix != nil && len(b.matrix.ByStage[stage.ArkID]) > 0)
-}
-
-// isRecruit tells whether the stage is the recruitment statistics, which the frontend shows in beta with measures
-// of its own
-func isRecruit(stage *service.SEOStage) bool {
-	return stage.ArkID == "recruit" || (stage.Zone != nil && stage.Zone.Category == "RECRUIT")
-}
-
-func (b *builder) itemName(item *service.SEOItem) string {
-	if n := item.Name.In(b.t.Lang); n != "" {
-		return n
-	}
-	return item.ArkID
-}
-
-func (b *builder) stageCode(stage *service.SEOStage) string {
-	if c := stage.Code.In(b.t.Lang); c != "" {
-		return c
-	}
-	return stage.ArkID
-}
-
-func (b *builder) zoneName(zone *service.SEOZone) string {
-	if zone == nil {
-		return ""
-	}
-	if n := zone.Name.In(b.t.Lang); n != "" {
-		return n
-	}
-	return zone.ArkID
-}
-
-// stageName is the code of the stage and the name of its zone: stages have no name of their own. A stage named like
-// its zone (the recruitment statistics) is named once.
-func (b *builder) stageName(stage *service.SEOStage) string {
-	code, zone := b.stageCode(stage), b.zoneName(stage.Zone)
-	if zone == "" || zone == code {
-		return code
-	}
-	return code + " " + zone
+	return service.StageOnServer(stage, b.r.server, b.matrix)
 }
 
 func (b *builder) stageLink(stageID string) Link {
@@ -280,7 +216,7 @@ func (b *builder) stageLink(stageID string) Link {
 	if stage == nil {
 		return Link{Name: stageID}
 	}
-	l := Link{Name: b.stageCode(stage)}
+	l := Link{Name: stage.DisplayCode(b.t.Lang)}
 	if stage.Zone != nil {
 		l.Href = b.abs(b.path(b.t.Lang, kindStage, stage.Zone.ArkID, stage.ArkID))
 	}
@@ -292,7 +228,7 @@ func (b *builder) itemLink(itemID string) Link {
 	if item == nil {
 		return Link{Name: itemID}
 	}
-	l := Link{Name: b.itemName(item)}
+	l := Link{Name: item.DisplayName(b.t.Lang)}
 	if b.itemOnServer(item) {
 		l.Href = b.abs(b.path(b.t.Lang, kindItem, item.ArkID))
 	}
@@ -328,13 +264,13 @@ func (b *builder) base(kind pageKind, title, imageAlt, description string, ids .
 		OGLocale:    b.t.OGLocale,
 		ImageAlt:    imageAlt,
 	}
-	for _, l := range langs {
+	for _, l := range service.StatsLangs {
 		p.Head.Alternates = append(p.Head.Alternates, Alternate{Hreflang: l, Href: b.abs(b.path(l, kind, ids...))})
 		if l != b.t.Lang {
 			p.Head.OGLocales = append(p.Head.OGLocales, textsByLang[l].OGLocale)
 		}
 	}
-	p.Head.Alternates = append(p.Head.Alternates, Alternate{Hreflang: "x-default", Href: b.abs(b.path(defaultLang, kind, ids...))})
+	p.Head.Alternates = append(p.Head.Alternates, Alternate{Hreflang: "x-default", Href: b.abs(b.path(service.StatsDefaultLang, kind, ids...))})
 	p.Body = Body{Lang: b.t.Lang, BreadcrumbLabel: b.t.BreadcrumbLabel, ServerLabel: b.t.ServerLabel}
 	return p
 }
@@ -482,7 +418,8 @@ func (b *builder) notes(filter, id string) *Notes {
 		UpdatedLabel: b.t.Updated,
 		Updated:      b.updated(),
 		LicenseLabel: b.t.License,
-		LicenseURL:   licenseURL,
+		LicenseURL:   service.DropDataLicenseURL,
+		LicenseName:  service.DropDataLicenseName,
 	}
 	if filter != "" {
 		n.Data = &Link{Name: b.t.FullData, Href: b.dataURL(filter, id)}
@@ -495,7 +432,7 @@ func (b *builder) itemPage() *Page {
 	if !b.itemOnServer(item) {
 		return b.notFound()
 	}
-	name := b.itemName(item)
+	name := item.DisplayName(b.t.Lang)
 	server := b.serverName(b.r.server)
 	heading := fill(b.t.ItemTitle, "name", name, "server", server)
 
@@ -535,7 +472,7 @@ func (b *builder) itemPage() *Page {
 			r := Row{Head: b.stageLink(row.StageID), Window: b.window(row)}
 			sanity, hasSanity := int64(0), false
 			if stage := b.catalog.Stages[row.StageID]; stage != nil {
-				r.HeadExtra = b.zoneName(stage.Zone)
+				r.HeadExtra = stage.Zone.DisplayName(b.t.Lang)
 				sanity, hasSanity = stage.Sanity.Int64, stage.Sanity.Valid
 			}
 			cost := "—"
@@ -588,7 +525,7 @@ func (b *builder) related(item *service.SEOItem) *Group {
 	g := &Group{Heading: b.t.Related}
 	for _, other := range b.catalog.ItemList {
 		if other != item && other.Group == item.Group && b.itemOnServer(other) {
-			g.Links = append(g.Links, Link{Name: b.itemName(other), Href: b.abs(b.path(b.t.Lang, kindItem, other.ArkID))})
+			g.Links = append(g.Links, Link{Name: other.DisplayName(b.t.Lang), Href: b.abs(b.path(b.t.Lang, kindItem, other.ArkID))})
 		}
 	}
 	if len(g.Links) == 0 {
@@ -606,8 +543,8 @@ func (b *builder) stagePage() *Page {
 		// the zone is part of the path, the stage alone tells the page
 		return &Page{Kind: kindStage, Outcome: "redirect", Redirect: b.path(b.t.Lang, kindStage, stage.Zone.ArkID, stage.ArkID)}
 	}
-	name := b.stageName(stage)
-	code := b.stageCode(stage)
+	name := stage.DisplayName(b.t.Lang)
+	code := stage.DisplayCode(b.t.Lang)
 	server := b.serverName(b.r.server)
 	heading := fill(b.t.StageTitle, "stage", name, "server", server)
 
@@ -627,7 +564,7 @@ func (b *builder) stagePage() *Page {
 
 	p := b.base(kindStage, b.title(heading), heading, desc, stage.Zone.ArkID, stage.ArkID)
 	p.Body.Breadcrumbs = []Link{b.home(), b.listCrumb(kindStageList), {Name: name}}
-	p.Body.Subheading = b.zoneName(stage.Zone)
+	p.Body.Subheading = stage.Zone.DisplayName(b.t.Lang)
 	p.Body.Heading = fill(b.t.StageHeading, "stage", code)
 	p.Body.Servers = b.servers(kindStage, func(s string) bool { return stage.Existence.In(s) }, stage.Zone.ArkID, stage.ArkID)
 	if stage.Sanity.Valid {
@@ -661,7 +598,7 @@ func (b *builder) stagePage() *Page {
 		p.Body.Notes = b.notes("stageFilter", stage.ArkID)
 		p.Head.JSONLD = b.jsonLD(p, fill(b.t.DatasetName, "name", name, "server", server), "stageFilter", stage.ArkID, rows, []Link{b.home(), b.listCrumb(kindStageList), {Name: name}})
 	}
-	if isRecruit(stage) && p.Indexable {
+	if service.IsRecruitStage(stage) && p.Indexable {
 		// the recruitment statistics are in beta in the frontend, with measures of their own
 		noindex(p, "noindex")
 	}
@@ -689,7 +626,7 @@ func (b *builder) stageHighlights(rows []service.SEORow) string {
 func (b *builder) listedItems() []*service.SEOItem {
 	var items []*service.SEOItem
 	for _, item := range b.catalog.ItemList {
-		if !isValidItemType(item.Type) {
+		if !service.IsListedItemType(item.Type) {
 			continue
 		}
 		if b.matrix != nil && len(b.matrix.ByItem[item.ArkID]) == 0 || b.matrix == nil && !item.Existence.In(b.r.server) {
@@ -704,7 +641,7 @@ func (b *builder) listedItems() []*service.SEOItem {
 func (b *builder) listedStages() []*service.SEOStage {
 	var stages []*service.SEOStage
 	for _, stage := range b.catalog.StageList {
-		if stage.Zone == nil || isRecruit(stage) {
+		if stage.Zone == nil || service.IsRecruitStage(stage) {
 			continue
 		}
 		if b.matrix != nil && len(b.matrix.ByStage[stage.ArkID]) == 0 || b.matrix == nil && !stage.Existence.In(b.r.server) {
@@ -730,7 +667,7 @@ func (b *builder) itemListPage() *Page {
 		p.Body.Paragraphs = []string{b.t.Cold}
 	}
 	byType := map[string]*Group{}
-	for _, t := range validItemTypes {
+	for _, t := range service.ListedItemTypes {
 		byType[t] = &Group{Heading: b.t.ItemCategories[t]}
 	}
 	for i, item := range items {
@@ -738,9 +675,9 @@ func (b *builder) itemListPage() *Page {
 			break
 		}
 		g := byType[item.Type]
-		g.Links = append(g.Links, Link{Name: b.itemName(item), Href: b.abs(b.path(b.t.Lang, kindItem, item.ArkID))})
+		g.Links = append(g.Links, Link{Name: item.DisplayName(b.t.Lang), Href: b.abs(b.path(b.t.Lang, kindItem, item.ArkID))})
 	}
-	for _, t := range validItemTypes {
+	for _, t := range service.ListedItemTypes {
 		if len(byType[t].Links) > 0 {
 			p.Body.Groups = append(p.Body.Groups, *byType[t])
 		}
@@ -798,9 +735,9 @@ func (b *builder) stageListPage() *Page {
 			p.Body.Groups = append(p.Body.Groups, Group{Heading: heading})
 			cur = &p.Body.Groups[len(p.Body.Groups)-1]
 		}
-		sub := Group{Heading: b.zoneName(zone)}
+		sub := Group{Heading: zone.DisplayName(b.t.Lang)}
 		for _, stage := range byZone[zone] {
-			sub.Links = append(sub.Links, Link{Name: b.stageCode(stage), Href: b.abs(b.path(b.t.Lang, kindStage, zone.ArkID, stage.ArkID))})
+			sub.Links = append(sub.Links, Link{Name: stage.DisplayCode(b.t.Lang), Href: b.abs(b.path(b.t.Lang, kindStage, zone.ArkID, stage.ArkID))})
 		}
 		cur.Subgroups = append(cur.Subgroups, sub)
 	}

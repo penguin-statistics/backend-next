@@ -97,7 +97,7 @@ func (b *builder) jsonLD(p *Page, name, filter, id string, rows []service.SEORow
 		Description:           p.Head.Description + " " + b.t.Definitions,
 		URL:                   p.Head.Canonical,
 		InLanguage:            b.t.Lang,
-		License:               licenseURL,
+		License:               service.DropDataLicenseURL,
 		IsAccessibleForFree:   true,
 		Creator:               org,
 		Publisher:             org,

@@ -80,7 +80,7 @@ func TestSitemapIndex(t *testing.T) {
 	if len(locs) != 16 {
 		t.Errorf("%d sitemaps, want 16", len(locs))
 	}
-	for _, lang := range langs {
+	for _, lang := range service.StatsLangs {
 		for _, server := range []string{"cn", "us", "jp", "kr"} {
 			loc := site + "/sitemap-" + lang + "-" + server + ".xml"
 			lm, ok := at[loc]
@@ -245,7 +245,7 @@ func assertSitemapsListExactlyTheIndexablePages(t *testing.T, e *testEnv) {
 		paths = append(paths, "/stage/"+url.PathEscape(zone)+"/"+url.PathEscape(stage.ArkID))
 	}
 	indexable := map[string]bool{}
-	for _, lang := range langs {
+	for _, lang := range service.StatsLangs {
 		for _, server := range []string{"cn", "us", "jp", "kr"} {
 			for _, p := range paths {
 				r := e.get(t, "/"+lang+"/result/"+server+p)
@@ -306,6 +306,30 @@ func TestSitemapsListExactlyTheIndexablePages(t *testing.T) {
 	}
 	if body := e.get(t, "/sitemap-en-cn.xml").body; !strings.Contains(body, "/item/a&amp;b</loc>") {
 		t.Error("the URLs are not escaped in XML")
+	}
+}
+
+// The links of the MCP server are built with the URL builders of service, which must link the pages as routed here
+func TestSharedPageURLsRouteAsThePages(t *testing.T) {
+	ids := []string{"30012", "a&b", "a/b", "é <x>", "", ".", ".."}
+	for _, lang := range service.StatsLangs {
+		for _, server := range []string{"CN", "kr", "XX"} {
+			for _, id := range ids {
+				path := pagePath(lang, server, kindItem, id)
+				u, ok := service.ItemPageURL(site+"/", lang, server, id)
+				if want := routable(path, kindItem); ok != want || ok && u != site+path {
+					t.Errorf("item %q on %s in %s: %q, %v; want %v for %s", id, server, lang, u, ok, want, path)
+				}
+				// a zone "" is left out: the stage builder rejects it outright
+				for _, zone := range []string{"main_1", "a/b", ".."} {
+					path := pagePath(lang, server, kindStage, zone, id)
+					u, ok := service.StagePageURL(site, lang, server, &service.SEOStage{ArkID: id, Zone: &service.SEOZone{ArkID: zone}})
+					if want := routable(path, kindStage); ok != want || ok && u != site+path {
+						t.Errorf("stage %q in %q on %s in %s: %q, %v; want %v for %s", id, zone, server, lang, u, ok, want, path)
+					}
+				}
+			}
+		}
 	}
 }
 

@@ -35,7 +35,7 @@
 <p>
 {{- with .Updated}}{{$.Notes.UpdatedLabel}} <time datetime="{{.Datetime}}">{{.Text}}</time>{{$.Notes.Stop}}{{end -}}
 {{- with .Data}}<a href="{{.Href}}">{{.Name}}</a>{{$.Notes.Stop}}{{end -}}
-{{.LicenseLabel}}<a href="{{.LicenseURL}}" rel="license">CC BY-NC 4.0</a></p>
+{{.LicenseLabel}}<a href="{{.LicenseURL}}" rel="license">{{.LicenseName}}</a></p>
 {{- end}}
 {{- range .Groups}}
 <h2>{{.Heading}}</h2>
