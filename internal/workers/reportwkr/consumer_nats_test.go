@@ -644,7 +644,11 @@ func TestTransientErrorIsNakedAndRetried(t *testing.T) {
 		return w.process(ctx, task)
 	}
 	startConsumer(t, w)
-	task := newTestTask(t, tw, testAccountID(), time.UnixMicro(1760600000123456), "203.0.113.7", testReport("main_01-07", 30012))
+	// two drops of one item: process merges them in place, so a line logging the decoded task rather than the message
+	// would show one drop
+	report := testReport("main_01-07", 30012)
+	report.Drops = append(report.Drops, &types.Drop{DropType: "EXTRA", ItemID: 30012, Quantity: 1})
+	task := newTestTask(t, tw, testAccountID(), time.UnixMicro(1760600000123456), "203.0.113.7", report)
 	if _, err := s.js.Publish(s.publish, task); err != nil {
 		t.Fatal(err)
 	}
