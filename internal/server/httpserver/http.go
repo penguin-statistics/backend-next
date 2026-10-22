@@ -86,9 +86,12 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 	app.Use(middlewares.RequestID())
 
 	// Compress responses, as neither ingress-nginx nor cloudflared does. It wraps the handlers and the /result
-	// response cache, so the cache keeps uncompressed bodies; BestSpeed as every response is compressed again.
+	// response cache, so the cache keeps uncompressed bodies and every response is compressed again. LevelDefault is
+	// brotli 4 / gzip 6: BestSpeed's brotli 0 is no smaller than gzip 1 (the boot responses are 888 KB at brotli 0 vs
+	// 630 KB at brotli 4, for about 20 ms more per large response), and BestCompression's brotli 11 takes seconds.
+	// See compressbench_test.go.
 	app.Use(compress.New(compress.Config{
-		Level: compress.LevelBestSpeed,
+		Level: compress.LevelDefault,
 	}))
 	// fasthttp adds Vary: Accept-Encoding only to the responses it compresses, but the identity response to a request
 	// without Accept-Encoding varies on it too: without the header a shared cache could serve that uncompressed body
