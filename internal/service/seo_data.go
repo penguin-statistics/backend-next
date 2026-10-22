@@ -182,8 +182,12 @@ func (d *SEOData) RefreshCatalog(ctx context.Context) error {
 		// the pages rendered from the catalog at hand stay valid (the lists are rendered once per catalog)
 		return nil
 	}
+	catalog := NewSEOCatalog(items, stages, zones)
+	if d.catalog.Load() != nil {
+		catalog.ChangedAt = time.Now()
+	}
 	d.catalogInputs = inputs
-	d.catalog.Store(NewSEOCatalog(items, stages, zones))
+	d.catalog.Store(catalog)
 	return nil
 }
 
@@ -319,6 +323,9 @@ type SEOCatalog struct {
 	// StageList is ordered by the numerical stage ID
 	StageList []*SEOStage
 	Zones     map[string]*SEOZone
+	// ChangedAt is when the catalog replaced one with other rows, which the rows have no time of their own to tell;
+	// zero for the first one loaded after a start, so that a start does not move the Last-Modified of every page
+	ChangedAt time.Time
 }
 
 func NewSEOCatalog(items []*model.Item, stages []*model.Stage, zones []*model.Zone) *SEOCatalog {

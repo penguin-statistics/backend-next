@@ -118,8 +118,8 @@ func Register(lc fx.Lifecycle, app *fiber.App, conf *appconfig.Config, data *ser
 			"not positive is replaced by its default)")
 }
 
-// MountDisabled registers the routes of the pages to send their requests back to the frontend, while the pages are
-// off.
+// MountDisabled registers the routes of the pages to send their requests back to the frontend, and those of their
+// sitemaps to answer 404, while the pages are off.
 func MountDisabled(r fiber.Router) {
 	disabled := func(c *fiber.Ctx) error {
 		path := c.Path()
@@ -130,6 +130,7 @@ func MountDisabled(r fiber.Router) {
 		r.Get("/"+lang+"/result", disabled)
 		r.Get("/"+lang+"/result/*", disabled)
 	}
+	mountSitemaps(r, sitemapsDisabled(kindSitemapIndex), sitemapsDisabled(kindSitemap))
 }
 
 type Handler struct {
@@ -139,6 +140,8 @@ type Handler struct {
 	data   Data
 	// lists holds the list pages rendered last, by listKey
 	lists sync.Map
+	// sitemaps holds the sitemaps built last, by sitemapKey
+	sitemaps sync.Map
 }
 
 func NewHandler(siteURL string, maxAge time.Duration, shells ShellSource, data Data) *Handler {
@@ -146,12 +149,13 @@ func NewHandler(siteURL string, maxAge time.Duration, shells ShellSource, data D
 }
 
 // Mount registers the routes of the pages: /{lang}/result and everything below it for each language of the stats
-// routes of the frontend.
+// routes of the frontend, and their sitemaps.
 func (h *Handler) Mount(r fiber.Router) {
 	for _, lang := range langs {
 		r.Get("/"+lang+"/result", h.Serve)
 		r.Get("/"+lang+"/result/*", h.Serve)
 	}
+	mountSitemaps(r, h.SitemapIndex, h.Sitemap)
 }
 
 // parseRoute parses a path of the stats routes as requested (escaped); it is one of the routes of Mount

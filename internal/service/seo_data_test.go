@@ -138,6 +138,9 @@ func TestSEODataKeepsTheCatalogWhileUnchanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	first := d.Catalog()
+	if !first.ChangedAt.IsZero() {
+		t.Errorf("first catalog changed at %v, want zero", first.ChangedAt)
+	}
 	if err := d.RefreshCatalog(ctx); err != nil || d.Catalog() != first {
 		t.Fatalf("catalog replaced while the cached rows are the same: %v", err)
 	}
@@ -147,8 +150,12 @@ func TestSEODataKeepsTheCatalogWhileUnchanged(t *testing.T) {
 		t.Fatalf("catalog replaced for equal rows: %v", err)
 	}
 	cache.Items.Set(items("Orirock Cube II"), time.Hour)
+	before := time.Now()
 	if err := d.RefreshCatalog(ctx); err != nil || d.Catalog() == first || d.Catalog().Items["30012"].Name.In("en") != "Orirock Cube II" {
 		t.Fatalf("catalog not replaced for changed rows: %v", err)
+	}
+	if at := d.Catalog().ChangedAt; at.Before(before) || at.After(time.Now()) {
+		t.Errorf("replaced catalog changed at %v, want the time it was replaced", at)
 	}
 }
 
