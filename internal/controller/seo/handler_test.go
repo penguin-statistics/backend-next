@@ -382,7 +382,7 @@ func TestCanonicalAndHreflang(t *testing.T) {
 		"stage":      "/stage/main_1/main_01-07",
 		"stage_list": "/stage",
 	}
-	for _, lang := range langs {
+	for _, lang := range service.StatsLangs {
 		for _, server := range []string{"cn", "us"} {
 			for kind, suffix := range paths {
 				path := "/" + lang + "/result/" + server + suffix
@@ -396,7 +396,7 @@ func TestCanonicalAndHreflang(t *testing.T) {
 				}
 				alts := hreflangRe.FindAllStringSubmatch(r.body, -1)
 				want := map[string]string{"x-default": site + "/en/result/" + server + suffix}
-				for _, l := range langs {
+				for _, l := range service.StatsLangs {
 					want[l] = site + "/" + l + "/result/" + server + suffix
 				}
 				got := map[string]string{}

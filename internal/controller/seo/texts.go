@@ -86,12 +86,6 @@ type texts struct {
 	MeasurementTechnique string
 }
 
-// langs are the languages of the stats routes of the frontend (src/router.js statsLanguages)
-var langs = []string{"zh", "en", "ja", "ko"}
-
-// defaultLang is the x-default of the hreflang links, the fallback locale of the frontend
-const defaultLang = "en"
-
 var textsByLang = map[string]*texts{
 	"zh": {
 		SiteName:        "企鹅物流数据统计",

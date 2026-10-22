@@ -127,7 +127,7 @@ func MountDisabled(r fiber.Router) {
 		(&Handler{}).unavailable(c, parseRoute(path), path, "disabled_redirect")
 		return nil
 	}
-	for _, lang := range langs {
+	for _, lang := range service.StatsLangs {
 		r.Get("/"+lang+"/result", disabled)
 		r.Get("/"+lang+"/result/*", disabled)
 	}
@@ -154,7 +154,7 @@ func NewHandler(siteURL string, maxAge time.Duration, shells ShellSource, data D
 // Mount registers the routes of the pages: /{lang}/result and everything below it for each language of the stats
 // routes of the frontend, and their sitemaps.
 func (h *Handler) Mount(r fiber.Router) {
-	for _, lang := range langs {
+	for _, lang := range service.StatsLangs {
 		r.Get("/"+lang+"/result", h.Serve)
 		r.Get("/"+lang+"/result/*", h.Serve)
 	}

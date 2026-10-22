@@ -51,7 +51,7 @@ type sitemapKey struct {
 // sitemapsByPath are the sitemaps by path
 var sitemapsByPath = func() map[string]sitemapKey {
 	m := map[string]sitemapKey{}
-	for _, lang := range langs {
+	for _, lang := range service.StatsLangs {
 		for _, server := range constant.Servers {
 			m[sitemapPath(lang, server)] = sitemapKey{lang: lang, server: server}
 		}
@@ -194,7 +194,7 @@ func (h *Handler) SitemapIndex(c *fiber.Ctx) error {
 	index := xmlSitemapIndex{NS: sitemapNS}
 	var lastModified time.Time
 	complete := true
-	for _, lang := range langs {
+	for _, lang := range service.StatsLangs {
 		for _, server := range constant.Servers {
 			entry := xmlSitemapURL{Loc: h.site + sitemapPath(lang, server)}
 			if matrix := h.data.Matrix(server); matrix != nil {

@@ -279,23 +279,51 @@ func (s SEOI18n) In(lang string) string {
 	return ""
 }
 
-// SEOExistence is the existence of an item, stage or zone in each server.
+// SEOExistence is the existence of an item, stage or zone in each server. Stages and zones of events have the times
+// they open and close (epoch milliseconds), items none.
 type SEOExistence map[string]struct {
-	Exist    bool     `json:"exist"`
-	OpenTime null.Int `json:"openTime"`
+	Exist     bool     `json:"exist"`
+	OpenTime  null.Int `json:"openTime"`
+	CloseTime null.Int `json:"closeTime"`
 }
 
 func (e SEOExistence) In(server string) bool {
 	return e[server].Exist
 }
 
+// OpenAt tells whether the item, stage or zone is open on server at now, like the frontend (src/utils/existUtils.js):
+// it exists there, has opened (no open time, or one not after now) and has not closed (no close time, or one after
+// now). The close time of what never closes, constant.FakeEndTimeMilli, counts as none.
+func (e SEOExistence) OpenAt(server string, now time.Time) bool {
+	ex := e[server]
+	if !ex.Exist {
+		return false
+	}
+	ms := now.UnixMilli()
+	if ex.OpenTime.Valid && ex.OpenTime.Int64 > ms {
+		return false
+	}
+	// 0 is no time to the frontend either
+	if end := ex.CloseTime; end.Valid && end.Int64 != 0 && end.Int64 != constant.FakeEndTimeMilli && end.Int64 <= ms {
+		return false
+	}
+	return true
+}
+
 type SEOItem struct {
-	ArkID     string
-	Type      string
-	Name      SEOI18n
+	ArkID string
+	Type  string
+	Name  SEOI18n
+	// Rarity is the rarity as stored, 0 to 4 (the tier minus 1)
+	Rarity    int
 	SortID    int
 	Group     string
 	Existence SEOExistence
+	// Alias holds the other names of the item per language for the search of the frontend (zh and ja only, October
+	// 2026). They are not unique: 土块 is each of 30011 to 30014.
+	Alias map[string][]string
+	// Pron holds the readings of the aliases per language, syllables separated by backticks (gu`yuan`yan)
+	Pron map[string][]string
 }
 
 type SEOZone struct {
@@ -308,10 +336,13 @@ type SEOZone struct {
 }
 
 type SEOStage struct {
-	ArkID     string
-	StageID   int
-	Code      SEOI18n
-	Sanity    null.Int
+	ArkID   string
+	StageID int
+	Code    SEOI18n
+	// Sanity is the sanity cost of a full clear, null for stages without one (the gachas, the recruitment)
+	Sanity null.Int
+	// IsGacha tells whether the stage is a gacha (extra process GACHABOX), whose times count the items drawn
+	IsGacha   bool
 	Zone      *SEOZone
 	Existence SEOExistence
 }
@@ -345,14 +376,23 @@ func NewSEOCatalog(items []*model.Item, stages []*model.Stage, zones []*model.Zo
 		zonesByID[zone.ZoneID] = zone
 	}
 	for _, it := range items {
-		item := &SEOItem{ArkID: it.ArkItemID, Type: it.Type, SortID: it.SortID, Group: it.Group.String}
+		item := &SEOItem{ArkID: it.ArkItemID, Type: it.Type, Rarity: it.Rarity, SortID: it.SortID, Group: it.Group.String}
 		unmarshalLenient(it.Name, &item.Name)
 		unmarshalLenient(it.Existence, &item.Existence)
+		var keywords seoKeywords
+		unmarshalLenient(it.Keywords, &keywords)
+		item.Alias, item.Pron = keywords.Alias, keywords.Pron
 		c.Items[item.ArkID] = item
 		c.ItemList = append(c.ItemList, item)
 	}
 	for _, st := range stages {
-		stage := &SEOStage{ArkID: st.ArkStageID, StageID: st.StageID, Sanity: st.Sanity, Zone: zonesByID[st.ZoneID]}
+		stage := &SEOStage{
+			ArkID:   st.ArkStageID,
+			StageID: st.StageID,
+			Sanity:  st.Sanity,
+			IsGacha: st.ExtraProcessType.String == constant.ExtraProcessTypeGachaBox,
+			Zone:    zonesByID[st.ZoneID],
+		}
 		unmarshalLenient(st.Code, &stage.Code)
 		unmarshalLenient(st.Existence, &stage.Existence)
 		c.Stages[stage.ArkID] = stage
@@ -363,8 +403,14 @@ func NewSEOCatalog(items []*model.Item, stages []*model.Stage, zones []*model.Zo
 	return c
 }
 
-// unmarshalLenient leaves dest as is if raw is not what dest is: a malformed name or existence of one row must not
-// keep the others from being shown
+// seoKeywords are the keywords of an item (model.Item.Keywords)
+type seoKeywords struct {
+	Alias map[string][]string `json:"alias"`
+	Pron  map[string][]string `json:"pron"`
+}
+
+// unmarshalLenient leaves dest as is if raw is not what dest is: a malformed name, existence or keywords of one row
+// must not keep the others from being shown
 func unmarshalLenient(raw json.RawMessage, dest any) {
 	if len(raw) == 0 {
 		return
@@ -374,7 +420,7 @@ func unmarshalLenient(raw json.RawMessage, dest any) {
 			Str("evt.name", "seo.catalog.malformed").
 			Err(err).
 			Str("raw", string(raw)).
-			Msg("malformed i18n text or existence")
+			Msg("malformed i18n text, existence or keywords")
 	}
 }
 
