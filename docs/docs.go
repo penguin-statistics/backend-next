@@ -16,8 +16,8 @@ const docTemplate = `{
             "email": "alvissreimu@gmail.com"
         },
         "license": {
-            "name": "MIT License",
-            "url": "https://opensource.org/licenses/MIT"
+            "name": "CC BY-NC 4.0 (data)",
+            "url": "https://creativecommons.org/licenses/by-nc/4.0/"
         },
         "version": "{{.Version}}"
     },
@@ -1635,7 +1635,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{"https"},
 	Title:            "Penguin Statistics API",
-	Description:      "This is the Penguin Statistics v3 Backend, implemented for best performance, scalability, and reliability.",
+	Description:      "Public API of Penguin Statistics (penguin-stats.io): crowdsourced Arknights item drop statistics for the CN, US, JP and KR game servers. Reading the data needs no key; send a User-Agent that names your program and cache responses for at least 5 minutes. Drop rate = quantity / times (items per run, can exceed 1); always pass `server` (CN when omitted). Data: CC BY-NC 4.0, credit \"Data: Penguin Statistics (penguin-stats.io), CC BY-NC 4.0\"; source code: MIT. Guide for agents: https://penguin-stats.io/llms.txt",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
