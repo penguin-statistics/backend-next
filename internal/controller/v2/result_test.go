@@ -166,7 +166,7 @@ func newAdvancedQueryTestResult(t *testing.T) (*Result, *bun.DB) {
 	dropInfoRepo := repo.NewDropInfo(db)
 	timeRange := service.NewTimeRange(repo.NewTimeRange(db), dropInfoRepo)
 	dropInfo := service.NewDropInfo(dropInfoRepo, timeRange)
-	dropReport := service.NewDropReport(repo.NewDropReport(db))
+	dropReport := service.NewDropReport(repo.NewDropReport(db), nil)
 	dropMatrixElement := service.NewDropMatrixElement(repo.NewDropMatrixElement(db))
 	stage := service.NewStage(repo.NewStage(db))
 	item := service.NewItem(repo.NewItem(db))

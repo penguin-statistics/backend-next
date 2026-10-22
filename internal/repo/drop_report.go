@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"exusiai.dev/gommon/constant"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
@@ -36,7 +38,8 @@ func NewDropReport(db *bun.DB) *DropReport {
 type statementDeadlineKey struct{}
 
 // RunWithStatementTimeout runs fn with a context in which the drop report aggregations (CalcQuantityUniqCount,
-// CalcTotalTimes, CalcDropMatrixForIntervalsBySourceCategories, CalcTotalQuantityForTrend and CalcTotalTimesForTrend)
+// CalcTotalTimes, CalcDropMatrixForIntervalsBySourceCategories, CalcTotalQuantityForPatternMatrixBySourceCategories,
+// CalcTotalQuantityForTrend and CalcTotalTimesForTrend, and their ...Within variants)
 // end at most timeout after it was called: each of them runs in a transaction of its own, with what is left of timeout
 // as its statement timeout, after which PostgreSQL cancels it. pgdriver does not cancel a statement on the server when
 // its context ends, so this is what bounds the work of a statement on the server. It does so only while the read
@@ -47,6 +50,14 @@ type statementDeadlineKey struct{}
 // connection; they run without a statement timeout.
 func (r *DropReport) RunWithStatementTimeout(ctx context.Context, timeout time.Duration, fn func(ctx context.Context) error) error {
 	return fn(context.WithValue(ctx, statementDeadlineKey{}, time.Now().Add(timeout)))
+}
+
+// IsStatementTimeout reports whether err is PostgreSQL cancelling a statement for exceeding its statement timeout.
+func IsStatementTimeout(err error) bool {
+	// SQLSTATE 57014 is also what a statement cancelled by pg_cancel_backend gets: only the message, in the language of
+	// lc_messages of the server, tells them apart
+	var pgErr pgdriver.Error
+	return errors.As(err, &pgErr) && pgErr.StatementTimeout() && pgErr.Field('M') == "canceling statement due to statement timeout"
 }
 
 // runWithStatementDeadline runs fn on the database, or, if ctx comes from RunWithStatementTimeout, in a transaction
@@ -174,6 +185,65 @@ func (r *DropReport) CalcDropMatrixForIntervalsBySourceCategories(
 		return nil, nil, nil
 	}
 
+	plan := newDropMatrixPlan(queryCtxs)
+	first, last := plan.thresholds[0], plan.thresholds[len(plan.thresholds)-1]
+
+	var rows []dropMatrixRow
+
+	// There are far fewer distinct patterns than reports (CN: ~100k vs ~1.8M a day), so patterns are only
+	// expanded into their elements after counting.
+	perPattern := r.db.NewSelect().
+		TableExpr("drop_reports AS dr").
+		Column("dr.stage_id", "dr.pattern_id").
+		ColumnExpr(isManualSourceExpr, bun.In(constant.ManualSources)).
+		ColumnExpr("width_bucket(dr.created_at, ?::timestamptz[]) AS segment", pgdialect.Array(plan.thresholds)).
+		ColumnExpr("COUNT(*) AS count").
+		ColumnExpr("SUM(dr.times) AS times")
+	r.handleAccountAndReliability(perPattern, queryCtxs[0].AccountID)
+	if queryCtxs[0].ExcludeNonOneTimes {
+		r.handleTimes(perPattern, 1)
+	}
+	r.handleCreatedAtWithTime(perPattern, &first, &last)
+	r.handleServer(perPattern, queryCtxs[0].Server)
+	r.handleStages(perPattern, plan.stageIds)
+	perPattern = perPattern.Group("dr.stage_id", "dr.pattern_id", "is_manual", "segment")
+
+	if err := r.runWithStatementDeadline(ctx, func(ctx context.Context, db bun.IConn) error {
+		return r.db.NewRaw(`WITH a AS MATERIALIZED (?)
+		SELECT 'quantity' AS kind, a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment, SUM(a.count) AS value
+		FROM a JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = a.pattern_id
+		GROUP BY a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment
+		UNION ALL
+		SELECT 'times' AS kind, a.stage_id, 0, 0, a.is_manual, a.segment, SUM(a.times) AS value
+		FROM a
+		GROUP BY a.stage_id, a.is_manual, a.segment`, perPattern).
+			Conn(db).
+			Scan(ctx, &rows)
+	}); err != nil {
+		return nil, nil, err
+	}
+
+	timesResults, quantityUniqCountResults := plan.results(queryCtxs, rows, sourceCategories)
+	return timesResults, quantityUniqCountResults, nil
+}
+
+// dropMatrixPlan is how CalcDropMatrixForIntervalsBySourceCategories counts reports for several intervals at once:
+// per segment between consecutive interval boundaries, of the stages any interval needs.
+type dropMatrixPlan struct {
+	// thresholds are the interval boundaries, in whole seconds as handleCreatedAtWithTime compares them, in order.
+	// Segment i+1 is [thresholds[i], thresholds[i+1]), as width_bucket numbers it.
+	thresholds        []time.Time
+	segmentByBoundary map[int64]int
+	// stageIds are the stages to count, or none for every stage.
+	stageIds []int
+	// bucketLength, if set, tells that segment i+1 lies in the bucket [bucketStart + i*bucketLength,
+	// bucketStart + (i+1)*bucketLength), as in a trend. The cold storage then computes the segment of a report
+	// instead of looking it up (see coldReportCounts).
+	bucketStart  time.Time
+	bucketLength time.Duration
+}
+
+func newDropMatrixPlan(queryCtxs []*model.DropReportQueryContext) dropMatrixPlan {
 	// interval boundaries in seconds, as handleCreatedAtWithTime compares them
 	boundarySet := make(map[int64]struct{})
 	stageIdSet := make(map[int]struct{})
@@ -195,69 +265,45 @@ func (r *DropReport) CalcDropMatrixForIntervalsBySourceCategories(
 		boundaries = append(boundaries, boundary)
 	}
 	sort.Slice(boundaries, func(i, j int) bool { return boundaries[i] < boundaries[j] })
-	thresholds := make([]time.Time, len(boundaries))
-	segmentByBoundary := make(map[int64]int, len(boundaries))
-	for i, boundary := range boundaries {
-		thresholds[i] = time.Unix(boundary, 0)
-		// width_bucket numbers the segment starting at thresholds[i] as i+1
-		segmentByBoundary[boundary] = i + 1
+	p := dropMatrixPlan{
+		thresholds:        make([]time.Time, len(boundaries)),
+		segmentByBoundary: make(map[int64]int, len(boundaries)),
+		stageIds:          make([]int, 0, len(stageIdSet)),
 	}
-	stageIds := make([]int, 0, len(stageIdSet))
+	for i, boundary := range boundaries {
+		p.thresholds[i] = time.Unix(boundary, 0)
+		// width_bucket numbers the segment starting at thresholds[i] as i+1
+		p.segmentByBoundary[boundary] = i + 1
+	}
 	if !allStages {
 		for stageId := range stageIdSet {
-			stageIds = append(stageIds, stageId)
+			p.stageIds = append(p.stageIds, stageId)
 		}
 	}
-	first, last := thresholds[0], thresholds[len(thresholds)-1]
+	return p
+}
 
-	var rows []struct {
-		Kind     string `bun:"kind"`
-		StageID  int    `bun:"stage_id"`
-		ItemID   int    `bun:"item_id"`
-		Quantity int    `bun:"quantity"`
-		IsManual bool   `bun:"is_manual"`
-		Segment  int    `bun:"segment"`
-		Value    int    `bun:"value"`
-	}
+// dropMatrixRow is a count of the reports of a segment: the reports ("times", SUM(times)) of a stage, or how many
+// of them dropped an item in a quantity ("quantity", COUNT(*)), of manual or automated sources.
+type dropMatrixRow struct {
+	Kind     string `bun:"kind"`
+	StageID  int    `bun:"stage_id"`
+	ItemID   int    `bun:"item_id"`
+	Quantity int    `bun:"quantity"`
+	IsManual bool   `bun:"is_manual"`
+	Segment  int    `bun:"segment"`
+	Value    int    `bun:"value"`
+}
 
-	// There are far fewer distinct patterns than reports (CN: ~100k vs ~1.8M a day), so patterns are only
-	// expanded into their elements after counting.
-	perPattern := r.db.NewSelect().
-		TableExpr("drop_reports AS dr").
-		Column("dr.stage_id", "dr.pattern_id").
-		ColumnExpr(isManualSourceExpr, bun.In(constant.ManualSources)).
-		ColumnExpr("width_bucket(dr.created_at, ?::timestamptz[]) AS segment", pgdialect.Array(thresholds)).
-		ColumnExpr("COUNT(*) AS count").
-		ColumnExpr("SUM(dr.times) AS times")
-	r.handleAccountAndReliability(perPattern, queryCtxs[0].AccountID)
-	if queryCtxs[0].ExcludeNonOneTimes {
-		r.handleTimes(perPattern, 1)
-	}
-	r.handleCreatedAtWithTime(perPattern, &first, &last)
-	r.handleServer(perPattern, queryCtxs[0].Server)
-	r.handleStages(perPattern, stageIds)
-	perPattern = perPattern.Group("dr.stage_id", "dr.pattern_id", "is_manual", "segment")
-
-	if err := r.runWithStatementDeadline(ctx, func(ctx context.Context, db bun.IConn) error {
-		return r.db.NewRaw(`WITH a AS MATERIALIZED (?)
-		SELECT 'quantity' AS kind, a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment, SUM(a.count) AS value
-		FROM a JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = a.pattern_id
-		GROUP BY a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment
-		UNION ALL
-		SELECT 'times' AS kind, a.stage_id, 0, 0, a.is_manual, a.segment, SUM(a.times) AS value
-		FROM a
-		GROUP BY a.stage_id, a.is_manual, a.segment`, perPattern).
-			Conn(db).
-			Scan(ctx, &rows)
-	}); err != nil {
-		return nil, nil, err
-	}
-
+// results adds the rows of the segments of each interval up, per source category, in the order of queryCtxs.
+func (p dropMatrixPlan) results(
+	queryCtxs []*model.DropReportQueryContext, rows []dropMatrixRow, sourceCategories []string,
+) ([]map[string][]*model.TotalTimesResult, []map[string][]*model.QuantityUniqCountResultForDropMatrix) {
 	timesResults := make([]map[string][]*model.TotalTimesResult, len(queryCtxs))
 	quantityUniqCountResults := make([]map[string][]*model.QuantityUniqCountResultForDropMatrix, len(queryCtxs))
 	for i, queryCtx := range queryCtxs {
-		fromSegment := segmentByBoundary[queryCtx.StartTime.Unix()]
-		toSegment := segmentByBoundary[queryCtx.EndTime.Unix()]
+		fromSegment := p.segmentByBoundary[queryCtx.StartTime.Unix()]
+		toSegment := p.segmentByBoundary[queryCtx.EndTime.Unix()]
 		intervalStageIds := queryCtx.GetStageIds()
 		intervalStageIdSet := make(map[int]struct{}, len(intervalStageIds))
 		for _, stageId := range intervalStageIds {
@@ -281,7 +327,7 @@ func (r *DropReport) CalcDropMatrixForIntervalsBySourceCategories(
 		}
 		timesResults[i], quantityUniqCountResults[i] = splitDropMatrixRowsBySourceCategories(timesRows, quantityRows, sourceCategories)
 	}
-	return timesResults, quantityUniqCountResults, nil
+	return timesResults, quantityUniqCountResults
 }
 
 type dropMatrixTimesRow struct {
@@ -389,12 +435,7 @@ func (r *DropReport) CalcTotalQuantityForPatternMatrix(
 func (r *DropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
 	ctx context.Context, queryCtx *model.DropReportQueryContext, sourceCategories []string,
 ) (map[string][]*model.TotalQuantityResultForPatternMatrix, error) {
-	var rows []struct {
-		StageID       int  `bun:"stage_id"`
-		PatternID     int  `bun:"pattern_id"`
-		IsManual      bool `bun:"is_manual"`
-		TotalQuantity int  `bun:"total_quantity"`
-	}
+	var rows []patternMatrixRow
 
 	subq1 := r.db.NewSelect().
 		TableExpr("drop_reports AS dr").
@@ -406,15 +447,29 @@ func (r *DropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
 	r.handleStages(subq1, queryCtx.GetStageIds())
 	r.handleTimes(subq1, 1)
 
-	if err := r.db.NewSelect().
+	if err := r.scan(ctx, r.db.NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("stage_id", "pattern_id", "is_manual").
 		ColumnExpr("COUNT(*) AS total_quantity").
-		Group("stage_id", "pattern_id", "is_manual").
-		Scan(ctx, &rows); err != nil {
+		Group("stage_id", "pattern_id", "is_manual"), &rows); err != nil {
 		return nil, err
 	}
 
+	return splitPatternMatrixRowsBySourceCategories(rows, sourceCategories), nil
+}
+
+// patternMatrixRow is the count of reports of a stage and pattern, of manual or automated sources.
+type patternMatrixRow struct {
+	StageID       int  `bun:"stage_id"`
+	PatternID     int  `bun:"pattern_id"`
+	IsManual      bool `bun:"is_manual"`
+	TotalQuantity int  `bun:"total_quantity"`
+}
+
+// splitPatternMatrixRowsBySourceCategories sums classified pattern matrix rows up per source category.
+func splitPatternMatrixRowsBySourceCategories(
+	rows []patternMatrixRow, sourceCategories []string,
+) map[string][]*model.TotalQuantityResultForPatternMatrix {
 	type key struct{ stageId, patternId int }
 	resultsBySourceCategory := make(map[string][]*model.TotalQuantityResultForPatternMatrix, len(sourceCategories))
 	for _, sourceCategory := range sourceCategories {
@@ -440,11 +495,28 @@ func (r *DropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
 		}
 		resultsBySourceCategory[sourceCategory] = results
 	}
-	return resultsBySourceCategory, nil
+	return resultsBySourceCategory
+}
+
+// TrendTimeRange returns the time range that the buckets of a trend query (CalcTotalQuantityForTrend and
+// CalcTotalTimesForTrend) cover: intervalNum+1 consecutive buckets of intervalLength, in whole hours, from the start of
+// the game day of startTime.
+func TrendTimeRange(server string, startTime time.Time, intervalLength time.Duration, intervalNum int) (start, end time.Time) {
+	start = gameday.StartTime(server, startTime)
+	return start, start.Add(time.Hour * time.Duration(int(intervalLength.Hours())*(intervalNum+1)))
 }
 
 func (r *DropReport) CalcTotalQuantityForTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int, sourceCategory string,
+) ([]*model.TotalQuantityResultForTrend, error) {
+	gameDayStart, lastDayEnd := TrendTimeRange(server, *startTime, intervalLength, intervalNum)
+	return r.CalcTotalQuantityForTrendWithin(ctx, gameDayStart, lastDayEnd, server, startTime, intervalLength, intervalNum, stageIdItemIdMap, accountId, sourceCategory)
+}
+
+// CalcTotalQuantityForTrendWithin is CalcTotalQuantityForTrend on the reports created in [from, to) only (compared in
+// whole seconds), e.g. those after the hot boundary of the cold storage. The buckets stay those of the whole trend.
+func (r *DropReport) CalcTotalQuantityForTrendWithin(
+	ctx context.Context, from, to time.Time, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIdItemIdMap map[int][]int, accountId null.Int, sourceCategory string,
 ) ([]*model.TotalQuantityResultForTrend, error) {
 	results := make([]*model.TotalQuantityResultForTrend, 0)
 	if len(stageIdItemIdMap) == 0 {
@@ -452,7 +524,6 @@ func (r *DropReport) CalcTotalQuantityForTrend(
 	}
 
 	gameDayStart := gameday.StartTime(server, *startTime)
-	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(int(intervalLength.Hours())*(intervalNum+1)))
 
 	subq1 := r.db.NewSelect().
 		With("intervals", r.genSubQueryForTrendSegments(gameDayStart, intervalLength, intervalNum)).
@@ -462,7 +533,7 @@ func (r *DropReport) CalcTotalQuantityForTrend(
 		Join("RIGHT JOIN intervals AS sub").
 		JoinOn("dr.created_at >= sub.interval_start AND dr.created_at < sub.interval_end")
 	r.handleAccountAndReliability(subq1, accountId)
-	r.handleCreatedAtWithTime(subq1, &gameDayStart, &lastDayEnd)
+	r.handleCreatedAtWithTime(subq1, &from, &to)
 	r.handleServer(subq1, server)
 	r.handleStagesAndItems(subq1, stageIdItemIdMap)
 
@@ -481,13 +552,21 @@ func (r *DropReport) CalcTotalQuantityForTrend(
 func (r *DropReport) CalcTotalTimesForTrend(
 	ctx context.Context, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId null.Int, sourceCategory string,
 ) ([]*model.TotalTimesResultForTrend, error) {
+	gameDayStart, lastDayEnd := TrendTimeRange(server, *startTime, intervalLength, intervalNum)
+	return r.CalcTotalTimesForTrendWithin(ctx, gameDayStart, lastDayEnd, server, startTime, intervalLength, intervalNum, stageIds, accountId, sourceCategory)
+}
+
+// CalcTotalTimesForTrendWithin is CalcTotalTimesForTrend on the reports created in [from, to) only, as
+// CalcTotalQuantityForTrendWithin.
+func (r *DropReport) CalcTotalTimesForTrendWithin(
+	ctx context.Context, from, to time.Time, server string, startTime *time.Time, intervalLength time.Duration, intervalNum int, stageIds []int, accountId null.Int, sourceCategory string,
+) ([]*model.TotalTimesResultForTrend, error) {
 	results := make([]*model.TotalTimesResultForTrend, 0)
 	if len(stageIds) == 0 {
 		return results, nil
 	}
 
 	gameDayStart := gameday.StartTime(server, *startTime)
-	lastDayEnd := gameDayStart.Add(time.Hour * time.Duration(int(intervalLength.Hours())*(intervalNum+1)))
 
 	subq1 := r.db.NewSelect().
 		With("intervals", r.genSubQueryForTrendSegments(gameDayStart, intervalLength, intervalNum)).
@@ -496,7 +575,7 @@ func (r *DropReport) CalcTotalTimesForTrend(
 		Join("RIGHT JOIN intervals AS sub").
 		JoinOn("dr.created_at >= sub.interval_start AND dr.created_at < sub.interval_end")
 	r.handleAccountAndReliability(subq1, accountId)
-	r.handleCreatedAtWithTime(subq1, &gameDayStart, &lastDayEnd)
+	r.handleCreatedAtWithTime(subq1, &from, &to)
 	r.handleServer(subq1, server)
 	r.handleStages(subq1, stageIds)
 
