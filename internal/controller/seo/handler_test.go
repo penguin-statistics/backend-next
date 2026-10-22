@@ -780,17 +780,19 @@ func TestNotModified(t *testing.T) {
 		}
 	}
 
-	// never a 404, nor a page without data
+	// never a 404, nor a page without data, which have no Last-Modified: that of the shell alone could be that of
+	// the list once made with the matrix again (cached again unchanged after a failed refresh deleted it, with a
+	// release meanwhile), and a client having the list without data be answered that it is not modified
 	later := since("Wed, 21 Oct 2026 12:00:00 GMT")
-	if r := get("/en/result/cn/item/nope", later); r.status != 404 || !strings.Contains(r.body, `<meta name="robots" content="noindex">`) {
-		t.Errorf("404: status %d", r.status)
+	if r := get("/en/result/cn/item/nope", later); r.status != 404 || !strings.Contains(r.body, `<meta name="robots" content="noindex">`) || r.header.Get("Last-Modified") != "" {
+		t.Errorf("404: status %d, Last-Modified %q", r.status, r.header.Get("Last-Modified"))
 	}
 	e.data.matrices = nil
-	if r := get("/en/result/cn/item/30012", later); r.status != 503 || r.body == "" {
-		t.Errorf("cold page: status %d", r.status)
+	if r := get("/en/result/cn/item/30012", later); r.status != 503 || r.body == "" || r.header.Get("Last-Modified") != "" {
+		t.Errorf("cold page: status %d, Last-Modified %q", r.status, r.header.Get("Last-Modified"))
 	}
-	if r := get("/en/result/cn/item", later); r.status != 200 || r.body == "" {
-		t.Errorf("list without the matrix: status %d", r.status)
+	if r := get("/en/result/cn/item", later); r.status != 200 || r.body == "" || r.header.Get("Last-Modified") != "" {
+		t.Errorf("list without the matrix: status %d, Last-Modified %q", r.status, r.header.Get("Last-Modified"))
 	}
 
 	// a frontend release after the matrix: the page is newer than a copy as old as the matrix

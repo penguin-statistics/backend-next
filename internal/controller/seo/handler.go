@@ -430,26 +430,26 @@ func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, catalog *service.SEO
 	if !p.Indexable {
 		c.Set("X-Robots-Tag", strings.ReplaceAll(p.Head.Robots, ",", ", "))
 	}
-	lastModified, shellAt := p.LastModified, shell.LastModified
+	// only a 200 made with the matrix (cacheable), indexable or not, has a Last-Modified: that of a 404, a 503 or a
+	// list rendered before the matrix was calculated would be the time of the shell alone, as the first catalog after
+	// a start has no time, which the page made with the matrix can have too (the matrix seen first keeps its own
+	// time, see stamps), and a client having the list without data be answered that it is not modified
 	if cacheable {
-		// the times given the data rather than their own, which p.LastModified is the later of
-		lastModified = h.stamps.at(matrixSlot{server: matrix.Server}, matrix, matrix.LastModified)
+		// the times given the data rather than their own; the catalog's too, for a name changed or a stage moved to
+		// another zone
+		lastModified := h.stamps.at(matrixSlot{server: matrix.Server}, matrix, matrix.LastModified)
 		if at := h.stamps.at(catalogSlot{}, catalog, catalog.ChangedAt); at.After(lastModified) {
 			lastModified = at
 		}
 		// a shell sent anew keeps its time, and a different one has a later one (see spashell.Shell)
-		shellAt = h.stamps.at(shellSlot{}, shell.LastModified.UnixNano(), shell.LastModified)
-	}
-	if shellAt.After(lastModified) {
-		lastModified = shellAt
-	}
-	sent := !lastModified.IsZero() && setLastModified(c, lastModified)
-	// only a 200 made with the matrix (cacheable), indexable or not: a 404, a 503, or a list rendered before the
-	// matrix was calculated has the Last-Modified of the shell alone, as the first catalog after a start has no time
-	if cacheable && sent && cachectrl.NotModified(c) {
-		count(p.Kind, "not_modified")
-		c.Status(fiber.StatusNotModified)
-		return
+		if at := h.stamps.at(shellSlot{}, shell.LastModified.UnixNano(), shell.LastModified); at.After(lastModified) {
+			lastModified = at
+		}
+		if !lastModified.IsZero() && setLastModified(c, lastModified) && cachectrl.NotModified(c) {
+			count(p.Kind, "not_modified")
+			c.Status(fiber.StatusNotModified)
+			return
+		}
 	}
 	count(p.Kind, p.Outcome)
 	c.Status(p.Status)

@@ -71,8 +71,7 @@ type Page struct {
 	// Cacheable tells whether the page holds data, cached for the max-age of the pages; else for a minute
 	Cacheable bool
 	// Redirect is the canonical path a request is redirected to (301)
-	Redirect     string
-	LastModified time.Time
+	Redirect string
 
 	Head Head
 	Body Body
@@ -319,13 +318,6 @@ func (b *builder) home() Link {
 // base is the page of the request with what all pages have: indexable unless made otherwise
 func (b *builder) base(kind pageKind, title, imageAlt, description string, ids ...string) *Page {
 	p := &Page{Kind: kind, Outcome: "ok", Status: 200, Indexable: true, Cacheable: b.matrix != nil}
-	if b.matrix != nil {
-		// and the catalog's, for a name changed or a stage moved to another zone
-		p.LastModified = b.matrix.LastModified
-		if b.catalog.ChangedAt.After(p.LastModified) {
-			p.LastModified = b.catalog.ChangedAt
-		}
-	}
 	p.Head = Head{
 		Lang:        b.t.Lang,
 		Title:       title,
