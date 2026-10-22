@@ -1,7 +1,8 @@
 package service
 
 // The calculations of v3.14.18, before the worker performance work, kept verbatim but for their caches as
-// references for the integration tests.
+// references for the integration tests. Its GetAllMaxAccumulableTimeRangesByServer is gone: #794 changed how the
+// time ranges of the global drop matrix accumulate, so the references calculate over the current ones.
 
 import (
 	"context"
@@ -64,61 +65,6 @@ func legacyGetMaxAccumulableTimeRangesByServer(ctx context.Context, s *TimeRange
 	return maxAccumulableTimeRanges, nil
 }
 
-func legacyGetAllMaxAccumulableTimeRangesByServer(ctx context.Context, s *TimeRange, server string) (map[int]map[int][]*model.TimeRange, error) {
-	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
-	if err != nil {
-		return nil, err
-	}
-	timeRangesMap, err := s.GetTimeRangesMap(ctx, server)
-	if err != nil {
-		return nil, err
-	}
-	maxAccumulableTimeRanges := make(map[int]map[int][]*model.TimeRange)
-	for _, el := range util.GroupBy(legacyDropInfosWithItem(dropInfos), func(dropInfo *model.DropInfo) int { return dropInfo.StageID }) {
-		stageId := el.Key
-		maxAccumulableTimeRangesForOneStage := make(map[int][]*model.TimeRange)
-		for _, el := range util.GroupBy(el.Items, func(dropInfo *model.DropInfo) int { return int(dropInfo.ItemID.Int64) }) {
-			itemId := el.Key
-			sortedDropInfos := legacyDistinctBy(el.Items, func(dropInfo *model.DropInfo) int { return dropInfo.RangeID })
-			legacySort(sortedDropInfos, func(a, b *model.DropInfo) bool {
-				return timeRangesMap[a.RangeID].StartTime.Before(*timeRangesMap[b.RangeID].StartTime)
-			})
-
-			timeRanges := make([]*model.TimeRange, 0)
-			for _, dropInfo := range sortedDropInfos {
-				timeRange := timeRangesMap[dropInfo.RangeID]
-				if len(timeRanges) == 0 || !dropInfo.Accumulable {
-					pureRange := &model.TimeRange{
-						StartTime: timeRange.StartTime,
-						EndTime:   timeRange.EndTime,
-					}
-					timeRanges = append(timeRanges, pureRange)
-					continue
-				}
-				lastAddedTimeRange := timeRanges[len(timeRanges)-1]
-				if !lastAddedTimeRange.EndTime.Before(*timeRange.StartTime) {
-					if lastAddedTimeRange.EndTime.Before(*timeRange.EndTime) {
-						lastAddedTimeRange.EndTime = timeRange.EndTime
-					}
-				} else {
-					pureRange := &model.TimeRange{
-						StartTime: timeRange.StartTime,
-						EndTime:   timeRange.EndTime,
-					}
-					timeRanges = append(timeRanges, pureRange)
-				}
-			}
-			if len(timeRanges) > 0 {
-				maxAccumulableTimeRangesForOneStage[itemId] = timeRanges
-			}
-		}
-		if len(maxAccumulableTimeRangesForOneStage) > 0 {
-			maxAccumulableTimeRanges[stageId] = maxAccumulableTimeRangesForOneStage
-		}
-	}
-	return maxAccumulableTimeRanges, nil
-}
-
 func legacyGetLatestTimeRangesByServer(ctx context.Context, s *TimeRange, server string) (map[int]*model.TimeRange, error) {
 	dropInfos, err := s.DropInfoRepo.GetDropInfosByServer(ctx, server)
 	if err != nil {
@@ -154,7 +100,9 @@ func legacyCalcDropMatrixByGivenDate(
 		EndTime:   end,
 	}
 
-	timeRangesMap, err := legacyGetAllMaxAccumulableTimeRangesByServer(ctx, s.TimeRangeService, server)
+	// the segments of #794 (option B) replaced those of v3.14.18: the reference renders the days over the current ones,
+	// as legacyCalcGlobalDropMatrix does
+	timeRangesMap, err := s.TimeRangeService.GetAllMaxAccumulableTimeRangesByServer(ctx, server)
 	if err != nil {
 		return nil, err
 	}

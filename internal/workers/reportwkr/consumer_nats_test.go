@@ -620,8 +620,8 @@ func TestStopFlushesAcksAndKeepsDurable(t *testing.T) {
 }
 
 // TestTransientErrorIsNakedAndRetried fails the first delivery of a task as a database error does: the task is
-// delivered again after the nak delay, and stored by the second delivery. Each line logged about the task carries it
-// whole, ip and accountId included.
+// delivered again after the nak delay, and stored by the second delivery. Each delivery logs one line about the task,
+// as it ends, and the line carries the task whole, ip and accountId included: no line is logged as a delivery starts.
 func TestTransientErrorIsNakedAndRetried(t *testing.T) {
 	s := newTestStream(t)
 	tw := newTestWorker(t)
@@ -644,7 +644,11 @@ func TestTransientErrorIsNakedAndRetried(t *testing.T) {
 		return w.process(ctx, task)
 	}
 	startConsumer(t, w)
-	task := newTestTask(t, tw, testAccountID(), time.UnixMicro(1760600000123456), "203.0.113.7", testReport("main_01-07", 30012))
+	// two drops of one item: process merges them in place, so a line logging the decoded task rather than the message
+	// would show one drop
+	report := testReport("main_01-07", 30012)
+	report.Drops = append(report.Drops, &types.Drop{DropType: "EXTRA", ItemID: 30012, Quantity: 1})
+	task := newTestTask(t, tw, testAccountID(), time.UnixMicro(1760600000123456), "203.0.113.7", report)
 	if _, err := s.js.Publish(s.publish, task); err != nil {
 		t.Fatal(err)
 	}
@@ -674,12 +678,8 @@ func TestTransientErrorIsNakedAndRetried(t *testing.T) {
 	} else if !reflect.DeepEqual(failed[0]["reportTask"], published) {
 		t.Errorf("failure logged with %v, want the task as published, %v", failed[0]["reportTask"], published)
 	}
-	// the task has one drop and an ip: what process changes in place (merging the drops by item, filling in an empty
-	// ip) leaves it as published
-	if received := logEntries(t, &logs, "reportwkr.received"); len(received) != 1 {
-		t.Errorf("%d tasks logged as received, want 1", len(received))
-	} else if !reflect.DeepEqual(received[0]["task"], published) {
-		t.Errorf("received task logged as %v, want %v", received[0]["task"], published)
+	if received := logEntries(t, &logs, "reportwkr.received"); len(received) != 0 {
+		t.Errorf("%d tasks logged as received, want none: the processed line carries the task", len(received))
 	}
 	if processed := logEntries(t, &logs, "reportwkr.processed"); len(processed) != 1 {
 		t.Errorf("%d tasks logged as processed, want 1", len(processed))
