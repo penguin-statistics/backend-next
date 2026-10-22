@@ -472,7 +472,7 @@ func TestProcessStoresReportWithoutDrops(t *testing.T) {
 // TestProcessStoresReliabilities stores the reliability the verification gives each report of a task: 0 for drops
 // that fit the drop infos, 6 for drops that do not, and the reliability of the reject rule a report matches. The drop
 // check comes first: a report failing both gets 6. The rejection is logged with why each rejected report was rejected
-// (violations) and the reliabilities.
+// (violations), the reliabilities and the task.
 func TestProcessStoresReliabilities(t *testing.T) {
 	w := newTestWorker(t)
 	var logs lockedBuffer
@@ -507,6 +507,9 @@ func TestProcessStoresReliabilities(t *testing.T) {
 	}
 	if got, want := fmt.Sprint(rejections[0]["reliabilities"]), "[0 6 300 6]"; got != want {
 		t.Errorf("reliabilities %s logged, want %s", got, want)
+	}
+	if logged, _ := rejections[0]["task"].(map[string]any); logged == nil || logged["taskId"] != taskID(t, task) {
+		t.Errorf("rejection logged with the task %v, want the task %s", rejections[0]["task"], taskID(t, task))
 	}
 }
 

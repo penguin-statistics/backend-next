@@ -341,7 +341,7 @@ func diffLines(want, got []string) (missing, extra []string) {
 func TestTimeRangesMatchLegacy(t *testing.T) {
 	db := newTestDB(t)
 	ctx := context.Background()
-	compared := 0
+	compared, personalCompared := 0, 0
 	for seed := int64(1); seed <= 3; seed++ {
 		mustExec(t, db, "TRUNCATE time_ranges, drop_infos, drop_reports, drop_pattern_elements")
 		seedMatrixData(t, rand.New(rand.NewSource(seed)), db)
@@ -349,25 +349,32 @@ func TestTimeRangesMatchLegacy(t *testing.T) {
 		for _, server := range testServers {
 			what := fmt.Sprintf("seed %d %s", seed, server)
 
-			want, err := legacyGetAllMaxAccumulableTimeRangesByServer(ctx, s, server)
-			if err != nil {
-				t.Fatal(err)
-			}
+			// #794 changed the segments of the global drop matrix (v3.14.18 merged a time range that is not
+			// accumulable with the accumulable ones after it, and split segments at gaps): they are checked against
+			// accumulableSegmentsInSQL instead of v3.14.18
+			wantAllLines, wantMaxLines := accumulableSegmentsInSQL(t, db, server)
 			got, err := s.GetAllMaxAccumulableTimeRangesByServer(ctx, server)
 			if err != nil {
 				t.Fatal(err)
 			}
-			compared += assertSameLines(t, what+" all max accumulable time ranges", timeRangesByStageAndItemLines(want), timeRangesByStageAndItemLines(got))
+			compared += assertSameLines(t, what+" all max accumulable time ranges", wantAllLines, timeRangesByStageAndItemLines(got))
 
-			want, err = legacyGetMaxAccumulableTimeRangesByServer(ctx, s, server)
-			if err != nil {
-				t.Fatal(err)
-			}
 			got, err = s.GetMaxAccumulableTimeRangesByServer(ctx, server)
 			if err != nil {
 				t.Fatal(err)
 			}
-			compared += assertSameLines(t, what+" max accumulable time ranges", timeRangesByStageAndItemLines(want), timeRangesByStageAndItemLines(got))
+			compared += assertSameLines(t, what+" max accumulable time ranges (SQL)", wantMaxLines, timeRangesByStageAndItemLines(got))
+
+			// those of the personal drop matrices did not change, but for time ranges of a stage and item starting at
+			// the same time, which v3.14.18 ordered as sort.Sort happened to leave them (the production data has none)
+			// and which are now ordered by range id
+			want, err := legacyGetMaxAccumulableTimeRangesByServer(ctx, s, server)
+			if err != nil {
+				t.Fatal(err)
+			}
+			equalStarts := stageItemsWithEqualStartTimes(t, db, server)
+			personalCompared += assertSameLines(t, what+" max accumulable time ranges",
+				withoutStageItems(timeRangesByStageAndItemLines(want), equalStarts), withoutStageItems(timeRangesByStageAndItemLines(got), equalStarts))
 
 			wantLatest, err := legacyGetLatestTimeRangesByServer(ctx, s, server)
 			if err != nil {
@@ -390,6 +397,111 @@ func TestTimeRangesMatchLegacy(t *testing.T) {
 		}
 	}
 	requireCompared(t, compared, 50)
+	requireCompared(t, personalCompared, 30)
+}
+
+// accumulableSegmentsInSQL calculates the segments of accumulableSegments (#794) in SQL, as a reference written
+// independently of it: the time ranges of the drop infos of a stage and item, once each, ordered by start time and
+// range id, where one starts a segment when it is the first, when it is not accumulable or when the one before it
+// is not. It returns the lines of GetAllMaxAccumulableTimeRangesByServer (every segment, from its start to its
+// latest end) and of GetMaxAccumulableTimeRangesByServer (the time ranges of the last segment, newest first).
+func accumulableSegmentsInSQL(t *testing.T, db *bun.DB, server string) (allLines, maxLines []string) {
+	t.Helper()
+	var rows []struct {
+		StageID      int       `bun:"stage_id"`
+		ItemID       int       `bun:"item_id"`
+		Segment      int       `bun:"segment"`
+		LastSegment  int       `bun:"last_segment"`
+		StartTime    time.Time `bun:"start_time"`
+		EndTime      time.Time `bun:"end_time"`
+		SegmentStart time.Time `bun:"segment_start"`
+		SegmentEnd   time.Time `bun:"segment_end"`
+	}
+	err := db.NewRaw(`WITH ranges AS (
+			SELECT DISTINCT ON (di.stage_id, di.item_id, di.range_id) di.stage_id, di.item_id, di.range_id, di.accumulable,
+				tr.start_time, tr.end_time
+			FROM drop_infos AS di JOIN time_ranges AS tr ON tr.range_id = di.range_id
+			WHERE di.server = ? AND di.item_id IS NOT NULL
+		), starts AS (
+			SELECT *, (NOT accumulable OR NOT COALESCE(lag(accumulable) OVER w, false)) AS starts_segment
+			FROM ranges
+			WINDOW w AS (PARTITION BY stage_id, item_id ORDER BY start_time, range_id)
+		), segments AS (
+			SELECT *, count(*) FILTER (WHERE starts_segment) OVER w AS segment
+			FROM starts
+			WINDOW w AS (PARTITION BY stage_id, item_id ORDER BY start_time, range_id)
+		)
+		SELECT stage_id, item_id, segment, max(segment) OVER (PARTITION BY stage_id, item_id) AS last_segment,
+			start_time, end_time,
+			min(start_time) OVER (PARTITION BY stage_id, item_id, segment) AS segment_start,
+			max(end_time) OVER (PARTITION BY stage_id, item_id, segment) AS segment_end
+		FROM segments
+		ORDER BY stage_id, item_id, start_time DESC, range_id DESC`, server).Scan(context.Background(), &rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type key struct{ stageId, itemId int }
+	segmentsByKey := make(map[key][]string)
+	latestByKey := make(map[key][]string)
+	previousSegment := make(map[key]int)
+	keys := make([]key, 0)
+	for _, row := range rows {
+		k := key{row.StageID, row.ItemID}
+		if _, ok := segmentsByKey[k]; !ok {
+			keys = append(keys, k)
+		}
+		// rows are newest first: a segment is prepended at its newest time range
+		if previousSegment[k] != row.Segment {
+			previousSegment[k] = row.Segment
+			segment := fmt.Sprintf("%d-%d", row.SegmentStart.UnixMilli(), row.SegmentEnd.UnixMilli())
+			segmentsByKey[k] = append([]string{segment}, segmentsByKey[k]...)
+		}
+		if row.Segment == row.LastSegment {
+			latestByKey[k] = append(latestByKey[k], fmt.Sprintf("%d-%d", row.StartTime.UnixMilli(), row.EndTime.UnixMilli()))
+		}
+	}
+	for _, k := range keys {
+		allLines = append(allLines, fmt.Sprintf("%d|%d|%s", k.stageId, k.itemId, strings.Join(segmentsByKey[k], ",")))
+		maxLines = append(maxLines, fmt.Sprintf("%d|%d|%s", k.stageId, k.itemId, strings.Join(latestByKey[k], ",")))
+	}
+	sort.Strings(allLines)
+	sort.Strings(maxLines)
+	return allLines, maxLines
+}
+
+// stageItemsWithEqualStartTimes returns the "stage|item|" prefixes of the lines of the stages and items of server
+// with two time ranges starting at the same time.
+func stageItemsWithEqualStartTimes(t *testing.T, db *bun.DB, server string) map[string]bool {
+	t.Helper()
+	var rows []struct {
+		StageID int `bun:"stage_id"`
+		ItemID  int `bun:"item_id"`
+	}
+	err := db.NewRaw(`SELECT DISTINCT di.stage_id, di.item_id
+		FROM drop_infos AS di JOIN time_ranges AS tr ON tr.range_id = di.range_id
+		WHERE di.server = ? AND di.item_id IS NOT NULL
+		GROUP BY di.stage_id, di.item_id, tr.start_time
+		HAVING count(DISTINCT di.range_id) > 1`, server).Scan(context.Background(), &rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prefixes := make(map[string]bool, len(rows))
+	for _, row := range rows {
+		prefixes[fmt.Sprintf("%d|%d|", row.StageID, row.ItemID)] = true
+	}
+	return prefixes
+}
+
+func withoutStageItems(lines []string, prefixes map[string]bool) []string {
+	kept := make([]string, 0, len(lines))
+	for _, line := range lines {
+		parts := strings.SplitN(line, "|", 3)
+		if !prefixes[parts[0]+"|"+parts[1]+"|"] {
+			kept = append(kept, line)
+		}
+	}
+	return kept
 }
 
 func TestCalcDropMatrixByGivenDateMatchesLegacy(t *testing.T) {
