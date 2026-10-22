@@ -41,34 +41,112 @@ func i18n(zh, en, ja, ko string) []byte {
 	return b
 }
 
+// existence is the existence of what opened on 2019-05-01 and never closes, on the servers.
 func existence(servers ...string) []byte {
+	return between(1556676000000, 0, servers...)
+}
+
+// between is the existence of what opens at open and closes at end (epoch milliseconds, 0 for none), on the servers.
+func between(open, end int64, servers ...string) []byte {
 	m := map[string]map[string]any{}
 	for _, s := range []string{"CN", "US", "JP", "KR"} {
 		m[s] = map[string]any{"exist": false}
 	}
 	for _, s := range servers {
-		m[s] = map[string]any{"exist": true, "openTime": 1556676000000}
+		e := map[string]any{"exist": true, "openTime": open}
+		if end != 0 {
+			e["closeTime"] = end
+		}
+		m[s] = e
 	}
 	b, _ := json.Marshal(m)
 	return b
 }
 
+// keywords are the aliases and readings of an item in zh and ja.
+func keywords(zhAlias, jaAlias, zhPron, jaPron []string) []byte {
+	b, _ := json.Marshal(map[string]map[string][]string{
+		"alias": {"zh": zhAlias, "ja": jaAlias},
+		"pron":  {"zh": zhPron, "ja": jaPron},
+	})
+	return b
+}
+
 var all = []string{"CN", "US", "JP", "KR"}
 
+// testNow is when the data of the fixtures was taken from the API: the event act52side_zone1 is open on CN until
+// 20:00Z.
+var testNow = time.Date(2026, 10, 22, 16, 53, 0, 0, time.UTC)
+
+// testCatalog is a part of the catalog of 2026-10-22, with the names, codes, aliases, sanity costs and CN times the API
+// had (the numerical IDs are made up, and the other servers have the times of CN): the four tiers of Orirock, which
+// share aliases, the two items named Carbon Brick in en, items of types not listed (LMD, and D32 Steel, crafted in the
+// workshop); stages whose codes collide (main_ and tough_, an event with its permanent stage and rerun, and another
+// event), the open event, a gacha and the recruitment.
 func testCatalog() *service.SEOCatalog {
 	return service.NewSEOCatalog(
 		[]*model.Item{
-			{ArkItemID: "30011", Type: "MATERIAL", SortID: 1, Name: i18n("源岩", "Orirock", "源岩", "원암"), Existence: existence(all...)},
-			{ArkItemID: "30012", Type: "MATERIAL", SortID: 2, Rarity: 1, Name: i18n("固源岩", "Orirock Cube", "初級源岩", "원암 큐브"), Existence: existence(all...),
-				Keywords: []byte("{\"alias\":{\"zh\":[\"石头\",\"土块\"]},\"pron\":{\"zh\":[\"shi`tou\",\"tu`kuai\"]}}")},
+			{ArkItemID: "30011", Type: "MATERIAL", SortID: 100015, Rarity: 0, Name: i18n("源岩", "Orirock", "源岩鉱", "원암"), Existence: existence(all...),
+				Keywords: keywords([]string{"源岩", "土块", "石头"}, []string{"源岩鉱", "げんがんこう", "ゲンガンコウ"},
+					[]string{"yuan`yan", "tu`kuai", "shi`tou"}, []string{"gengan`kou", "gengan`kou"})},
+			{ArkItemID: "30012", Type: "MATERIAL", SortID: 100014, Rarity: 1, Name: i18n("固源岩", "Orirock Cube", "初級源岩", "원암 큐브"), Existence: existence(all...),
+				Keywords: keywords([]string{"固源岩", "土块", "石头"}, []string{"初級源岩", "しょきゅうげんがん", "ショキュウゲンガン"},
+					[]string{"gu`yuan`yan", "tu`kuai", "shi`tou"}, []string{"shokyuu`gengan", "syokyuu`gengan"})},
+			{ArkItemID: "30013", Type: "MATERIAL", SortID: 100013, Rarity: 2, Name: i18n("固源岩组", "Orirock Cluster", "中級源岩", "원암 큐브 번들"), Existence: existence(all...),
+				Keywords: keywords([]string{"固源岩组", "土块", "石头"}, []string{"中級源岩", "ちゅうきゅうげんがん", "チュウキュウゲンガン"},
+					[]string{"gu`yuan`yan`zu", "tu`kuai", "shi`tou"}, []string{"chuukyuu`gengan", "tyuukyuu`gengan"})},
+			{ArkItemID: "30014", Type: "MATERIAL", SortID: 100012, Rarity: 3, Name: i18n("提纯源岩", "Orirock Concentration", "上級源岩", "정제 원암"), Existence: existence(all...),
+				Keywords: keywords([]string{"提纯源岩", "土块", "石头"}, []string{"上級源岩", "じょうきゅうげんがん", "ジョウキュウゲンガン"},
+					[]string{"ti`chun`yuan`yan", "tu`kuai", "shi`tou"}, []string{"joukyuu`gengan", "joukyuu`gengan"})},
+			{ArkItemID: "3113", Type: "MATERIAL", SortID: 200007, Rarity: 2, Name: i18n("碳素", "Carbon Brick", "中級炭素材", "카본 번들"), Existence: existence(all...),
+				Keywords: keywords([]string{"碳素"}, []string{"中級炭素材"}, []string{"tan`su"}, []string{"chuukyuu`tan`sozai"})},
+			// the en name of 3114 is that of 3113 in the data (Carbon Pack in the game)
+			{ArkItemID: "3114", Type: "MATERIAL", SortID: 200006, Rarity: 3, Name: i18n("碳素组", "Carbon Brick", "上級炭素材", "카본 팩"), Existence: existence(all...),
+				Keywords: keywords([]string{"碳素组"}, []string{"上級炭素材"}, []string{"tan`su`zu"}, []string{"joukyuu`tan`sozai"})},
+			{ArkItemID: "4001_1000", Type: "TEMP", SortID: -10000, Rarity: 3, Name: i18n("龙门币1000", "LMD1000", "龍門幣1000", "용문폐1000"), Existence: existence(all...),
+				Keywords: keywords([]string{"龙门币1000", "钱"}, nil, []string{"long`men`bi`1000", "qian"}, nil)},
+			{ArkItemID: "30135", Type: "ARKPLANNER", SortID: 100030, Rarity: 4, Name: i18n("D32钢", "D32 Steel", "D32鋼", "D32 강철"), Existence: existence(all...),
+				Keywords: keywords([]string{"D32钢"}, nil, []string{"D32`gang"}, nil)},
 		},
 		[]*model.Stage{
-			{ArkStageID: "main_01-07", StageID: 1, ZoneID: 1, StageType: "MAIN", Code: i18n("1-7", "1-7", "1-7", "1-7"), Sanity: null.IntFrom(6), Existence: existence(all...)},
+			{ArkStageID: "main_01-07", StageID: 7, ZoneID: 1, StageType: "MAIN", Code: i18n("1-7", "1-7", "1-7", "1-7"), Sanity: null.IntFrom(6), Existence: existence(all...)},
+			{ArkStageID: "recruit", StageID: 8, ZoneID: 99, StageType: "MAIN", Code: i18n("公开招募", "Recruit", "公開求人", "공개모집"), Sanity: null.IntFrom(99), Existence: existence(all...)},
+			{ArkStageID: "randomMaterial_1", StageID: 100, ZoneID: 98, StageType: "ACTIVITY", Code: i18n("罗德岛物资补给", "Rhodes Island Supplies", "補給物資・ロドス", "로도스 아일랜드 보급 물자"),
+				Sanity: null.IntFrom(99), ExtraProcessType: null.StringFrom("GACHABOX"), Existence: between(1577174400000, 0, all...)},
+			{ArkStageID: "act10d5_01", StageID: 200, ZoneID: 20, StageType: "ACTIVITY", Code: i18n("SV-1", "SV-1", "SV-1", "SV-1"), Sanity: null.IntFrom(6), Existence: between(1592467200000, 1593028800000, all...)},
+			{ArkStageID: "act18d3_01", StageID: 300, ZoneID: 30, StageType: "ACTIVITY", Code: i18n("SV-1", "SV-1", "SV-1", "SV-1"), Sanity: null.IntFrom(12), Existence: between(1619856000000, 1621022400000, all...)},
+			{ArkStageID: "act18d3_01_perm", StageID: 310, ZoneID: 31, StageType: "ACTIVITY", Code: i18n("SV-1", "SV-1", "SV-1", "SV-1"), Sanity: null.IntFrom(12), Existence: between(1621627200000, 0, all...)},
+			{ArkStageID: "act18d3_01_rep", StageID: 320, ZoneID: 32, StageType: "ACTIVITY", Code: i18n("SV-1", "SV-1", "SV-1", "SV-1"), Sanity: null.IntFrom(12), Existence: between(1653897600000, 1654718400000, all...)},
+			{ArkStageID: "main_10-01", StageID: 400, ZoneID: 10, StageType: "MAIN", Code: i18n("10-2", "10-2", "10-2", "10-2"), Sanity: null.IntFrom(21), Existence: between(1649923200000, 0, all...)},
+			{ArkStageID: "tough_10-01", StageID: 401, ZoneID: 11, StageType: "MAIN", Code: i18n("10-2", "10-2", "10-2", "10-2"), Sanity: null.IntFrom(21), Existence: between(1649923200000, 0, all...)},
+			{ArkStageID: "main_11-06", StageID: 450, ZoneID: 12, StageType: "MAIN", Code: i18n("11-7", "11-7", "11-7", "11-7"), Sanity: null.IntFrom(21), Existence: between(1665475200000, 0, all...)},
+			{ArkStageID: "tough_11-06", StageID: 451, ZoneID: 13, StageType: "MAIN", Code: i18n("11-7", "11-7", "11-7", "11-7"), Sanity: null.IntFrom(21), Existence: between(1665475200000, 0, all...)},
+			{ArkStageID: "act52side_04", StageID: 900, ZoneID: 52, StageType: "ACTIVITY", Code: i18n("YW-4", "YW-4", "YW-4", "YW-4"), Sanity: null.IntFrom(12), Existence: between(1791518400000, 1792699200000, "CN")},
 		},
 		[]*model.Zone{
-			{ArkZoneID: "main_1", ZoneID: 1, Index: 1, Category: "MAINLINE", Name: i18n("黑暗时代·上", "Evil Time Part 1", "暗黒時代・上", "암흑시대・상"), Existence: existence(all...)},
+			{ArkZoneID: "main_1", ZoneID: 1, Index: 1, Category: "MAINLINE", Name: i18n("第一章", "Episode 1", "第一章", "에피소드 1"), Existence: existence(all...)},
+			{ArkZoneID: "main_10", ZoneID: 10, Index: 10, Category: "MAINLINE", Name: i18n("第十章 (标准)", "Episode 10 (Standard)", "第十章 (通常)", "에피소드 10 (Standard)"), Existence: between(1649923200000, 0, all...)},
+			{ArkZoneID: "main_10_tough", ZoneID: 11, Index: 11, Category: "MAINLINE", Name: i18n("第十章 (磨难)", "Episode 10 (Tough)", "第十章 (厄難)", "에피소드 10 (Tough)"), Existence: between(1649923200000, 0, all...)},
+			{ArkZoneID: "main_11", ZoneID: 12, Index: 12, Category: "MAINLINE", Name: i18n("第十一章 (标准)", "Episode 11 (Standard)", "第十一章 (通常)", "에피소드 11 (Standard)"), Existence: between(1665475200000, 0, all...)},
+			{ArkZoneID: "main_11_tough", ZoneID: 13, Index: 13, Category: "MAINLINE", Name: i18n("第十一章 (磨难)", "Episode 11 (Tough)", "第十一章 (厄難)", "에피소드 11 (Tough)"), Existence: between(1665475200000, 0, all...)},
+			{ArkZoneID: "act10d5_zone1", ZoneID: 20, Index: 1008, Category: "ACTIVITY", Name: i18n("乌萨斯的孩子们", "Children of Ursus", "ウルサスの子供たち", "우르수스의 아이들"), Existence: between(1592467200000, 1593028800000, all...)},
+			{ArkZoneID: "act18d3_zone1", ZoneID: 30, Index: 1021, Category: "ACTIVITY", Name: i18n("覆潮之下", "Under Tides", "潮汐の下", "언더 타이즈"), Existence: between(1619856000000, 1621022400000, all...)},
+			{ArkZoneID: "permanent_sub_3_zone1", ZoneID: 31, Index: 2003, Category: "ACTIVITY_PERMANENT", Type: null.StringFrom("INTERLUDE"),
+				Name: i18n("覆潮之下・插曲", "Under Tides - Intermezzi", "潮汐の下・エピソード", "언더 타이즈 에피소드"), Existence: between(1621627200000, 0, all...)},
+			{ArkZoneID: "act11sre_zone1", ZoneID: 32, Index: 1038, Category: "ACTIVITY", Name: i18n("覆潮之下・复刻", "Under Tides - Rerun", "潮汐の下・復刻", "언더 타이즈 재개방"), Existence: between(1653897600000, 1654718400000, all...)},
+			{ArkZoneID: "act52side_zone1", ZoneID: 52, Index: 1118, Category: "ACTIVITY", Name: i18n("昨日海", "昨日海", "昨日海", "昨日海"), Existence: between(1791518400000, 1792699200000, "CN")},
+			{ArkZoneID: "gachabox", ZoneID: 98, Category: "GACHABOX", Name: i18n("物资补给", "Supplies", "補給物資", "보급물자"), Existence: existence(all...)},
+			{ArkZoneID: "recruit", ZoneID: 99, Category: "RECRUIT", Name: i18n("公开招募", "Recruit", "公開求人", "공개모집"), Existence: existence(all...)},
 		},
 	)
+}
+
+// weeklyCatalog has a supply stage, CA-5 of 空中威胁 (WEEKLY), open every day by its existence, and an item it drops
+func weeklyCatalog() *service.SEOCatalog {
+	return service.NewSEOCatalog(
+		[]*model.Item{{ArkItemID: "3303", Type: "MATERIAL", SortID: 1, Rarity: 2, Name: i18n("技巧概要·卷3", "Skill Summary - 3", "アーツ学III", "스킬개론 제3권"), Existence: existence(all...)}},
+		[]*model.Stage{{ArkStageID: "wk_fly_5", StageID: 1, ZoneID: 1, Code: i18n("CA-5", "CA-5", "CA-5", "CA-5"), Sanity: null.IntFrom(30), Existence: existence(all...)}},
+		[]*model.Zone{{ArkZoneID: "weekly_6", ZoneID: 1, Category: "WEEKLY", Name: i18n("空中威胁", "Aerial Threat", "航空脅威", "공중 위협"), Existence: existence(all...)}})
 }
 
 func testMatrices() map[string]*service.SEOMatrix {
@@ -81,7 +159,7 @@ func testMatrices() map[string]*service.SEOMatrix {
 
 // testServer returns a server of data, and its registry for tests to add tools to.
 func testServer(data Data) (*registry, *fiber.App) {
-	srv, r := newServer(&tools{data: data, site: site}, "test")
+	srv, r := newServer(&tools{data: data, site: site, clock: func() time.Time { return testNow }}, "test")
 	app := fiber.New()
 	Mount(app, srv, 1000, time.Minute)
 	return r, app

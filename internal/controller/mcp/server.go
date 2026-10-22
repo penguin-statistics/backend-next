@@ -4,7 +4,8 @@
 // database.
 //
 // Each tool has a file of its own (tool_<name>.go) and a line in tools.register; output.go has what their results
-// share: the credit of the data, the definitions, the server and language arguments, the text content.
+// share: the credit of the data, the definitions, the server and language arguments, the text content; search.go
+// finds the items and stages by what users and models call them.
 package mcp
 
 import (
@@ -12,6 +13,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -36,7 +38,8 @@ const (
 // instructions tell the model what the data is, how to use the tools and how to credit the data (600 characters at
 // most, as clients may cut them)
 const instructions = "Penguin Statistics (penguin-stats.io) publishes crowdsourced Arknights drop statistics: for each " +
-	"game server (CN, US, JP, KR), how often each stage drops each item, from the reports of players. Call " +
+	"game server (CN, US, JP, KR), how often each stage drops each item, from the reports of players. Find the IDs " +
+	"of items and stages with search_items and search_stages (any language, aliases, pinyin, codes like 1-7). Call " +
 	"get_dataset_info for what the numbers mean, how fresh the data of each server is and its caveats. When you use " +
 	"these numbers, name the server, the data-as-of time and credit Penguin Statistics (penguin-stats.io), CC BY-NC 4.0."
 
@@ -48,11 +51,17 @@ type tools struct {
 	data Data
 	// site is the origin of the stats pages the results link to, without a trailing slash
 	site string
+	// clock tells the time of a call, time.Now if nil (see now)
+	clock func() time.Time
+	// index is the search index of the catalog searched last (see searchIndex)
+	index atomic.Pointer[searchIndex]
 }
 
 // register adds the tools to the server, one line each.
 func (t *tools) register(r *registry) {
 	add(r, getDatasetInfoTool(), t.getDatasetInfo)
+	add(r, searchItemsTool(), t.searchItems)
+	add(r, searchStagesTool(), t.searchStages)
 }
 
 // registry adds the tools to a server and keeps their names, the values of the tool label of the metrics.
