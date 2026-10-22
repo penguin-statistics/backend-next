@@ -131,6 +131,7 @@ func (s *DropMatrix) RunCalcDropMatrixJob(ctx context.Context, server string) er
 	if len(dropMatrixElements) != 0 {
 		s.DropMatrixElementService.BatchSaveElements(ctx, dropMatrixElements, server)
 	}
+	describeCalcJob(ctx, dayNum, s.Config.MatrixWorkerSourceCategories, len(dropMatrixElements))
 
 	// If this is the first time we run the job for this server at this day, we need to update the drop matrix for the previous day.
 	// TODO: archive all drop reports for the today-60d and upload to s3
@@ -144,6 +145,7 @@ func (s *DropMatrix) RunCalcDropMatrixJob(ctx context.Context, server string) er
 		if len(dropMatrixElementsForYesterday) != 0 {
 			s.DropMatrixElementService.BatchSaveElements(ctx, dropMatrixElementsForYesterday, server)
 		}
+		describePreviousDay(ctx, len(dropMatrixElementsForYesterday))
 	}
 
 	// the global drop matrices and the trend are replaced by RefreshGlobalDropMatrixCaches and

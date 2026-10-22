@@ -130,6 +130,7 @@ func (s *PatternMatrix) RunCalcPatternMatrixJob(ctx context.Context, server stri
 	if len(patternMatrixElements) != 0 {
 		s.PatternMatrixElementService.BatchSaveElements(ctx, patternMatrixElements, server)
 	}
+	describeCalcJob(ctx, dayNum, s.Config.MatrixWorkerSourceCategories, len(patternMatrixElements))
 
 	// If this is the first time we run the job for this server at this day, we need to update the pattern matrix for the previous day.
 	if !exists {
@@ -142,6 +143,7 @@ func (s *PatternMatrix) RunCalcPatternMatrixJob(ctx context.Context, server stri
 		if len(patternMatrixElementsForYesterday) != 0 {
 			s.PatternMatrixElementService.BatchSaveElements(ctx, patternMatrixElementsForYesterday, server)
 		}
+		describePreviousDay(ctx, len(patternMatrixElementsForYesterday))
 	}
 
 	// the global pattern matrices are replaced by RefreshGlobalPatternMatrixCaches, not dropped: requests keep
@@ -210,6 +212,7 @@ func (s *PatternMatrix) UpdatePatternMatrixByGivenDate(ctx context.Context, serv
 	if len(patternMatrixElements) != 0 {
 		s.PatternMatrixElementService.BatchSaveElements(ctx, patternMatrixElements, server)
 	}
+	describeCalcJob(ctx, dayNum, s.Config.MatrixWorkerSourceCategories, len(patternMatrixElements))
 	return nil
 }
 
