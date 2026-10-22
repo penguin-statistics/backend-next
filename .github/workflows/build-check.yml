@@ -25,3 +25,5 @@ jobs:
           version: "__check__"
           repository: "penguin-statistics/backend-next"
           push: false
+          build-args: |
+            GIT_COMMIT_SHA=${{ github.event.pull_request.head.sha || github.sha }}

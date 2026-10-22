@@ -27,6 +27,8 @@ jobs:
         with:
           version: ${{ steps.git-meta.outputs.version }}
           repository: "penguin-statistics/backend-next"
+          build-args: |
+            GIT_COMMIT_SHA=${{ github.sha }}
 
       - name: "Release: Call Dispatcher"
         id: release-dispatcher
