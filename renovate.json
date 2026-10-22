@@ -1,7 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:base"],
-  "baseBranches": ["dev"],
   "prConcurrentLimit": 5,
   "ignoreDeps": ["golang.org/x/exp"]
 }
