@@ -14,6 +14,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/uptrace/bun"
 	"go.opentelemetry.io/otel"
@@ -689,17 +690,19 @@ func term(msg *nats.Msg) {
 }
 
 func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) error {
-	lc := log.With()
-	if raw, ok := ctx.Value(rawTaskKey{}).(*[]byte); ok {
-		lc = lc.RawJSON("task", *raw)
-	} else {
-		lc = lc.Interface("task", reportTask)
+	// L returns a logger of the task, for the lines about its verification and its transaction. It is built when one
+	// of them is logged, not for every task: building it copies (or encodes) the task. A task is not logged as it
+	// starts: the line logged as it ends (reportwkr.processed, or the failure in ingestPreprocess) carries the task.
+	L := func() *zerolog.Logger {
+		lc := log.With()
+		if raw, ok := ctx.Value(rawTaskKey{}).(*[]byte); ok {
+			lc = lc.RawJSON("task", *raw)
+		} else {
+			lc = lc.Interface("task", reportTask)
+		}
+		l := lc.Logger()
+		return &l
 	}
-	L := lc.Logger()
-
-	L.Info().
-		Str("evt.name", "reportwkr.received").
-		Msg("received report task: processing")
 
 	// reportTask.CreatedAt is in microseconds
 	taskCreatedAt := time.UnixMicro(reportTask.CreatedAt)
@@ -729,7 +732,7 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 		}
 	}
 	if len(violations) > 0 {
-		L.Warn().
+		L().Warn().
 			Str("evt.name", "reportwkr.violations").
 			Str("violations", strings.Join(violations, "; ")).
 			Ints("reliabilities", reliabilities).
@@ -757,9 +760,10 @@ func (w *Worker) process(ctx context.Context, reportTask *types.ReportTask) erro
 			// rolled back here rather than by RunInTx, which drops the error of a failed rollback. A failed commit
 			// is not rolled back: it has already ended the transaction. Neither has a transaction database/sql
 			// rolled back as its context ended (the task's deadline), which is not a failed rollback.
-			L.Warn().Msg("rolling back transaction due to error")
+			tl := L()
+			tl.Warn().Msg("rolling back transaction due to error")
 			if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
-				L.Error().Err(err).Msg("failed to rollback transaction")
+				tl.Error().Err(err).Msg("failed to rollback transaction")
 			}
 		}
 		return err
