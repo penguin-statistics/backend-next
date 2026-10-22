@@ -142,6 +142,8 @@ type Handler struct {
 	lists sync.Map
 	// sitemaps holds the sitemaps built last, by sitemapKey
 	sitemaps sync.Map
+	// stamps holds the times given the data the sitemaps are made of
+	stamps stamps
 }
 
 func NewHandler(siteURL string, maxAge time.Duration, shells ShellSource, data Data) *Handler {

@@ -100,8 +100,8 @@ type sitemapEntry struct {
 	catalog *service.SEOCatalog
 	matrix  *service.SEOMatrix
 	xml     []byte
-	// lastModified is when the sitemap last changed: the later of the times of the matrix and the catalog; zero if
-	// the matrix has no last modified time
+	// lastModified is when the sitemap last changed: the later of the times given the matrix and the catalog (see
+	// stamps); zero if the matrix has no last modified time
 	lastModified time.Time
 }
 
@@ -127,9 +127,9 @@ func (h *Handler) buildSitemap(k sitemapKey, catalog *service.SEOCatalog, matrix
 	e := &sitemapEntry{catalog: catalog, matrix: matrix}
 	if !matrix.LastModified.IsZero() {
 		// the catalog changes the sitemap too, when a stage is added or moved to another zone
-		e.lastModified = matrix.LastModified
-		if catalog.ChangedAt.After(e.lastModified) {
-			e.lastModified = catalog.ChangedAt
+		e.lastModified = h.stamps.at(matrixSlot{server: k.server}, matrix, matrix.LastModified)
+		if at := h.stamps.at(catalogSlot{}, catalog, catalog.ChangedAt); at.After(e.lastModified) {
+			e.lastModified = at
 		}
 	}
 	lastmod := w3cTime(matrix.LastModified)

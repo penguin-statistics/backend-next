@@ -338,10 +338,10 @@ func TestSitemapLastmod(t *testing.T) {
 		t.Errorf("index after the catalog changed: lastmod %q, Last-Modified %q", at[site+"/sitemap-zh-cn.xml"], r.header.Get("Last-Modified"))
 	}
 	// one that changed before it
-	catalog = testCatalog()
-	catalog.ChangedAt = lastModified.Add(-time.Hour)
-	e.data.catalog = catalog
-	if r := e.get(t, "/sitemap-zh-cn.xml"); r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 10:30:00 GMT" {
+	before := newTestEnv(t)
+	warmAll(before)
+	before.data.catalog.ChangedAt = lastModified.Add(-time.Hour)
+	if r := before.get(t, "/sitemap-zh-cn.xml"); r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 10:30:00 GMT" {
 		t.Errorf("catalog changed before the matrix: Last-Modified %q", r.header.Get("Last-Modified"))
 	}
 
@@ -389,6 +389,60 @@ func TestSitemapNotModified(t *testing.T) {
 	e.data.matrices["KR"] = nil
 	if r := e.getWith(t, "/sitemap.xml", map[string]string{"If-Modified-Since": "Wed, 21 Oct 2026 12:00:00 GMT"}); r.status != 200 {
 		t.Errorf("index with KR cold: status %d", r.status)
+	}
+}
+
+func TestSitemapNotModifiedAfterAChangeInTheSameSecond(t *testing.T) {
+	e := newTestEnv(t)
+	warmAll(e)
+	// the matrix of server published anew at t, with the same rows
+	matrixAt := func(server string, t time.Time) *service.SEOMatrix {
+		m := *testMatrices()[server]
+		m.LastModified = t
+		return &m
+	}
+	e.data.matrices["CN"] = matrixAt("CN", lastModified.Add(100*time.Millisecond))
+	since := func(lm string) map[string]string { return map[string]string{"If-Modified-Since": lm} }
+	first := e.get(t, "/sitemap-en-cn.xml")
+	if lm := first.header.Get("Last-Modified"); lm != "Wed, 21 Oct 2026 10:30:00 GMT" {
+		t.Fatalf("Last-Modified %q", lm)
+	}
+	if r := e.get(t, "/sitemap-en-cn.xml"); r.header.Get("Last-Modified") != first.header.Get("Last-Modified") {
+		t.Errorf("unchanged: Last-Modified %q", r.header.Get("Last-Modified"))
+	}
+
+	// 1-7 moved to another zone later in the same second: modified since the first sitemap and index
+	catalog := testCatalog()
+	catalog.Stages["main_01-07"].Zone = catalog.Zones["act1_zone1"]
+	catalog.ChangedAt = lastModified.Add(900 * time.Millisecond)
+	e.data.catalog = catalog
+	r := e.getWith(t, "/sitemap-en-cn.xml", since(first.header.Get("Last-Modified")))
+	if r.status != 200 || r.body == first.body || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 10:30:01 GMT" {
+		t.Errorf("catalog changed in the same second: status %d, Last-Modified %q", r.status, r.header.Get("Last-Modified"))
+	}
+	// a sitemap built for the first time since then, which a crawler has from another backend
+	if r := e.getWith(t, "/sitemap-zh-cn.xml", since(first.header.Get("Last-Modified"))); r.status != 200 || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 10:30:01 GMT" {
+		t.Errorf("another sitemap after the catalog changed in the same second: status %d, Last-Modified %q", r.status, r.header.Get("Last-Modified"))
+	}
+	index := e.getWith(t, "/sitemap.xml", since(first.header.Get("Last-Modified")))
+	if index.status != 200 || index.header.Get("Last-Modified") != "Wed, 21 Oct 2026 10:30:01 GMT" {
+		t.Errorf("index after the catalog changed in the same second: status %d, Last-Modified %q", index.status, index.header.Get("Last-Modified"))
+	}
+
+	// the matrix published in that second too, after the catalog
+	e.data.matrices["CN"] = matrixAt("CN", lastModified.Add(950*time.Millisecond))
+	if r := e.getWith(t, "/sitemap-en-cn.xml", since("Wed, 21 Oct 2026 10:30:01 GMT")); r.status != 200 || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 10:30:02 GMT" {
+		t.Errorf("matrix published in the same second: status %d, Last-Modified %q", r.status, r.header.Get("Last-Modified"))
+	}
+	index = e.get(t, "/sitemap.xml")
+
+	// the matrix of another server, with a time older than the latest sitemap: the index lists its new lastmod
+	e.data.matrices["US"] = matrixAt("US", lastModified.Add(500*time.Millisecond))
+	if r := e.getWith(t, "/sitemap.xml", since(index.header.Get("Last-Modified"))); r.status != 200 || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 10:30:03 GMT" {
+		t.Errorf("index after an older matrix of another server: status %d, Last-Modified %q", r.status, r.header.Get("Last-Modified"))
+	}
+	if r := e.getWith(t, "/sitemap.xml", since("Wed, 21 Oct 2026 10:30:03 GMT")); r.status != 304 {
+		t.Errorf("unchanged index: status %d", r.status)
 	}
 }
 
