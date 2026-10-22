@@ -223,12 +223,14 @@ func (d *SEOData) Catalog() *SEOCatalog {
 // looks at the cache, as calculating the matrix takes long.
 func (d *SEOData) Matrix(server string) *SEOMatrix {
 	key := server + constant.CacheSep + "true" + constant.CacheSep + SEOSourceCategory
+	// the time first, as the v2 controllers read it (see cache.GetLastModifiedTime): a matrix cached meanwhile then
+	// looks older than it is, while read after, an older matrix could get the time of a newer one, and the pages
+	// made of it be answered as not modified after the newer one is cached
+	lastModified := cache.GetLastModifiedTime("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:" + key + "]")
 	var result modelv2.DropMatrixQueryResult
 	if err := cache.ShimGlobalDropMatrix.Get(key, &result); err != nil {
 		return nil
 	}
-	var lastModified time.Time
-	_ = cache.LastModifiedTime.Get("[shimGlobalDropMatrix#server|showClosedZones|sourceCategory:"+key+"]", &lastModified)
 
 	d.matricesMu.Lock()
 	memo, ok := d.matrices[server]
