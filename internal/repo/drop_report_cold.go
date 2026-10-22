@@ -91,10 +91,81 @@ func (r *ColdDropReport) CalcDropMatrixForIntervalsBySourceCategories(
 	return timesResults, quantityUniqCountResults, nil
 }
 
+// CalcTotalQuantityForPatternMatrixBySourceCategories is DropReport.CalcTotalQuantityForPatternMatrixBySourceCategories
+// on the archived reports of view: the interval must end at the latest at view's hot boundary. It counts the reports
+// with times = 1 per stage and pattern from the same files as CalcDropMatrixForIntervalsBySourceCategories.
+func (r *ColdDropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
+	ctx context.Context, view *coldstore.View, queryCtx *model.DropReportQueryContext, sourceCategories []string,
+) (_ map[string][]*model.TotalQuantityResultForPatternMatrix, err error) {
+	// the pattern matrix counts only the reports with times = 1, whatever queryCtx says
+	oneTimeCtx := *queryCtx
+	oneTimeCtx.ExcludeNonOneTimes = true
+	plan := newDropMatrixPlan([]*model.DropReportQueryContext{&oneTimeCtx})
+	if end := plan.thresholds[len(plan.thresholds)-1]; end.After(view.HotBoundary()) {
+		return nil, errors.Errorf("coldstore: pattern matrix interval ends at %s, after the hot boundary %s", end.UTC(), view.HotBoundary().UTC())
+	}
+	if len(plan.thresholds) < 2 {
+		// an empty interval
+		return splitPatternMatrixRowsBySourceCategories(nil, sourceCategories), nil
+	}
+	var queryFiles coldstore.QueryFiles
+	counts, ok := coldReportCounts(&queryFiles, view, plan, &oneTimeCtx)
+	if !ok {
+		return splitPatternMatrixRowsBySourceCategories(nil, sourceCategories), nil
+	}
+
+	started := time.Now()
+	defer func() { coldstore.ObserveQuery("pattern_matrix", started, err) }()
+	args := []any{queryCtx.Server}
+	if queryCtx.AccountID.Valid {
+		args = append(args, queryCtx.AccountID.Int64)
+	}
+	rows, err := r.reader.Query(ctx, &queryFiles, counts+`
+		SELECT stage_id, pattern_id, is_manual, sum(cnt)::BIGINT AS total_quantity
+		FROM a
+		GROUP BY stage_id, pattern_id, is_manual`, args...)
+	if err != nil {
+		return nil, errors.Wrap(err, "coldstore: pattern matrix")
+	}
+	defer rows.Close()
+	var results []patternMatrixRow
+	for rows.Next() {
+		var row patternMatrixRow
+		if err := rows.Scan(&row.StageID, &row.PatternID, &row.IsManual, &row.TotalQuantity); err != nil {
+			return nil, errors.Wrap(err, "coldstore: pattern matrix")
+		}
+		results = append(results, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "coldstore: pattern matrix")
+	}
+	return splitPatternMatrixRowsBySourceCategories(results, sourceCategories), nil
+}
+
 // coldDropMatrixQuery returns the DuckDB query of CalcDropMatrixForIntervalsBySourceCategories, with the server as
 // $1 and the account, if any, as $2, over the files of view it adds to queryFiles; or false when no file holds
 // reports of the plan.
 func coldDropMatrixQuery(queryFiles *coldstore.QueryFiles, view *coldstore.View, plan dropMatrixPlan, queryCtx *model.DropReportQueryContext) (string, bool) {
+	counts, ok := coldReportCounts(queryFiles, view, plan, queryCtx)
+	if !ok {
+		return "", false
+	}
+	return counts + `
+		SELECT 'quantity' AS kind, a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment, sum(a.cnt)::BIGINT AS value
+		FROM a JOIN ` + queryFiles.ReadParquet([]string{view.DimFile(coldstore.DropPatternElementsFile)}) + ` AS dpe
+			ON dpe.drop_pattern_id = a.pattern_id
+		GROUP BY a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment
+		UNION ALL
+		SELECT 'times' AS kind, a.stage_id, 0, 0, a.is_manual, a.segment, sum(a.times)::BIGINT AS value
+		FROM a
+		GROUP BY a.stage_id, a.is_manual, a.segment`, true
+}
+
+// coldReportCounts returns the WITH clause of a DuckDB query, with the server as $1 and the account, if any, as $2,
+// that counts the reports of the plan that queryCtx's filters (account and reliability, server, times, stages)
+// keep: a(stage_id, pattern_id, is_manual, segment, cnt, times) holds the number of reports and their sum of times.
+// It reads files of view, which it adds to queryFiles, and returns false when no file holds reports of the plan.
+func coldReportCounts(queryFiles *coldstore.QueryFiles, view *coldstore.View, plan dropMatrixPlan, queryCtx *model.DropReportQueryContext) (string, bool) {
 	first, last := plan.thresholds[0], plan.thresholds[len(plan.thresholds)-1]
 	personal := queryCtx.AccountID.Valid
 
@@ -184,15 +255,7 @@ func coldDropMatrixQuery(queryFiles *coldstore.QueryFiles, view *coldstore.View,
 		a AS MATERIALIZED (
 			SELECT stage_id, pattern_id, is_manual, segment, sum(cnt)::BIGINT AS cnt, sum(times)::BIGINT AS times
 			FROM (` + strings.Join(parts, "\nUNION ALL\n") + `)
-			GROUP BY stage_id, pattern_id, is_manual, segment)
-		SELECT 'quantity' AS kind, a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment, sum(a.cnt)::BIGINT AS value
-		FROM a JOIN ` + queryFiles.ReadParquet([]string{view.DimFile(coldstore.DropPatternElementsFile)}) + ` AS dpe
-			ON dpe.drop_pattern_id = a.pattern_id
-		GROUP BY a.stage_id, dpe.item_id, dpe.quantity, a.is_manual, a.segment
-		UNION ALL
-		SELECT 'times' AS kind, a.stage_id, 0, 0, a.is_manual, a.segment, sum(a.times)::BIGINT AS value
-		FROM a
-		GROUP BY a.stage_id, a.is_manual, a.segment`, true
+			GROUP BY stage_id, pattern_id, is_manual, segment)`, true
 }
 
 // coldIsManualSourceExpr is isManualSourceExpr in DuckDB; the rollup's is_manual is computed with it.
