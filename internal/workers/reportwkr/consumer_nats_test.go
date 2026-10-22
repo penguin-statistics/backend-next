@@ -25,10 +25,12 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/nats-io/nats.go"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"exusiai.dev/backend-next/internal/model/types"
+	"exusiai.dev/backend-next/internal/pkg/observability"
 )
 
 // testStream is a work queue stream of a test, like penguin-reports in production.
@@ -721,6 +723,7 @@ func TestMalformedPayloadIsTerminated(t *testing.T) {
 		return nil
 	}
 	terminated := s.countTerminated(t, w.conf.durable)
+	deadLettered := deadLetteredCounter("malformed")
 	startConsumer(t, w)
 	if _, err := s.js.Publish(s.publish, []byte("not-json")); err != nil {
 		t.Fatal(err)
@@ -751,6 +754,16 @@ func TestMalformedPayloadIsTerminated(t *testing.T) {
 		t.Fatalf("%d messages in the dead-letter stream, want 1", len(dead))
 	}
 	s.checkDead(t, dead[0], 1, []byte("not-json"), 1, "invalid character")
+	if n := deadLettered(); n != 1 {
+		t.Errorf("dead_lettered_total{malformed} increased by %v, want 1", n)
+	}
+}
+
+// deadLetteredCounter returns how much dead_lettered_total{reason} has increased since it was called.
+func deadLetteredCounter(reason string) func() float64 {
+	c := observability.ReportDeadLetteredTotal.WithLabelValues(reason)
+	before := testutil.ToFloat64(c)
+	return func() float64 { return testutil.ToFloat64(c) - before }
 }
 
 // TestUnknownStageIsParked processes a task whose second report is of a stage that does not exist: no retry can store
@@ -766,6 +779,7 @@ func TestUnknownStageIsParked(t *testing.T) {
 	w := newWorker(tw.WorkerDeps, s.consumerConfig())
 	w.NatsJS = s.js
 	terminated := s.countTerminated(t, w.conf.durable)
+	deadLettered := deadLetteredCounter("not_found")
 	startConsumer(t, w)
 	first := testReport("main_01-07", 30012)
 	first.Drops = append(first.Drops, &types.Drop{DropType: "EXTRA", ItemID: 30012, Quantity: 1})
@@ -802,6 +816,9 @@ func TestUnknownStageIsParked(t *testing.T) {
 		t.Fatalf("%d messages in the dead-letter stream, want 1", len(dead))
 	}
 	s.checkDead(t, dead[0], 1, task, 1, "not found")
+	if n := deadLettered(); n != 1 {
+		t.Errorf("dead_lettered_total{not_found} increased by %v, want 1", n)
+	}
 }
 
 // TestDeadLetterAfter checks that a task failing at every delivery is retried for over an hour and a half (a database
@@ -841,6 +858,7 @@ func TestPermanentFailuresMoveToDeadLetter(t *testing.T) {
 	}
 
 	const bad, good = 2 * 64, 20
+	deadLettered := deadLetteredCounter("max_deliveries")
 	payloads := map[uint64][]byte{}
 	for i := 0; i < bad+good; i++ {
 		id := fmt.Sprintf("bad-%d", i)
@@ -884,6 +902,9 @@ func TestPermanentFailuresMoveToDeadLetter(t *testing.T) {
 	}
 	if n := len(logEntries(t, &logs, "reportwkr.dead")); n != bad {
 		t.Errorf("%d tasks logged as moved to the dead-letter stream, want %d", n, bad)
+	}
+	if n := deadLettered(); n != bad {
+		t.Errorf("dead_lettered_total{max_deliveries} increased by %v, want %d", n, bad)
 	}
 }
 

@@ -82,7 +82,7 @@ func TestConsumeMetricsOnUnmarshalFailure(t *testing.T) {
 
 func TestConsumeMetricsOnProcessFailure(t *testing.T) {
 	consumed := observability.ReportConsumeTotal.WithLabelValues("failed_process", "other")
-	stored := observability.ReportStoredTotal.WithLabelValues("other")
+	stored := observability.ReportStoredTotal.WithLabelValues("other", "other")
 	before, storedBefore := testutil.ToFloat64(consumed), testutil.ToFloat64(stored)
 
 	// a closed database fails the transaction before anything is stored
@@ -138,8 +138,10 @@ func TestConsumeMetricsOnStore(t *testing.T) {
 			}
 
 			consumed := observability.ReportConsumeTotal.WithLabelValues(tc.outcome, "REPORT.BATCH")
-			stored := observability.ReportStoredTotal.WithLabelValues("maa")
-			consumedBefore, storedBefore := testutil.ToFloat64(consumed), testutil.ToFloat64(stored)
+			stored := observability.ReportStoredTotal.WithLabelValues("maa", "CN")
+			// the drops of the reports fit no drop info of the schema: both are stored as rejected (6)
+			rejected := observability.ReportReliability.WithLabelValues("6", "MaaAssistantArknights", "CN")
+			consumedBefore, storedBefore, rejectedBefore := testutil.ToFloat64(consumed), testutil.ToFloat64(stored), testutil.ToFloat64(rejected)
 
 			w.ingestPreprocess(newTestMsg("REPORT.BATCH", 1, data))
 
@@ -147,7 +149,11 @@ func TestConsumeMetricsOnStore(t *testing.T) {
 				t.Errorf("consume_total{%s,REPORT.BATCH} increased by %v, want 1", tc.outcome, got)
 			}
 			if got := testutil.ToFloat64(stored) - storedBefore; got != tc.storedDelta {
-				t.Errorf("stored_total{maa} increased by %v, want %v", got, tc.storedDelta)
+				t.Errorf("stored_total{maa,CN} increased by %v, want %v", got, tc.storedDelta)
+			}
+			// the reports of a task rolled back are not counted either
+			if got := testutil.ToFloat64(rejected) - rejectedBefore; got != tc.storedDelta {
+				t.Errorf("reliability{6,MaaAssistantArknights,CN} increased by %v, want %v", got, tc.storedDelta)
 			}
 			if n, err := w.DB.NewSelect().Table("drop_reports").Count(ctx); err != nil || n != tc.reportsInDB {
 				t.Errorf("drop_reports has %d rows (err %v), want %d", n, err, tc.reportsInDB)
