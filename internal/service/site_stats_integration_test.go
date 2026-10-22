@@ -210,7 +210,7 @@ func TestRefreshShimSiteStatsMatchesLegacy(t *testing.T) {
 
 	generations := &memorySiteStatsBaseGenerations{}
 	s := &SiteStats{
-		DropReportService:        NewDropReport(repo.NewDropReport(db)),
+		DropReportService:        NewDropReport(repo.NewDropReport(db), nil),
 		DropMatrixElementService: NewDropMatrixElement(repo.NewDropMatrixElement(db)),
 		StageService:             NewStage(repo.NewStage(db)),
 		ItemService:              NewItem(repo.NewItem(db)),
@@ -287,7 +287,7 @@ func TestShimSiteStatsCache(t *testing.T) {
 	seedSiteStatsData(t, rand.New(rand.NewSource(1)), db, today, []int{-3, -1, 0})
 	calculations := &countingSiteStatsBaseGenerations{}
 	s := &SiteStats{
-		DropReportService:        NewDropReport(repo.NewDropReport(db)),
+		DropReportService:        NewDropReport(repo.NewDropReport(db), nil),
 		DropMatrixElementService: NewDropMatrixElement(repo.NewDropMatrixElement(db)),
 		StageService:             NewStage(repo.NewStage(db)),
 		ItemService:              NewItem(repo.NewItem(db)),
@@ -397,7 +397,7 @@ func TestShimSiteStatsOverlappingRefreshes(t *testing.T) {
 	hook := &pauseQueriesHook{table: "drop_matrix_elements", paused: make(chan struct{}), release: make(chan struct{})}
 	db.AddQueryHook(hook)
 	s := &SiteStats{
-		DropReportService:        NewDropReport(repo.NewDropReport(db)),
+		DropReportService:        NewDropReport(repo.NewDropReport(db), nil),
 		DropMatrixElementService: NewDropMatrixElement(repo.NewDropMatrixElement(db)),
 		StageService:             NewStage(repo.NewStage(db)),
 		ItemService:              NewItem(repo.NewItem(db)),
@@ -509,7 +509,7 @@ func newSiteStatsForOverlapTest(t *testing.T) (*SiteStats, *bun.DB, map[string]i
 	}
 	seedSiteStatsData(t, rand.New(rand.NewSource(1)), db, today, []int{-3, -1, 0})
 	return &SiteStats{
-		DropReportService:        NewDropReport(repo.NewDropReport(db)),
+		DropReportService:        NewDropReport(repo.NewDropReport(db), nil),
 		DropMatrixElementService: NewDropMatrixElement(repo.NewDropMatrixElement(db)),
 		StageService:             NewStage(repo.NewStage(db)),
 		ItemService:              NewItem(repo.NewItem(db)),
