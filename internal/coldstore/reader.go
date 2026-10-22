@@ -661,17 +661,35 @@ func (v *View) Split(start, end time.Time) (cold, hot TimeRange) {
 // in the order of the months, or none if r is empty or outside the archive. A month's file holds all its reports,
 // so the query must still filter on created_at.
 func (v *View) Files(kind Kind, r TimeRange) []string {
+	var files []string
+	for _, mf := range v.MonthFiles(kind, r) {
+		files = append(files, mf.Path)
+	}
+	return files
+}
+
+// MonthFile is the file of a kind of an archived month.
+type MonthFile struct {
+	// Month is the month's manifest entry, e.g. for its RecruitStageID. It must not be modified.
+	Month *MonthEntry
+	// Path is the absolute path of the file.
+	Path string
+}
+
+// MonthFiles is Files with the manifest entry of each file's month.
+func (v *View) MonthFiles(kind Kind, r TimeRange) []MonthFile {
 	if r.Empty() {
 		return nil
 	}
-	var files []string
-	for _, e := range v.manifest.Months {
+	var files []MonthFile
+	for i := range v.manifest.Months {
+		e := &v.manifest.Months[i]
 		month, err := ParseMonth(e.Month)
 		if err != nil || !month.End.After(r.Start) || (!month.IsPre() && !month.Start.Before(r.End)) {
 			continue
 		}
 		if fe := e.File(kind); fe != nil {
-			files = append(files, v.path(fe.Path))
+			files = append(files, MonthFile{Month: e, Path: v.path(fe.Path)})
 		}
 	}
 	return files
