@@ -163,6 +163,16 @@ type ConfigSpec struct {
 	// <dir>/v1.5.6/linux_amd64/postgres_scanner.duckdb_extension.
 	ColdstoreExtensionDirectory string `split_words:"true" default:"/opt/duckdb/extensions"`
 
+	// ReportSchemaV2Enabled means the database has the partitioned schema of #752: write drop_report_extras.created_at.
+	// On the new database (scripts/newdb) drop_reports and drop_report_extras are partitioned by month of created_at,
+	// so the report worker writes the created_at of the report to drop_report_extras, its partition key there. Reports
+	// are stored as before otherwise, recruitment reports included. Keep it false on today's database, which has no
+	// such column: every report would fail to store. Keep it true on the new database, where a drop_report_extras row
+	// without created_at fails to insert. The report worker checks the database at startup and fails the startup when
+	// the flag does not match it. With the flag on, it also creates the partitions of the current and the next month
+	// every hour (the new database has no default partition).
+	ReportSchemaV2Enabled bool `split_words:"true" default:"false"`
+
 	// SEOPagesEnabled serves the stats pages of the frontend (/{zh,en,ja,ko}/result/...) from here: the frontend's
 	// index.html with the page's title, description, canonical and hreflang links, structured data and a plain HTML
 	// table of its data, for search engines and link previews. The ingress has to route those paths here. When

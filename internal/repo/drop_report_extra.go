@@ -70,10 +70,15 @@ func (c *DropReportExtra) DeleteDropReportExtrasForArchive(ctx context.Context, 
 	return r.RowsAffected()
 }
 
+// CreateDropReportExtra inserts the extra of a report, with created_at only when report.CreatedAt is set (see
+// model.DropReportExtra.CreatedAt).
 func (r *DropReportExtra) CreateDropReportExtra(ctx context.Context, tx bun.Tx, report *model.DropReportExtra) error {
-	_, err := tx.NewInsert().
-		Model(report).
-		Exec(ctx)
+	query := tx.NewInsert().
+		Model(report)
+	if report.CreatedAt != nil {
+		query = query.Value("created_at", "?", *report.CreatedAt)
+	}
+	_, err := query.Exec(ctx)
 
 	return err
 }

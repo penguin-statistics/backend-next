@@ -10,8 +10,9 @@
 --
 -- - The archive job detaches and drops the partition of a month once it is in the cold store: no DELETE, no bloat.
 --   create_report_partitions creates the partitions of a month for both tables; it must run ahead of time (the
---   migration creates the next month, the archive job the month after the current one): there is no default
---   partition, so a report of a month without partition fails to insert instead of landing where no archive finds it.
+--   migration creates the months after the hot ones, the report worker the current and the next month every hour):
+--   there is no default partition, so a report of a month without partition fails to insert instead of landing where
+--   no archive finds it.
 --   created_at is the time the API accepted the report (types.ReportTask.CreatedAt), never set by clients.
 -- - A unique constraint of a partitioned table must contain the partition key, so the primary keys are
 --   (report_id, created_at). report_id stays unique because every report id comes from drop_reports_report_id_seq,
