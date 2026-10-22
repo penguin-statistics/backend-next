@@ -244,7 +244,7 @@ func newMatrixServices(db *bun.DB) matrixServices {
 	dropInfoRepo := repo.NewDropInfo(db)
 	timeRange := NewTimeRange(repo.NewTimeRange(db), dropInfoRepo)
 	dropInfo := NewDropInfo(dropInfoRepo, timeRange)
-	dropReport := NewDropReport(repo.NewDropReport(db))
+	dropReport := NewDropReport(repo.NewDropReport(db), nil)
 	return matrixServices{
 		timeRange:     timeRange,
 		dropMatrix:    &DropMatrix{TimeRangeService: timeRange, DropReportService: dropReport, DropInfoService: dropInfo},

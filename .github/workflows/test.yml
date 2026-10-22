@@ -61,6 +61,24 @@ jobs:
           docker run -d --name nats -p 4222:4222 nats:2.10-alpine -js
           timeout 30 sh -c 'until nc -z 127.0.0.1 4222; do sleep 1; done'
 
+      # the DuckDB postgres extension for the tests that read PostgreSQL through DuckDB (internal/pkg/duckdbx,
+      # internal/coldstore); the app never installs extensions itself. Same download as the Dockerfile's duckdb-extensions stage: keep
+      # DUCKDB_VERSION equal to its ARG DUCKDB_VERSION
+      - name: Download DuckDB extensions
+        env:
+          DUCKDB_VERSION: v1.5.6
+        # bash -eo pipefail, so that a failed download fails the step
+        shell: bash
+        run: |
+          dir="$RUNNER_TEMP/duckdb-extensions/$DUCKDB_VERSION/linux_amd64"
+          mkdir -p "$dir"
+          curl -fsSL --retry 3 "https://extensions.duckdb.org/$DUCKDB_VERSION/linux_amd64/postgres_scanner.duckdb_extension.gz" \
+            | gunzip > "$dir/postgres_scanner.duckdb_extension"
+
+      # backfill.sh's markers, resuming and upload checks, with a fake app binary and an rclone stub (a few seconds)
+      - name: Test the cold storage backfill script
+        run: scripts/coldstore/backfill_test.sh
+
       - name: Vet
         run: |
           go vet ./...
@@ -73,4 +91,5 @@ jobs:
           PENGUIN_TEST_POSTGRES_DSN: postgres://postgres:test@127.0.0.1:5432/postgres?sslmode=disable
           PENGUIN_TEST_REDIS_URL: redis://127.0.0.1:6379/0
           PENGUIN_TEST_NATS_URL: nats://127.0.0.1:4222
+          PENGUIN_TEST_DUCKDB_EXTENSION_DIR: ${{ runner.temp }}/duckdb-extensions
         run: go test -race -count=1 $(go list ./... | grep -v '/backend-next/test$')
