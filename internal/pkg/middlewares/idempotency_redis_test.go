@@ -455,10 +455,13 @@ func (h *replayFirstLockHook) ProcessHook(next redis.ProcessHook) redis.ProcessH
 	return func(ctx context.Context, cmd redis.Cmder) error {
 		name := cmd.Name()
 		if (name == "evalsha" || name == "eval") && len(cmd.Args()) > 4 && cmd.Args()[4] == h.lockKey &&
-			h.replayed.CompareAndSwap(false, true) {
+			!h.replayed.Load() {
+			// only a run that went through counts: an EVALSHA answered NOSCRIPT (a cold script cache) did nothing,
+			// and go-redis falls back to EVAL
 			if err := next(ctx, cmd); err != nil {
 				return err
 			}
+			h.replayed.Store(true)
 		}
 		return next(ctx, cmd)
 	}
