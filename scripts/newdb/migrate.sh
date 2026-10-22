@@ -31,7 +31,8 @@
 #   VERIFY_HASH       1 (default) compares a hash of every column, 0 only the row counts
 #   RUNWAY_MONTHS     months of partitions created after the last hot month (default 3). There is no default
 #                     partition: a report of a month without partition fails to store, so the months after these must
-#                     be created ahead of time (SELECT create_report_partitions(date)).
+#                     be created ahead of time (SELECT create_report_partitions(date)): the report worker creates the
+#                     current and the next month every hour when ReportSchemaV2Enabled is on.
 #
 # Use the client tools of the new version (pg_dump 17 can dump PostgreSQL 14). Every step logs its duration. The
 # Parquet export of the hot months (also part of T3) is not done here: the hot months stay in the new database, and

@@ -24,6 +24,7 @@ import (
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
+	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/types"
 	"exusiai.dev/backend-next/internal/pkg/jetstream"
@@ -165,6 +166,9 @@ type Worker struct {
 
 	conf     consumerConfig
 	verifier reportverifs.Verifier
+	// reportSchemaV2 writes drop_report_extras.created_at and keeps the report partitions: see
+	// appconfig.ConfigSpec.ReportSchemaV2Enabled
+	reportSchemaV2 bool
 	// handle processes a task: process, or a stand-in in tests
 	handle func(ctx context.Context, reportTask *types.ReportTask) error
 
@@ -185,9 +189,14 @@ func newWorker(deps WorkerDeps, conf consumerConfig) *Worker {
 	return w
 }
 
-// Start sets the report consumer up, failing the startup if it cannot, and runs its workers while the app runs.
-func Start(lc fx.Lifecycle, deps WorkerDeps) error {
+// Start checks that the database has the report schema of the configuration and sets the report consumer up, failing
+// the startup if either fails, and runs its workers while the app runs.
+func Start(lc fx.Lifecycle, conf *appconfig.Config, deps WorkerDeps) error {
 	w := newWorker(deps, defaultConsumerConfig)
+	w.reportSchemaV2 = conf.ReportSchemaV2Enabled
+	if err := w.checkReportSchema(context.Background()); err != nil {
+		return err
+	}
 	if err := w.subscribe(); err != nil {
 		return err
 	}
@@ -281,8 +290,12 @@ func (w *Worker) addConsumer() error {
 	return errors.Wrap(err, "failed to create report consumer")
 }
 
-// start runs a worker per subscription.
+// start runs a worker per subscription, and on the new database the upkeep of the report partitions.
 func (w *Worker) start() {
+	if w.reportSchemaV2 {
+		w.wg.Add(1)
+		go w.maintainReportPartitions()
+	}
 	for _, sub := range w.subs {
 		w.wg.Add(1)
 		go w.consume(sub)
@@ -833,12 +846,17 @@ func (w *Worker) persist(ctx context.Context, tx bun.Tx, reportTask *types.Repor
 
 			reportTask.IP = "127.0.0.1"
 		}
-		if err = w.DropReportExtraRepo.CreateDropReportExtra(ctx, tx, &model.DropReportExtra{
+		dropReportExtra := &model.DropReportExtra{
 			ReportID: dropReport.ReportID,
 			IP:       reportTask.IP,
 			Metadata: report.Metadata,
 			MD5:      null.NewString(md5, md5 != ""),
-		}); err != nil {
+		}
+		if w.reportSchemaV2 {
+			// the partition key of drop_report_extras on the new database; today's has no such column
+			dropReportExtra.CreatedAt = dropReport.CreatedAt
+		}
+		if err = w.DropReportExtraRepo.CreateDropReportExtra(ctx, tx, dropReportExtra); err != nil {
 			return 0, nil, errors.Wrap(err, "failed to create drop report extra")
 		}
 
