@@ -1,6 +1,10 @@
 package observability
 
 import (
+	"strconv"
+	"strings"
+	"sync"
+
 	"exusiai.dev/gommon/constant"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -26,10 +30,12 @@ var (
 		Help:    "Messaging latency of report consumption in seconds",
 		Buckets: prometheus.ExponentialBuckets(0.01, 2, 10),
 	}, []string{})
+	// ReportReliability counts the stored reports by reliability (0 is accepted; see reportverifs.Verifier), source
+	// and server. source_name is the source as the client sent it, bounded by reportSourceNames.
 	ReportReliability = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: prometheus.BuildFQName(ServiceName, "report", "reliability"),
 		Help: "Reliability distribution of report consumption",
-	}, []string{"reliability", "source_name"})
+	}, []string{"reliability", "source_name", "server"})
 	ReportConsumeTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: prometheus.BuildFQName(ServiceName, "report", "consume_total"),
 		Help: "Consumed report task messages by outcome (stored, failed_unmarshal, failed_process) and subject",
@@ -54,8 +60,22 @@ var (
 	}, []string{"result"})
 	ReportStoredTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: prometheus.BuildFQName(ServiceName, "report", "stored_total"),
-		Help: "Stored reports by source category (maa, frontend, other)",
-	}, []string{"source"})
+		Help: "Stored reports by source category (maa, frontend, other) and server",
+	}, []string{"source", "server"})
+	// ReportDeadLetteredTotal counts the report tasks moved to the dead-letter stream by reason: malformed (not a
+	// report task), not_found (a stage of the task does not exist), max_deliveries (failed at its last delivery) and
+	// over_delivered (delivered after it was moved already).
+	ReportDeadLetteredTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "report", "dead_lettered_total"),
+		Help: "Report tasks moved to the dead-letter stream by reason (malformed, not_found, max_deliveries, over_delivered)",
+	}, []string{"reason"})
+	// ReportAccounts counts how the report routes resolve the account of a request: existing (the PenguinID sent
+	// names an account), created (none sent: a new account) or recreated (the PenguinID sent names no account, and a
+	// new one replaces it), or error (creating it failed).
+	ReportAccounts = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "report", "accounts_total"),
+		Help: "Accounts of report requests by outcome (existing, created, recreated, error)",
+	}, []string{"outcome"})
 	WorkerCalcDuration = promauto.NewGaugeVec(prometheus.GaugeOpts{
 		Name: prometheus.BuildFQName(ServiceName, "worker", "calc_duration_seconds"),
 		Help: "Duration of last worker calculation in seconds",
@@ -104,6 +124,14 @@ var (
 		Help:    "Size of HTTP response bodies in bytes by matched route, method and status class",
 		Buckets: prometheus.ExponentialBuckets(1024, 8, 5),
 	}, []string{"route", "method", "status_class"})
+	// HTTPRequestDuration times every request from the request logger, unsampled (the traces are sampled), by the
+	// same route and method as HTTPResponseSize and the exact status code (see HTTPStatusCode). The buckets run from
+	// 1ms to 16s, past the 10s that a report publish waits for NATS at most.
+	HTTPRequestDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    prometheus.BuildFQName(ServiceName, "http", "request_duration_seconds"),
+		Help:    "Duration of HTTP requests in seconds by matched route, method and status code",
+		Buckets: prometheus.ExponentialBuckets(0.001, 2, 15),
+	}, []string{"route", "method", "status_code"})
 	// WorkerCalcBatchDuration and WorkerCalcBatches cover the batches of the calc worker. outcome is one of ok,
 	// error, timeout and lock_not_acquired; a batch that did not acquire the lock has no duration.
 	WorkerCalcBatchDuration = promauto.NewHistogram(prometheus.HistogramOpts{
@@ -177,4 +205,80 @@ func HTTPStatusClass(code int) string {
 	default:
 		return "other"
 	}
+}
+
+// statusCodes holds the label of every status code from 100 to 599, so that labelling a response allocates nothing.
+var statusCodes = func() (codes [600]string) {
+	for code := 100; code < len(codes); code++ {
+		codes[code] = strconv.Itoa(code)
+	}
+	return codes
+}()
+
+// HTTPStatusCode returns the status code as a label ("200", "304", ...), or "other" for a code outside 100-599, to
+// keep metric labels bounded.
+func HTTPStatusCode(code int) string {
+	if code < 100 || code >= len(statusCodes) {
+		return "other"
+	}
+	return statusCodes[code]
+}
+
+// ReportServerLabel bounds the server label of the report metrics to the servers of the game. A report task's server
+// is validated (arkserver) as it is accepted, so other is not expected.
+func ReportServerLabel(server string) string {
+	switch server {
+	case "CN", "US", "JP", "KR":
+		return server
+	default:
+		return "other"
+	}
+}
+
+// maxReportSourceNames bounds the distinct values of the source_name label of ReportReliability. The source of a
+// report is free-form (up to 128 printable characters), so without a bound any client could create a series per
+// report, which every process would keep in memory for good. A handful of sources send nearly all reports.
+const maxReportSourceNames = 64
+
+var reportSourceNames = boundedLabel{max: maxReportSourceNames}
+
+// ReportSourceNameLabel returns source as the source_name label of ReportReliability: itself while it is one of the
+// first maxReportSourceNames sources this process has seen, and other after that.
+func ReportSourceNameLabel(source string) string {
+	return reportSourceNames.label(source)
+}
+
+// boundedLabel keeps the first max values of a label, and maps the others to "other".
+type boundedLabel struct {
+	max    int
+	mu     sync.RWMutex
+	values map[string]struct{}
+}
+
+func (b *boundedLabel) label(v string) string {
+	b.mu.RLock()
+	_, ok := b.values[v]
+	full := len(b.values) >= b.max
+	b.mu.RUnlock()
+	if ok {
+		return v
+	}
+	if full {
+		return "other"
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if _, ok := b.values[v]; ok {
+		return v
+	}
+	if len(b.values) >= b.max {
+		return "other"
+	}
+	if b.values == nil {
+		b.values = make(map[string]struct{}, b.max)
+	}
+	// a copy: v may be backed by a buffer that is reused, e.g. a decoded message
+	v = strings.Clone(v)
+	b.values[v] = struct{}{}
+	return v
 }

@@ -1,30 +1,49 @@
 package reportutil
 
 import (
-	"strconv"
-
-	"github.com/ahmetb/go-linq/v3"
-
 	"exusiai.dev/backend-next/internal/model/types"
 )
 
+// mergeDropsLinearMax is the number of merged drops up to which a merge looks a drop up by scanning them: a report has
+// a handful of drops, for which a scan is cheaper than a map, but a request may carry many.
+const mergeDropsLinearMax = 16
+
+type dropTypeAndItemID struct {
+	dropType string
+	itemID   int
+}
+
 // MergeDropsByDropTypeAndItemID merges drops with same (DropType, ItemID) pair into one drop, summing up their Quantity values.
+// The first drop of each pair is kept, in place, with the Quantity of the others added to it; the merged drops are in
+// the order their pairs first appear, and nil for no drops.
 func MergeDropsByDropTypeAndItemID(drops []*types.Drop) (mergedDrops []*types.Drop) {
-	linq.
-		From(drops).
-		GroupByT(func(drop *types.Drop) string {
-			return drop.DropType + strconv.FormatInt(int64(drop.ItemID), 10)
-		}, func(drop *types.Drop) *types.Drop {
-			return drop
-		}).
-		SelectT(func(group linq.Group) *types.Drop {
-			return linq.From(group.Group).
-				AggregateT(func(drop *types.Drop, next *types.Drop) *types.Drop {
-					drop.Quantity += next.Quantity
-					return drop
-				}).(*types.Drop)
-		}).
-		ToSlice(&mergedDrops)
+	var index map[dropTypeAndItemID]*types.Drop
+	for _, drop := range drops {
+		var merged *types.Drop
+		if index != nil {
+			merged = index[dropTypeAndItemID{drop.DropType, drop.ItemID}]
+		} else {
+			for _, m := range mergedDrops {
+				if m.ItemID == drop.ItemID && m.DropType == drop.DropType {
+					merged = m
+					break
+				}
+			}
+		}
+		if merged != nil {
+			merged.Quantity += drop.Quantity
+			continue
+		}
+		mergedDrops = append(mergedDrops, drop)
+		if index != nil {
+			index[dropTypeAndItemID{drop.DropType, drop.ItemID}] = drop
+		} else if len(mergedDrops) > mergeDropsLinearMax {
+			index = make(map[dropTypeAndItemID]*types.Drop, len(drops))
+			for _, m := range mergedDrops {
+				index[dropTypeAndItemID{m.DropType, m.ItemID}] = m
+			}
+		}
+	}
 	return mergedDrops
 }
 
@@ -47,10 +66,11 @@ func MergeDropsByItemID(drops []*types.Drop) (mergedDrops []*types.Drop) {
 	return mergedDrops
 }
 
+// AggregateGachaBoxDrops sets the Times of a gacha box report to the sum of the Quantity of its drops, 0 for no drops.
 func AggregateGachaBoxDrops(report *types.ReportTaskSingleReport) {
-	report.Times = int(linq.From(report.Drops).
-		SelectT(func(drop *types.Drop) int {
-			return drop.Quantity
-		}).
-		SumInts())
+	times := 0
+	for _, drop := range report.Drops {
+		times += drop.Quantity
+	}
+	report.Times = times
 }

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"exusiai.dev/gommon/constant"
-	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"github.com/uptrace/bun"
@@ -227,7 +226,9 @@ func (r *DropInfo) GetDropInfosWithFilters(ctx context.Context, server string, t
 				fmt.Fprintf(&whereBuilder, " AND di.range_id = %d", timeRanges[0].RangeID)
 			} else {
 				rangeIdStr := make([]string, len(timeRanges))
-				linq.From(timeRanges).SelectT(func(timeRange *model.TimeRange) string { return strconv.Itoa(timeRange.RangeID) }).ToSlice(&rangeIdStr)
+				for i, timeRange := range timeRanges {
+					rangeIdStr[i] = strconv.Itoa(timeRange.RangeID)
+				}
 				fmt.Fprintf(&whereBuilder, " AND di.range_id IN (%s)", strings.Join(rangeIdStr, ","))
 			}
 		}

@@ -137,6 +137,18 @@ func responseSize(t *testing.T, route, method, statusClass string) (uint64, floa
 	return m.GetHistogram().GetSampleCount(), m.GetHistogram().GetSampleSum()
 }
 
+// requestDurations returns the sample count of the request duration histogram for the given labels.
+func requestDurations(t *testing.T, route, method, statusCode string) uint64 {
+	t.Helper()
+
+	var m dto.Metric
+	h := observability.HTTPRequestDuration.WithLabelValues(route, method, statusCode).(prometheus.Metric)
+	if err := h.Write(&m); err != nil {
+		t.Fatal(err)
+	}
+	return m.GetHistogram().GetSampleCount()
+}
+
 func TestRequestLoggerObservesResponseSizeByRoute(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -156,11 +168,19 @@ func TestRequestLoggerObservesResponseSizeByRoute(t *testing.T) {
 			var buf bytes.Buffer
 			app := newRouteLoggedApp(t, &buf)
 
+			statusCode := "200"
+			if tt.statusClass == "4xx" {
+				statusCode = "404"
+			}
 			countBefore, sumBefore := responseSize(t, tt.route, tt.method, tt.statusClass)
+			durationsBefore := requestDurations(t, tt.route, tt.method, statusCode)
 			if _, err := app.Test(httptest.NewRequest(tt.method, tt.url, nil)); err != nil {
 				t.Fatal(err)
 			}
 			countAfter, sumAfter := responseSize(t, tt.route, tt.method, tt.statusClass)
+			if got := requestDurations(t, tt.route, tt.method, statusCode) - durationsBefore; got != 1 {
+				t.Errorf("request_duration_seconds{%s,%s,%s} observed %d requests, want 1", tt.route, tt.method, statusCode, got)
+			}
 
 			if got := countAfter - countBefore; got != 1 {
 				t.Errorf("response count increased by %d, want 1", got)

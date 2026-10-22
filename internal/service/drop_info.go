@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"exusiai.dev/gommon/constant"
-	"github.com/ahmetb/go-linq/v3"
-	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
@@ -69,12 +67,19 @@ func (s *DropInfo) GetItemDropSetByStageIdAndTimeRange(ctx context.Context, serv
 	if err != nil {
 		return nil, err
 	}
-	linq.From(dropInfos).
-		SelectT(func(dropInfo *model.DropInfo) null.Int { return dropInfo.ItemID }).
-		WhereT(func(itemID null.Int) bool { return itemID.Valid }).
-		SelectT(func(itemID null.Int) int { return int(itemID.Int64) }).
-		Distinct().
-		ToSlice(&itemDropSet)
+	// the distinct item ids in the order they first appear, nil for none
+	seen := make(map[int]struct{})
+	for _, dropInfo := range dropInfos {
+		if !dropInfo.ItemID.Valid {
+			continue
+		}
+		itemId := int(dropInfo.ItemID.Int64)
+		if _, ok := seen[itemId]; ok {
+			continue
+		}
+		seen[itemId] = struct{}{}
+		itemDropSet = append(itemDropSet, itemId)
+	}
 
 	cache.ItemDropSetByStageIdAndTimeRange.Set(key, itemDropSet, time.Minute*5)
 	return itemDropSet, nil
@@ -85,8 +90,16 @@ func (s *DropInfo) GetAppearStageIdsByServer(ctx context.Context, server string)
 	if err != nil {
 		return nil, err
 	}
+	// the distinct stage ids in the order they first appear, nil for none
 	var stageIds []int
-	linq.From(dropInfos).SelectT(func(dropInfo *model.DropInfo) int { return dropInfo.StageID }).Distinct().ToSlice(&stageIds)
+	seen := make(map[int]struct{})
+	for _, dropInfo := range dropInfos {
+		if _, ok := seen[dropInfo.StageID]; ok {
+			continue
+		}
+		seen[dropInfo.StageID] = struct{}{}
+		stageIds = append(stageIds, dropInfo.StageID)
+	}
 	return stageIds, nil
 }
 

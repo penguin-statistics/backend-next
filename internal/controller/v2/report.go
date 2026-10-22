@@ -15,6 +15,7 @@ import (
 	"exusiai.dev/backend-next/internal/pkg/crypto"
 	"exusiai.dev/backend-next/internal/pkg/flog"
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
+	"exusiai.dev/backend-next/internal/pkg/observability"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/pkg/pgid"
 	"exusiai.dev/backend-next/internal/server/svr"
@@ -49,18 +50,34 @@ func RegisterReport(v2 *svr.V2, c Report) {
 	v2.Post("/report/recognition", c.MiddlewareGetOrCreateAccount, c.RecognitionReport)
 }
 
+// the outcomes of MiddlewareGetOrCreateAccount in observability.ReportAccounts
+var (
+	reportAccountsExisting  = observability.ReportAccounts.WithLabelValues("existing")
+	reportAccountsCreated   = observability.ReportAccounts.WithLabelValues("created")
+	reportAccountsRecreated = observability.ReportAccounts.WithLabelValues("recreated")
+	reportAccountsError     = observability.ReportAccounts.WithLabelValues("error")
+)
+
 func (c *Report) MiddlewareGetOrCreateAccount(ctx *fiber.Ctx) error {
 	var accountId int
 
 	account, err := c.AccountService.GetAccountFromRequest(ctx)
 	if err != nil {
+		// recreated: the request sent a PenguinID that names no account (or that could not be looked up)
+		outcome := reportAccountsCreated
+		if pgid.Extract(ctx) != "" {
+			outcome = reportAccountsRecreated
+		}
 		createdAccount, err := c.AccountService.CreateAccountWithRandomPenguinId(ctx.UserContext())
 		if err != nil {
+			reportAccountsError.Inc()
 			return err
 		}
+		outcome.Inc()
 		accountId = createdAccount.AccountID
 		pgid.Inject(ctx, createdAccount.PenguinID)
 	} else {
+		reportAccountsExisting.Inc()
 		accountId = account.AccountID
 	}
 

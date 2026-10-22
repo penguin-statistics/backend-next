@@ -2,10 +2,10 @@ package service
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"exusiai.dev/gommon/constant"
-	"github.com/ahmetb/go-linq/v3"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/guregu/null.v3"
 
@@ -219,82 +219,56 @@ func (s *Trend) calcTrend(
 func (s *Trend) combineQuantityAndTimesResults(
 	ctx context.Context, server string, itemIdFilter []int, quantityResults []*model.TotalQuantityResultForTrend, timesResults []*model.TotalTimesResultForTrend,
 ) ([]*model.CombinedResultForTrend, error) {
-	var firstGroupResultsForQuantity []linq.Group
 	combinedResults := make([]*model.CombinedResultForTrend, 0)
-	linq.From(quantityResults).
-		GroupByT(
-			func(result *model.TotalQuantityResultForTrend) int { return result.GroupID },
-			func(result *model.TotalQuantityResultForTrend) *model.TotalQuantityResultForTrend { return result }).
-		ToSlice(&firstGroupResultsForQuantity)
+	// group id -> stage id -> item id -> quantity; of results with the same ids the last one is kept
 	groupResultsMap := make(map[int]map[int]map[int]int)
-	for _, firstGroupElements := range firstGroupResultsForQuantity {
-		groupId := firstGroupElements.Key.(int)
-		var secondGroupResultsForQuantity []linq.Group
-		linq.From(firstGroupElements.Group).
-			GroupByT(
-				func(result *model.TotalQuantityResultForTrend) int { return result.StageID },
-				func(result *model.TotalQuantityResultForTrend) *model.TotalQuantityResultForTrend { return result }).
-			ToSlice(&secondGroupResultsForQuantity)
-		quantityResultsMap := make(map[int]map[int]int)
-		for _, secondGroupElements := range secondGroupResultsForQuantity {
-			stageId := secondGroupElements.Key.(int)
-			resultsMap := make(map[int]int)
-			linq.From(secondGroupElements.Group).
-				ToMapByT(&resultsMap,
-					func(el any) int { return el.(*model.TotalQuantityResultForTrend).ItemID },
-					func(el any) int { return el.(*model.TotalQuantityResultForTrend).TotalQuantity })
-			quantityResultsMap[stageId] = resultsMap
+	for _, result := range quantityResults {
+		quantityResultsMap, ok := groupResultsMap[result.GroupID]
+		if !ok {
+			quantityResultsMap = make(map[int]map[int]int)
+			groupResultsMap[result.GroupID] = quantityResultsMap
 		}
-		groupResultsMap[groupId] = quantityResultsMap
+		resultsMap, ok := quantityResultsMap[result.StageID]
+		if !ok {
+			resultsMap = make(map[int]int)
+			quantityResultsMap[result.StageID] = resultsMap
+		}
+		resultsMap[result.ItemID] = result.TotalQuantity
 	}
 
-	var firstGroupResultsForTimes []linq.Group
-	linq.From(timesResults).
-		GroupByT(
-			func(result *model.TotalTimesResultForTrend) int { return result.GroupID },
-			func(result *model.TotalTimesResultForTrend) *model.TotalTimesResultForTrend { return result }).
-		ToSlice(&firstGroupResultsForTimes)
-	for _, firstGroupElements := range firstGroupResultsForTimes {
-		groupId := firstGroupElements.Key.(int)
+	// times results grouped by group id, then by stage id, in the order the ids first appear
+	for _, firstGroupElements := range util.GroupBy(timesResults, func(result *model.TotalTimesResultForTrend) int { return result.GroupID }) {
+		groupId := firstGroupElements.Key
 		quantityResultsMapForOneGroup := groupResultsMap[groupId]
-		var secondGroupResultsForTimes []linq.Group
-		linq.From(firstGroupElements.Group).
-			GroupByT(
-				func(result *model.TotalTimesResultForTrend) int { return result.StageID },
-				func(result *model.TotalTimesResultForTrend) *model.TotalTimesResultForTrend { return result }).
-			ToSlice(&secondGroupResultsForTimes)
-		for _, secondGroupElements := range secondGroupResultsForTimes {
-			stageId := secondGroupElements.Key.(int)
+		for _, secondGroupElements := range util.GroupBy(firstGroupElements.Items, func(result *model.TotalTimesResultForTrend) int { return result.StageID }) {
+			stageId := secondGroupElements.Key
 
 			if quantityResultsMapForOneGroup == nil {
 				// it means no items were dropped in this group, we need to find all dropable items and set their quantity to 0
 				dropInfosForSpecialTimeRange, err := s.DropInfoService.GetDropInfosWithFilters(ctx, server, []*model.TimeRange{
 					{
-						StartTime: secondGroupElements.Group[0].(*model.TotalTimesResultForTrend).IntervalStart,
-						EndTime:   secondGroupElements.Group[0].(*model.TotalTimesResultForTrend).IntervalEnd,
+						StartTime: secondGroupElements.Items[0].IntervalStart,
+						EndTime:   secondGroupElements.Items[0].IntervalEnd,
 					},
 				}, []int{stageId}, itemIdFilter)
 				if err != nil {
 					return nil, err
 				}
-				var dropItemIds []int
-				linq.From(dropInfosForSpecialTimeRange).
-					WhereT(func(el *model.DropInfo) bool { return el.ItemID.Valid }).
-					SelectT(func(el *model.DropInfo) int { return int(el.ItemID.Int64) }).
-					ToSlice(&dropItemIds)
 				quantityResultsMapForOneGroup = make(map[int]map[int]int)
 				subMap := make(map[int]int)
-				for _, dropItemId := range dropItemIds {
-					subMap[dropItemId] = 0
+				for _, dropInfo := range dropInfosForSpecialTimeRange {
+					if dropInfo.ItemID.Valid {
+						subMap[int(dropInfo.ItemID.Int64)] = 0
+					}
 				}
 				quantityResultsMapForOneGroup[stageId] = subMap
 			}
 
 			resultsMap := quantityResultsMapForOneGroup[stageId]
-			for _, el := range secondGroupElements.Group {
-				times := el.(*model.TotalTimesResultForTrend).TotalTimes
-				startTime := el.(*model.TotalTimesResultForTrend).IntervalStart
-				endTime := el.(*model.TotalTimesResultForTrend).IntervalEnd
+			for _, el := range secondGroupElements.Items {
+				times := el.TotalTimes
+				startTime := el.IntervalStart
+				endTime := el.IntervalEnd
 				for itemId, quantity := range resultsMap {
 					combinedResults = append(combinedResults, &model.CombinedResultForTrend{
 						GroupID:   groupId,
@@ -313,39 +287,25 @@ func (s *Trend) combineQuantityAndTimesResults(
 }
 
 func (s *Trend) convertTrendElementsToTrendQueryResult(trendElements []*model.TrendElement) (*model.TrendQueryResult, error) {
-	var groupedResults []linq.Group
-	linq.From(trendElements).
-		GroupByT(
-			func(el *model.TrendElement) int { return el.StageID },
-			func(el *model.TrendElement) *model.TrendElement { return el },
-		).
-		ToSlice(&groupedResults)
 	trendQueryResult := &model.TrendQueryResult{
 		Trends: make([]*model.StageTrend, 0),
 	}
-	for _, el := range groupedResults {
-		stageId := el.Key.(int)
+	// grouped by stage id, then by item id, in the order the ids first appear
+	for _, el := range util.GroupBy(trendElements, func(el *model.TrendElement) int { return el.StageID }) {
+		stageId := el.Key
 		stageTrend := &model.StageTrend{
 			StageID: stageId,
 			Results: make([]*model.ItemTrend, 0),
 		}
-		var groupedResults2 []linq.Group
-		linq.From(el.Group).
-			GroupByT(
-				func(el *model.TrendElement) int { return el.ItemID },
-				func(el *model.TrendElement) *model.TrendElement { return el },
-			).
-			ToSlice(&groupedResults2)
 		var startTime *time.Time
-		for _, el2 := range groupedResults2 {
-			itemId := el2.Key.(int)
-			var sortedElements []*model.TrendElement
-			linq.From(el2.Group).
-				SortT(func(el1, el2 *model.TrendElement) bool { return el1.GroupID < el2.GroupID }).
-				ToSlice(&sortedElements)
+		for _, el2 := range util.GroupBy(el.Items, func(el *model.TrendElement) int { return el.ItemID }) {
+			itemId := el2.Key
+			// the items of a group are a new slice, sorted in place
+			sortedElements := el2.Items
+			sort.Sort(trendElementsByGroupID(sortedElements))
 			startTime = sortedElements[0].StartTime
-			minGroupId := linq.From(sortedElements).SelectT(func(el *model.TrendElement) int { return el.GroupID }).Min().(int)
-			maxGroupId := linq.From(sortedElements).SelectT(func(el *model.TrendElement) int { return el.GroupID }).Max().(int)
+			minGroupId := sortedElements[0].GroupID
+			maxGroupId := sortedElements[len(sortedElements)-1].GroupID
 			timesArray := make([]int, maxGroupId+1)
 			quantityArray := make([]int, maxGroupId+1)
 			for _, el3 := range sortedElements {
@@ -411,3 +371,10 @@ func (s *Trend) applyShimForTrendQuery(ctx context.Context, queryResult *model.T
 	}
 	return results, nil
 }
+
+// trendElementsByGroupID sorts trend elements by group id.
+type trendElementsByGroupID []*model.TrendElement
+
+func (s trendElementsByGroupID) Len() int           { return len(s) }
+func (s trendElementsByGroupID) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s trendElementsByGroupID) Less(i, j int) bool { return s[i].GroupID < s[j].GroupID }
