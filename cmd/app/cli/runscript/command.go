@@ -7,6 +7,10 @@ import (
 	cliapp "exusiai.dev/backend-next/cmd/app/cli"
 	script_archive_drop_reports "exusiai.dev/backend-next/cmd/app/cli/runscript/scripts/archive_drop_reports"
 	script_migrate_drop_report_extras_cols "exusiai.dev/backend-next/cmd/app/cli/runscript/scripts/at20230110-migrate_drop_report_extras_cols"
+	script_coldstore "exusiai.dev/backend-next/cmd/app/cli/runscript/scripts/coldstore"
+	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/app/appcontext"
+	"exusiai.dev/backend-next/internal/pkg/logger"
 )
 
 func depsFn[T any]() func() T {
@@ -17,13 +21,23 @@ func depsFn[T any]() func() T {
 	}
 }
 
+// coldstoreDeps reads the configuration without starting the app (see script_coldstore.CommandDeps).
+func coldstoreDeps() script_coldstore.CommandDeps {
+	conf, err := appconfig.Parse(appcontext.Declare(appcontext.EnvCLI))
+	if err != nil {
+		panic(err)
+	}
+	logger.Configure(conf)
+	return script_coldstore.CommandDeps{Config: conf}
+}
+
 func Command() *cli.Command {
 	return &cli.Command{
 		Name:        "run-script",
 		Description: "run maintenance go scripts",
-		Subcommands: []*cli.Command{
+		Subcommands: append([]*cli.Command{
 			script_migrate_drop_report_extras_cols.Command(depsFn[script_migrate_drop_report_extras_cols.CommandDeps]()),
 			script_archive_drop_reports.Command(depsFn[script_archive_drop_reports.CommandDeps]()),
-		},
+		}, script_coldstore.Commands(coldstoreDeps)...),
 	}
 }
