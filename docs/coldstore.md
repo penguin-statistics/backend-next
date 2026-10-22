@@ -337,8 +337,8 @@ backend run-script coldstore-patch --dir /data/coldstore-v1 --delete 123458 --fi
 
 With `PENGUIN_V3_COLDSTORE_ENABLED=true`, the app opens the local copy in `PENGUIN_V3_COLDSTORE_DIRECTORY` at startup
 (`coldstore.Reader`). With `PENGUIN_V3_COLDSTORE_QUERIES_ENABLED=true` as well, the personal drop and pattern
-matrices and the drop matrix queries of `/result/advanced` read the archived part of their time ranges from it (see
-below); the other queries come in later PRs.
+matrices, the drop matrix queries of `/result/advanced` and the customized trend (`/result/advanced` with an
+interval) read the archived part of their time ranges from it (see below).
 
 | Setting (`PENGUIN_V3_...`) | Default | |
 |---|---|---|
@@ -349,7 +349,7 @@ below); the other queries come in later PRs.
 | `COLDSTORE_TEMP_DIRECTORY` | system temp | DuckDB's spill files (in a directory of its own) and the time of the last integrity check |
 | `COLDSTORE_RELOAD_INTERVAL` | `1m` | how often the manifest is checked for a change; `0` never |
 | `COLDSTORE_INTEGRITY_CHECK_INTERVAL` | `168h` | how often every file is hashed again; `0` never |
-| `COLDSTORE_QUERIES_ENABLED` | `false` | read the archived part of the drop and pattern matrix queries from the cold storage; requires `COLDSTORE_ENABLED` |
+| `COLDSTORE_QUERIES_ENABLED` | `false` | read the archived part of the drop matrix, pattern matrix and customized trend queries from the cold storage; requires `COLDSTORE_ENABLED` |
 
 - The app never reads the bucket. DuckDB is confined to the cold storage directory and its temp directory: external
   access is off (`enable_external_access = false`, with only those two in `allowed_directories`), extensions are
@@ -381,6 +381,14 @@ below); the other queries come in later PRs.
   personal pattern matrix (161 time ranges of CN, up to seven years each) takes 6 to 7 s
   from the files, 35 to 45 ms per range, also for the heaviest account. Query durations:
   `penguinbackend_coldstore_query_duration_seconds{query="pattern_matrix"}`.
+- The customized trend (quantity and times per bucket of a stage and its items) splits the range of its buckets at
+  the boundary. A bucket that straddles the boundary keeps its interval and is counted from both sides. The cold part
+  reads the same files as the drop matrix: whole UTC hours from `rollup`, the partial first and last hours and the
+  reports of an account from `drop_reports`, and the recruit stage from `recruit`. On the prototype (2 threads,
+  1 GB), quantity + times of a CN stage take 0.4 + 0.25 s for 60 daily buckets, 3.4 + 2.9 s for seven years of
+  weekly buckets, 0.17 + 0.07 s for 14 days of hourly buckets; 0.3 s for an account's 60 daily buckets (6.2 s on
+  PostgreSQL 14); 2.2 + 2.1 s for the recruit stage's 60 daily buckets (no rollup for recruit). Query durations:
+  `penguinbackend_coldstore_query_duration_seconds{query="trend_quantity"}` and `{query="trend_times"}`.
 - The manifest is checked every `COLDSTORE_RELOAD_INTERVAL`. A changed manifest (a month archived, a month patched)
   is served once all its files pass the startup checks. Until then the app keeps serving the previous one, logs
   `coldstore.reader.reload_failed` and counts `penguinbackend_coldstore_manifest_reload_failures_total` at every

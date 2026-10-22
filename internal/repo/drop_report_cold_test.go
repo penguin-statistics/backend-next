@@ -85,3 +85,83 @@ func TestNewColdDropReport(t *testing.T) {
 		t.Error("enabled without the cold storage: no error")
 	}
 }
+
+func TestNewColdTrendPlan(t *testing.T) {
+	utc := func(s string) time.Time {
+		t.Helper()
+		v, err := time.Parse(time.DateTime, s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	boundary := utc("2019-07-01 00:00:00")
+	// the CN game day of 2019-06-28 12:00 UTC starts at 2019-06-27 20:00 UTC: 31 buckets of 5 hours, the 16th of
+	// them, [06-30 23:00, 07-01 04:00), straddling the boundary
+	start := utc("2019-06-28 12:00:00")
+	type bucket struct {
+		groupId    int
+		start, end string
+	}
+	for _, tc := range []struct {
+		name       string
+		from, to   time.Time
+		thresholds []string
+		buckets    []bucket
+	}{
+		{
+			name:       "cut to the first buckets",
+			from:       utc("2019-01-01 00:00:00"),
+			to:         utc("2019-06-28 03:00:00"),
+			thresholds: []string{"2019-06-27 20:00:00", "2019-06-28 01:00:00", "2019-06-28 03:00:00"},
+			buckets:    []bucket{{0, "2019-06-27 20:00:00", "2019-06-28 01:00:00"}, {1, "2019-06-28 01:00:00", "2019-06-28 06:00:00"}},
+		},
+		{
+			name:       "the straddling bucket",
+			from:       utc("2019-06-30 18:00:00.5"),
+			to:         boundary,
+			thresholds: []string{"2019-06-30 18:00:00", "2019-06-30 23:00:00", "2019-07-01 00:00:00"},
+			buckets:    []bucket{{14, "2019-06-30 18:00:00", "2019-06-30 23:00:00"}, {15, "2019-06-30 23:00:00", "2019-07-01 04:00:00"}},
+		},
+		{
+			name: "empty",
+			from: boundary,
+			to:   boundary,
+		},
+	} {
+		plan, err := newColdTrendPlan(boundary, tc.from, tc.to, "CN", start, 5*time.Hour, 30, []int{1})
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		// the cold storage computes the segments from the first bucket
+		if len(plan.buckets) > 0 && (!plan.plan.bucketStart.Equal(plan.buckets[0].start) || plan.plan.bucketLength != 5*time.Hour) {
+			t.Errorf("%s: buckets from %s of %s", tc.name, plan.plan.bucketStart, plan.plan.bucketLength)
+		}
+		var thresholds []string
+		for _, th := range plan.plan.thresholds {
+			thresholds = append(thresholds, th.UTC().Format(time.DateTime))
+		}
+		var buckets []bucket
+		for _, b := range plan.buckets {
+			buckets = append(buckets, bucket{b.groupId, b.start.UTC().Format(time.DateTime), b.end.UTC().Format(time.DateTime)})
+		}
+		if !reflect.DeepEqual(thresholds, tc.thresholds) || !reflect.DeepEqual(buckets, tc.buckets) {
+			t.Errorf("%s: thresholds %v, buckets %v; want %v, %v", tc.name, thresholds, buckets, tc.thresholds, tc.buckets)
+		}
+	}
+
+	// the whole cold part: 16 buckets, the last one cut at the boundary
+	plan, err := newColdTrendPlan(boundary, time.Time{}, boundary, "CN", start, 5*time.Hour, 30, []int{1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(plan.buckets); n != 16 || len(plan.plan.thresholds) != 17 || plan.buckets[n-1].groupId != 15 || !plan.plan.thresholds[16].Equal(boundary) {
+		t.Errorf("up to the boundary: thresholds %v, buckets %v", plan.plan.thresholds, plan.buckets)
+	}
+	if _, err := newColdTrendPlan(boundary, start, boundary.Add(time.Second), "CN", start, 5*time.Hour, 30, []int{1}); err == nil {
+		t.Error("a trend past the hot boundary: no error")
+	}
+	if _, err := newColdTrendPlan(boundary, start, boundary, "CN", start, 30*time.Minute, 30, []int{1}); err == nil {
+		t.Error("an interval length shorter than an hour: no error")
+	}
+}
