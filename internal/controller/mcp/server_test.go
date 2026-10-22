@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/jsonschema-go/jsonschema"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/rs/zerolog"
@@ -426,6 +427,47 @@ func TestNullArguments(t *testing.T) {
 	}
 	if got := testutil.ToFloat64(panics) - before; got != 0 {
 		t.Errorf("panics counted %v times", got)
+	}
+}
+
+// echoIn is the input of the tool echo of TestNumbersForStrings
+type echoIn struct {
+	ID string `json:"id"`
+	N  int    `json:"n,omitempty"`
+}
+
+// A number given for a string argument (an item ID such as 30012) is read as that string; other types are still
+// rejected against the input schema.
+func TestNumbersForStrings(t *testing.T) {
+	r, app := testServer(&fakeData{})
+	in, err := jsonschema.For[echoIn](nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	add(r, &sdkmcp.Tool{Name: "echo", Title: "Echo", InputSchema: in},
+		func(_ context.Context, _ *sdkmcp.CallToolRequest, in echoIn) (*sdkmcp.CallToolResult, echoIn, error) {
+			return &sdkmcp.CallToolResult{Content: []sdkmcp.Content{&sdkmcp.TextContent{Text: in.ID}}}, in, nil
+		})
+	for args, want := range map[string]string{
+		`{"id":30012}`:         `{"id":"30012"}`,
+		`{"id":-1.5e3,"n":2}`:  `{"id":"-1.5e3","n":2}`,
+		`{"id":"30012","n":2}`: `{"id":"30012","n":2}`,
+		`{"id":true}`:          "",
+		`{"id":"a","n":"2"}`:   "",
+	} {
+		_, b := post(t, app, `{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"echo","arguments":`+args+`}}`, "Mcp-Protocol-Version", legacyVersion)
+		var res toolResult
+		if r := decode(t, b); r.Error != nil || json.Unmarshal(r.Result, &res) != nil {
+			t.Errorf("%s: %s", args, b)
+			continue
+		}
+		if want == "" {
+			if !res.IsError {
+				t.Errorf("%s: accepted: %s", args, res.StructuredContent)
+			}
+		} else if res.IsError || string(res.StructuredContent) != want {
+			t.Errorf("%s: result %s, want %s", args, res.StructuredContent, want)
+		}
 	}
 }
 

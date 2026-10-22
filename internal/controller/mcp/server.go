@@ -9,11 +9,14 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"exusiai.dev/backend-next/internal/service"
@@ -65,6 +68,8 @@ func (t *tools) register(r *registry) {
 type registry struct {
 	server *sdkmcp.Server
 	names  map[string]struct{}
+	// stringArgs are the arguments of type string of each tool (see quoteNumbers)
+	stringArgs map[string][]string
 }
 
 // add adds a tool with the annotations every tool has: it only reads, the same arguments give the same result until
@@ -73,6 +78,51 @@ func add[In, Out any](r *registry, tool *sdkmcp.Tool, h sdkmcp.ToolHandlerFor[In
 	tool.Annotations = &sdkmcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: new(bool)}
 	sdkmcp.AddTool(r.server, tool, h)
 	r.names[tool.Name] = struct{}{}
+	r.stringArgs[tool.Name] = stringProperties(tool.InputSchema)
+}
+
+// stringProperties are the names of the properties of type string of an input schema.
+func stringProperties(schema any) []string {
+	s, ok := schema.(*jsonschema.Schema)
+	if !ok || s == nil {
+		return nil
+	}
+	var names []string
+	for name, p := range s.Properties {
+		if p != nil && p.Type == "string" {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+// quoteNumbers returns the arguments of a call to tool with a number given for one of its string arguments as that
+// string: models send an ID such as 30012 as a number, which the SDK would reject against the input schema. Other
+// arguments are left as they are.
+func (r *registry) quoteNumbers(tool string, args json.RawMessage) json.RawMessage {
+	names := r.stringArgs[tool]
+	if len(names) == 0 {
+		return args
+	}
+	var m map[string]json.RawMessage
+	if json.Unmarshal(args, &m) != nil {
+		return args
+	}
+	quoted := false
+	for _, name := range names {
+		if v := bytes.TrimSpace(m[name]); len(v) > 0 && (v[0] == '-' || '0' <= v[0] && v[0] <= '9') {
+			m[name], _ = json.Marshal(string(v))
+			quoted = true
+		}
+	}
+	if !quoted {
+		return args
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return args
+	}
+	return b
 }
 
 // toolLabel bounds the tool label of the metrics to the tools of the server, as a client may call any name.
@@ -109,7 +159,7 @@ func newServer(t *tools, version string) (*sdkmcp.Server, *registry) {
 			c.CacheScope = "public"
 		},
 	})
-	r := &registry{server: s, names: make(map[string]struct{})}
+	r := &registry{server: s, names: make(map[string]struct{}), stringArgs: make(map[string][]string)}
 	t.register(r)
 	// added last, so outermost: it also covers the middlewares of the SDK
 	s.AddReceivingMiddleware(observe(r))
