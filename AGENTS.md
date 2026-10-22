@@ -20,7 +20,7 @@ is CC BY-NC 4.0.
 - cgo is required: `duckdb-go` links DuckDB's prebuilt static library, built for glibc (no Alpine/musl). Its DuckDB
   release is repeated as `DUCKDB_VERSION` in the Dockerfile and in `test.yml`: bump `duckdb-go` and both of them
   together.
-- Services: PostgreSQL (CI uses 14), Redis, NATS with JetStream (`nats -js`).
+- Services: PostgreSQL (CI uses 14), Redis, NATS with JetStream (`nats-server -js`).
 - Config: environment variables `PENGUIN_V3_*` (`internal/app/appconfig/spec.go`, envconfig with `split_words`, so
   `PostgresDSN` is `PENGUIN_V3_POSTGRES_DSN`). A gitignored `.env` at the repo root is loaded when present. Never
   commit `.env` or production values.
