@@ -197,6 +197,23 @@ type ConfigSpec struct {
 	// same either way.
 	ColdstoreQueriesEnabled bool `split_words:"true" default:"false"`
 
+	// ColdstoreShadowEnabled (shadow mode) answers the queries of ColdstoreQueriesEnabled from PostgreSQL alone, as
+	// with the cold storage off, and computes each of them that reaches back before the hot boundary again in the
+	// background, split as ColdstoreQueriesEnabled would, to compare the two. Differences are logged and counted
+	// (penguinbackend_coldstore_shadow_comparisons_total{result="mismatch"}). This only makes sense while PostgreSQL
+	// still holds every report (before the migration of #752). Requires ColdstoreEnabled, and excludes
+	// ColdstoreQueriesEnabled.
+	ColdstoreShadowEnabled bool `split_words:"true" default:"false"`
+
+	// ColdstoreShadowTimeout bounds each background computation of shadow mode; one that runs longer is cancelled and
+	// counted as a timeout. Its PostgreSQL statements run with a statement timeout a little shorter (by a tenth, at
+	// most a second), so that PostgreSQL cancels them on the server. The user's response never waits for it.
+	ColdstoreShadowTimeout time.Duration `split_words:"true" default:"30s"`
+
+	// ColdstoreShadowMaxInFlight caps the background computations of shadow mode running at once; queries beyond it
+	// are not compared (counted as skipped).
+	ColdstoreShadowMaxInFlight int `split_words:"true" default:"2"`
+
 	// ColdstoreDirectory is the local cold storage directory (manifest.json and the files it lists), on the disk of
 	// the machine the app runs on. Required when ColdstoreEnabled. DuckDB may read nothing else.
 	ColdstoreDirectory string `split_words:"true"`

@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"exusiai.dev/gommon/constant"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
@@ -36,7 +38,8 @@ func NewDropReport(db *bun.DB) *DropReport {
 type statementDeadlineKey struct{}
 
 // RunWithStatementTimeout runs fn with a context in which the drop report aggregations (CalcQuantityUniqCount,
-// CalcTotalTimes, CalcDropMatrixForIntervalsBySourceCategories, CalcTotalQuantityForTrend and CalcTotalTimesForTrend)
+// CalcTotalTimes, CalcDropMatrixForIntervalsBySourceCategories, CalcTotalQuantityForPatternMatrixBySourceCategories,
+// CalcTotalQuantityForTrend and CalcTotalTimesForTrend, and their ...Within variants)
 // end at most timeout after it was called: each of them runs in a transaction of its own, with what is left of timeout
 // as its statement timeout, after which PostgreSQL cancels it. pgdriver does not cancel a statement on the server when
 // its context ends, so this is what bounds the work of a statement on the server. It does so only while the read
@@ -47,6 +50,14 @@ type statementDeadlineKey struct{}
 // connection; they run without a statement timeout.
 func (r *DropReport) RunWithStatementTimeout(ctx context.Context, timeout time.Duration, fn func(ctx context.Context) error) error {
 	return fn(context.WithValue(ctx, statementDeadlineKey{}, time.Now().Add(timeout)))
+}
+
+// IsStatementTimeout reports whether err is PostgreSQL cancelling a statement for exceeding its statement timeout.
+func IsStatementTimeout(err error) bool {
+	// SQLSTATE 57014 is also what a statement cancelled by pg_cancel_backend gets: only the message, in the language of
+	// lc_messages of the server, tells them apart
+	var pgErr pgdriver.Error
+	return errors.As(err, &pgErr) && pgErr.StatementTimeout() && pgErr.Field('M') == "canceling statement due to statement timeout"
 }
 
 // runWithStatementDeadline runs fn on the database, or, if ctx comes from RunWithStatementTimeout, in a transaction
@@ -436,12 +447,11 @@ func (r *DropReport) CalcTotalQuantityForPatternMatrixBySourceCategories(
 	r.handleStages(subq1, queryCtx.GetStageIds())
 	r.handleTimes(subq1, 1)
 
-	if err := r.db.NewSelect().
+	if err := r.scan(ctx, r.db.NewSelect().
 		TableExpr("(?) AS a", subq1).
 		Column("stage_id", "pattern_id", "is_manual").
 		ColumnExpr("COUNT(*) AS total_quantity").
-		Group("stage_id", "pattern_id", "is_manual").
-		Scan(ctx, &rows); err != nil {
+		Group("stage_id", "pattern_id", "is_manual"), &rows); err != nil {
 		return nil, err
 	}
 

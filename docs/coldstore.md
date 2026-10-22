@@ -350,6 +350,9 @@ interval) read the archived part of their time ranges from it (see below).
 | `COLDSTORE_RELOAD_INTERVAL` | `1m` | how often the manifest is checked for a change; `0` never |
 | `COLDSTORE_INTEGRITY_CHECK_INTERVAL` | `168h` | how often every file is hashed again; `0` never |
 | `COLDSTORE_QUERIES_ENABLED` | `false` | read the archived part of the drop matrix, pattern matrix and customized trend queries from the cold storage; requires `COLDSTORE_ENABLED` |
+| `COLDSTORE_SHADOW_ENABLED` | `false` | shadow mode (below); requires `COLDSTORE_ENABLED`, excludes `COLDSTORE_QUERIES_ENABLED` |
+| `COLDSTORE_SHADOW_TIMEOUT` | `30s` | bound of each background computation of shadow mode; its PostgreSQL statements get a `statement_timeout` a tenth (at most 1 s) shorter |
+| `COLDSTORE_SHADOW_MAX_IN_FLIGHT` | `2` | background computations of shadow mode at once; queries beyond it are not compared |
 
 - The app never reads the bucket. DuckDB is confined to the cold storage directory and its temp directory: external
   access is off (`enable_external_access = false`, with only those two in `allowed_directories`), extensions are
@@ -389,6 +392,27 @@ interval) read the archived part of their time ranges from it (see below).
   weekly buckets, 0.17 + 0.07 s for 14 days of hourly buckets; 0.3 s for an account's 60 daily buckets (6.2 s on
   PostgreSQL 14); 2.2 + 2.1 s for the recruit stage's 60 daily buckets (no rollup for recruit). Query durations:
   `penguinbackend_coldstore_query_duration_seconds{query="trend_quantity"}` and `{query="trend_times"}`.
+- Shadow mode (`COLDSTORE_SHADOW_ENABLED`), for the week before the migration while PostgreSQL still holds every
+  report: the queries of `COLDSTORE_QUERIES_ENABLED` are answered from PostgreSQL alone, as with the cold storage
+  off. Each of them that reaches back before the boundary is also computed split at the boundary, in the background,
+  at the same time; the response never waits for it. Once both are done, their counts are compared whatever the
+  order of the rows. `penguinbackend_coldstore_shadow_comparisons_total{query, result}` counts `match`,
+  `mismatch`, `error`, `timeout` (longer than `COLDSTORE_SHADOW_TIMEOUT`, or cancelled by PostgreSQL for its
+  statement timeout) and `skipped` (every slot busy, or PostgreSQL failed); `penguinbackend_coldstore_shadow_duration_seconds{query, result}` is the duration of the split
+  computation. A mismatch logs `coldstore.shadow.mismatch` with the query (`drop_matrix`, `pattern_matrix`,
+  `trend_quantity`, `trend_times`), server, time range, hot boundary, whether an account was queried (never which),
+  the number of differences and the first ten. Expect no `mismatch` before turning on `COLDSTORE_QUERIES_ENABLED`.
+  A mismatch whose differences are all in parts that end less than an hour before the query (an advanced query
+  without `end`, the latest time range of a personal matrix, the last bucket of a trend up to today) counts as
+  `mismatch_open` instead, logged with `open_end: true`: PostgreSQL alone and the hot part of the split are two
+  reads of PostgreSQL, and a report written in between is counted by one of them only. A few such mismatches on busy
+  stages are expected; their differences are a few reports. Each interval of a matrix and each bucket of a trend is
+  classified by its own end, so a difference in an older interval or bucket stays a `mismatch` (the log's
+  `closed_differences` counts them) even when the same query reaches to now.
+  The PostgreSQL statements of a background computation run with a `statement_timeout` that ends just before
+  `COLDSTORE_SHADOW_TIMEOUT`: the driver does not cancel a statement on the server when it gives up on it, so a
+  computation that timed out never leaves its scan running.
+  The background computations add load: the cold storage, and PostgreSQL again for the part from the boundary on.
 - The manifest is checked every `COLDSTORE_RELOAD_INTERVAL`. A changed manifest (a month archived, a month patched)
   is served once all its files pass the startup checks. Until then the app keeps serving the previous one, logs
   `coldstore.reader.reload_failed` and counts `penguinbackend_coldstore_manifest_reload_failures_total` at every

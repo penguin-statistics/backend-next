@@ -23,8 +23,7 @@ import (
 // came well before a statement taking wouldTake would have finished by itself.
 func assertStatementTimeout(t *testing.T, err error, elapsed, wouldTake time.Duration) {
 	t.Helper()
-	var pgErr pgdriver.Error
-	if !errors.As(err, &pgErr) || !pgErr.StatementTimeout() {
+	if !IsStatementTimeout(err) {
 		t.Fatalf("got error %v, want a statement timeout", err)
 	}
 	if elapsed > wouldTake/2 {
@@ -40,6 +39,55 @@ func countRows(t *testing.T, db *bun.DB, query string, args ...interface{}) int 
 		t.Fatal(err)
 	}
 	return n
+}
+
+// TestIsStatementTimeoutTellsCancellationsApart checks that IsStatementTimeout holds for a statement PostgreSQL
+// cancelled for its statement timeout, wrapped or not, and not for one cancelled by pg_cancel_backend, which has the
+// same SQLSTATE.
+func TestIsStatementTimeoutTellsCancellationsApart(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+
+	timeoutErr := db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if _, err := tx.ExecContext(ctx, "SET LOCAL statement_timeout = 100"); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, "SELECT pg_sleep(5)")
+		return err
+	})
+	if !IsStatementTimeout(timeoutErr) || !IsStatementTimeout(fmt.Errorf("calc: %w", timeoutErr)) {
+		t.Errorf("IsStatementTimeout(%v) = false, want true", timeoutErr)
+	}
+
+	cancelErr := cancelledStatement(t, db)
+	var pgErr pgdriver.Error
+	if !errors.As(cancelErr, &pgErr) || !pgErr.StatementTimeout() {
+		t.Fatalf("got error %v, want a statement cancelled with SQLSTATE 57014", cancelErr)
+	}
+	_, otherErr := db.ExecContext(ctx, "SELECT * FROM table_that_does_not_exist")
+	for _, err := range []error{cancelErr, otherErr, fmt.Errorf("not a database error"), nil} {
+		if IsStatementTimeout(err) {
+			t.Errorf("IsStatementTimeout(%v) = true, want false", err)
+		}
+	}
+}
+
+// cancelledStatement returns the error of a statement that pg_cancel_backend cancelled.
+func cancelledStatement(t *testing.T, db *bun.DB) error {
+	t.Helper()
+	ctx := context.Background()
+	marker := fmt.Sprintf("cancel test %d", time.Now().UnixNano())
+	go func() {
+		for i := 0; i < 50; i++ {
+			time.Sleep(100 * time.Millisecond)
+			var cancelled int
+			if err := db.NewRaw("SELECT count(pg_cancel_backend(pid)) FROM pg_stat_activity WHERE query LIKE ? AND pid <> pg_backend_pid()", "%"+marker).Scan(ctx, &cancelled); err != nil || cancelled > 0 {
+				return
+			}
+		}
+	}()
+	_, err := db.ExecContext(ctx, "SELECT pg_sleep(5) -- "+marker)
+	return err
 }
 
 func TestRunWithStatementTimeoutCancelsSleepOnServer(t *testing.T) {
@@ -111,6 +159,10 @@ func TestRunWithStatementTimeoutCancelsAggregationsOnServer(t *testing.T) {
 		},
 		"CalcDropMatrixForIntervalsBySourceCategories": func(ctx context.Context) error {
 			_, _, err := repo.CalcDropMatrixForIntervalsBySourceCategories(ctx, []*model.DropReportQueryContext{queryCtx}, []string{constant.SourceCategoryAll})
+			return err
+		},
+		"CalcTotalQuantityForPatternMatrixBySourceCategories": func(ctx context.Context) error {
+			_, err := repo.CalcTotalQuantityForPatternMatrixBySourceCategories(ctx, queryCtx, []string{constant.SourceCategoryAll})
 			return err
 		},
 		"CalcTotalQuantityForTrend": func(ctx context.Context) error {
