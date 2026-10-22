@@ -26,7 +26,7 @@ func TestPersonalMatricesAreNotCacheable(t *testing.T) {
 
 	conf := &appconfig.Config{ConfigSpec: appconfig.ConfigSpec{MatrixWorkerSourceCategories: []string{"all"}, PatternMatrixLimit: 19}}
 	timeRangeService := service.NewTimeRange(repo.NewTimeRange(db), repo.NewDropInfo(db))
-	dropReportService := service.NewDropReport(repo.NewDropReport(db))
+	dropReportService := service.NewDropReport(repo.NewDropReport(db), nil)
 	dropInfoService := service.NewDropInfo(repo.NewDropInfo(db), timeRangeService)
 	stageService := service.NewStage(repo.NewStage(db))
 	itemService := service.NewItem(repo.NewItem(db))

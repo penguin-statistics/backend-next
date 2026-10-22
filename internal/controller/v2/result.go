@@ -12,7 +12,6 @@ import (
 	"github.com/gofiber/fiber/v2/utils"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"github.com/uptrace/bun/driver/pgdriver"
 	"go.uber.org/fx"
 	"gopkg.in/guregu/null.v3"
 
@@ -23,6 +22,7 @@ import (
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/pkg/observability"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
+	"exusiai.dev/backend-next/internal/repo"
 	"exusiai.dev/backend-next/internal/server/svr"
 	"exusiai.dev/backend-next/internal/service"
 	"exusiai.dev/backend-next/internal/util/rekuest"
@@ -404,10 +404,7 @@ func (c *Result) runAdvancedQuery(ctx *fiber.Ctx, query *types.AdvancedQuery, de
 // advancedQueryError returns ErrAdvancedQueryTimeout for a statement PostgreSQL cancelled for its statement timeout,
 // and err otherwise.
 func advancedQueryError(err error) error {
-	// SQLSTATE 57014 is also what a statement cancelled by pg_cancel_backend gets: only the message, in the language of
-	// lc_messages of the server, tells them apart
-	var pgErr pgdriver.Error
-	if errors.As(err, &pgErr) && pgErr.StatementTimeout() && pgErr.Field('M') == "canceling statement due to statement timeout" {
+	if repo.IsStatementTimeout(err) {
 		log.Warn().
 			Str("evt.name", "result.advanced_query.timeout").
 			Err(err).

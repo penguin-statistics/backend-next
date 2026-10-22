@@ -132,6 +132,17 @@ type ConfigSpec struct {
 	// WorkerEnabled is a flag to indicate whether to enable the worker.
 	WorkerEnabled bool `split_words:"true"`
 
+	// ReportWorkerEnabled runs the report worker (reportwkr), which consumes the report tasks of NATS and stores
+	// them in the database. It is separate from WorkerEnabled, which runs calcwkr. When false, the HTTP API still
+	// accepts reports and publishes them to the penguin-reports stream, a work queue without MaxAge, where they wait
+	// until a report worker runs again: the maintenance window of #752 turns it off to stop the report writes to the
+	// database. The intake still writes one row itself: a report without a known PenguinID (a client's first report)
+	// creates its account first. While the database is read-only in that window, those reports fail with an error
+	// and are not queued; the reports of existing accounts are queued and none is lost. A recall writes too: it
+	// fails for reports stored before the window, and answers not found for queued ones (the worker sets the recall
+	// key only when it stores a report).
+	ReportWorkerEnabled bool `split_words:"true" default:"true"`
+
 	// AdminKey is the key used to authenticate the admin API.
 	AdminKey string `split_words:"true"`
 
@@ -154,6 +165,77 @@ type ConfigSpec struct {
 	NoArchiveDays int `split_words:"true" default:"60"`
 
 	DeleteDropReportAfterArchive bool `split_words:"true" default:"false"`
+
+	// ColdstoreExtensionDirectory is where the cold storage (#752) loads the DuckDB extensions that are not built
+	// into the binary from: postgres, to export the reports from PostgreSQL (run-script coldstore-export and
+	// coldstore-verify). DuckDB never downloads them. The image preinstalls them in /opt/duckdb/extensions
+	// (duckdbx.ImageExtensionDirectory); elsewhere, put
+	// https://extensions.duckdb.org/v1.5.6/linux_amd64/postgres_scanner.duckdb_extension.gz, gunzipped, at
+	// <dir>/v1.5.6/linux_amd64/postgres_scanner.duckdb_extension.
+	ColdstoreExtensionDirectory string `split_words:"true" default:"/opt/duckdb/extensions"`
+
+	// ReportSchemaV2Enabled means the database has the partitioned schema of #752: write drop_report_extras.created_at.
+	// On the new database (scripts/newdb) drop_reports and drop_report_extras are partitioned by month of created_at,
+	// so the report worker writes the created_at of the report to drop_report_extras, its partition key there. Reports
+	// are stored as before otherwise, recruitment reports included. Keep it false on today's database, which has no
+	// such column: every report would fail to store. Keep it true on the new database, where a drop_report_extras row
+	// without created_at fails to insert. The report worker checks the database at startup and fails the startup when
+	// the flag does not match it. With the flag on, it also creates the partitions of the current and the next month
+	// every hour (the new database has no default partition).
+	ReportSchemaV2Enabled bool `split_words:"true" default:"false"`
+
+	// ColdstoreEnabled opens the local cold storage (#752) at startup with coldstore.Reader, so that queries can read
+	// the archived months from it. The app then refuses to start unless every file of the manifest in
+	// ColdstoreDirectory is there with its size; restore missing ones with run-script coldstore-pull. The app never
+	// reads the bucket. Queries read from it only with ColdstoreQueriesEnabled.
+	ColdstoreEnabled bool `split_words:"true" default:"false"`
+
+	// ColdstoreQueriesEnabled reads the archived part (before the cold storage's hot boundary) of the time ranges of
+	// the personal drop and pattern matrices, of the drop matrix queries of /result/advanced and of the customized
+	// trend (its buckets) from the cold storage, and only the rest from PostgreSQL; the two are added up. Requires
+	// ColdstoreEnabled. While PostgreSQL still holds every report (before the migration of #752), the results are the
+	// same either way.
+	ColdstoreQueriesEnabled bool `split_words:"true" default:"false"`
+
+	// ColdstoreShadowEnabled (shadow mode) answers the queries of ColdstoreQueriesEnabled from PostgreSQL alone, as
+	// with the cold storage off, and computes each of them that reaches back before the hot boundary again in the
+	// background, split as ColdstoreQueriesEnabled would, to compare the two. Differences are logged and counted
+	// (penguinbackend_coldstore_shadow_comparisons_total{result="mismatch"}). This only makes sense while PostgreSQL
+	// still holds every report (before the migration of #752). Requires ColdstoreEnabled, and excludes
+	// ColdstoreQueriesEnabled.
+	ColdstoreShadowEnabled bool `split_words:"true" default:"false"`
+
+	// ColdstoreShadowTimeout bounds each background computation of shadow mode; one that runs longer is cancelled and
+	// counted as a timeout. Its PostgreSQL statements run with a statement timeout a little shorter (by a tenth, at
+	// most a second), so that PostgreSQL cancels them on the server. The user's response never waits for it.
+	ColdstoreShadowTimeout time.Duration `split_words:"true" default:"30s"`
+
+	// ColdstoreShadowMaxInFlight caps the background computations of shadow mode running at once; queries beyond it
+	// are not compared (counted as skipped).
+	ColdstoreShadowMaxInFlight int `split_words:"true" default:"2"`
+
+	// ColdstoreDirectory is the local cold storage directory (manifest.json and the files it lists), on the disk of
+	// the machine the app runs on. Required when ColdstoreEnabled. DuckDB may read nothing else.
+	ColdstoreDirectory string `split_words:"true"`
+
+	// ColdstoreThreads caps the threads of the cold storage's DuckDB database.
+	ColdstoreThreads int `split_words:"true" default:"2"`
+
+	// ColdstoreMemoryLimit caps the memory of the cold storage's DuckDB database, in DuckDB's syntax.
+	ColdstoreMemoryLimit string `split_words:"true" default:"1GB"`
+
+	// ColdstoreTempDirectory is where the cold storage's DuckDB database spills (in a directory of its own, removed
+	// at shutdown), and where the time of the last integrity check is kept. Empty is the system's temp directory.
+	ColdstoreTempDirectory string `split_words:"true"`
+
+	// ColdstoreReloadInterval is how often the manifest is checked for a change (a month archived or patched); 0
+	// disables the reload.
+	ColdstoreReloadInterval time.Duration `split_words:"true" default:"1m"`
+
+	// ColdstoreIntegrityCheckInterval is how often every local cold storage file is hashed again, one at a time at
+	// the lowest CPU and I/O priority, and compared with the manifest's sha256. Mismatches are logged and counted
+	// (penguinbackend_coldstore_integrity_files_total{result!="ok"}), never repaired. 0 disables the check.
+	ColdstoreIntegrityCheckInterval time.Duration `split_words:"true" default:"168h"`
 
 	// SEOPagesEnabled serves the stats pages of the frontend (/{zh,en,ja,ko}/result/...) from here: the frontend's
 	// index.html with the page's title, description, canonical and hreflang links, structured data and a plain HTML
