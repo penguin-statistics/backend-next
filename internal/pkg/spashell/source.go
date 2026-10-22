@@ -250,7 +250,11 @@ func (s *Source) fetch(ctx context.Context) (err error) {
 	// a different index.html is never older than the one at hand, as that of a release rolled back to is: the pages
 	// take their Last-Modified from it, and one cached with the newer one would be answered as not modified while it
 	// refers to the scripts of the release rolled back from. Later by a second at least, the precision of HTTP dates.
-	if cur != nil && !bytes.Equal(cur.raw, shell.raw) && !shell.LastModified.After(cur.LastModified) {
+	// The same index.html sent anew (with another ETag) keeps the time of the one at hand, which may be such a time.
+	switch {
+	case cur != nil && bytes.Equal(cur.raw, shell.raw):
+		shell.LastModified = cur.LastModified
+	case cur != nil && !shell.LastModified.After(cur.LastModified):
 		shell.LastModified = now
 		if floor := cur.LastModified.Add(time.Second); shell.LastModified.Before(floor) {
 			shell.LastModified = floor

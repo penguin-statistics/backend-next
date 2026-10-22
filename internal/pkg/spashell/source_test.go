@@ -162,6 +162,16 @@ func TestSourceLastModifiedNeverGoesBack(t *testing.T) {
 	if got := mustGet(t, s); !strings.Contains(string(got.Raw()), "v1") || !got.LastModified.Equal(c.now()) {
 		t.Errorf("rollback: LastModified %v, want %v", got.LastModified, c.now())
 	}
+	// and sent anew with another ETag: the time it was given, not that of the origin
+	rolledBackAt := c.now()
+	c.advance(time.Minute)
+	u.set(200, shellV1, `"v1b"`)
+	if err := s.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustGet(t, s).LastModified; !got.Equal(rolledBackAt) {
+		t.Errorf("rollback sent anew: LastModified %v, want %v", got, rolledBackAt)
+	}
 
 	// rolled back again, though the clock is behind: a second after the one at hand
 	rolledBack := mustGet(t, s).LastModified
