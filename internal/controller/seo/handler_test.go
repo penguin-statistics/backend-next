@@ -735,6 +735,93 @@ func TestSameHTMLForEveryone(t *testing.T) {
 	}
 }
 
+func TestNotModified(t *testing.T) {
+	e := newTestEnv(t)
+	get := func(path string, header map[string]string) response {
+		t.Helper()
+		return e.getWith(t, path, header)
+	}
+	const matrixTime = "Wed, 21 Oct 2026 10:30:00 GMT"
+	since := func(v string) map[string]string { return map[string]string{"If-Modified-Since": v} }
+
+	// the pages with data, the lists rendered once included
+	for _, path := range []string{"/en/result/cn/item/30012", "/zh/result/cn/stage/main_1/main_01-07", "/en/result/cn/item", "/en/result/cn/item"} {
+		r := get(path, since(matrixTime))
+		if r.status != 304 || r.body != "" {
+			t.Errorf("%s: status %d, %d bytes, want 304 without a body", path, r.status, len(r.body))
+		}
+		// the headers of the 200, which refresh the cached copy
+		for k, want := range map[string]string{
+			"Cache-Control":                "public, max-age=60, s-maxage=300",
+			"Last-Modified":                matrixTime,
+			"Cross-Origin-Embedder-Policy": "",
+			"Vary":                         "",
+		} {
+			if got := r.header.Get(k); got != want {
+				t.Errorf("%s: %s %q, want %q", path, k, got, want)
+			}
+		}
+		if r := get(path, since("Wed, 21 Oct 2026 10:29:59 GMT")); r.status != 200 || !strings.Contains(r.body, `<section id="pe-ssr"`) {
+			t.Errorf("%s modified since: status %d", path, r.status)
+		}
+		if r := get(path, map[string]string{"If-Modified-Since": matrixTime, "If-None-Match": `"x"`}); r.status != 200 {
+			t.Errorf("%s with If-None-Match: status %d", path, r.status)
+		}
+	}
+	if r := e.do(t, fiber.MethodHead, "/en/result/cn/item/30012"); r.status != 200 {
+		t.Errorf("HEAD: status %d", r.status)
+	}
+
+	// a page made with the matrix but noindex (an item never dropped, the recruitment statistics) too, with its
+	// X-Robots-Tag
+	for _, path := range []string{"/en/result/cn/item/quiet", "/en/result/cn/stage/recruit/recruit"} {
+		if r := get(path, since(matrixTime)); r.status != 304 || r.header.Get("X-Robots-Tag") != "noindex, follow" {
+			t.Errorf("%s: status %d, X-Robots-Tag %q", path, r.status, r.header.Get("X-Robots-Tag"))
+		}
+	}
+
+	// never a 404, nor a page without data
+	later := since("Wed, 21 Oct 2026 12:00:00 GMT")
+	if r := get("/en/result/cn/item/nope", later); r.status != 404 || !strings.Contains(r.body, `<meta name="robots" content="noindex">`) {
+		t.Errorf("404: status %d", r.status)
+	}
+	e.data.matrices = nil
+	if r := get("/en/result/cn/item/30012", later); r.status != 503 || r.body == "" {
+		t.Errorf("cold page: status %d", r.status)
+	}
+	if r := get("/en/result/cn/item", later); r.status != 200 || r.body == "" {
+		t.Errorf("list without the matrix: status %d", r.status)
+	}
+
+	// a frontend release after the matrix: the page is newer than a copy as old as the matrix
+	e.data.matrices = testMatrices()
+	s, err := spashell.Parse(e.shells.shell.Raw())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.LastModified = time.Date(2026, 10, 21, 11, 0, 0, 0, time.UTC)
+	e.shells.shell = s
+	if r := get("/en/result/cn/item/30012", since(matrixTime)); r.status != 200 || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 11:00:00 GMT" {
+		t.Errorf("new shell: status %d, Last-Modified %q", r.status, r.header.Get("Last-Modified"))
+	}
+	// and a new matrix
+	e.data.matrices["CN"] = service.NewSEOMatrix("CN", []*modelv2.OneDropMatrixElement{
+		{StageID: "main_01-07", ItemID: "30012", Times: 10, Quantity: 12, StartTime: 1556676000000},
+	}, lastModified.Add(time.Hour))
+	if r := get("/en/result/cn/item/30012", since("Wed, 21 Oct 2026 11:00:00 GMT")); r.status != 200 {
+		t.Errorf("new matrix: status %d", r.status)
+	}
+	// and a new catalog, as when an item is renamed or a stage moved to another zone
+	catalog := testCatalog()
+	catalog.ChangedAt = lastModified.Add(2 * time.Hour)
+	e.data.catalog = catalog
+	for _, path := range []string{"/en/result/cn/item/30012", "/en/result/cn/item"} {
+		if r := get(path, since("Wed, 21 Oct 2026 11:30:00 GMT")); r.status != 200 || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 12:30:00 GMT" {
+			t.Errorf("%s with a new catalog: status %d, Last-Modified %q", path, r.status, r.header.Get("Last-Modified"))
+		}
+	}
+}
+
 func TestItemPageCapsRows(t *testing.T) {
 	e := newTestEnv(t)
 	var rows []*modelv2.OneDropMatrixElement

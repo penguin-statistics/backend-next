@@ -320,7 +320,11 @@ func (b *builder) home() Link {
 func (b *builder) base(kind pageKind, title, imageAlt, description string, ids ...string) *Page {
 	p := &Page{Kind: kind, Outcome: "ok", Status: 200, Indexable: true, Cacheable: b.matrix != nil}
 	if b.matrix != nil {
+		// and the catalog's, for a name changed or a stage moved to another zone
 		p.LastModified = b.matrix.LastModified
+		if b.catalog.ChangedAt.After(p.LastModified) {
+			p.LastModified = b.catalog.ChangedAt
+		}
 	}
 	p.Head = Head{
 		Lang:        b.t.Lang,

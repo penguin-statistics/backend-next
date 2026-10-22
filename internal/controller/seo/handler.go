@@ -19,6 +19,7 @@ import (
 	"go.uber.org/fx"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/pkg/cachectrl"
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/pkg/observability"
 	"exusiai.dev/backend-next/internal/pkg/spashell"
@@ -408,17 +409,20 @@ func (h *Handler) sendCold(c *fiber.Ctx, shell *spashell.Shell, r route) {
 	_ = c.Send(shell.Raw())
 }
 
+// send sends a page, or 304 Not Modified without a body to a conditional request for a page made with the matrix
+// that is not older than its Last-Modified: the latest of the times of the matrix, the catalog and the shell it was
+// made of
 func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, p *Page, html []byte) {
-	count(p.Kind, p.Outcome)
 	// a 404 of a page that does not exist (crawlers keep requesting retired IDs) or a 503 while the data is
-	// calculated after a start is no error of the backend; their outcomes are counted above
+	// calculated after a start is no error of the backend; their outcomes are counted below
 	middlewares.ExpectStatus(c)
 	setHTML(c, p.Head.Lang)
+	cacheable := p.Status == fiber.StatusOK && p.Cacheable
 	switch {
 	case p.Status == fiber.StatusServiceUnavailable:
 		c.Set(fiber.HeaderCacheControl, "no-store")
 		c.Set(fiber.HeaderRetryAfter, strconv.Itoa(int(retryAfterCold.Seconds())))
-	case p.Status == fiber.StatusOK && p.Cacheable:
+	case cacheable:
 		h.cachePage(c)
 	default:
 		h.cacheFor(c, h.shortMaxAge())
@@ -433,6 +437,14 @@ func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, p *Page, html []byte
 	if !lastModified.IsZero() {
 		c.Response().Header.SetLastModified(lastModified)
 	}
+	// only a 200 made with the matrix (cacheable), indexable or not: a 404, a 503, or a list rendered before the
+	// matrix was calculated has the Last-Modified of the shell alone, as the first catalog after a start has no time
+	if cacheable && cachectrl.NotModified(c) {
+		count(p.Kind, "not_modified")
+		c.Status(fiber.StatusNotModified)
+		return
+	}
+	count(p.Kind, p.Outcome)
 	c.Status(p.Status)
 	_ = c.Send(html)
 }
