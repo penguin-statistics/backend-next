@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/uptrace/bun"
@@ -17,13 +18,21 @@ import (
 	"exusiai.dev/backend-next/internal/repo/selector"
 )
 
+// dropPatternsByHashMaxEntries bounds DropPattern.byHash: it is cleared once full.
+const dropPatternsByHashMaxEntries = 50000
+
 type DropPattern struct {
 	db  *bun.DB
 	sel selector.S[model.DropPattern]
+
+	// byHash holds the patterns Remember was given, by hash: a pattern is never changed or deleted once committed. It
+	// lives as long as the process: restart it if drop_patterns is ever restored or renumbered.
+	byHashMu sync.RWMutex
+	byHash   map[string]model.DropPattern
 }
 
 func NewDropPattern(db *bun.DB) *DropPattern {
-	return &DropPattern{db: db, sel: selector.New[model.DropPattern](db)}
+	return &DropPattern{db: db, sel: selector.New[model.DropPattern](db), byHash: map[string]model.DropPattern{}}
 }
 
 func (r *DropPattern) GetDropPatterns(ctx context.Context) ([]*model.DropPattern, error) {
@@ -44,8 +53,17 @@ func (r *DropPattern) GetDropPatternByHash(ctx context.Context, hash string) (*m
 	})
 }
 
+// GetOrCreateDropPatternFromDrops returns the pattern of drops, and whether it was created in tx. A pattern remembered
+// (see Remember) is returned without querying.
 func (r *DropPattern) GetOrCreateDropPatternFromDrops(ctx context.Context, tx bun.Tx, drops []*types.Drop) (*model.DropPattern, bool, error) {
 	originalFingerprint, hash := r.calculateDropPatternHash(drops)
+	r.byHashMu.RLock()
+	cached, ok := r.byHash[hash]
+	r.byHashMu.RUnlock()
+	if ok {
+		return &cached, false, nil
+	}
+
 	dropPattern := &model.DropPattern{
 		Hash:                hash,
 		OriginalFingerprint: originalFingerprint,
@@ -56,6 +74,7 @@ func (r *DropPattern) GetOrCreateDropPatternFromDrops(ctx context.Context, tx bu
 		Scan(ctx)
 
 	if err == nil {
+		// not remembered here: tx may have inserted it, and roll back
 		return dropPattern, false, nil
 	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, false, err
@@ -69,6 +88,19 @@ func (r *DropPattern) GetOrCreateDropPatternFromDrops(ctx context.Context, tx bu
 	}
 
 	return dropPattern, true, nil
+}
+
+// Remember keeps patterns for GetOrCreateDropPatternFromDrops to return without querying. Only patterns committed may
+// be remembered: one selected or inserted in a transaction that rolls back may not exist.
+func (r *DropPattern) Remember(patterns ...*model.DropPattern) {
+	r.byHashMu.Lock()
+	defer r.byHashMu.Unlock()
+	for _, pattern := range patterns {
+		if len(r.byHash) >= dropPatternsByHashMaxEntries {
+			r.byHash = map[string]model.DropPattern{}
+		}
+		r.byHash[pattern.Hash] = *pattern
+	}
 }
 
 func (r *DropPattern) calculateDropPatternHash(drops []*types.Drop) (originalFingerprint, hexHash string) {

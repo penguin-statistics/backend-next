@@ -427,6 +427,27 @@ func TestProcessRollsBackWithoutRecallKey(t *testing.T) {
 	}
 }
 
+// TestProcessRollsBackWithoutRememberingPattern fails a batch task on its third report after its first inserted a new
+// pattern and its second selected it in the same transaction: the pattern is rolled back, so the next task of those
+// drops must create it again rather than reuse its id.
+func TestProcessRollsBackWithoutRememberingPattern(t *testing.T) {
+	w := newTestWorker(t)
+	createdAt := time.UnixMicro(1760600000123456)
+	failed := newTestTask(t, w, 42, createdAt, "203.0.113.7",
+		testReport("main_01-07", 30012), testReport("main_01-07", 30012), testReport("no_such_stage", 30013))
+	if err := processTask(t, w, failed); err == nil {
+		t.Fatal("a task with an unknown stage was processed")
+	}
+	assertRows(t, w.DB, dumpDropPatterns, []string{})
+
+	if err := processTask(t, w, newTestTask(t, w, 42, createdAt, "203.0.113.7", testReport("main_01-07", 30012))); err != nil {
+		t.Fatal(err)
+	}
+	// sequences are not rolled back: the failed task took patterns 1 and 2 and reports 1 and 2
+	assertRows(t, w.DB, dumpDropPatterns, []string{"3|" + dumpRows(t, w.DB, "SELECT hash FROM drop_patterns")[0] + "|30012:1"})
+	assertRows(t, w.DB, dumpDropReports, []string{"3|1|3|1|1760600000123456|0|CN|42|MeoAssistant|v4.0.0"})
+}
+
 // TestProcessStoresReportWithoutDrops stores a report of no drops when its pattern does not exist yet, as it does in
 // production (pattern 12, of no elements), and once it does.
 func TestProcessStoresReportWithoutDrops(t *testing.T) {
