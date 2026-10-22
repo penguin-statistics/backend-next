@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"exusiai.dev/gommon/constant"
-	"github.com/go-redsync/redsync/v4"
 	"github.com/gofiber/fiber/v2"
+	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 	"github.com/vmihailenco/msgpack/v5"
 
@@ -27,10 +27,10 @@ type IdempotencyConfig struct {
 
 	keepResponseHeadersMap map[string]struct{}
 
-	// Storage is the storage backend for the idempotency key & its response data.
-	Storage fiber.Storage
-
-	RedSync *redsync.Redsync
+	// Redis stores the response of an idempotency key under <KeyPrefix>:<key>, and its lock under
+	// mutex:idempotency-request:<key>.
+	Redis     redis.Scripter
+	KeyPrefix string
 
 	// Next defines a function to skip this middleware when returned true.
 	//
@@ -86,43 +86,72 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 		// Save idempotency key to context
 		c.Locals(constant.IdempotencyKeyLocalsKey, key)
 
-		// First-pass: if the idempotency key is in the storage, get and return the response
-		if exist, err := checkWriteIdempotencyCachedMessage(c, config, key); exist {
-			return err
+		lock := &idempotencyLock{
+			redis: config.Redis,
+			keys:  [2]string{config.KeyPrefix + ":" + key, "mutex:idempotency-request:" + key},
+			token: newIdempotencyLockToken(),
 		}
 
-		// Idempotency key not empty and not found in storage. Lock the key.
-		// Logged at info: dashboards count lock + hit as the opt-in requests.
-		if l := log.Info(); l.Enabled() {
-			l.
-				Str("evt.name", "http.idempotency.lock").
-				Str("key", key).
-				Msg("idempotency key not found in storage. Locking key.")
-		}
-
-		lockKey := "mutex:idempotency-request:" + key
-		mutex := config.RedSync.NewMutex(lockKey, redsync.WithExpiry(time.Minute), redsync.WithTries(5), redsync.WithRetryDelay(time.Millisecond*250))
-
-		if err := mutex.Lock(); err != nil {
-			log.Err(err).
-				Str("evt.name", "http.idempotency.lock.failed").
-				Str("key", key).
-				Msg("failed to lock idempotency key. Returning error.")
-			return pgerr.ErrInternalError.Msg("failed to lock idempotency key: idempoency key is locked by another request; are you sending the same request concurrently or retrying with little or no backoff?")
-		}
-
-		defer func() {
-			if _, err := mutex.Unlock(); err != nil {
+		// Look for the saved response and lock the key in one round trip, retrying while another request holds the
+		// lock.
+		var (
+			response []byte
+			locked   bool
+		)
+		for try := 0; ; try++ {
+			if try != 0 {
+				time.Sleep(idempotencyLockRetryDelay)
+			}
+			var err error
+			response, locked, err = lock.acquire(try == 0)
+			if response != nil {
+				break
+			}
+			if try == 0 {
+				// Idempotency key not empty and not found in storage. Lock the key.
+				// Logged at info: dashboards count lock + hit as the opt-in requests.
+				if l := log.Info(); l.Enabled() {
+					l.
+						Str("evt.name", "http.idempotency.lock").
+						Str("key", key).
+						Msg("idempotency key not found in storage. Locking key.")
+				}
+			}
+			if locked {
+				break
+			}
+			if err == nil {
+				err = errIdempotencyLockTaken
+			} else {
+				// the script may have taken the lock before its reply was lost
+				_, _ = lock.release()
+			}
+			if try == idempotencyLockTries-1 {
 				log.Err(err).
-					Str("evt.name", "http.idempotency.unlock.failed").
+					Str("evt.name", "http.idempotency.lock.failed").
 					Str("key", key).
-					Msg("failed to unlock idempotency key.")
+					Msg("failed to lock idempotency key. Returning error.")
+				return pgerr.ErrInternalError.Msg("failed to lock idempotency key: idempoency key is locked by another request; are you sending the same request concurrently or retrying with little or no backoff?")
+			}
+		}
+
+		unlocked := false
+		defer func() {
+			if locked && !unlocked {
+				lock.unlock(key)
 			}
 		}()
 
-		// Lock acquired. Check if the key is still empty. If not, return the response.
-		if exist, err := checkWriteIdempotencyCachedMessage(c, config, key); exist {
-			return err
+		if response != nil {
+			// Idempotency key found in storage. Return the response.
+			// Logged at info: dashboards count the hits.
+			if l := log.Info(); l.Enabled() {
+				l.
+					Str("evt.name", "http.idempotency.hit").
+					Str("key", key).
+					Msg("idempotency key found in storage")
+			}
+			return unmarshalResponseToFiberResponse(c, config, response)
 		}
 
 		// Execute the request handler
@@ -147,14 +176,16 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 			return err
 		}
 
-		// Store the response in the storage
-		if err := config.Storage.Set(key, responseBytes, config.Lifetime); err != nil {
+		// Store the response in the storage and unlock the key
+		released, err := lock.save(responseBytes, config.Lifetime)
+		if err != nil {
 			log.Error().
 				Str("evt.name", "http.idempotency.response.save.failed").
 				Err(err).
 				Msg("error saving the idempotency response. Skipping saving the idempotency response.")
 			return err
 		}
+		unlocked = true
 
 		// Add idempotency header
 		c.Set(constant.IdempotencyHeader, "saved")
@@ -164,6 +195,13 @@ func Idempotency(config *IdempotencyConfig) fiber.Handler {
 				Str("evt.name", "http.idempotency.saved").
 				Str("key", key).
 				Msg("idempotency response saved")
+		}
+
+		if !released {
+			log.Err(errIdempotencyLockLost).
+				Str("evt.name", "http.idempotency.unlock.failed").
+				Str("key", key).
+				Msg("failed to unlock idempotency key.")
 		}
 
 		return nil
@@ -230,22 +268,4 @@ func unmarshalResponseToFiberResponse(c *fiber.Ctx, conf *IdempotencyConfig, res
 	}
 
 	return nil
-}
-
-func checkWriteIdempotencyCachedMessage(c *fiber.Ctx, conf *IdempotencyConfig, key string) (bool, error) {
-	// Idempotency key not empty. Check if it is in the storage
-	response, err := conf.Storage.Get(key)
-	if err == nil && response != nil {
-		// Idempotency key found in storage. Return the response.
-		// Logged at info: dashboards count the hits.
-		if l := log.Info(); l.Enabled() {
-			l.
-				Str("evt.name", "http.idempotency.hit").
-				Str("key", key).
-				Msg("idempotency key found in storage")
-		}
-		return true, unmarshalResponseToFiberResponse(c, conf, response)
-	}
-
-	return false, nil
 }

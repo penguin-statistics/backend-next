@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"exusiai.dev/gommon/constant"
-	"github.com/go-redsync/redsync/v4"
 	"github.com/goccy/go-json"
 	"github.com/gofiber/fiber/v2"
 	"github.com/redis/go-redis/v9"
@@ -14,7 +13,6 @@ import (
 	"exusiai.dev/backend-next/internal/model/types"
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/crypto"
-	"exusiai.dev/backend-next/internal/pkg/fiberstore"
 	"exusiai.dev/backend-next/internal/pkg/flog"
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
@@ -28,7 +26,6 @@ type Report struct {
 	fx.In
 
 	Redis          *redis.Client
-	RedSync        *redsync.Redsync
 	Crypto         *crypto.Crypto
 	ReportService  *service.Report
 	AccountService *service.Account
@@ -45,8 +42,8 @@ func RegisterReport(v2 *svr.V2, c Report) {
 			constant.PenguinIDSetHeader,
 			constant.ShimCompatibilityHeaderKey,
 		},
-		Storage: fiberstore.NewRedis(c.Redis, constant.ReportIdempotencyRedisHashKey),
-		RedSync: c.RedSync,
+		Redis:     c.Redis,
+		KeyPrefix: constant.ReportIdempotencyRedisHashKey,
 	}), middlewares.InjectValidBody[types.SingularReportRequest](), c.MiddlewareGetOrCreateAccount, c.SingularReport)
 	v2.Post("/report/recall", middlewares.InjectValidBody[types.SingularReportRecallRequest](), c.RecallSingularReport)
 	v2.Post("/report/recognition", c.MiddlewareGetOrCreateAccount, c.RecognitionReport)
