@@ -1,6 +1,10 @@
 module exusiai.dev/backend-next
 
-go 1.19
+go 1.25.0
+
+// go-sdk needs the go 1.25 directive; keep the runtime defaults (TLS, x509, panic(nil), rand.Seed, ...) of the
+// go 1.19 the module declared before, so that raising it changes no behavior of the binary
+godebug default=go1.19
 
 require (
 	exusiai.dev/gommon v0.0.9
@@ -59,9 +63,9 @@ require (
 	go.opentelemetry.io/otel/sdk v1.16.0
 	go.uber.org/fx v1.19.2
 	golang.org/x/exp v0.0.0-20220823124025-807a23277127
-	golang.org/x/mod v0.18.0
-	golang.org/x/sync v0.7.0
-	golang.org/x/text v0.16.0
+	golang.org/x/mod v0.33.0
+	golang.org/x/sync v0.20.0
+	golang.org/x/text v0.34.0
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.48.0
 	gopkg.in/guregu/null.v3 v3.5.0
@@ -157,10 +161,10 @@ require (
 	go.uber.org/dig v1.16.1 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	go.uber.org/zap v1.23.0 // indirect
-	golang.org/x/crypto v0.24.0 // indirect
-	golang.org/x/net v0.26.0
-	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/tools v0.22.0 // indirect
+	golang.org/x/crypto v0.48.0 // indirect
+	golang.org/x/net v0.50.0
+	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/tools v0.42.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	mellium.im/sasl v0.3.1 // indirect
 )
