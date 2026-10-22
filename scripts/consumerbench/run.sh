@@ -23,6 +23,7 @@ BENCH=${BENCH:-BenchmarkConsumer}
 PGPORT=${PGPORT:-5434}
 PSQL=${PSQL:-sudo -n -u postgres psql}
 mkdir -p "$OUT"
+OUT=$(cd "$OUT" && pwd) # the binary is built from the repository root and run from the package
 
 variant_env() {
 	case $1 in
