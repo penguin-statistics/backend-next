@@ -39,11 +39,11 @@ func searchStagesTool() *sdkmcp.Tool {
 		Name:  "search_stages",
 		Title: "Search stages",
 		Description: "Finds stages by code (1-7, S2-12, YW-4; full-width characters work too), by stage ID " +
-			"(main_01-07), or by the name or ID of their zone (第十章, Under Tides), and returns their stage IDs with " +
-			"their zone, sanity cost and whether they are open on the server now. Codes are not unique: the standard " +
-			"and tough versions of a stage of the main story share them, as do an event, its rerun and the stages it " +
-			"left open for good. Best matches first (the code before the zone, exact before prefix before " +
-			"substring), then the stages open now, standard before tough, original before permanent before rerun. " +
+			"(main_01-07), or by the name or ID of their zone (第十章, Under Tides), and returns their stage IDs (for " +
+			"get_stage_drops) with their zone, sanity cost and whether they are open on the server now. Codes are not " +
+			"unique: the standard and tough versions of a stage of the main story share them, as do an event, its rerun " +
+			"and the stages it left open for good. Best matches first (the code before the zone, exact before prefix " +
+			"before substring), then the stages open now, standard before tough, original before permanent before rerun. " +
 			"ambiguous is true when several stages share the best-matching code (not for the stages of a zone found by " +
 			"its name): ask the user which one is meant or decide by context.",
 		InputSchema: inputSchema[searchStagesIn](map[string]property{

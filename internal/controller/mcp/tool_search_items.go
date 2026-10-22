@@ -55,11 +55,11 @@ func searchItemsTool() *sdkmcp.Tool {
 		Title: "Search items",
 		Description: "Finds items (materials, battle records, chips, furniture, event items) by name in any language " +
 			"(zh, en, ja, ko), by alias or nickname (土块, 狗粮), by pinyin (guyuanyan) or by item ID, and returns their " +
-			"item IDs and names in every language. Best matches first: exact before prefix before substring, names " +
-			"before aliases. Several items can share an alias (石头 is each tier of Orirock): ambiguous is then true; " +
-			"ask the user which one is meant or decide by context. Items of other types (workshop-crafted materials " +
-			"such as D32 Steel, recruitment tags) are returned only when no listed item matches, with a note saying " +
-			"what they are.",
+			"item IDs (for get_item_drop_rates) and names in every language. Best matches first: exact before prefix " +
+			"before substring, names before aliases. Several items can share an alias (石头 is each tier of Orirock): " +
+			"ambiguous is then true; ask the user which one is meant or decide by context. Items of other types " +
+			"(workshop-crafted materials such as D32 Steel, recruitment tags) are returned only when no listed item " +
+			"matches, with a note saying what they are.",
 		InputSchema: inputSchema[searchItemsIn](map[string]property{
 			"query": lengthProperty(1, queryMaxLength),
 			"lang":  langProperty,

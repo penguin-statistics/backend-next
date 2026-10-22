@@ -79,7 +79,7 @@ func TestSearchIndex(t *testing.T) {
 	for _, k := range ix.unlisted {
 		ids = append(ids, k.item.ArkID)
 	}
-	if got, want := ids, []string{"4001_1000", "30135"}; !slices.Equal(got, want) {
+	if got, want := ids, []string{"4001_1000", "recruit_tag_senior_operator", "4005", "30135"}; !slices.Equal(got, want) {
 		t.Errorf("unlisted items %q, want %q", got, want)
 	}
 }
