@@ -24,6 +24,8 @@ type Verifier struct {
 	now func() time.Time
 	// rejectRules holds the active reject rules, read-only, for cacheTTL
 	rejectRules expiringCache[struct{}, []*model.RejectRule]
+	// dropInfos holds the current drop infos by stage and server (see currentDropInfos)
+	dropInfos expiringCache[repo.DropInfoQuery, stageDropInfos]
 }
 
 func (v *Verifier) clock() time.Time {
@@ -34,10 +36,11 @@ func (v *Verifier) clock() time.Time {
 }
 
 // Reliability checks a report of the task, in this order: its drops against the drop infos of its stage, current now
-// (6 if they do not fit), then the active reject rules by rule id (the reliability of the first one it matches), as read
-// up to cacheTTL ago. A report passing both gets 0. The message says why a report is rejected, as the pipeline's
-// Violation did, and is empty for 0. A database error is returned: the task is to be retried, not stored with a
-// reliability the checks did not decide.
+// (6 if they do not fit), then the active reject rules by rule id (the reliability of the first one it matches). Both
+// are as read up to cacheTTL ago, but for the drop infos of a time range that has ended since (see currentDropInfos). A
+// report passing both gets 0. The message says why a report is rejected, as the pipeline's Violation did, and is empty
+// for 0. A database error is returned: the task is to be retried, not stored with a reliability the checks did not
+// decide.
 func (v *Verifier) Reliability(ctx context.Context, reportTask *types.ReportTask, report *types.ReportTaskSingleReport) (reliability int, message string, err error) {
 	start := time.Now()
 	violations, err := v.verifyDrops(ctx, report, reportTask)

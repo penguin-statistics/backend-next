@@ -1,7 +1,9 @@
 package reportverifs
 
 import (
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
@@ -154,6 +156,58 @@ func TestVerifyDropsMultipleTimes(t *testing.T) {
 		errs := verify(main0107Report(c.times, c.kinds))
 		if !lo.SomeBy(errs, func(err error) bool { return errors.Is(err, ErrInvalidDropType) }) {
 			t.Errorf("times %d, %d kinds of EXTRA items: not rejected by the drop type bounds: %v", c.times, c.kinds, errs)
+		}
+	}
+}
+
+// TestCopyDropInfos checks that adjusting the copies of drop infos for times leaves the drop infos as they were.
+func TestCopyDropInfos(t *testing.T) {
+	items, types := main0107DropInfos()
+	items[1].Bounds.Exceptions = []int{1}
+	types[2].Bounds.Exceptions = []int{1}
+	wantItems, wantTypes := main0107DropInfos()
+	wantItems[1].Bounds.Exceptions = []int{1}
+	wantTypes[2].Bounds.Exceptions = []int{1}
+
+	for times := 1; times <= 3; times++ {
+		itemCopies, typeCopies := copyDropInfos(items, types)
+		if !reflect.DeepEqual(itemCopies, items) || !reflect.DeepEqual(typeCopies, types) {
+			t.Fatalf("times %d: the copies differ from the drop infos", times)
+		}
+		adjustDropInfosByTimes(itemCopies, typeCopies, times)
+		// the item copies have no room to append to: it would overwrite the type copies
+		_ = append(itemCopies, &model.DropInfo{})
+		if !reflect.DeepEqual(items, wantItems) || !reflect.DeepEqual(types, wantTypes) {
+			t.Fatalf("times %d: adjusting the copies changed the drop infos", times)
+		}
+		if typeCopies[0].DropType != "REGULAR" {
+			t.Fatalf("times %d: appending to the item copies changed the type copies", times)
+		}
+	}
+
+	if itemCopies, typeCopies := copyDropInfos(nil, types); itemCopies != nil || len(typeCopies) != len(types) {
+		t.Errorf("copies of no item drop infos: %v, %d type drop infos", itemCopies, len(typeCopies))
+	}
+	if itemCopies, typeCopies := copyDropInfos(items, nil); len(itemCopies) != len(items) || typeCopies != nil {
+		t.Errorf("copies of no type drop infos: %d item drop infos, %v", len(itemCopies), typeCopies)
+	}
+}
+
+func TestDropInfosExpiry(t *testing.T) {
+	now := time.Date(2026, 10, 22, 0, 0, 0, 0, time.UTC)
+	for _, c := range []struct {
+		name  string
+		until time.Time
+		want  time.Time
+	}{
+		{"no time range ends", time.Time{}, now.Add(cacheTTL)},
+		{"a time range ends after the TTL", now.Add(cacheTTL + time.Second), now.Add(cacheTTL)},
+		{"a time range ends with the TTL", now.Add(cacheTTL), now.Add(cacheTTL)},
+		{"a time range ends within the TTL", now.Add(time.Second), now.Add(time.Second)},
+		{"a time range has ended", now.Add(-time.Second), now.Add(-time.Second)},
+	} {
+		if got := dropInfosExpiry(now, c.until); !got.Equal(c.want) {
+			t.Errorf("%s: expiry %v, want %v", c.name, got, c.want)
 		}
 	}
 }

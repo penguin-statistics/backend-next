@@ -125,14 +125,22 @@ func (r *DropInfo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server
 	return results, nil
 }
 
+// dropInfoBounds is a drop info of getBoundsForCurrentTimeRange, with the end of its time range, zero if it never ends
+// (selected as null: pgdriver cannot read infinity)
+type dropInfoBounds struct {
+	model.DropInfo `bun:",extend"`
+	EndTime        bun.NullTime `bun:"end_time"`
+}
+
 // getBoundsForCurrentTimeRange returns the drop infos of query's stage and server in their current time range, with
-// only their ItemID, DropType and Bounds.
-func (r *DropInfo) getBoundsForCurrentTimeRange(ctx context.Context, query *DropInfoQuery) ([]*model.DropInfo, error) {
-	var dropInfo []*model.DropInfo
+// only their ItemID, DropType and Bounds, and the end of their time range.
+func (r *DropInfo) getBoundsForCurrentTimeRange(ctx context.Context, query *DropInfoQuery) ([]*dropInfoBounds, error) {
+	var dropInfo []*dropInfoBounds
 	err := pgqry.New(
 		r.db.NewSelect().
 			Model(&dropInfo).
 			Column("item_id", "drop_type", "bounds").
+			ColumnExpr("CASE WHEN isfinite(tr.end_time) THEN tr.end_time END AS end_time").
 			Where("di.server = ?", query.Server).
 			Where("st.ark_stage_id = ?", query.ArkStageId),
 	).
@@ -154,11 +162,24 @@ func (r *DropInfo) getBoundsForCurrentTimeRange(ctx context.Context, query *Drop
 // but those of RECOGNITION_ONLY, split into those of an item and those of a drop type. Only their ItemID, DropType and
 // Bounds are filled.
 func (r *DropInfo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) (itemDropInfos, typeDropInfos []*model.DropInfo, err error) {
+	itemDropInfos, typeDropInfos, _, err = r.GetForCurrentTimeRangeWithDropTypesUntil(ctx, query)
+	return itemDropInfos, typeDropInfos, err
+}
+
+// GetForCurrentTimeRangeWithDropTypesUntil is GetForCurrentTimeRangeWithDropTypes, also returning until, the earliest
+// end of the time ranges of the drop infos, zero if none ends: they are the current ones until then, unless a time range
+// of the stage starts meanwhile.
+func (r *DropInfo) GetForCurrentTimeRangeWithDropTypesUntil(ctx context.Context, query *DropInfoQuery) (itemDropInfos, typeDropInfos []*model.DropInfo, until time.Time, err error) {
 	allDropInfos, err := r.getBoundsForCurrentTimeRange(ctx, query)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, time.Time{}, err
 	}
-	for _, dropInfo := range allDropInfos {
+	for _, row := range allDropInfos {
+		// of every drop info, RECOGNITION_ONLY too: they are all of the stage's current time ranges
+		if !row.EndTime.IsZero() && (until.IsZero() || row.EndTime.Before(until)) {
+			until = row.EndTime.Time
+		}
+		dropInfo := &row.DropInfo
 		if dropInfo.DropType != constant.DropTypeRecognitionOnly {
 			if dropInfo.ItemID.Valid {
 				itemDropInfos = append(itemDropInfos, dropInfo)
@@ -168,7 +189,7 @@ func (r *DropInfo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, quer
 		}
 	}
 
-	return itemDropInfos, typeDropInfos, nil
+	return itemDropInfos, typeDropInfos, until, nil
 }
 
 func (r *DropInfo) GetDropInfosWithFilters(ctx context.Context, server string, timeRanges []*model.TimeRange, stageIdFilter []int, itemIdFilter []int) ([]*model.DropInfo, error) {
