@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"exusiai.dev/gommon/constant"
-	"github.com/ahmetb/go-linq/v3"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
 	"gopkg.in/guregu/null.v3"
@@ -250,10 +249,7 @@ func (s *PatternMatrix) calcPatternMatrixByGivenDate(
 		}
 
 		// exclude some stages (gachabox, recruit) before calc
-		linq.From(stageIds).WhereT(func(stageId int) bool {
-			_, ok := excludeStageIdsSet[stageId]
-			return !ok
-		}).ToSlice(&stageIds)
+		stageIds = excludeStageIds(stageIds, excludeStageIdsSet)
 		if len(stageIds) == 0 {
 			continue
 		}
@@ -359,10 +355,7 @@ func (s *PatternMatrix) getLatestPatternMatrixElements(ctx context.Context, serv
 	elements := make([]*model.PatternMatrixElement, 0)
 	for rangeId, stageIds := range stageIdsMap {
 		// exclude some stages (gachabox, recruit) before calc
-		linq.From(stageIds).WhereT(func(stageId int) bool {
-			_, ok := excludeStageIdsSet[stageId]
-			return !ok
-		}).ToSlice(&stageIds)
+		stageIds = excludeStageIds(stageIds, excludeStageIdsSet)
 		if len(stageIds) == 0 {
 			continue
 		}
@@ -544,16 +537,10 @@ func (s *PatternMatrix) applyShimForPatternMatrixQuery(ctx context.Context, quer
 		return nil, err
 	}
 
-	var groupedResults []linq.Group
-	linq.From(queryResult.PatternMatrix).
-		GroupByT(
-			func(el *model.OnePatternMatrixElement) int { return el.PatternID },
-			func(el *model.OnePatternMatrixElement) *model.OnePatternMatrixElement { return el },
-		).ToSlice(&groupedResults)
-	for _, group := range groupedResults {
-		patternId := group.Key.(int)
-		for _, el := range group.Group {
-			oneDropPattern := el.(*model.OnePatternMatrixElement)
+	// grouped by pattern id, in the order the pattern ids first appear
+	for _, group := range util.GroupBy(queryResult.PatternMatrix, func(el *model.OnePatternMatrixElement) int { return el.PatternID }) {
+		patternId := group.Key
+		for _, oneDropPattern := range group.Items {
 			stage := stagesMapById[oneDropPattern.StageID]
 			dropPatternElements, err := s.DropPatternElementService.GetDropPatternElementsByPatternId(ctx, patternId)
 			if err != nil {
@@ -564,12 +551,12 @@ func (s *PatternMatrix) applyShimForPatternMatrixQuery(ctx context.Context, quer
 				PatternID: patternId,
 				Drops:     make([]*modelv2.OneDrop, 0),
 			}
-			linq.From(dropPatternElements).SortT(func(el1, el2 *model.DropPatternElement) bool {
-				item1 := itemsMapById[el1.ItemID]
-				item2 := itemsMapById[el2.ItemID]
-				return item1.SortID < item2.SortID
-			}).ToSlice(&dropPatternElements)
-			for _, dropPatternElement := range dropPatternElements {
+			// sorted as go-linq sorted them: a private copy, written back into dropPatternElements (which may be the
+			// cached slice, shared with concurrent requests) only once sorted, and only the copy is read below
+			sorted := append([]*model.DropPatternElement(nil), dropPatternElements...)
+			sort.Sort(dropPatternElementsBySortID{elements: sorted, itemsMapById: itemsMapById})
+			copy(dropPatternElements, sorted)
+			for _, dropPatternElement := range sorted {
 				item := itemsMapById[dropPatternElement.ItemID]
 				pattern.Drops = append(pattern.Drops, &modelv2.OneDrop{
 					ItemID:   item.ArkItemID,
@@ -624,4 +611,29 @@ func (s *PatternMatrix) interceptPatternMatrixResults(onePatternMatrixElements [
 		results = append(results, elements...)
 	}
 	return results, nil
+}
+
+// excludeStageIds filters stageIds in place, keeping the stages that are not in excludeStageIdsSet.
+func excludeStageIds(stageIds []int, excludeStageIdsSet map[int]struct{}) []int {
+	kept := stageIds[:0]
+	for _, stageId := range stageIds {
+		if _, ok := excludeStageIdsSet[stageId]; !ok {
+			kept = append(kept, stageId)
+		}
+	}
+	return kept
+}
+
+// dropPatternElementsBySortID sorts drop pattern elements by the sort id of their items.
+type dropPatternElementsBySortID struct {
+	elements     []*model.DropPatternElement
+	itemsMapById map[int]*model.Item
+}
+
+func (s dropPatternElementsBySortID) Len() int { return len(s.elements) }
+func (s dropPatternElementsBySortID) Swap(i, j int) {
+	s.elements[i], s.elements[j] = s.elements[j], s.elements[i]
+}
+func (s dropPatternElementsBySortID) Less(i, j int) bool {
+	return s.itemsMapById[s.elements[i].ItemID].SortID < s.itemsMapById[s.elements[j].ItemID].SortID
 }
