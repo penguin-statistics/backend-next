@@ -235,6 +235,7 @@ func TestItemPage(t *testing.T) {
 		"Cache-Control":    "public, max-age=60, s-maxage=300",
 		"Last-Modified":    "Wed, 21 Oct 2026 10:30:00 GMT",
 		"X-Robots-Tag":     "",
+		"Link":             `<https://penguin-stats.io/zh/result/cn/item/30012.md>; rel="alternate"; type="text/markdown", <https://penguin-stats.io/llms.txt>; rel="describedby"`,
 		// helmet's isolation would block the app's cross-origin images and scripts
 		"Cross-Origin-Embedder-Policy": "",
 		"Cross-Origin-Opener-Policy":   "",

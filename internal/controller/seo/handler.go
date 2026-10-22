@@ -435,6 +435,11 @@ func (h *Handler) sendCold(c *fiber.Ctx, shell *spashell.Shell, r route) {
 // was made of (see stamps), if not later than the Date (see setLastModified)
 func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, catalog *service.SEOCatalog, matrix *service.SEOMatrix, p *Page, html []byte) {
 	setHTML(c, p.Head.Lang)
+	if p.Head.Markdown != "" {
+		// for agents: the Markdown view of the page, also linked in its head, and the guide to the site, which the
+		// frontend's index.html links in the head already (/llms.txt, frontend-v2 v3.13.42)
+		c.Append(fiber.HeaderLink, "<"+p.Head.Markdown+`>; rel="alternate"; type="text/markdown"`, "<"+h.site+`/llms.txt>; rel="describedby"`)
+	}
 	h.sendPage(c, p.Kind, shell, catalog, matrix, p, html)
 }
 

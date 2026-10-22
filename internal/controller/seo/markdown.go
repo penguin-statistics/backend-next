@@ -26,6 +26,9 @@ import (
 // their codes and IDs, under the names and IDs of their zones, and the front matter gives the URL of their views
 // (stage_url_template), which keeps the view under about 50,000 characters.
 //
+// A page links its view in its head (<link rel="alternate" type="text/markdown">) and in a Link header, with the guide
+// to the site (/llms.txt, rel="describedby"), which the frontend's index.html links in the head already.
+//
 // A view is made of the same data as its page, never of the frontend's index.html, so it is served whatever the
 // shell. It has the status, Cache-Control and Last-Modified of the page, so the same 304s (and no ETag: neither has
 // one); its Last-Modified is that of the data alone. The view of an indexable page links the page as its canonical
