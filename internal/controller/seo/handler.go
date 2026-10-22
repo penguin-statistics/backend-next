@@ -143,7 +143,7 @@ type Handler struct {
 	lists sync.Map
 	// sitemaps holds the sitemaps built last, by sitemapKey
 	sitemaps sync.Map
-	// stamps holds the times given the data the sitemaps are made of
+	// stamps holds the times given the data the sitemaps and pages are made of
 	stamps stamps
 }
 
@@ -258,7 +258,7 @@ func (h *Handler) Serve(c *fiber.Ctx) error {
 		key = listKey{lang: r.lang, server: r.server, kind: r.kind}
 		if e, ok := h.lists.Load(key); ok {
 			if e := e.(*listEntry); e.catalog == catalog && e.matrix == matrix && e.shell == shell {
-				h.send(c, shell, e.page, e.html)
+				h.send(c, shell, catalog, matrix, e.page, e.html)
 				return nil
 			}
 		}
@@ -276,7 +276,7 @@ func (h *Handler) Serve(c *fiber.Ctx) error {
 	if key.kind != "" {
 		h.lists.Store(key, &listEntry{catalog: catalog, matrix: matrix, shell: shell, page: p, html: html})
 	}
-	h.send(c, shell, p, html)
+	h.send(c, shell, catalog, matrix, p, html)
 	return nil
 }
 
@@ -410,9 +410,9 @@ func (h *Handler) sendCold(c *fiber.Ctx, shell *spashell.Shell, r route) {
 }
 
 // send sends a page, or 304 Not Modified without a body to a conditional request for a page made with the matrix
-// that is not older than its Last-Modified: the latest of the times of the matrix, the catalog and the shell it was
-// made of
-func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, p *Page, html []byte) {
+// that is not older than its Last-Modified: the latest of the times given the matrix, the catalog and the shell it
+// was made of (see stamps), if not later than the Date (see setLastModified)
+func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, catalog *service.SEOCatalog, matrix *service.SEOMatrix, p *Page, html []byte) {
 	// a 404 of a page that does not exist (crawlers keep requesting retired IDs) or a 503 while the data is
 	// calculated after a start is no error of the backend; their outcomes are counted below
 	middlewares.ExpectStatus(c)
@@ -430,16 +430,23 @@ func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, p *Page, html []byte
 	if !p.Indexable {
 		c.Set("X-Robots-Tag", strings.ReplaceAll(p.Head.Robots, ",", ", "))
 	}
-	lastModified := p.LastModified
-	if shell.LastModified.After(lastModified) {
-		lastModified = shell.LastModified
+	lastModified, shellAt := p.LastModified, shell.LastModified
+	if cacheable {
+		// the times given the data rather than their own, which p.LastModified is the later of
+		lastModified = h.stamps.at(matrixSlot{server: matrix.Server}, matrix, matrix.LastModified)
+		if at := h.stamps.at(catalogSlot{}, catalog, catalog.ChangedAt); at.After(lastModified) {
+			lastModified = at
+		}
+		// a shell sent anew keeps its time, and a different one has a later one (see spashell.Shell)
+		shellAt = h.stamps.at(shellSlot{}, shell.LastModified.UnixNano(), shell.LastModified)
 	}
-	if !lastModified.IsZero() {
-		c.Response().Header.SetLastModified(lastModified)
+	if shellAt.After(lastModified) {
+		lastModified = shellAt
 	}
+	sent := !lastModified.IsZero() && setLastModified(c, lastModified)
 	// only a 200 made with the matrix (cacheable), indexable or not: a 404, a 503, or a list rendered before the
 	// matrix was calculated has the Last-Modified of the shell alone, as the first catalog after a start has no time
-	if cacheable && cachectrl.NotModified(c) {
+	if cacheable && sent && cachectrl.NotModified(c) {
 		count(p.Kind, "not_modified")
 		c.Status(fiber.StatusNotModified)
 		return

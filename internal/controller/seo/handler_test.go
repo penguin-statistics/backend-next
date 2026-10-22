@@ -822,6 +822,73 @@ func TestNotModified(t *testing.T) {
 	}
 }
 
+func TestNotModifiedAfterAChangeInTheSameSecond(t *testing.T) {
+	e := newTestEnv(t)
+	warmAll(e)
+	since := func(v string) map[string]string { return map[string]string{"If-Modified-Since": v} }
+	paths := []string{"/en/result/cn/item/30012", "/en/result/cn/item", "/en/result/us/item/30012"}
+	for _, path := range paths {
+		if r := e.get(t, path); r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 10:30:00 GMT" {
+			t.Fatalf("%s: Last-Modified %q", path, r.header.Get("Last-Modified"))
+		}
+	}
+
+	// an item renamed later in the second of the matrix
+	catalog := testCatalog()
+	catalog.Items["30012"].Name["en"] = "Orirock Cube II"
+	catalog.ChangedAt = lastModified.Add(500 * time.Millisecond)
+	e.data.catalog = catalog
+	for _, path := range paths {
+		r := e.getWith(t, path, since("Wed, 21 Oct 2026 10:30:00 GMT"))
+		if r.status != 200 || !strings.Contains(r.body, "Orirock Cube II") || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 10:30:01 GMT" {
+			t.Errorf("%s after a rename in the same second: status %d, Last-Modified %q", path, r.status, r.header.Get("Last-Modified"))
+		}
+		if r := e.getWith(t, path, since("Wed, 21 Oct 2026 10:30:01 GMT")); r.status != 304 {
+			t.Errorf("%s unchanged since: status %d", path, r.status)
+		}
+	}
+	// the pages of another server first served since then, which a crawler has from another backend
+	if r := e.getWith(t, "/en/result/jp/item", since("Wed, 21 Oct 2026 10:30:00 GMT")); r.status != 200 || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 10:30:01 GMT" {
+		t.Errorf("JP after a rename in the same second: status %d, Last-Modified %q", r.status, r.header.Get("Last-Modified"))
+	}
+
+	// a frontend release deployed before then, fetched now: older than the pages, but modifies them
+	s, err := spashell.Parse(e.shells.shell.Raw())
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.LastModified = lastModified.Add(-30 * time.Minute)
+	e.shells.shell = s
+	if r := e.getWith(t, paths[0], since("Wed, 21 Oct 2026 10:30:01 GMT")); r.status != 200 || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 10:30:02 GMT" {
+		t.Errorf("older shell: status %d, Last-Modified %q", r.status, r.header.Get("Last-Modified"))
+	}
+
+	// the matrix published in the second after the rename
+	m := *e.data.matrices["CN"]
+	m.LastModified = lastModified.Add(1200 * time.Millisecond)
+	e.data.matrices["CN"] = &m
+	if r := e.getWith(t, paths[0], since("Wed, 21 Oct 2026 10:30:02 GMT")); r.status != 200 || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 10:30:03 GMT" {
+		t.Errorf("matrix published in the same second: status %d, Last-Modified %q", r.status, r.header.Get("Last-Modified"))
+	}
+	// the pages of another server keep theirs
+	if r := e.getWith(t, "/en/result/us/item/30012", since("Wed, 21 Oct 2026 10:30:02 GMT")); r.status != 304 {
+		t.Errorf("US after the matrix of CN: status %d", r.status)
+	}
+}
+
+func TestPageLastModifiedNotLaterThanDate(t *testing.T) {
+	e := newTestEnv(t)
+	// a matrix whose changes were recorded in the next seconds
+	now := time.Now()
+	m := *e.data.matrices["CN"]
+	m.LastModified = now.Add(time.Minute)
+	e.data.matrices["CN"] = &m
+	r := e.getWith(t, "/en/result/cn/item/30012", map[string]string{"If-Modified-Since": now.UTC().Format(http.TimeFormat)})
+	if r.status != 200 || r.header.Get("Last-Modified") != "" || r.header.Get("Cache-Control") != "public, max-age=60, s-maxage=300" {
+		t.Errorf("status %d, Last-Modified %q, Cache-Control %q", r.status, r.header.Get("Last-Modified"), r.header.Get("Cache-Control"))
+	}
+}
+
 func TestItemPageCapsRows(t *testing.T) {
 	e := newTestEnv(t)
 	var rows []*modelv2.OneDropMatrixElement
