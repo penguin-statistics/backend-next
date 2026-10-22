@@ -70,7 +70,8 @@ func TestInitialize(t *testing.T) {
 	if n := len(res.Instructions); n > 600 || !strings.Contains(res.Instructions, "CC BY-NC 4.0") {
 		t.Errorf("instructions (%d bytes): %s", n, res.Instructions)
 	}
-	for _, tool := range []string{"get_dataset_info"} {
+	// they tell the workflow: every tool
+	for _, tool := range []string{"get_dataset_info", "search_items", "search_stages"} {
 		if !strings.Contains(res.Instructions, tool) {
 			t.Errorf("instructions lack %s: %s", tool, res.Instructions)
 		}
@@ -105,7 +106,7 @@ func TestToolsList(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	// meta#20: the order of tools/list is fixed (the SDK sorts it by name)
-	if !slices.Equal(names, []string{"get_dataset_info"}) {
+	if !slices.Equal(names, []string{"get_dataset_info", "search_items", "search_stages"}) {
 		t.Errorf("tools %q", names)
 	}
 	for _, tool := range res.Tools {

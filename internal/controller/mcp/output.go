@@ -109,6 +109,14 @@ func langOf(lang string) string {
 	return lang
 }
 
+// limitOf returns a limit argument, def if none was given (see serverOf), at most maximum.
+func limitOf(limit, def, maximum int) int {
+	if limit <= 0 {
+		return def
+	}
+	return min(limit, maximum)
+}
+
 // property adjusts a property of an input schema.
 type property func(*jsonschema.Schema)
 
@@ -170,7 +178,90 @@ func lengthProperty(minimum, maximum int) property {
 	}
 }
 
+// Servers and pages.
+
+// existsOn lists the servers e exists on, in the order of servers: CN first.
+func existsOn(e service.SEOExistence) []string {
+	on := make([]string, 0, len(servers))
+	for _, s := range servers {
+		if e.In(s) {
+			on = append(on, s)
+		}
+	}
+	return on
+}
+
+// link is the URL of a page in a result: null if there is no page (ok is false).
+func link(u string, ok bool) *string {
+	if !ok {
+		return nil
+	}
+	return &u
+}
+
+// stageRef is a stage in a result, on a server.
+type stageRef struct {
+	StageID  string   `json:"stageId"`
+	Code     string   `json:"code" jsonschema:"Code in the language asked for"`
+	ZoneID   string   `json:"zoneId"`
+	ZoneName string   `json:"zoneName" jsonschema:"Name of the zone in the language asked for"`
+	ZoneType string   `json:"zoneType" jsonschema:"MAINLINE (the main story), ACTIVITY (an event), ACTIVITY_PERMANENT (a side story or intermezzo, open for good), WEEKLY (supplies and chips), GACHABOX or RECRUIT"`
+	APCost   *int64   `json:"apCost" jsonschema:"Sanity cost of a run; null without one (gachas, the recruitment)"`
+	OpenNow  bool     `json:"openNow" jsonschema:"Whether the stage is open on the server now, by the open and close times of the stage and its zone; supply and chip stages (zoneType WEEKLY) count as open every day, as their weekday rotation is not tracked"`
+	ExistsOn []string `json:"existsOn" jsonschema:"Game servers the stage exists on"`
+	PageURL  *string  `json:"pageUrl" jsonschema:"Page of the drops of the stage on Penguin Statistics, on the server or else the first server it exists on; null if there is none"`
+}
+
+// stageRef is the stage on server at now, in lang. Its page is on server, or else on the first server it exists on. m
+// is the matrix of server, nil while it is not calculated (the page then follows the existence only).
+func (t *tools) stageRef(stage *service.SEOStage, server, lang string, m *service.SEOMatrix, now time.Time) stageRef {
+	ref := stageRef{
+		StageID:  stage.ArkID,
+		Code:     stage.DisplayCode(lang),
+		ZoneName: stage.Zone.DisplayName(lang),
+		OpenNow:  stageOpen(stage, server, now),
+		ExistsOn: existsOn(stage.Existence),
+	}
+	if stage.Zone != nil {
+		ref.ZoneID, ref.ZoneType = stage.Zone.ArkID, stage.Zone.Category
+	}
+	if sanity, ok := stage.SanityCost(); ok {
+		ref.APCost = &sanity
+	}
+	switch {
+	case service.StageOnServer(stage, server, m):
+		ref.PageURL = link(service.StagePageURL(t.site, lang, server, stage))
+	case len(ref.ExistsOn) > 0:
+		ref.PageURL = link(service.StagePageURL(t.site, lang, ref.ExistsOn[0], stage))
+	}
+	return ref
+}
+
 // Numbers and times.
+
+// now is the time of a call.
+func (t *tools) now() time.Time {
+	if t.clock != nil {
+		return t.clock()
+	}
+	return time.Now()
+}
+
+// stageOpen tells whether the stage is open on server at now: the stage and its zone, if it has one (see
+// service.SEOExistence.OpenAt).
+func stageOpen(stage *service.SEOStage, server string, now time.Time) bool {
+	return stage.Existence.OpenAt(server, now) && (stage.Zone == nil || stage.Zone.Existence.OpenAt(server, now))
+}
+
+// rotates tells whether the stage is a supply or chip stage (zone category WEEKLY): those open on some weekdays only, a
+// rotation the data does not have, so stageOpen counts them open every day
+func rotates(stage *service.SEOStage) bool {
+	return stage != nil && stage.Zone != nil && stage.Zone.Category == constant.ZoneCategoryWeekly
+}
+
+// rotationCaveat qualifies openNow wherever a supply or chip stage is shown open (see rotates)
+const rotationCaveat = "Supply and chip stages (zone type WEEKLY) open on some weekdays only, which is not tracked: they " +
+	"count as open every day, so check today's schedule in the game."
 
 // rounded returns x rounded to places decimals, or nil (null) if ok is false or x is not finite: encoding/json
 // refuses NaN and ±Inf, and one such number would turn the whole result into a protocol error.
@@ -242,4 +333,12 @@ func cell(s string) string {
 // number formats x in the text content, with no more digits than it has.
 func number(x float64) string {
 	return strconv.FormatFloat(x, 'f', -1, 64)
+}
+
+// yesNo is a boolean in the text content.
+func yesNo(b bool) string {
+	if b {
+		return "yes"
+	}
+	return "no"
 }
