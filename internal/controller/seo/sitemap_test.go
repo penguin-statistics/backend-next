@@ -460,6 +460,47 @@ func TestSitemapNotModifiedAfterAChangeInTheSameSecond(t *testing.T) {
 	}
 }
 
+// a request still holding a replaced catalog, answered after a request for the current one built its sitemap but
+// before it kept it: the current sitemap is modified since the one sent from the replaced catalog
+func TestSitemapModifiedSinceAReplacedCatalog(t *testing.T) {
+	e := newTestEnv(t)
+	h := NewHandler(site+"/", 5*time.Minute, e.shells, e.data)
+	e.app = fiber.New(fiber.Config{Immutable: true})
+	h.Mount(e.app)
+	replaced := testCatalog()
+	replaced.ChangedAt = lastModified.Add(time.Minute)
+	current := testCatalog()
+	current.ChangedAt = lastModified.Add(2 * time.Minute)
+	current.Stages["main_01-07"].Zone = current.Zones["act1_zone1"]
+	e.data.catalog = current
+	k := sitemapKey{lang: "en", server: "CN"}
+	matrix := e.data.matrices["CN"]
+
+	// the request for the current catalog builds its sitemap, which is given its time
+	built := h.sitemap(k, current, matrix)
+	h.sitemapLastModified(k.server, current, matrix)
+	// the request holding the replaced catalog then builds, keeps and sends its own
+	e.app.Get("/replaced", func(c *fiber.Ctx) error {
+		h.sendSitemap(c, kindSitemap, h.sitemap(k, replaced, matrix).xml, h.sitemapLastModified(k.server, replaced, matrix))
+		return nil
+	})
+	old := e.get(t, "/replaced")
+	lm := old.header.Get("Last-Modified")
+	if lm == "" {
+		t.Fatal("the sitemap of the replaced catalog has no Last-Modified")
+	}
+	// and the request for the current catalog keeps its sitemap last
+	h.sitemaps.Store(k, built)
+
+	r := e.getWith(t, "/sitemap-en-cn.xml", map[string]string{"If-Modified-Since": lm})
+	if r.status != 200 || r.body == old.body {
+		t.Fatalf("current sitemap since the one of the replaced catalog (%s): status %d, Last-Modified %q", lm, r.status, r.header.Get("Last-Modified"))
+	}
+	if r := e.getWith(t, "/sitemap-en-cn.xml", map[string]string{"If-Modified-Since": r.header.Get("Last-Modified")}); r.status != 304 {
+		t.Errorf("unchanged since: status %d", r.status)
+	}
+}
+
 func TestSitemapLastModifiedNotLaterThanDate(t *testing.T) {
 	e := newTestEnv(t)
 	warmAll(e)

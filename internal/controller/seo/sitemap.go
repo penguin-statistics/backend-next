@@ -100,9 +100,6 @@ type sitemapEntry struct {
 	catalog *service.SEOCatalog
 	matrix  *service.SEOMatrix
 	xml     []byte
-	// lastModified is when the sitemap last changed: the later of the times given the matrix and the catalog (see
-	// stamps); zero if the matrix has no last modified time
-	lastModified time.Time
 }
 
 // routable tells whether path, the canonical path of a page, is served as that page: an ID "" would be parsed as
@@ -125,14 +122,6 @@ func routable(path string, kind pageKind) bool {
 func (h *Handler) buildSitemap(k sitemapKey, catalog *service.SEOCatalog, matrix *service.SEOMatrix) *sitemapEntry {
 	b := &builder{site: h.site, t: textsByLang[k.lang], r: route{lang: k.lang, server: k.server}, catalog: catalog, matrix: matrix}
 	e := &sitemapEntry{catalog: catalog, matrix: matrix}
-	// given a time even without one, so that the time it is published with is given a later second: the index of the
-	// sitemaps lists its lastmod from then on
-	if e.lastModified = h.stamps.at(matrixSlot{server: k.server}, matrix, matrix.LastModified); !e.lastModified.IsZero() {
-		// the catalog changes the sitemap too, when a stage is added or moved to another zone
-		if at := h.stamps.at(catalogSlot{}, catalog, catalog.ChangedAt); at.After(e.lastModified) {
-			e.lastModified = at
-		}
-	}
 	lastmod := w3cTime(matrix.LastModified)
 	set := xmlURLSet{NS: sitemapNS}
 	add := func(kind pageKind, ids ...string) {
@@ -152,6 +141,24 @@ func (h *Handler) buildSitemap(k sitemapKey, catalog *service.SEOCatalog, matrix
 	}
 	e.xml = marshalXML(set)
 	return e
+}
+
+// sitemapLastModified returns when the sitemap of server built from catalog and matrix last changed: the later of the
+// times given the matrix and the catalog (see stamps); zero if the matrix has no last modified time. It is asked on
+// each request rather than kept with the sitemap built: a request still holding replaced data has them given a later
+// time, and the sitemap of the current data must then be given a later time again, not the one it was built with.
+func (h *Handler) sitemapLastModified(server string, catalog *service.SEOCatalog, matrix *service.SEOMatrix) time.Time {
+	// given a time even without one, so that the time it is published with is given a later second: the index of the
+	// sitemaps lists its lastmod from then on
+	t := h.stamps.at(matrixSlot{server: server}, matrix, matrix.LastModified)
+	if t.IsZero() {
+		return t
+	}
+	// the catalog changes the sitemap too, when a stage is added or moved to another zone
+	if at := h.stamps.at(catalogSlot{}, catalog, catalog.ChangedAt); at.After(t) {
+		t = at
+	}
+	return t
 }
 
 // sitemap returns the sitemap of k, built once per catalog and matrix
@@ -191,10 +198,10 @@ func (h *Handler) SitemapIndex(c *fiber.Ctx) error {
 		for _, server := range constant.Servers {
 			entry := xmlSitemapURL{Loc: h.site + sitemapPath(lang, server)}
 			if matrix := h.data.Matrix(server); matrix != nil {
-				e := h.sitemap(sitemapKey{lang: lang, server: server}, catalog, matrix)
-				entry.LastMod = w3cTime(e.lastModified)
-				if e.lastModified.After(lastModified) {
-					lastModified = e.lastModified
+				t := h.sitemapLastModified(server, catalog, matrix)
+				entry.LastMod = w3cTime(t)
+				if t.After(lastModified) {
+					lastModified = t
 				}
 			} else {
 				complete = false
@@ -230,8 +237,7 @@ func (h *Handler) Sitemap(c *fiber.Ctx) error {
 		h.sitemapCold(c, kindSitemap)
 		return nil
 	}
-	e := h.sitemap(k, catalog, matrix)
-	h.sendSitemap(c, kindSitemap, e.xml, e.lastModified)
+	h.sendSitemap(c, kindSitemap, h.sitemap(k, catalog, matrix).xml, h.sitemapLastModified(k.server, catalog, matrix))
 	return nil
 }
 
