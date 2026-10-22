@@ -65,6 +65,7 @@ jobs:
         run: |
           go vet ./...
           go vet -tags workerbench ./internal/workers/calcwkr/ ./internal/service/
+          go vet -tags compressbench ./internal/server/httpserver/
 
       # ./test holds end-to-end tests against a fully configured app and database, which CI does not have
       - name: Test
