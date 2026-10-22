@@ -125,8 +125,36 @@ func (r *DropInfo) GetItemDropSetByStageIdAndRangeId(ctx context.Context, server
 	return results, nil
 }
 
+// getBoundsForCurrentTimeRange returns the drop infos of query's stage and server in their current time range, with
+// only their ItemID, DropType and Bounds.
+func (r *DropInfo) getBoundsForCurrentTimeRange(ctx context.Context, query *DropInfoQuery) ([]*model.DropInfo, error) {
+	var dropInfo []*model.DropInfo
+	err := pgqry.New(
+		r.db.NewSelect().
+			Model(&dropInfo).
+			Column("item_id", "drop_type", "bounds").
+			Where("di.server = ?", query.Server).
+			Where("st.ark_stage_id = ?", query.ArkStageId),
+	).
+		UseStageById("di.stage_id").
+		UseTimeRange("di.range_id").
+		DoFilterCurrentTimeRange().
+		Q.Scan(ctx)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, pgerr.ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	return dropInfo, nil
+}
+
+// GetForCurrentTimeRangeWithDropTypes returns the drop infos of query's stage and server in their current time range,
+// but those of RECOGNITION_ONLY, split into those of an item and those of a drop type. Only their ItemID, DropType and
+// Bounds are filled.
 func (r *DropInfo) GetForCurrentTimeRangeWithDropTypes(ctx context.Context, query *DropInfoQuery) (itemDropInfos, typeDropInfos []*model.DropInfo, err error) {
-	allDropInfos, err := r.GetForCurrentTimeRange(ctx, query)
+	allDropInfos, err := r.getBoundsForCurrentTimeRange(ctx, query)
 	if err != nil {
 		return nil, nil, err
 	}
