@@ -2,6 +2,7 @@ package seo
 
 import (
 	"encoding/json"
+	"fmt"
 	"html"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
+	"exusiai.dev/backend-next/internal/model"
+	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/pkg/spashell"
 	"exusiai.dev/backend-next/internal/service"
 )
@@ -208,6 +211,7 @@ func TestMarkdownShowsTheDataOfThePage(t *testing.T) {
 		"/item/30011", "/item/30012", "/item/30013", "/item/evil", "/item/quiet", "/item/tag_1", "/item/nope",
 		"/stage/main_1/main_01-07", "/stage/act1_zone1/act1_01", "/stage/act1_zone1/act1_02", "/stage/recruit/recruit",
 		"/stage/main_1/nope",
+		"/item", "/stage",
 	}
 	tables := 0
 	for _, lang := range service.StatsLangs {
@@ -257,6 +261,22 @@ func TestMarkdownShowsTheDataOfThePage(t *testing.T) {
 	}
 	if tables < 10 {
 		t.Errorf("%d tables compared", tables)
+	}
+
+	// the lists list what the list pages link, in the same order
+	pageLinkRe := regexp.MustCompile(`<li><a href="[^"]*/(?:item|stage/[^/"]+)/([^/"]+)">`)
+	viewIDRe := regexp.MustCompile("(?m)^- .* `([^`]+)`$")
+	for _, path := range []string{"/en/result/cn/item", "/ja/result/us/item", "/zh/result/cn/stage", "/ko/result/us/stage"} {
+		var want, got []string
+		for _, m := range pageLinkRe.FindAllStringSubmatch(ssrRe.FindString(e.get(t, path).body), -1) {
+			want = append(want, m[1])
+		}
+		for _, m := range viewIDRe.FindAllStringSubmatch(e.get(t, path+".md").body, -1) {
+			got = append(got, m[1])
+		}
+		if len(want) == 0 || strings.Join(got, ",") != strings.Join(want, ",") {
+			t.Errorf("%s: view lists %v, page links %v", path, got, want)
+		}
 	}
 }
 
@@ -316,6 +336,7 @@ func TestMarkdownControlCharacters(t *testing.T) {
 	for _, lang := range service.StatsLangs {
 		catalog.Items["30012"].Name[lang] = name
 		catalog.Stages["main_01-07"].Code[lang] = "\n    - 1-7"
+		catalog.Stages["act1_02"].Code[lang] = "1. x"
 	}
 	e.data.catalog = catalog
 	for _, path := range []string{
@@ -324,6 +345,9 @@ func TestMarkdownControlCharacters(t *testing.T) {
 		"/en/result/cn/stage/main_1/main_01-07.md",
 		"/zh/result/cn/stage/main_1/main_01-07.md",
 		"/en/result/cn/item/30011.md",
+		"/en/result/cn/item.md",
+		"/en/result/cn/stage.md",
+		"/zh/result/cn/stage.md",
 	} {
 		r := e.get(t, path)
 		if r.status != 200 {
@@ -344,6 +368,8 @@ func TestMarkdownControlCharacters(t *testing.T) {
 			}
 		}
 	}
+	// the stages of the stage list, which it does not link
+	assertOnce(t, e.get(t, "/en/result/cn/stage.md").body, "\n- \\- 1-7 `main_01-07`\n", "\n- 1\\. x `act1_02`\n")
 }
 
 func TestMarkdownEscaping(t *testing.T) {
@@ -418,8 +444,7 @@ func TestMarkdownNotFound(t *testing.T) {
 		"/en/result/cn/foo.md",
 		"/en/result/cn/item/30012/more.md",
 		"/en/result/xx/item/30012.md",
-		"/en/result/cn/item.md",
-		"/en/result/cn/stage.md",
+		"/en/result/xx/item.md",
 		"/en/result/cn/stage/main_1.md",
 		// an ID .md
 		"/en/result/cn/item/.md",
@@ -437,7 +462,7 @@ func TestMarkdownNotFound(t *testing.T) {
 	}
 	r := e.get(t, "/ja/result/cn/stage/main_1/nope.md")
 	if r.body != "# ページが見つかりません\n\nページが見つかりません：アイテムまたはステージが存在しないか、このサーバーにはありません。\n\n"+
-		"[作戦別（大陸版）](https://penguin-stats.io/ja/result/cn/stage)\n" {
+		"[作戦別（大陸版）](https://penguin-stats.io/ja/result/cn/stage.md)\n" {
 		t.Errorf("body %q", r.body)
 	}
 }
@@ -504,7 +529,8 @@ func TestMarkdownNotModified(t *testing.T) {
 	e := newTestEnv(t)
 	since := func(v string) map[string]string { return map[string]string{"If-Modified-Since": v} }
 	const matrixTime = "Wed, 21 Oct 2026 10:30:00 GMT"
-	for _, path := range []string{"/en/result/cn/item/30012.md", "/zh/result/cn/stage/main_1/main_01-07.md", "/en/result/cn/item/quiet.md"} {
+	for _, path := range []string{"/en/result/cn/item/30012.md", "/zh/result/cn/stage/main_1/main_01-07.md", "/en/result/cn/item/quiet.md",
+		"/en/result/cn/stage.md", "/en/result/cn/stage.md"} {
 		r := e.getWith(t, path, since(matrixTime))
 		if r.status != 304 || r.body != "" || r.header.Get("Last-Modified") != matrixTime || r.header.Get("Cache-Control") != "public, max-age=60, s-maxage=300" {
 			t.Errorf("%s: status %d, %d bytes, Last-Modified %q", path, r.status, len(r.body), r.header.Get("Last-Modified"))
@@ -536,6 +562,117 @@ func TestMarkdownNotModified(t *testing.T) {
 	e.data.catalog = catalog
 	if r := e.getWith(t, "/en/result/cn/item/30012.md", since("Wed, 21 Oct 2026 11:00:00 GMT")); r.status != 200 || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 12:30:00 GMT" {
 		t.Errorf("view with a new catalog: status %d, Last-Modified %q", r.status, r.header.Get("Last-Modified"))
+	}
+}
+
+func TestMarkdownListViews(t *testing.T) {
+	e := newTestEnv(t)
+	r := e.get(t, "/zh/result/cn/item.md")
+	if r.status != 200 || r.header.Get("Content-Type") != "text/markdown; charset=utf-8" ||
+		r.header.Get("Cache-Control") != "public, max-age=60, s-maxage=300" || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 10:30:00 GMT" ||
+		r.header.Get("Link") != `<https://penguin-stats.io/zh/result/cn/item>; rel="canonical"` || r.header.Get("X-Robots-Tag") != "" {
+		t.Fatalf("item list: status %d, headers %v", r.status, r.header)
+	}
+	fm, rest := frontMatter(t, r.body)
+	for k, want := range map[string]string{
+		"title":             "素材掉率 · 按素材（国服）",
+		"items":             "3",
+		"item_url_template": "https://penguin-stats.io/zh/result/cn/item/{item_id}.md",
+		"canonical":         "https://penguin-stats.io/zh/result/cn/item",
+		"api":               "https://penguin-stats.io/PenguinStats/api/v2/result/matrix?server=CN&show_closed_zones=true",
+		"as_of":             "2026-10-21T10:30:00Z",
+	} {
+		if fm[k] != want {
+			t.Errorf("item list front matter %s: %q, want %q", k, fm[k], want)
+		}
+	}
+	// linked, by category
+	assertOnce(t, rest, "## 材料\n\n- [源岩](https://penguin-stats.io/zh/result/cn/item/30011.md) `30011`\n- [固源岩](https://penguin-stats.io/zh/result/cn/item/30012.md) `30012`\n\n## 活动道具")
+	golden(t, "testdata/item_list_zh_cn.golden.md", r.body)
+
+	r = e.get(t, "/en/result/cn/stage.md")
+	fm, rest = frontMatter(t, r.body)
+	if fm["stages"] != "3" || fm["stage_url_template"] != "https://penguin-stats.io/en/result/cn/stage/{zone_id}/{stage_id}.md" {
+		t.Errorf("stage list front matter %v", fm)
+	}
+	// by zone, with the IDs the template takes; the recruitment statistics are no stage of the list
+	assertOnce(t, rest, "### Evil Time Part 1 `main_1`\n\n- 1-7 `main_01-07`")
+	if strings.Contains(rest, "recruit") {
+		t.Error("the stage list lists the recruitment statistics")
+	}
+	golden(t, "testdata/stage_list_en_cn.golden.md", r.body)
+
+	// a list without the matrix lists what exists on the server, cached for a minute, without as_of
+	e.data.matrices = nil
+	r = e.get(t, "/en/result/cn/item.md")
+	if fm, rest := frontMatter(t, r.body); r.status != 200 || r.header.Get("Cache-Control") != "public, max-age=60" || r.header.Get("Last-Modified") != "" ||
+		fm["as_of"] != "" || fm["api"] != "" || !strings.Contains(rest, "/en/result/cn/item/quiet.md") || !strings.Contains(rest, "being calculated") {
+		t.Errorf("item list without the matrix: status %d, Cache-Control %q\n%s", r.status, r.header.Get("Cache-Control"), r.body)
+	}
+}
+
+func TestMarkdownListsAreRenderedOncePerData(t *testing.T) {
+	e := newTestEnv(t)
+	page, view := e.get(t, "/en/result/cn/item"), e.get(t, "/en/result/cn/item.md")
+	// cached apart
+	if again := e.get(t, "/en/result/cn/item"); again.body != page.body || !strings.HasPrefix(again.header.Get("Content-Type"), "text/html") {
+		t.Error("the list page changed after its view")
+	}
+	if again := e.get(t, "/en/result/cn/item.md"); again.body != view.body || again.header.Get("Content-Type") != "text/markdown; charset=utf-8" {
+		t.Error("the list view changed without the data changing")
+	}
+	// a frontend release changes the page, not the view
+	s, err := spashell.Parse([]byte(strings.Replace(string(e.shells.shell.Raw()), "app.2f494de9.js", "app.00000000.js", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.shells.shell = s
+	if r := e.get(t, "/en/result/cn/item.md"); r.body != view.body {
+		t.Error("the list view changed with the shell")
+	}
+	// the worker refreshed the matrix: evil dropped no more
+	e.data.matrices = map[string]*service.SEOMatrix{"CN": service.NewSEOMatrix("CN", []*modelv2.OneDropMatrixElement{
+		{StageID: "main_01-07", ItemID: "30012", Times: 10, Quantity: 12, StartTime: 1556676000000},
+	}, lastModified.Add(30*time.Minute))}
+	if r := e.get(t, "/en/result/cn/item.md"); strings.Contains(r.body, "/item/evil") || r.header.Get("Last-Modified") != "Wed, 21 Oct 2026 11:00:00 GMT" {
+		t.Errorf("list view not rendered again for the new matrix (Last-Modified %q)", r.header.Get("Last-Modified"))
+	}
+}
+
+// The lists stay well under about 100,000 characters (meta#18) with a quarter more stages than CN has (1,586 in
+// October 2026, in 167 zones: about 45,000 characters), all named and identified as long as the longest of today
+func TestMarkdownListSize(t *testing.T) {
+	e := newTestEnv(t)
+	var items []*model.Item
+	var stages []*model.Stage
+	var zones []*model.Zone
+	var rows []*modelv2.OneDropMatrixElement
+	for z := 0; z < 200; z++ {
+		zoneID := fmt.Sprintf("permanent_sidestory_%02d_zone1", z)
+		name := fmt.Sprintf("The Knight & The Hunters - Side Story %d", z)
+		zones = append(zones, &model.Zone{ArkZoneID: zoneID, ZoneID: z + 1, Index: z, Category: "ACTIVITY_PERMANENT", Name: i18n(name, name, name, name), Existence: existence(all...)})
+		for s := 0; s < 10; s++ {
+			id := fmt.Sprintf("act%02dside_%02d_perm", z, s)
+			code := fmt.Sprintf("DV-EX-%d", s)
+			stages = append(stages, &model.Stage{ArkStageID: id, StageID: z*10 + s + 1, ZoneID: z + 1, Code: i18n(code, code, code, code), Existence: existence(all...)})
+			rows = append(rows, &modelv2.OneDropMatrixElement{StageID: id, ItemID: fmt.Sprintf("item_%03d", (z*10+s)%300), Times: 10, Quantity: 1, StartTime: 1556676000000})
+		}
+	}
+	for i := 0; i < 300; i++ {
+		id := fmt.Sprintf("item_%03d", i)
+		name := fmt.Sprintf("Rhodes Island Supplies Crate %d", i)
+		items = append(items, &model.Item{ArkItemID: id, Type: "ACTIVITY_ITEM", SortID: i, Name: i18n(name, name, name, name), Existence: existence(all...)})
+	}
+	e.data.catalog = service.NewSEOCatalog(items, stages, zones)
+	e.data.matrices = map[string]*service.SEOMatrix{"CN": service.NewSEOMatrix("CN", rows, lastModified)}
+	for _, path := range []string{"/en/result/cn/stage.md", "/en/result/cn/item.md", "/zh/result/cn/stage.md"} {
+		r := e.get(t, path)
+		fm, _ := frontMatter(t, r.body)
+		if n := len([]rune(r.body)); r.status != 200 || n > 80000 || fm["stages"] != "" && fm["stages"] != "2000" {
+			t.Errorf("%s: status %d, %d characters, %s stages", path, r.status, n, fm["stages"])
+		} else {
+			t.Logf("%s: %d characters", path, n)
+		}
 	}
 }
 

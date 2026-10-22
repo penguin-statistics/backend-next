@@ -33,5 +33,5 @@ Updated 2026-10-21 18:30 (UTC+8). [Full data (JSON)](https://penguin-stats.io/Pe
 
 ## Related Items
 
-- [Orirock](https://penguin-stats.io/en/result/cn/item/30011.md)
-- [Orirock Cluster](https://penguin-stats.io/en/result/cn/item/30013.md)
+- [Orirock](https://penguin-stats.io/en/result/cn/item/30011.md) `30011`
+- [Orirock Cluster](https://penguin-stats.io/en/result/cn/item/30013.md) `30013`

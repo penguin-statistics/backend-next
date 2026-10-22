@@ -96,6 +96,8 @@ type Alternate struct {
 type Link struct {
 	Name string
 	Href string
+	// ID is the ID of the item or stage of the page linked, which the Markdown view shows; "" for other links
+	ID string
 }
 
 type ServerLink struct {
@@ -162,7 +164,9 @@ type Notes struct {
 }
 
 type Group struct {
-	Heading   string
+	Heading string
+	// ID is the ID of the zone of a group of stages, which the Markdown view shows
+	ID        string
 	Links     []Link
 	Subgroups []Group
 }
@@ -548,7 +552,7 @@ func (b *builder) related(item *service.SEOItem) *Group {
 	g := &Group{Heading: b.t.Related}
 	for _, other := range b.catalog.ItemList {
 		if other != item && other.Group == item.Group && b.itemOnServer(other) {
-			g.Links = append(g.Links, Link{Name: other.DisplayName(b.t.Lang), Href: b.abs(b.path(b.t.Lang, kindItem, other.ArkID))})
+			g.Links = append(g.Links, Link{Name: other.DisplayName(b.t.Lang), Href: b.abs(b.path(b.t.Lang, kindItem, other.ArkID)), ID: other.ArkID})
 		}
 	}
 	if len(g.Links) == 0 {
@@ -700,7 +704,7 @@ func (b *builder) itemListPage() *Page {
 			break
 		}
 		g := byType[item.Type]
-		g.Links = append(g.Links, Link{Name: item.DisplayName(b.t.Lang), Href: b.abs(b.path(b.t.Lang, kindItem, item.ArkID))})
+		g.Links = append(g.Links, Link{Name: item.DisplayName(b.t.Lang), Href: b.abs(b.path(b.t.Lang, kindItem, item.ArkID)), ID: item.ArkID})
 	}
 	for _, t := range service.ListedItemTypes {
 		if len(byType[t].Links) > 0 {
@@ -760,9 +764,9 @@ func (b *builder) stageListPage() *Page {
 			p.Body.Groups = append(p.Body.Groups, Group{Heading: heading})
 			cur = &p.Body.Groups[len(p.Body.Groups)-1]
 		}
-		sub := Group{Heading: zone.DisplayName(b.t.Lang)}
+		sub := Group{Heading: zone.DisplayName(b.t.Lang), ID: zone.ArkID}
 		for _, stage := range byZone[zone] {
-			sub.Links = append(sub.Links, Link{Name: stage.DisplayCode(b.t.Lang), Href: b.abs(b.path(b.t.Lang, kindStage, zone.ArkID, stage.ArkID))})
+			sub.Links = append(sub.Links, Link{Name: stage.DisplayCode(b.t.Lang), Href: b.abs(b.path(b.t.Lang, kindStage, zone.ArkID, stage.ArkID)), ID: stage.ArkID})
 		}
 		cur.Subgroups = append(cur.Subgroups, sub)
 	}
