@@ -87,6 +87,7 @@ func observe(r *registry) sdkmcp.Middleware {
 				if a := bytes.TrimSpace(call.Params.Arguments); len(a) == 0 || string(a) == "null" {
 					call.Params.Arguments = json.RawMessage("{}")
 				}
+				call.Params.Arguments = r.quoteNumbers(call.Params.Name, call.Params.Arguments)
 			}
 			return next(ctx, method, req)
 		}
