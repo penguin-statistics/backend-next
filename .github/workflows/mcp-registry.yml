@@ -1,0 +1,130 @@
+name: MCP Registry
+
+# Publishes server.json, the listing of the MCP server (internal/controller/mcp/listing.go), to the official MCP
+# Registry. The registry keeps every version for good and refuses one it already has, so the listing is published when
+# it changes, under a new version, rather than with every release of the backend.
+on:
+  pull_request:
+    paths:
+      - server.json
+      - .github/workflows/mcp-registry.yml
+  push:
+    branches:
+      - main
+    paths:
+      # a change of the listing, whose version must be new
+      - server.json
+  # publishes the version of server.json if the registry does not have it: the first time, once
+  # vars.MCP_REGISTRY_PUBLISH is 'true', or after the registry lost its data
+  workflow_dispatch:
+    inputs:
+      login_only:
+        description: Only log in, which checks that the registry accepts the proof on penguin-stats.io (publishes nothing)
+        type: boolean
+        default: false
+
+concurrency:
+  group: mcp-registry-${{ github.ref }}
+  # a publish is never stopped halfway
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: https://registry.modelcontextprotocol.io
+  # pinned: the sha256 of mcp-publisher_linux_amd64.tar.gz is in registry_<version>_checksums.txt of the release
+  MCP_PUBLISHER_VERSION: v1.8.1
+  MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+
+jobs:
+  # the registry would take server.json as it is, under a version it does not have yet
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL --retry 3 -o mcp-publisher.tar.gz "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+          echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
+
+      # the checks of the registry itself (schema, lengths, URLs), which need no login
+      - name: Validate
+        run: ./mcp-publisher validate server.json
+
+      # a pull request changing only this workflow leaves the published listing as it is
+      - name: A changed listing has a new version
+        run: |
+          git fetch -q --depth=1 origin "$GITHUB_BASE_REF"
+          if git diff --quiet FETCH_HEAD -- server.json; then echo "server.json is unchanged"; exit 0; fi
+          name=$(jq -r .name server.json); version=$(jq -r .version server.json)
+          url="$REGISTRY/v0.1/servers/$(jq -rn --arg s "$name" '$s|@uri')/versions/$(jq -rn --arg s "$version" '$s|@uri')"
+          code=$(curl -sS -o /dev/null -w '%{http_code}' "$url")
+          case "$code" in
+            404) echo "$name@$version is not published yet" ;;
+            200) echo "::error::$name@$version is already published: bump version in server.json (and listingVersion)"; exit 1 ;;
+            *)   echo "::error::registry answered $code for $url"; exit 1 ;;
+          esac
+
+  # main only, and only once vars.MCP_REGISTRY_PUBLISH is 'true'; login_only needs no variable, so the proof can be
+  # checked before anything is published. A pull request cannot check it: the environment lets main in only.
+  publish:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && (vars.MCP_REGISTRY_PUBLISH == 'true' || inputs.login_only)
+    runs-on: ubuntu-latest
+    # holds MCP_REGISTRY_PRIVATE_KEY (the Ed25519 seed in hex, whose public key is the proof served at
+    # https://penguin-stats.io/.well-known/mcp-registry-auth), for main only: every workflow could read a repository
+    # secret
+    environment: mcp-registry
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install mcp-publisher
+        run: |
+          curl -fsSL --retry 3 -o mcp-publisher.tar.gz "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+          echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
+
+      - name: Skip a version the registry already has
+        id: check
+        run: |
+          name=$(jq -r .name server.json); version=$(jq -r .version server.json)
+          url="$REGISTRY/v0.1/servers/$(jq -rn --arg s "$name" '$s|@uri')/versions/$(jq -rn --arg s "$version" '$s|@uri')"
+          code=$(curl -sS -o /dev/null -w '%{http_code}' "$url")
+          case "$code" in
+            200) echo "publish=false" >> "$GITHUB_OUTPUT"; echo "::notice::$name@$version is already published" ;;
+            404) echo "publish=true" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "::error::registry answered $code for $url"; exit 1 ;;
+          esac
+
+      # the registry does not check that the remote answers, and a listing is permanent
+      - name: The remote answers MCP
+        if: steps.check.outputs.publish == 'true' && !inputs.login_only
+        run: |
+          curl -fsS --max-time 20 -X POST "$(jq -r '.remotes[0].url' server.json)" \
+            -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"mcp-registry-preflight","version":"1"}}}' \
+            | jq -e '.result.serverInfo.name'
+
+      # the registry fetches the proof from penguin-stats.io and checks the signature of the key; its token lasts 5
+      # minutes, enough for the publish that follows
+      - name: Log in (HTTP proof on penguin-stats.io)
+        if: steps.check.outputs.publish == 'true' || inputs.login_only
+        env:
+          PRIVATE_KEY: ${{ secrets.MCP_REGISTRY_PRIVATE_KEY }}
+        run: ./mcp-publisher login http --domain penguin-stats.io --private-key "$PRIVATE_KEY"
+        # with the same key in a TXT record of penguin-stats.io: ./mcp-publisher login dns --domain penguin-stats.io --private-key "$PRIVATE_KEY"
+
+      - name: Publish
+        if: steps.check.outputs.publish == 'true' && !inputs.login_only
+        run: ./mcp-publisher publish server.json
+
+      - name: Verify
+        if: steps.check.outputs.publish == 'true' && !inputs.login_only
+        run: |
+          name=$(jq -r .name server.json); version=$(jq -r .version server.json)
+          curl -fsS "$REGISTRY/v0.1/servers/$(jq -rn --arg s "$name" '$s|@uri')/versions/latest" | jq -e --arg v "$version" '.server.version == $v'
