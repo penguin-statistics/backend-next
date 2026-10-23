@@ -5,8 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/netip"
+	"net/url"
+	"regexp"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -47,19 +50,48 @@ const (
 	defaultRateLimitWindow = time.Minute
 )
 
-// Register serves the MCP server at /mcp if it is enabled. Disabled, /mcp is not routed: 404.
-func Register(app *fiber.App, conf *appconfig.Config, data *service.SEOData) {
+// Register serves the MCP server at /mcp if it is enabled, and its server card if it has a public URL
+// (MCPPublicURL). Disabled, /mcp is not routed: 404, and neither is the card. A public URL that is not one fails the
+// startup, enabled or not, rather than be found out when the server is turned on.
+func Register(app *fiber.App, conf *appconfig.Config, data *service.SEOData) error {
+	public, err := parsePublicURL(conf.MCPPublicURL)
+	if err != nil {
+		return err
+	}
 	if !conf.MCPEnabled {
-		return
+		return nil
 	}
 	limit, window := rateLimitOf(conf.MCPRateLimitMax, conf.MCPRateLimitWindow)
 	Mount(app, NewServer(data, conf.SEOSiteURL, bininfo.Version), limit, window)
+	if public != nil {
+		if err := mountServerCard(app, newServerCard(public, conf.SEOSiteURL)); err != nil {
+			return err
+		}
+	}
 	log.Info().
 		Str("evt.name", "mcp.enabled").
 		Int("rateLimitMax", limit).
 		Dur("rateLimitWindow", window).
 		Str("siteURL", conf.SEOSiteURL).
+		Str("publicURL", conf.MCPPublicURL).
 		Msg("serving the MCP server at " + middlewares.MCPPath)
+	return nil
+}
+
+// publicURLPattern is the form of a public URL: https, a host name in lower case, maybe a port, and the path /mcp with
+// nothing after it. The card gives it to clients as it is, so it must be the one URL of the endpoint.
+var publicURLPattern = regexp.MustCompile(`^https://[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?/mcp$`)
+
+// parsePublicURL parses the public URL of the server (MCPPublicURL), nil for none.
+func parsePublicURL(s string) (*url.URL, error) {
+	if s == "" {
+		return nil, nil
+	}
+	if !publicURLPattern.MatchString(s) {
+		return nil, fmt.Errorf("PENGUIN_V3_MCP_PUBLIC_URL %q is not the URL of the MCP endpoint: it must be https://<host>/mcp "+
+			"(e.g. https://mcp.penguin-stats.io/mcp), with the host in lower case and nothing after /mcp", s)
+	}
+	return url.Parse(s)
 }
 
 // Mount routes /mcp (middlewares.MCPPath) to srv behind a rate limit per client (rateLimitMax requests per

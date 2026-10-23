@@ -186,6 +186,9 @@ func TestCORSMCPPathIsPublic(t *testing.T) {
 	app.All(MCPPath, func(c *fiber.Ctx) error {
 		return c.SendString("ok")
 	})
+	app.Get(MCPServerCardPath, func(c *fiber.Ctx) error {
+		return c.SendString("ok")
+	})
 	app.Get("/mcpx", func(c *fiber.Ctx) error {
 		return c.SendString("ok")
 	})
@@ -206,10 +209,18 @@ func TestCORSMCPPathIsPublic(t *testing.T) {
 			wantACAO: "*", wantAllowHeaders: mcpHeaders},
 		{name: "preflight without request headers", method: fiber.MethodOptions, path: "/mcp", origin: "https://inspector.example",
 			wantACAO: "*", wantAllowHeaders: "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace,traceparent,tracestate,Mcp-Protocol-Version,Mcp-Method,Mcp-Name"},
+		// the server card too, whose preflights allow If-None-Match, to revalidate it
+		{name: "server card", method: fiber.MethodGet, path: "/mcp/server-card", origin: "https://penguin-stats.io", wantACAO: "*"},
+		{name: "server card preflight", method: fiber.MethodOptions, path: "/mcp/server-card", origin: "https://penguin-stats.io",
+			requestHeaders: "if-none-match", wantACAO: "*", wantAllowHeaders: "if-none-match"},
+		{name: "server card preflight without request headers", method: fiber.MethodOptions, path: "/mcp/server-card/", origin: "https://evil.example",
+			wantACAO: "*", wantAllowHeaders: "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace,traceparent,tracestate,If-None-Match"},
 		// other paths keep the tiers and the fixed list
 		{name: "other path", method: fiber.MethodGet, path: "/mcpx", origin: "https://penguin-stats.io", wantACAO: "https://penguin-stats.io", wantCredentials: true},
 		{name: "other path preflight", method: fiber.MethodOptions, path: "/mcpx", origin: "https://evil.example", requestHeaders: mcpHeaders,
 			wantACAO: "*", wantAllowHeaders: "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace,traceparent,tracestate"},
+		{name: "other path under /mcp", method: fiber.MethodGet, path: "/mcp/other", origin: "https://penguin-stats.io", wantACAO: "https://penguin-stats.io",
+			wantCredentials: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			req := httptest.NewRequest(tc.method, tc.path, nil)

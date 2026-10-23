@@ -159,11 +159,7 @@ func newServer(t *tools, version string) (*sdkmcp.Server, *registry) {
 		Description: serverDescription,
 		Version:     version,
 		WebsiteURL:  t.site,
-		// the icons of the site (frontend-v2 serves them), for clients and directories to show
-		Icons: []sdkmcp.Icon{
-			{Source: t.site + "/favicon/android-chrome-512x512.png", MIMEType: "image/png", Sizes: []string{"512x512"}},
-			{Source: t.site + "/favicon/android-chrome-192x192.png", MIMEType: "image/png", Sizes: []string{"192x192"}},
-		},
+		Icons:       icons(t.site),
 	}, &sdkmcp.ServerOptions{
 		Instructions: instructions,
 		// tools only, and their list never changes while the server runs: a subscriptions/listen of the 2026-07-28
@@ -181,4 +177,13 @@ func newServer(t *tools, version string) (*sdkmcp.Server, *registry) {
 	// added last, so outermost: it also covers the middlewares of the SDK
 	s.AddReceivingMiddleware(observe(r))
 	return s, r
+}
+
+// icons are the icons of the site of origin site (frontend-v2 serves them), for clients and directories to show: in
+// serverInfo and in the server card.
+func icons(site string) []sdkmcp.Icon {
+	return []sdkmcp.Icon{
+		{Source: site + "/favicon/android-chrome-512x512.png", MIMEType: "image/png", Sizes: []string{"512x512"}},
+		{Source: site + "/favicon/android-chrome-192x192.png", MIMEType: "image/png", Sizes: []string{"192x192"}},
+	}
 }

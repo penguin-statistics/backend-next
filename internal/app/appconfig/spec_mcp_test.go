@@ -24,15 +24,21 @@ func TestMCPSettings(t *testing.T) {
 	if defaults.MCPRateLimitMax != 120 || defaults.MCPRateLimitWindow != time.Minute {
 		t.Errorf("defaults: max %d, window %s", defaults.MCPRateLimitMax, defaults.MCPRateLimitWindow)
 	}
+	// nothing is advertised until the manifests give the public URL
+	if defaults.MCPPublicURL != "" {
+		t.Errorf("default public URL %q", defaults.MCPPublicURL)
+	}
 
 	t.Setenv("PENGUIN_V3_MCP_ENABLED", "true")
 	t.Setenv("PENGUIN_V3_MCP_RATE_LIMIT_MAX", "30")
 	t.Setenv("PENGUIN_V3_MCP_RATE_LIMIT_WINDOW", "10s")
+	t.Setenv("PENGUIN_V3_MCP_PUBLIC_URL", "https://mcp.penguin-stats.io/mcp")
 	var set ConfigSpec
 	if err := envconfig.Process("penguin_v3", &set); err != nil {
 		t.Fatal(err)
 	}
-	if !set.MCPEnabled || set.MCPRateLimitMax != 30 || set.MCPRateLimitWindow != 10*time.Second {
-		t.Errorf("set: enabled %v, max %d, window %s", set.MCPEnabled, set.MCPRateLimitMax, set.MCPRateLimitWindow)
+	if !set.MCPEnabled || set.MCPRateLimitMax != 30 || set.MCPRateLimitWindow != 10*time.Second ||
+		set.MCPPublicURL != "https://mcp.penguin-stats.io/mcp" {
+		t.Errorf("set: enabled %v, max %d, window %s, public URL %q", set.MCPEnabled, set.MCPRateLimitMax, set.MCPRateLimitWindow, set.MCPPublicURL)
 	}
 }
