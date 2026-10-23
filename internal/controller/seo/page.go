@@ -84,6 +84,8 @@ type Head struct {
 	OGLocale    string
 	OGLocales   []string
 	ImageAlt    string
+	// Markdown is the URL of the Markdown view of the page (see markdown.go); "" for a page without one
+	Markdown string
 	// JSONLD is marshaled into a JSON-LD script; nil for none
 	JSONLD any
 }
@@ -270,6 +272,7 @@ func (b *builder) base(kind pageKind, title, imageAlt, description string, ids .
 		Description: description,
 		Robots:      "index,follow",
 		Canonical:   b.abs(b.path(b.t.Lang, kind, ids...)),
+		Markdown:    b.abs(b.path(b.t.Lang, kind, ids...)) + mdSuffix,
 		SiteName:    b.t.SiteName,
 		OGLocale:    b.t.OGLocale,
 		ImageAlt:    imageAlt,

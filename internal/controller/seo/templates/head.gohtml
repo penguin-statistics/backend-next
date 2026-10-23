@@ -11,6 +11,9 @@
 <link rel="alternate" hreflang="{{.Hreflang}}" href="{{.Href}}">
 {{- end}}
 {{- end}}
+{{- if .Markdown}}
+<link rel="alternate" type="text/markdown" href="{{.Markdown}}">
+{{- end}}
 <meta property="og:site_name" content="{{.SiteName}}">
 <meta property="og:type" content="website">
 {{- if .Canonical}}

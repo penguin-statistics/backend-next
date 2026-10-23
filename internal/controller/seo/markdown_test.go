@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -673,6 +674,80 @@ func TestMarkdownListSize(t *testing.T) {
 		} else {
 			t.Logf("%s: %d characters", path, n)
 		}
+	}
+}
+
+var mdAlternateRe = regexp.MustCompile(`<link rel="alternate" type="text/markdown" href="([^"]*)">`)
+
+// The pages link their views and the guide to the site, in a Link header and in the head
+func TestPagesLinkTheirViews(t *testing.T) {
+	e := newTestEnv(t)
+	links := func(view string) string {
+		return `<` + site + view + `>; rel="alternate"; type="text/markdown", <https://penguin-stats.io/llms.txt>; rel="describedby"`
+	}
+	for _, path := range []string{
+		"/en/result/cn/item/30012", "/zh/result/us/stage/main_1/main_01-07", "/ja/result/cn/item", "/ko/result/kr/stage",
+		// not indexed, but with a view all the same
+		"/en/result/cn/item/quiet", "/en/result/cn/stage/recruit/recruit",
+	} {
+		r := e.get(t, path)
+		if r.status != 200 || r.header.Get("Link") != links(path+".md") {
+			t.Errorf("%s: status %d, Link %q", path, r.status, r.header.Get("Link"))
+		}
+		if m := mdAlternateRe.FindAllStringSubmatch(r.body, -1); len(m) != 1 || m[0][1] != site+path+".md" {
+			t.Errorf("%s: Markdown alternates %v", path, m)
+		}
+		// the view is there
+		if v := e.get(t, path+".md"); v.status != 200 || v.header.Get("Content-Type") != "text/markdown; charset=utf-8" {
+			t.Errorf("%s.md: status %d", path, v.status)
+		}
+	}
+	// a 304 has the headers of the 200
+	if r := e.getWith(t, "/en/result/cn/item/30012", map[string]string{"If-Modified-Since": "Wed, 21 Oct 2026 10:30:00 GMT"}); r.status != 304 || r.header.Get("Link") != links("/en/result/cn/item/30012.md") {
+		t.Errorf("304: status %d, Link %q", r.status, r.header.Get("Link"))
+	}
+	// no view, no link: a 404, the app as is
+	for _, path := range []string{"/en/result/cn/item/nope", "/en/result/cn", "/en/result"} {
+		if r := e.get(t, path); r.header.Get("Link") != "" || mdAlternateRe.MatchString(r.body) {
+			t.Errorf("%s: status %d, Link %q", path, r.status, r.header.Get("Link"))
+		}
+	}
+	// the page of an item whose matrix is being calculated links its view, which is a 503 too
+	e.data.matrices = nil
+	if r := e.get(t, "/en/result/cn/item/30012"); r.status != 503 || r.header.Get("Link") != links("/en/result/cn/item/30012.md") {
+		t.Errorf("cold page: status %d, Link %q", r.status, r.header.Get("Link"))
+	}
+}
+
+// The index.html of the frontend links /llms.txt in its head (frontend-v2 v3.13.42): the page keeps that link and
+// adds none, the Link header has its own, and a Link set before is kept
+func TestPagesLinkTheGuideOnce(t *testing.T) {
+	e := newTestEnv(t)
+	raw := strings.Replace(string(e.shells.shell.Raw()), "</head>",
+		`<link rel="api-catalog" href="/.well-known/api-catalog"><link rel="describedby" type="text/plain" href="/llms.txt"></head>`, 1)
+	s, err := spashell.Parse([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.shells.shell = s
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Set(fiber.HeaderLink, `</x.css>; rel="preload"; as="style"`)
+		return c.Next()
+	})
+	NewHandler(site, 5*time.Minute, e.shells, e.data).Mount(app)
+	resp, err := app.Test(httptestRequest("/en/result/cn/item/30012"), -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if n := strings.Count(string(body), `rel="describedby"`); n != 1 {
+		t.Errorf("%d describedby links in the page, want the shell's", n)
+	}
+	assertOnce(t, string(body), `<link rel="api-catalog" href="/.well-known/api-catalog">`, `<link rel="alternate" type="text/markdown" `)
+	if got, want := resp.Header.Get("Link"), `</x.css>; rel="preload"; as="style", <https://penguin-stats.io/en/result/cn/item/30012.md>; rel="alternate"; type="text/markdown", <https://penguin-stats.io/llms.txt>; rel="describedby"`; got != want {
+		t.Errorf("Link %q, want %q", got, want)
 	}
 }
 
