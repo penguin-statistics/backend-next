@@ -168,8 +168,8 @@ type ConfigSpec struct {
 	// into the binary from: postgres, to export the reports from PostgreSQL (run-script coldstore-export and
 	// coldstore-verify). DuckDB never downloads them. The image preinstalls them in /opt/duckdb/extensions
 	// (duckdbx.ImageExtensionDirectory); elsewhere, put
-	// https://extensions.duckdb.org/v1.5.6/linux_amd64/postgres_scanner.duckdb_extension.gz, gunzipped, at
-	// <dir>/v1.5.6/linux_amd64/postgres_scanner.duckdb_extension.
+	// https://extensions.duckdb.org/v2.0.0/linux_amd64/postgres_scanner.duckdb_extension.gz, gunzipped, at
+	// <dir>/v2.0.0/linux_amd64/postgres_scanner.duckdb_extension.
 	ColdstoreExtensionDirectory string `split_words:"true" default:"/opt/duckdb/extensions"`
 
 	// ReportSchemaV2Enabled means the database has the partitioned schema of #752: write drop_report_extras.created_at.

@@ -39,8 +39,8 @@ func TestOpenAppliesConfig(t *testing.T) {
 	})
 
 	// the cold storage files and queries are validated against this exact DuckDB release
-	if v := queryString(t, db, "SELECT version()"); v != "v1.5.6" {
-		t.Errorf("version() = %q, want v1.5.6", v)
+	if v := queryString(t, db, "SELECT version()"); v != "v2.0.0" {
+		t.Errorf("version() = %q, want v2.0.0", v)
 	}
 	want := map[string]string{
 		"threads":                      "2",
