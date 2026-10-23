@@ -162,9 +162,10 @@ type Syncer struct {
 	// polled tells whether a poll succeeded since the process started, and late whether one failed before
 	polled, late bool
 
-	// refreshMu runs the refreshes of cached global results of the process one at a time: the followed ones, and
-	// those of its worker (RefreshLock)
-	refreshMu sync.Mutex
+	// refreshSem runs the refreshes of cached global results of the process one at a time: the followed ones, and
+	// those of its worker (RefreshLock). A semaphore rather than a mutex, so that a followed refresh waiting for the
+	// worker's stops waiting when the process stops.
+	refreshSem semaphore
 
 	// queueMu guards queue and queued, the targets waiting for a refresh, in order
 	queueMu sync.Mutex
@@ -221,6 +222,7 @@ func newSyncer(store Store, interval, timeout time.Duration, followers map[Kind]
 		unconfirmed: make(map[target]int64),
 		queued:      make(map[target]bool),
 		wake:        make(chan struct{}, 1),
+		refreshSem:  make(semaphore, 1),
 	}
 	for _, kind := range Kinds {
 		for _, server := range servers {
@@ -281,7 +283,23 @@ func Start(lc fx.Lifecycle, s *Syncer) error {
 // process does not load the database with two at once, nor cache the results of one over those of a later one
 // calculated from newer data.
 func (s *Syncer) RefreshLock() sync.Locker {
-	return &s.refreshMu
+	return s.refreshSem
+}
+
+// semaphore is a lock of one slot, which lockCtx can stop waiting for.
+type semaphore chan struct{}
+
+func (m semaphore) Lock()   { m <- struct{}{} }
+func (m semaphore) Unlock() { <-m }
+
+// lockCtx takes the lock unless ctx is done first, and reports whether it took it.
+func (m semaphore) lockCtx(ctx context.Context) bool {
+	select {
+	case m <- struct{}{}:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 // Bump tells every process that this one refreshed the results of kind of server, by advancing their generation.
@@ -306,7 +324,9 @@ func (s *Syncer) Bump(ctx context.Context, kind Kind, server string) {
 	}
 	observability.CacheSyncBumps.WithLabelValues(string(kind), "ok").Inc()
 	delete(s.unconfirmed, t)
-	if previous == s.seen[t] {
+	// another process advanced it since this one read it (previous > seen): leave it to the next poll. Otherwise,
+	// also before the first poll and after Redis lost it (previous < seen), the generation is this refresh's.
+	if !s.polled || previous <= s.seen[t] {
 		s.seen[t] = generation
 	}
 }
@@ -459,9 +479,11 @@ func (s *Syncer) refreshLoop(ctx context.Context) {
 // refresh refreshes the results of t, as the worker did: if it fails, they are dropped, and requests recalculate them.
 // One cancelled as the process stops is no failure: it is counted and logged as cancelled.
 func (s *Syncer) refresh(stopCtx context.Context, t target) {
-	s.refreshMu.Lock()
-	defer s.refreshMu.Unlock()
-	if stopCtx.Err() != nil { // stopped while waiting for the worker's refresh
+	if !s.refreshSem.lockCtx(stopCtx) { // stopped while waiting for the worker's refresh
+		return
+	}
+	defer s.refreshSem.Unlock()
+	if stopCtx.Err() != nil {
 		return
 	}
 	kind := string(t.kind)

@@ -226,13 +226,15 @@ func (w *Worker) warmUpGlobalCaches(ctx context.Context, fill func(ctx context.C
 	if !w.refreshGlobalMatrices {
 		return
 	}
-	mu := w.refreshLock()
-	mu.Lock()
-	defer mu.Unlock()
 	for _, server := range constant.Servers {
 		server := server
 		// microtask keeps the worker lock and logs the error
 		_ = w.microtask(ctx, "globalCachesWarmUp", server, func(ctx context.Context) (err error) {
+			// the refresh lock is taken in the microtask, which renews the worker lock: a refresh following another
+			// process's worker may hold it longer than the worker lock lasts without renewal
+			mu := w.refreshLock()
+			mu.Lock()
+			defer mu.Unlock()
 			// a panic would end the process on every start: fail the server instead
 			defer func() {
 				if r := recover(); r != nil {

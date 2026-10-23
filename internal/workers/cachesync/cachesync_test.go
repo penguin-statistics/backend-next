@@ -287,6 +287,27 @@ func TestBumpBeforeTheFirstPoll(t *testing.T) {
 	assertQueued(t, s)
 }
 
+// A bump after Redis lost the generation, which this process had seen higher, is this process's refresh: what it
+// just cached is not dropped as results of another process's refresh that nobody read.
+func TestBumpAfterRedisLostTheGenerationIsSeen(t *testing.T) {
+	store := &memoryStore{}
+	caches := &fakeCaches{}
+	caches.cacheUnused(KindGlobalDropMatrix, "US")
+	s := newTestSyncer(store, caches)
+	mustPoll(t, s)
+	s.Bump(context.Background(), KindGlobalDropMatrix, "US")
+	s.Bump(context.Background(), KindGlobalDropMatrix, "US")
+	mustPoll(t, s) // seen 2
+
+	store.flush() // the next bump advances it to 1, below the one seen
+	s.Bump(context.Background(), KindGlobalDropMatrix, "US")
+	mustPoll(t, s)
+	assertQueued(t, s)
+	if dropped := caches.drops(); len(dropped) != 0 {
+		t.Errorf("dropped %v that this process just refreshed", dropped)
+	}
+}
+
 func TestBumpFailureIsCounted(t *testing.T) {
 	store := &memoryStore{}
 	store.setErr(errors.New("redis is down"))
@@ -545,6 +566,30 @@ func TestRefreshWaitsForTheRefreshOfTheWorker(t *testing.T) {
 	<-done
 	if refreshed := caches.refreshes(); len(refreshed) != 1 {
 		t.Errorf("refreshed %v, want the drop matrices", refreshed)
+	}
+}
+
+// A refresh waiting for the worker's stops waiting when the process stops, instead of holding up the shutdown.
+func TestARefreshStopsWaitingForTheWorkerWhenTheProcessStops(t *testing.T) {
+	caches := &fakeCaches{}
+	s := newTestSyncer(&memoryStore{}, caches)
+	lock := s.RefreshLock()
+	lock.Lock() // the worker of the process refreshes
+	defer lock.Unlock()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		s.refresh(ctx, target{KindGlobalDropMatrix, "CN"})
+	}()
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the refresh kept waiting for the worker's after the process stopped")
+	}
+	if refreshed := caches.refreshes(); len(refreshed) != 0 {
+		t.Errorf("refreshed %v after the process stopped", refreshed)
 	}
 }
 
