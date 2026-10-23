@@ -38,7 +38,7 @@ func guideApp(t *testing.T, app *fiber.App) *fiber.App {
 	srv, _ := newServer(&tools{data: &fakeData{}, site: site}, "test")
 	mountEndpointHelp(app, guideURL(u))
 	Mount(app, srv, 1000, time.Minute)
-	if err := mountServerCard(app, newServerCard(u, site)); err != nil {
+	if err := mountServerCard(app, newServerCard(u, site, "test")); err != nil {
 		t.Fatal(err)
 	}
 	if err := mountGuide(app, u, site, 120, time.Minute); err != nil {

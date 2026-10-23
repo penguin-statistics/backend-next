@@ -16,12 +16,16 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/fx/fxtest"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
+	"exusiai.dev/backend-next/internal/model/cache"
+	"exusiai.dev/backend-next/internal/pkg/bininfo"
 	"exusiai.dev/backend-next/internal/server/httpserver"
+	"exusiai.dev/backend-next/internal/service"
 )
 
-// cardApp returns an app serving the card of the server at endpoint.
+// cardApp returns an app serving the card of the server at endpoint, built as the tests build the server ("test").
 func cardApp(t *testing.T, app *fiber.App, endpoint string) *fiber.App {
 	t.Helper()
 	u, err := parsePublicURL(endpoint)
@@ -31,7 +35,7 @@ func cardApp(t *testing.T, app *fiber.App, endpoint string) *fiber.App {
 	if app == nil {
 		app = fiber.New()
 	}
-	if err := mountServerCard(app, newServerCard(u, site)); err != nil {
+	if err := mountServerCard(app, newServerCard(u, site, "test")); err != nil {
 		t.Fatal(err)
 	}
 	return app
@@ -99,7 +103,8 @@ func TestServerCard(t *testing.T) {
 		for _, f := range []struct{ field, got, want string }{
 			{"$schema", card.Schema, "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json"},
 			{"name", card.Name, "io.penguin-stats/penguin-stats"},
-			{"version", card.Version, listingVersion},
+			// that of serverInfo, the build's, not the listing's (see TestServerCardMatchesServerInfo)
+			{"version", card.Version, wantServerInfo.Version},
 			{"description", card.Description, wantServerInfo.Description},
 			{"title", card.Title, wantServerInfo.Title},
 			{"websiteUrl", card.WebsiteURL, "https://mcp.penguin-stats.io/"},
@@ -122,7 +127,8 @@ func TestServerCard(t *testing.T) {
 	}
 }
 
-// The card says what the listing in the MCP Registry says: checkers compare them.
+// The card says what the listing in the MCP Registry says, as checkers compare them, but for the version: the card has
+// that of the build, as serverInfo does, and the listing a version of its own (listingVersion).
 func TestServerCardMatchesListing(t *testing.T) {
 	b, err := os.ReadFile("../../../server.json")
 	if err != nil {
@@ -137,7 +143,7 @@ func TestServerCardMatchesListing(t *testing.T) {
 	if err := json.Unmarshal(b, &card); err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{"name", "version", "title", "description", "websiteUrl", "repository", "icons"} {
+	for _, field := range []string{"name", "title", "description", "websiteUrl", "repository", "icons"} {
 		if !reflect.DeepEqual(card[field], listing[field]) {
 			t.Errorf("%s: card %v, server.json %v", field, card[field], listing[field])
 		}
@@ -146,6 +152,82 @@ func TestServerCardMatchesListing(t *testing.T) {
 	want := listing["remotes"].([]any)[0].(map[string]any)
 	if remote["type"] != want["type"] || remote["url"] != want["url"] {
 		t.Errorf("remote %v, server.json %v", remote, want)
+	}
+}
+
+// The card and serverInfo name the same server, with the same version: clients reconcile the card with the live
+// server, and the specification asks a card not to contradict serverInfo. Both as Register serves them, for a release
+// (whose version is not that of the listing) and for builds without a semantic version.
+func TestServerCardMatchesServerInfo(t *testing.T) {
+	cache.Initialize()
+	build := bininfo.Version
+	t.Cleanup(func() { bininfo.Version = build })
+	const release = "v3.14.63"
+	if serverVersion(release) == listingVersion {
+		t.Fatalf("release %s has the version of the listing: the test would not tell them apart", release)
+	}
+	for _, tc := range []struct{ name, build, want string }{
+		{"release", release, "3.14.63"},
+		{"release with the commit", release + "+8b9d3f1", "3.14.63+8b9d3f1"},
+		{"no -ldflags", "v0.0.0", "0.0.0"},
+		{"Dockerfile without VERSION", "", devVersion},
+		{"build-check.yml", "__check__", devVersion},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bininfo.Version = tc.build
+			app := fiber.New()
+			data := service.NewSEOData(fxtest.NewLifecycle(t), &appconfig.Config{}, nil, nil, nil, nil)
+			if err := Register(app, &appconfig.Config{ConfigSpec: appconfig.ConfigSpec{MCPEnabled: true, SEOSiteURL: site,
+				MCPPublicURL: publicURL}}, data); err != nil {
+				t.Fatal(err)
+			}
+			type identity struct{ Name, Version string }
+			var card identity
+			if resp, b := request(t, app, fiber.MethodGet, "/mcp/server-card"); resp.StatusCode != fiber.StatusOK || json.Unmarshal(b, &card) != nil {
+				t.Fatalf("card: status %d: %s", resp.StatusCode, b)
+			}
+			var res struct {
+				ServerInfo identity `json:"serverInfo"`
+			}
+			if resp, b := post(t, app, initialize); resp.StatusCode != fiber.StatusOK || json.Unmarshal(decode(t, b).Result, &res) != nil {
+				t.Fatalf("initialize: status %d: %s", resp.StatusCode, b)
+			}
+			if res.ServerInfo != card {
+				t.Errorf("serverInfo %+v, card %+v", res.ServerInfo, card)
+			}
+			if want := (identity{registryName, tc.want}); card != want {
+				t.Errorf("card %+v, want %+v", card, want)
+			}
+		})
+	}
+}
+
+// The version of the server is a semantic version, that of the build without its v, and no longer than a card allows.
+func TestServerVersion(t *testing.T) {
+	for build, want := range map[string]string{
+		"v3.14.63":         "3.14.63",
+		"3.14.63":          "3.14.63",
+		"v3.14.63+8b9d3f1": "3.14.63+8b9d3f1",
+		"v3.15.0-rc.1":     "3.15.0-rc.1",
+		"v0.0.0":           "0.0.0",
+		devVersion:         devVersion,
+		"1.0.0+" + strings.Repeat("a", maxVersionLength-6): "1.0.0+" + strings.Repeat("a", maxVersionLength-6),
+		"1.0.0+" + strings.Repeat("a", maxVersionLength-5): devVersion,
+		"":          devVersion,
+		"v":         devVersion,
+		"test":      devVersion,
+		"__check__": devVersion,
+		"v3.14":     devVersion,
+		"v03.14.63": devVersion,
+		"V3.14.63":  devVersion,
+		" v3.14.63": devVersion,
+		"vv3.14.63": devVersion,
+		"^3.14.63":  devVersion,
+		"3.x":       devVersion,
+	} {
+		if got := serverVersion(build); got != want {
+			t.Errorf("serverVersion(%q) = %q, want %q", build, got, want)
+		}
 	}
 }
 

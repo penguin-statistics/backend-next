@@ -7,12 +7,13 @@ package mcp
 // these constants and to serverInfo.
 const (
 	// registryName is the name of the server in the registry: the namespace of penguin-stats.io, which its proof
-	// (/.well-known/mcp-registry-auth, served by frontend-v2) lets us publish under, then serverName. It cannot
-	// change: another name would be another listing, and the registry gives a remote URL to one name only.
+	// (/.well-known/mcp-registry-auth, served by frontend-v2) lets us publish under, then penguin-stats. It is also
+	// the name of the server in serverInfo and in the server card, which clients compare. It cannot change: another
+	// name would be another listing, and the registry gives a remote URL to one name only.
 	registryName = "io.penguin-stats/penguin-stats"
 	// listingVersion is the version of the listing, not of the backend (released several times a day, which would
 	// pile up versions saying the same): bump it with every change of server.json, as the registry refuses a version
-	// it already has
+	// it already has. serverInfo and the server card have the version of the build instead (serverVersion).
 	listingVersion = "1.0.0"
 	// publicURL is where clients reach the server, the remote of the listing
 	publicURL = "https://mcp.penguin-stats.io/mcp"

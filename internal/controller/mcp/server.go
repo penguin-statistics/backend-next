@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -31,7 +32,7 @@ type Data interface {
 }
 
 const (
-	serverName  = "penguin-stats"
+	// serverTitle is the name of the server for people; its name for programs is registryName (see newServer)
 	serverTitle = "Penguin Statistics"
 	// serverDescription tells people choosing a server in a client or a directory what this one serves (100 characters
 	// at most, the limit of the MCP Registry)
@@ -144,20 +145,22 @@ func (r *registry) toolLabel(name string) string {
 	return "other"
 }
 
-// NewServer returns the MCP server of data. site is the origin of the stats pages the results link to, version the
-// version of the backend.
-func NewServer(data Data, site, version string) *sdkmcp.Server {
-	s, _ := newServer(&tools{data: data, site: strings.TrimRight(site, "/")}, version)
+// NewServer returns the MCP server of data. site is the origin of the stats pages the results link to, build the
+// version of the backend (bininfo.Version), which serverVersion makes the version of the server.
+func NewServer(data Data, site, build string) *sdkmcp.Server {
+	s, _ := newServer(&tools{data: data, site: strings.TrimRight(site, "/")}, build)
 	return s
 }
 
-// newServer returns the MCP server of t, and its registry for tests to add tools to before it serves.
-func newServer(t *tools, version string) (*sdkmcp.Server, *registry) {
+// newServer returns the MCP server of t, and its registry for tests to add tools to before it serves. Its serverInfo
+// names it as the server card and the listing in the MCP Registry do: registryName, which clients reconciling the card
+// with the live server compare, and the version of the build (serverVersion), which the card has too.
+func newServer(t *tools, build string) (*sdkmcp.Server, *registry) {
 	s := sdkmcp.NewServer(&sdkmcp.Implementation{
-		Name:        serverName,
+		Name:        registryName,
 		Title:       serverTitle,
 		Description: serverDescription,
-		Version:     version,
+		Version:     serverVersion(build),
 		WebsiteURL:  t.site,
 		Icons:       icons(t.site),
 	}, &sdkmcp.ServerOptions{
@@ -177,6 +180,31 @@ func newServer(t *tools, version string) (*sdkmcp.Server, *registry) {
 	// added last, so outermost: it also covers the middlewares of the SDK
 	s.AddReceivingMiddleware(observe(r))
 	return s, r
+}
+
+// devVersion is the version of the server for a build without a semantic version: one built without the version
+// (the Dockerfile without VERSION) or with a placeholder (build-check.yml's __check__, the tests' "test"). It is a
+// semantic version, as the card asks for one, and a pre-release of 0.0.0, which no release is.
+const devVersion = "0.0.0-dev"
+
+// maxVersionLength is the longest version a server card may have
+const maxVersionLength = 255
+
+// semverPattern matches a semantic version (https://semver.org/spec/v2.0.0.html; the expression it suggests)
+var semverPattern = regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)` +
+	`(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?` +
+	`(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$`)
+
+// serverVersion is the version of the server of the build build (bininfo.Version), in serverInfo and in the server
+// card, which say the same: the release tag (vX.Y.Z) without its v, as the card asks for a semantic version (the form
+// of its examples and of the listing, 1.0.2), or devVersion for a build whose version is not a semantic one. It is
+// not the version of the listing (listingVersion), which changes with server.json only.
+func serverVersion(build string) string {
+	v := strings.TrimPrefix(build, "v")
+	if len(v) > maxVersionLength || !semverPattern.MatchString(v) {
+		return devVersion
+	}
+	return v
 }
 
 // icons are the icons of the site of origin site (frontend-v2 serves them), for clients and directories to show: in
