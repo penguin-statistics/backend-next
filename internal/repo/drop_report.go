@@ -535,24 +535,24 @@ func (r *DropReport) CalcTotalQuantityForTrendWithin(
 	gameDayStart := gameday.StartTime(server, *startTime)
 
 	subq1 := r.db.NewSelect().
-		With("intervals", r.genSubQueryForTrendSegments(gameDayStart, intervalLength, intervalNum)).
 		TableExpr("drop_reports AS dr").
-		Column("dr.source_name", "sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id", "dpe.item_id", "dpe.quantity").
-		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id").
-		Join("RIGHT JOIN intervals AS sub").
-		JoinOn("dr.created_at >= sub.interval_start AND dr.created_at < sub.interval_end")
+		Column("dr.source_name", "dr.stage_id", "dpe.item_id", "dpe.quantity").
+		ColumnExpr(trendGroupIdExpr, trendGroupIdArgs(gameDayStart, intervalLength)...).
+		Join("JOIN drop_pattern_elements AS dpe ON dpe.drop_pattern_id = dr.pattern_id")
 	r.handleAccountAndReliability(subq1, accountId)
 	r.handleCreatedAtWithTime(subq1, &from, &to)
+	r.handleTrendBuckets(subq1, gameDayStart, intervalLength, intervalNum)
 	r.handleServer(subq1, server)
 	r.handleStagesAndItems(subq1, stageIdItemIdMap)
 
 	mainq := r.db.NewSelect().
 		TableExpr("(?) AS a", subq1).
-		Column("group_id", "interval_start", "interval_end", "stage_id", "item_id").
+		Column("group_id", "stage_id", "item_id").
+		ColumnExpr(trendIntervalExprs, trendIntervalArgs(gameDayStart, intervalLength)...).
 		ColumnExpr("SUM(quantity) AS total_quantity")
 	r.handleSourceName(mainq, sourceCategory)
 
-	if err := r.scan(ctx, mainq.Group("group_id", "interval_start", "interval_end", "stage_id", "item_id"), &results); err != nil {
+	if err := r.scan(ctx, mainq.Group("group_id", "stage_id", "item_id"), &results); err != nil {
 		return nil, err
 	}
 	return results, nil
@@ -578,23 +578,23 @@ func (r *DropReport) CalcTotalTimesForTrendWithin(
 	gameDayStart := gameday.StartTime(server, *startTime)
 
 	subq1 := r.db.NewSelect().
-		With("intervals", r.genSubQueryForTrendSegments(gameDayStart, intervalLength, intervalNum)).
 		TableExpr("drop_reports AS dr").
-		Column("dr.source_name", "sub.group_id", "sub.interval_start", "sub.interval_end", "dr.stage_id", "dr.times").
-		Join("RIGHT JOIN intervals AS sub").
-		JoinOn("dr.created_at >= sub.interval_start AND dr.created_at < sub.interval_end")
+		Column("dr.source_name", "dr.stage_id", "dr.times").
+		ColumnExpr(trendGroupIdExpr, trendGroupIdArgs(gameDayStart, intervalLength)...)
 	r.handleAccountAndReliability(subq1, accountId)
 	r.handleCreatedAtWithTime(subq1, &from, &to)
+	r.handleTrendBuckets(subq1, gameDayStart, intervalLength, intervalNum)
 	r.handleServer(subq1, server)
 	r.handleStages(subq1, stageIds)
 
 	mainq := r.db.NewSelect().
 		TableExpr("(?) AS a", subq1).
-		Column("group_id", "interval_start", "interval_end", "stage_id").
+		Column("group_id", "stage_id").
+		ColumnExpr(trendIntervalExprs, trendIntervalArgs(gameDayStart, intervalLength)...).
 		ColumnExpr("SUM(times) AS total_times")
 	r.handleSourceName(mainq, sourceCategory)
 
-	if err := r.scan(ctx, mainq.Group("group_id", "interval_start", "interval_end", "stage_id"), &results); err != nil {
+	if err := r.scan(ctx, mainq.Group("group_id", "stage_id"), &results); err != nil {
 		return nil, err
 	}
 	return results, nil
@@ -773,17 +773,31 @@ func (r *DropReport) handleSourceName(query *bun.SelectQuery, sourceCategory str
 	}
 }
 
-func (r *DropReport) genSubQueryForTrendSegments(gameDayStart time.Time, intervalLength time.Duration, intervalNum int) *bun.SelectQuery {
-	var subQueryExprBuilder strings.Builder
-	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + (n || ' hours')::interval AS interval_start, ")
-	fmt.Fprintf(&subQueryExprBuilder, "to_timestamp(?) + ((n + ?) || ' hours')::interval AS interval_end, ")
-	fmt.Fprintf(&subQueryExprBuilder, "(n / ?) AS group_id")
-	return r.db.NewSelect().
-		TableExpr("generate_series(?, ? * ?, ?) AS n", 0, int(intervalLength.Hours()), intervalNum, int(intervalLength.Hours())).
-		ColumnExpr(subQueryExprBuilder.String(),
-			gameDayStart.Unix(),
-			gameDayStart.Unix(),
-			int(intervalLength.Hours()),
-			int(intervalLength.Hours()),
-		)
+// The buckets of a trend are intervalNum+1 consecutive intervals of intervalLength (in whole hours) from the start of
+// the game day of its start time (TrendTimeRange); bucket group_id is [start + group_id*length, start +
+// (group_id+1)*length). A report's bucket is computed from its created_at, as the cold storage does (coldTrendPlan),
+// instead of joining the reports to a series of the buckets: the cost then grows with the reports only, not with
+// reports times buckets (PostgreSQL compared every report with every bucket of the series).
+const (
+	trendGroupIdExpr   = "floor((extract(epoch FROM dr.created_at) - ?) / ?)::integer AS group_id"
+	trendIntervalExprs = "to_timestamp(? + group_id * ?::bigint) AS interval_start, to_timestamp(? + (group_id + 1) * ?::bigint) AS interval_end"
+)
+
+func trendBucketSeconds(intervalLength time.Duration) int64 {
+	return int64(intervalLength.Hours()) * 3600
+}
+
+func trendGroupIdArgs(gameDayStart time.Time, intervalLength time.Duration) []any {
+	return []any{gameDayStart.Unix(), trendBucketSeconds(intervalLength)}
+}
+
+func trendIntervalArgs(gameDayStart time.Time, intervalLength time.Duration) []any {
+	start, length := gameDayStart.Unix(), trendBucketSeconds(intervalLength)
+	return []any{start, length, start, length}
+}
+
+// handleTrendBuckets keeps the reports in the buckets of a trend only (those the series of buckets covered).
+func (r *DropReport) handleTrendBuckets(query *bun.SelectQuery, gameDayStart time.Time, intervalLength time.Duration, intervalNum int) {
+	start, end := gameDayStart, gameDayStart.Add(time.Duration(trendBucketSeconds(intervalLength)*int64(intervalNum+1))*time.Second)
+	query.Where("dr.created_at >= ? AND dr.created_at < ?", start, end)
 }
