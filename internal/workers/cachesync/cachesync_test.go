@@ -378,6 +378,26 @@ func TestAFailedPollKeepsTheSeenGenerations(t *testing.T) {
 	assertQueued(t, s, target{KindSiteStats, "US"})
 }
 
+// A bump over another process's before the first poll succeeded (after failed ones) is not taken for this process's
+// own: what this process refreshed may have read the data before the other one's, and is refreshed again.
+func TestABumpOverAnotherProcessesBeforeTheFirstPollIsFollowed(t *testing.T) {
+	store := &memoryStore{}
+	caches := &fakeCaches{}
+	caches.use(KindGlobalDropMatrix, "CN")
+	s := newTestSyncer(store, caches)
+	store.setErr(errors.New("redis is down"))
+	if err := s.poll(context.Background()); err == nil {
+		t.Fatal("poll succeeded without the generations")
+	}
+	store.setErr(nil)
+
+	other := newTestSyncer(store, &fakeCaches{})
+	other.Bump(context.Background(), KindGlobalDropMatrix, "CN")
+	s.Bump(context.Background(), KindGlobalDropMatrix, "CN")
+	mustPoll(t, s)
+	assertQueued(t, s, target{KindGlobalDropMatrix, "CN"})
+}
+
 func TestAFirstPollAfterFailedOnesFollowsWhatTheProcessCached(t *testing.T) {
 	store := &memoryStore{}
 	store.set(KindSiteStats, "US", 3)
@@ -504,6 +524,26 @@ func TestResultsCachedButNotServedAreDropped(t *testing.T) {
 
 // A request calculating results the worker of another process refreshes meanwhile may calculate them from the data
 // before: the process follows the refresh, which keeps the request's results from being cached.
+// Results this process does not serve are refreshed rather than dropped while it refreshes cached results: that
+// refresh may have read the data before the change, and would cache it after the drop.
+func TestAChangeDuringARefreshOfTheProcessIsRefreshedAfterIt(t *testing.T) {
+	store := &memoryStore{}
+	caches := &fakeCaches{}
+	caches.cacheUnused(KindGlobalDropMatrix, "CN")
+	s := newTestSyncer(store, caches)
+	mustPoll(t, s)
+
+	lock := s.RefreshLock()
+	lock.Lock() // the worker of the process refreshes
+	newTestSyncer(store, &fakeCaches{}).Bump(context.Background(), KindGlobalDropMatrix, "CN")
+	mustPoll(t, s)
+	lock.Unlock()
+	assertQueued(t, s, target{KindGlobalDropMatrix, "CN"})
+	if dropped := caches.drops(); len(dropped) != 0 {
+		t.Errorf("dropped %v while the process refreshed", dropped)
+	}
+}
+
 func TestACalculationInFlightIsRefreshed(t *testing.T) {
 	trends := cache.NewSet[int]("cachesyncTestTrend")
 	followers := map[Kind]follower{
@@ -762,12 +802,13 @@ func TestStartFollowsThePolledChanges(t *testing.T) {
 		}
 	}()
 
-	// the first poll runs at start
-	waitFor(t, "the first poll", func() bool {
-		store.mu.Lock()
-		defer store.mu.Unlock()
-		return store.loads > 0
-	})
+	// the first poll runs in OnStart, before the hooks after it (the HTTP server's) start
+	store.mu.Lock()
+	loads := store.loads
+	store.mu.Unlock()
+	if loads != 1 {
+		t.Fatalf("%d polls when OnStart returned, want the first one", loads)
+	}
 	store.set(KindGlobalPatternMatrix, "CN", 1)
 	waitFor(t, "the refresh", func() bool { return len(caches.refreshes()) == 1 })
 	if got := caches.refreshes()[0]; got != (target{KindGlobalPatternMatrix, "CN"}) {

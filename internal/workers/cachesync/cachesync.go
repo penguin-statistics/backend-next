@@ -247,6 +247,10 @@ func Start(lc fx.Lifecycle, s *Syncer) error {
 	var wg sync.WaitGroup
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
+			// the first poll runs before the hooks registered after this one, the HTTP server's among them: it
+			// records the generations before a request caches anything, so that no change after a result was cached
+			// is taken for the baseline. If it fails, the next ones follow from what this process bumped (see poll).
+			s.pollAndLog(ctx)
 			wg.Add(2)
 			go func() {
 				defer wg.Done()
@@ -284,6 +288,11 @@ func Start(lc fx.Lifecycle, s *Syncer) error {
 // calculated from newer data.
 func (s *Syncer) RefreshLock() sync.Locker {
 	return s.refreshSem
+}
+
+// refreshing tells whether the process is refreshing cached global results (its worker, or a followed refresh).
+func (s *Syncer) refreshing() bool {
+	return len(s.refreshSem) > 0
 }
 
 // semaphore is a lock of one slot, which lockCtx can stop waiting for.
@@ -324,23 +333,25 @@ func (s *Syncer) Bump(ctx context.Context, kind Kind, server string) {
 	}
 	observability.CacheSyncBumps.WithLabelValues(string(kind), "ok").Inc()
 	delete(s.unconfirmed, t)
-	// another process advanced it since this one read it (previous > seen): leave it to the next poll. Otherwise,
-	// also before the first poll and after Redis lost it (previous < seen), the generation is this refresh's.
-	if !s.polled || previous <= s.seen[t] {
+	// another process advanced it since this one read it (previous > seen): leave it to the next poll, also before
+	// the first poll succeeded. Otherwise, also after Redis lost it (previous < seen), the generation is this
+	// refresh's.
+	if previous <= s.seen[t] {
 		s.seen[t] = generation
 	}
 }
 
+// pollLoop polls every interval, after the first poll of Start.
 func (s *Syncer) pollLoop(ctx context.Context) {
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 	for {
-		s.pollAndLog(ctx)
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
 		}
+		s.pollAndLog(ctx)
 	}
 }
 
@@ -417,8 +428,9 @@ func (s *Syncer) poll(ctx context.Context) (err error) {
 				Int64("seen", seen).Msg("the cache sync generation is gone: waiting for the next refresh of the worker")
 			continue
 		}
-		if f := s.followers[t.kind]; !f.used(t.server) {
-			// a request calculates them from the data of the refresh, if any comes
+		if f := s.followers[t.kind]; !f.used(t.server) && !s.refreshing() {
+			// a request calculates them from the data of the refresh, if any comes. Not while this process
+			// refreshes cached results: that refresh may have read the data before, and cache it after the drop.
 			f.drop(t.server)
 			continue
 		}
