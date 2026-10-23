@@ -1,0 +1,31 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.penguin-stats/penguin-stats",
+  "title": "Penguin Statistics",
+  "description": "Crowdsourced Arknights drop rates by stage and item, for the CN, US, JP and KR game servers",
+  "version": "1.0.0",
+  "websiteUrl": "https://mcp.penguin-stats.io/",
+  "repository": {
+    "url": "https://github.com/penguin-statistics/backend-next",
+    "source": "github",
+    "id": "431197141"
+  },
+  "icons": [
+    {
+      "src": "https://penguin-stats.io/favicon/android-chrome-512x512.png",
+      "mimeType": "image/png",
+      "sizes": ["512x512"]
+    },
+    {
+      "src": "https://penguin-stats.io/favicon/android-chrome-192x192.png",
+      "mimeType": "image/png",
+      "sizes": ["192x192"]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.penguin-stats.io/mcp"
+    }
+  ]
+}
