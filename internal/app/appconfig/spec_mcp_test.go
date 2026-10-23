@@ -21,7 +21,7 @@ func TestMCPSettings(t *testing.T) {
 	if defaults.MCPEnabled {
 		t.Error("the MCP server is enabled by default")
 	}
-	if defaults.MCPRateLimitMax != 120 || defaults.MCPRateLimitWindow != time.Minute {
+	if defaults.MCPRateLimitMax != 1200 || defaults.MCPRateLimitWindow != time.Minute {
 		t.Errorf("defaults: max %d, window %s", defaults.MCPRateLimitMax, defaults.MCPRateLimitWindow)
 	}
 	// nothing is advertised until the manifests give the public URL
