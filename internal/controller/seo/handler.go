@@ -1,7 +1,8 @@
 // Package seo serves the stats pages of the frontend (/{lang}/result/{server}/item[/{itemId}] and
 // /{lang}/result/{server}/stage[/{zoneId}/{stageId}]) as the frontend's index.html with the page's metadata,
 // structured data and a plain HTML table of its data spliced in, for search engines and link previews. The app
-// replaces the table once it starts; everyone gets the same HTML.
+// replaces the table once it starts; everyone gets the same HTML. The pages of items and stages have a Markdown view
+// too, at their path with .md appended, for agents (see markdown.go).
 package seo
 
 import (
@@ -124,7 +125,12 @@ func Register(lc fx.Lifecycle, app *fiber.App, conf *appconfig.Config, data *ser
 func MountDisabled(r fiber.Router) {
 	disabled := func(c *fiber.Ctx) error {
 		path := c.Path()
-		(&Handler{}).unavailable(c, parseRoute(path), path, "disabled_redirect")
+		r := parseRoute(path)
+		if r.md {
+			markdownDisabled(c, r)
+			return nil
+		}
+		(&Handler{}).unavailable(c, r, path, "disabled_redirect")
 		return nil
 	}
 	for _, lang := range service.StatsLangs {
@@ -181,6 +187,12 @@ func parseRoute(path string) route {
 		r.kind = kindOther
 		return r
 	}
+	// the Markdown view of the page of the path without .md: no ID of an item or a stage ends in .md (see routable),
+	// and a last segment that is just .md is an ID, not found
+	if last := rest[len(rest)-1]; len(last) > len(mdSuffix) && strings.HasSuffix(last, mdSuffix) {
+		rest[len(rest)-1] = strings.TrimSuffix(last, mdSuffix)
+		r.md = true
+	}
 	server := strings.ToUpper(rest[0])
 	if _, ok := constant.LocMap[server]; !ok {
 		return r
@@ -201,8 +213,16 @@ func parseRoute(path string) route {
 	return r
 }
 
-// canonicalPath is the canonical path of the page of r, escaped
+// canonicalPath is the canonical path of the page of r, or of its Markdown view, escaped
 func (r route) canonicalPath() string {
+	if r.md {
+		return r.pagePath() + mdSuffix
+	}
+	return r.pagePath()
+}
+
+// pagePath is the canonical path of the page of r, escaped
+func (r route) pagePath() string {
 	var ids []string
 	switch r.kind {
 	case kindItem:
@@ -221,6 +241,11 @@ func (h *Handler) Serve(c *fiber.Ctx) error {
 	// as requested, not unescaped (fiber's UnescapePath is off)
 	path := c.Path()
 	r := parseRoute(path)
+	if r.md {
+		// made of the data alone: served whatever the shell
+		h.serveMarkdown(c, r, path)
+		return nil
+	}
 
 	shell, err := h.shells.Get(c.UserContext())
 	if err != nil {
@@ -306,19 +331,7 @@ func (h *Handler) build(r route, catalog *service.SEOCatalog, matrix *service.SE
 			ok = false
 		}
 	}()
-	b := &builder{site: h.site, t: textsByLang[r.lang], r: r, catalog: catalog, matrix: matrix}
-	switch r.kind {
-	case kindItem:
-		p = b.itemPage()
-	case kindItemList:
-		p = b.itemListPage()
-	case kindStage:
-		p = b.stagePage()
-	case kindStageList:
-		p = b.stageListPage()
-	default:
-		p = b.notFound()
-	}
+	p = h.builder(r, catalog, matrix).page()
 	if p.Redirect != "" {
 		return p, nil, true
 	}
@@ -333,6 +346,11 @@ func (h *Handler) build(r route, catalog *service.SEOCatalog, matrix *service.SE
 	var buf bytes.Buffer
 	shell.Render(&buf, p.Head.Lang, head, body)
 	return p, buf.Bytes(), true
+}
+
+// builder is the builder of the pages of r
+func (h *Handler) builder(r route, catalog *service.SEOCatalog, matrix *service.SEOMatrix) *builder {
+	return &builder{site: h.site, t: textsByLang[r.lang], r: r, catalog: catalog, matrix: matrix}
 }
 
 func count(kind pageKind, outcome string) {
@@ -413,10 +431,16 @@ func (h *Handler) sendCold(c *fiber.Ctx, shell *spashell.Shell, r route) {
 // that is not older than its Last-Modified: the latest of the times given the matrix, the catalog and the shell it
 // was made of (see stamps), if not later than the Date (see setLastModified)
 func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, catalog *service.SEOCatalog, matrix *service.SEOMatrix, p *Page, html []byte) {
+	setHTML(c, p.Head.Lang)
+	h.sendPage(c, p.Kind, shell, catalog, matrix, p, html)
+}
+
+// sendPage sends p rendered as body, its content type set, as send does; it is counted as kind, and shell is the
+// shell it was made of, nil for a Markdown view, which is made of the data alone
+func (h *Handler) sendPage(c *fiber.Ctx, kind pageKind, shell *spashell.Shell, catalog *service.SEOCatalog, matrix *service.SEOMatrix, p *Page, body []byte) {
 	// a 404 of a page that does not exist (crawlers keep requesting retired IDs) or a 503 while the data is
 	// calculated after a start is no error of the backend; their outcomes are counted below
 	middlewares.ExpectStatus(c)
-	setHTML(c, p.Head.Lang)
 	cacheable := p.Status == fiber.StatusOK && p.Cacheable
 	switch {
 	case p.Status == fiber.StatusServiceUnavailable:
@@ -435,25 +459,33 @@ func (h *Handler) send(c *fiber.Ctx, shell *spashell.Shell, catalog *service.SEO
 	// a start has no time, which the page made with the matrix can have too (the matrix seen first keeps its own
 	// time, see stamps), and a client having the list without data be answered that it is not modified
 	if cacheable {
-		// the times given the data rather than their own; the catalog's too, for a name changed or a stage moved to
-		// another zone
-		lastModified := h.stamps.at(matrixSlot{server: matrix.Server}, matrix, matrix.LastModified)
-		if at := h.stamps.at(catalogSlot{}, catalog, catalog.ChangedAt); at.After(lastModified) {
-			lastModified = at
-		}
-		// a shell sent anew keeps its time, and a different one has a later one (see spashell.Shell)
-		if at := h.stamps.at(shellSlot{}, shell.LastModified.UnixNano(), shell.LastModified); at.After(lastModified) {
-			lastModified = at
-		}
-		if !lastModified.IsZero() && setLastModified(c, lastModified) && cachectrl.NotModified(c) {
-			count(p.Kind, "not_modified")
+		if lastModified := h.lastModified(shell, catalog, matrix); !lastModified.IsZero() && setLastModified(c, lastModified) && cachectrl.NotModified(c) {
+			count(kind, "not_modified")
 			c.Status(fiber.StatusNotModified)
 			return
 		}
 	}
-	count(p.Kind, p.Outcome)
+	count(kind, p.Outcome)
 	c.Status(p.Status)
-	_ = c.Send(html)
+	_ = c.Send(body)
+}
+
+// lastModified returns when a page made with shell (nil for none), catalog and matrix last changed: the latest of
+// the times given them (see stamps)
+func (h *Handler) lastModified(shell *spashell.Shell, catalog *service.SEOCatalog, matrix *service.SEOMatrix) time.Time {
+	// the times given the data rather than their own; the catalog's too, for a name changed or a stage moved to
+	// another zone
+	lastModified := h.stamps.at(matrixSlot{server: matrix.Server}, matrix, matrix.LastModified)
+	if at := h.stamps.at(catalogSlot{}, catalog, catalog.ChangedAt); at.After(lastModified) {
+		lastModified = at
+	}
+	// a shell sent anew keeps its time, and a different one has a later one (see spashell.Shell)
+	if shell != nil {
+		if at := h.stamps.at(shellSlot{}, shell.LastModified.UnixNano(), shell.LastModified); at.After(lastModified) {
+			lastModified = at
+		}
+	}
+	return lastModified
 }
 
 // unavailable answers a request while there is no index.html to serve, or the pages are off. The ingress routes the stats paths here

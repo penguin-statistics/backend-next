@@ -103,13 +103,14 @@ type sitemapEntry struct {
 }
 
 // routable tells whether path, the canonical path of a page, is served as that page: an ID "" would be parsed as
-// another path and redirected, and "." or ".." resolved to another path before routing
+// another path and redirected, "." or ".." resolved to another path before routing, and an ID ending in .md served
+// as the Markdown view of another page
 func routable(path string, kind pageKind) bool {
 	if p := path + "/"; strings.Contains(p, "/./") || strings.Contains(p, "/../") {
 		return false
 	}
 	r := parseRoute(path)
-	return r.kind == kind && r.canonicalPath() == path
+	return r.kind == kind && !r.md && r.canonicalPath() == path
 }
 
 // buildSitemap lists the pages in lang on server that are served as indexable 200s: the two lists, and the items

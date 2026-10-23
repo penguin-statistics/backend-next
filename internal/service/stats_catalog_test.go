@@ -149,13 +149,21 @@ func TestStatsPageURLs(t *testing.T) {
 		"unknown language":           {func() (string, bool) { return ItemPageURL(site, "fr", "CN", "30012") }, ""},
 		"empty item ID":              {func() (string, bool) { return ItemPageURL(site, "en", "CN", "") }, ""},
 		"item ID a dot segment":      {func() (string, bool) { return ItemPageURL(site, "en", "CN", "..") }, ""},
+		"item ID ending in .md":      {func() (string, bool) { return ItemPageURL(site, "en", "CN", "x.md") }, ""},
+		"item ID .md":                {func() (string, bool) { return ItemPageURL(site, "en", "CN", ".md") }, site + "/en/result/cn/item/.md"},
 		"stage":                      {func() (string, bool) { return StagePageURL(site, "ko", "KR", stage) }, site + "/ko/result/kr/stage/main_1/main_01-07"},
 		"stage without a zone":       {func() (string, bool) { return StagePageURL(site, "en", "CN", &SEOStage{ArkID: "orphan"}) }, ""},
 		"no stage":                   {func() (string, bool) { return StagePageURL(site, "en", "CN", nil) }, ""},
 		"zone ID a dot segment": {func() (string, bool) {
 			return StagePageURL(site, "en", "CN", &SEOStage{ArkID: "x", Zone: &SEOZone{ArkID: "."}})
 		}, ""},
-		"empty zone ID":      {func() (string, bool) { return StagePageURL(site, "en", "CN", &SEOStage{ArkID: "x", Zone: &SEOZone{}}) }, ""},
+		"empty zone ID": {func() (string, bool) { return StagePageURL(site, "en", "CN", &SEOStage{ArkID: "x", Zone: &SEOZone{}}) }, ""},
+		"stage ID ending in .md": {func() (string, bool) {
+			return StagePageURL(site, "en", "CN", &SEOStage{ArkID: "x.md", Zone: &SEOZone{ArkID: "main_1"}})
+		}, ""},
+		"zone ID ending in .md": {func() (string, bool) {
+			return StagePageURL(site, "en", "CN", &SEOStage{ArkID: "x", Zone: &SEOZone{ArkID: "z.md"}})
+		}, site + "/en/result/cn/stage/z.md/x"},
 		"stage on no server": {func() (string, bool) { return StagePageURL(site, "en", "", stage) }, ""},
 	} {
 		u, ok := c.url()
