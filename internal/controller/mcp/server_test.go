@@ -714,20 +714,32 @@ func TestCORSPreflight(t *testing.T) {
 func TestRegister(t *testing.T) {
 	cache.Initialize()
 	for _, tc := range []struct {
-		enabled bool
-		status  int
+		enabled    bool
+		publicURL  string
+		status     int
+		cardStatus int
 	}{
-		{enabled: false, status: fiber.StatusNotFound},
-		{enabled: true, status: fiber.StatusOK},
+		{enabled: false, status: fiber.StatusNotFound, cardStatus: fiber.StatusNotFound},
+		{enabled: false, publicURL: publicURL, status: fiber.StatusNotFound, cardStatus: fiber.StatusNotFound},
+		// no public URL, no card
+		{enabled: true, status: fiber.StatusOK, cardStatus: fiber.StatusNotFound},
+		{enabled: true, publicURL: publicURL, status: fiber.StatusOK, cardStatus: fiber.StatusOK},
 	} {
-		t.Run("enabled "+strconv.FormatBool(tc.enabled), func(t *testing.T) {
+		t.Run("enabled "+strconv.FormatBool(tc.enabled)+" public URL "+tc.publicURL, func(t *testing.T) {
 			lc := fxtest.NewLifecycle(t)
 			data := service.NewSEOData(lc, &appconfig.Config{}, nil, nil, nil, nil)
 			app := fiber.New()
-			Register(app, &appconfig.Config{ConfigSpec: appconfig.ConfigSpec{MCPEnabled: tc.enabled, SEOSiteURL: site}}, data)
+			err := Register(app, &appconfig.Config{ConfigSpec: appconfig.ConfigSpec{MCPEnabled: tc.enabled, SEOSiteURL: site,
+				MCPPublicURL: tc.publicURL}}, data)
+			if err != nil {
+				t.Fatal(err)
+			}
 			resp, b := post(t, app, initialize)
 			if resp.StatusCode != tc.status {
 				t.Fatalf("status %d, want %d: %s", resp.StatusCode, tc.status, b)
+			}
+			if resp, b := request(t, app, fiber.MethodGet, "/mcp/server-card"); resp.StatusCode != tc.cardStatus {
+				t.Errorf("card: status %d, want %d: %s", resp.StatusCode, tc.cardStatus, b)
 			}
 			if !tc.enabled {
 				return
@@ -739,5 +751,16 @@ func TestRegister(t *testing.T) {
 				t.Errorf("info %s %v", res.StructuredContent, err)
 			}
 		})
+	}
+}
+
+// A public URL that is not one fails the startup, also while the server is off.
+func TestRegisterRejectsAWrongPublicURL(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		err := Register(fiber.New(), &appconfig.Config{ConfigSpec: appconfig.ConfigSpec{MCPEnabled: enabled, SEOSiteURL: site,
+			MCPPublicURL: "https://mcp.penguin-stats.io/"}}, nil)
+		if err == nil || !strings.Contains(err.Error(), "PENGUIN_V3_MCP_PUBLIC_URL") {
+			t.Errorf("enabled %v: %v", enabled, err)
+		}
 	}
 }

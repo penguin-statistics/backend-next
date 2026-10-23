@@ -324,6 +324,12 @@ type ConfigSpec struct {
 
 	// MCPRateLimitWindow is the sliding window of MCPRateLimitMax. Not positive: 1m.
 	MCPRateLimitWindow time.Duration `split_words:"true" default:"1m"`
+
+	// MCPPublicURL is the URL clients reach the MCP server at, https://mcp.penguin-stats.io/mcp in production: an
+	// https URL whose path is /mcp, with nothing after it, or the startup fails. Set (and MCPEnabled), the server
+	// describes itself at /mcp/server-card, its MCP Server Card, which gives clients this URL; the ingress has to route
+	// that path here. Empty, /mcp/server-card is not routed (404).
+	MCPPublicURL string `split_words:"true"`
 }
 
 type Config struct {
