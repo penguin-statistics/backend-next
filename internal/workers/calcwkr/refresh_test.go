@@ -89,7 +89,7 @@ func TestGlobalMatrixRefreshRecoversFromAPanic(t *testing.T) {
 	done.Wait()
 }
 
-func TestGlobalCachesWarmUpRunsEveryServerOneAtATimeHoldingTheLock(t *testing.T) {
+func TestGlobalCachesWarmUpRunsEveryServerOneAtATimeHoldingTheLocks(t *testing.T) {
 	rs := newTestRedSync(t)
 	w := newTestWorker(t, rs, 2*time.Second)
 	w.timeout = time.Minute
@@ -104,6 +104,7 @@ func TestGlobalCachesWarmUpRunsEveryServerOneAtATimeHoldingTheLock(t *testing.T)
 		mu                  sync.Mutex
 		warmed              []string
 		refreshedAfter      int
+		refreshedDuring     bool
 		refreshed           = make(chan struct{})
 	)
 	// the batch's context: the lock renewals of the microtasks end with it
@@ -119,10 +120,12 @@ func TestGlobalCachesWarmUpRunsEveryServerOneAtATimeHoldingTheLock(t *testing.T)
 		mu.Unlock()
 		switch server {
 		case constant.Servers[0]:
-			// a refresh scheduled meanwhile waits for the warm-up
+			// a refresh scheduled meanwhile waits for the warm-up of the server (each holds the refresh lock), and
+			// may run before the next server's
 			w.globalMatrixRefresh(ctx, "globalDropMatrixRefresh", server, func(context.Context, string) error {
 				mu.Lock()
 				refreshedAfter = len(warmed)
+				refreshedDuring = running.Load() > 0
 				mu.Unlock()
 				close(refreshed)
 				return nil
@@ -148,8 +151,8 @@ func TestGlobalCachesWarmUpRunsEveryServerOneAtATimeHoldingTheLock(t *testing.T)
 	if maxRunning.Load() != 1 {
 		t.Errorf("%d servers warmed up at the same time, want one", maxRunning.Load())
 	}
-	if refreshedAfter != len(constant.Servers) {
-		t.Errorf("a refresh ran after %d of %d servers warmed up, want after all", refreshedAfter, len(constant.Servers))
+	if refreshedDuring || refreshedAfter < 1 {
+		t.Errorf("a refresh ran during a server's warm-up (after %d servers started), want between them", refreshedAfter)
 	}
 	other := rs.NewMutex(w.syncMutex.Name(), redsync.WithExpiry(time.Second), redsync.WithTries(1))
 	if err := other.Lock(); err == nil {
