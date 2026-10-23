@@ -55,6 +55,13 @@ const (
 	// lookups, and the waits for a pool connection. It lasts longer so that PostgreSQL, not the driver, ends an
 	// aggregation at the deadline, which keeps the connection usable and the error a statement timeout.
 	advancedQueryLookupGrace = 2 * time.Second
+
+	// advancedQueryMaxIntervalNum is the most sections a trend query of an advanced query request may have (gommon's
+	// constant.MaxIntervalNum, 360, was too few for hourly sections over more than two weeks). The number of sections
+	// does not change the cost of a query: both stores compute the section of a report from its time (see
+	// trendGroupIdExpr), and the cost is that of scanning the reports of the time range, which advancedQueryTimeout
+	// bounds.
+	advancedQueryMaxIntervalNum = 10000
 )
 
 type Result struct {
@@ -481,8 +488,8 @@ func (c *Result) handleAdvancedQuery(ctx *fiber.Ctx, qctx context.Context, query
 			return nil, ErrIntervalLengthTooSmall
 		}
 		intervalNum := c.calcIntervalNum(startTime, endTime, intervalLength)
-		if intervalNum > constant.MaxIntervalNum {
-			return nil, pgerr.ErrInvalidReq.Msg("too many sections: interval number is %d sections, which is larger than %d sections", intervalNum, constant.MaxIntervalNum)
+		if intervalNum > advancedQueryMaxIntervalNum {
+			return nil, pgerr.ErrInvalidReq.Msg("too many sections: interval number is %d sections, which is larger than %d sections", intervalNum, advancedQueryMaxIntervalNum)
 		}
 
 		shimTrendQueryResult, err := c.TrendService.GetShimCustomizedTrendResults(qctx, query.Server, &startTime, intervalLength, intervalNum, []int{stage.StageID}, itemIds, accountId, sourceCategory)
