@@ -4,7 +4,7 @@
 
 # Penguin Statistics - V3 Backend
 
-[![License](https://img.shields.io/github/license/penguin-statistics/backend-next)](https://github.com/penguin-statistics/backend-next/blob/dev/LICENSE)
+[![License](https://img.shields.io/github/license/penguin-statistics/backend-next)](https://github.com/penguin-statistics/backend-next/blob/main/LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/penguin-statistics/backend-next)](https://github.com/penguin-statistics/backend-next/commits/dev)
 [![GitHub Actions Status](https://github.com/penguin-statistics/backend-next/actions/workflows/build-release.yml/badge.svg)](https://github.com/penguin-statistics/backend-next/actions/workflows/build-release.yml)
 [![go.mod Version](https://img.shields.io/github/go-mod/go-version/penguin-statistics/backend-next)](https://github.com/penguin-statistics/backend-next/blob/main/go.mod)
@@ -13,6 +13,28 @@
 ![Alt](https://repobeats.axiom.co/api/embed/ae259f962b4d5fc542de420d31a237986d282765.svg "Repobeats analytics image")
 
 The re-designed [Penguin Statistics](https://penguin-stats.io/?utm_source=github) v3 Backend, built with Go.
+
+## Using the data
+
+The drop data is public:
+
+- **REST API** at `https://penguin-stats.io/PenguinStats/api/v2/`: see the
+  [developer docs](https://developer.penguin-stats.io/public-api) and the
+  [OpenAPI (Swagger 2.0) spec](https://penguin-stats.io/swagger/doc.json).
+- **MCP server** for AI assistants (Claude, ChatGPT, Cursor, VS Code, Cherry Studio and others) at
+  `https://mcp.penguin-stats.io/mcp`: Streamable HTTP, no authentication, read-only. In Claude Code:
+
+  ```sh
+  claude mcp add --transport http --scope user penguin-stats https://mcp.penguin-stats.io/mcp
+  ```
+
+  The steps for every other app, in English and Chinese, are at https://mcp.penguin-stats.io/.
+- **Plugin and skill** for coding agents, the MCP server with a skill on reading, citing and querying the numbers:
+  https://github.com/penguin-statistics/agent-skills
+
+The drop data is licensed [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/): non-commercial use, with
+credit. Credit it as `Data: Penguin Statistics (penguin-stats.io), CC BY-NC 4.0`. The code of this repository is
+[MIT](LICENSE).
 
 ## Architecture
 
