@@ -43,20 +43,20 @@ require (
 	github.com/prometheus/client_model v0.4.0
 	github.com/redis/go-redis/extra/redisotel/v9 v9.0.5
 	github.com/redis/go-redis/v9 v9.0.5
-	github.com/rs/xid v1.5.0
-	github.com/rs/zerolog v1.31.0
+	github.com/rs/xid v1.6.0
+	github.com/rs/zerolog v1.34.0
 	github.com/samber/lo v1.38.1
 	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/swag v1.16.2
 	github.com/tidwall/gjson v1.16.0
 	github.com/tidwall/sjson v1.2.5
-	github.com/uptrace/bun v1.1.14
+	github.com/uptrace/bun v1.2.15
 	github.com/uptrace/bun/dialect/pgdialect v1.1.14
-	github.com/uptrace/bun/driver/pgdriver v1.1.14
+	github.com/uptrace/bun/driver/pgdriver v1.2.15
 	github.com/uptrace/bun/extra/bundebug v1.1.14
 	github.com/uptrace/bun/extra/bunotel v1.1.14
 	github.com/urfave/cli/v2 v2.25.7
-	github.com/vmihailenco/msgpack/v5 v5.3.5
+	github.com/vmihailenco/msgpack/v5 v5.4.1
 	github.com/zeebo/xxh3 v1.1.0
 	go.opentelemetry.io/otel v1.38.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.17.0
@@ -118,6 +118,7 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.25 // indirect
 	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.0 // indirect
+	github.com/puzpuzpuz/xsync/v3 v3.5.1 // indirect
 	github.com/redis/go-redis/extra/rediscmd/v9 v9.0.5 // indirect
 	github.com/richardartoul/molecule v1.0.1-0.20221107223329-32cfee06a052 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
@@ -158,7 +159,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/nats-io/nats-server/v2 v2.7.3 // indirect
 	github.com/nats-io/nkeys v0.3.0 // indirect
@@ -185,5 +186,5 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/tools v0.42.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	mellium.im/sasl v0.3.1 // indirect
+	mellium.im/sasl v0.3.2 // indirect
 )
