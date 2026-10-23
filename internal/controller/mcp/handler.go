@@ -48,7 +48,7 @@ const (
 
 // the rate limit with a setting that is not positive
 const (
-	defaultRateLimitMax    = 120
+	defaultRateLimitMax    = 1200
 	defaultRateLimitWindow = time.Minute
 )
 

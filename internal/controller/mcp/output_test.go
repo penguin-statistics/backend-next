@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -108,7 +110,7 @@ type argsIn struct {
 func TestInputSchema(t *testing.T) {
 	s := inputSchema[argsIn](map[string]property{
 		"query":  lengthProperty(1, 64),
-		"server": serverProperty,
+		"server": rankingServerProperty,
 		"lang":   langProperty,
 		"limit":  intProperty(10, 1, 25),
 	})
@@ -142,7 +144,8 @@ func TestInputSchema(t *testing.T) {
 	if len(srv.Enum) != 4 || srv.Enum[0] != "CN" || srv.Default != "CN" || srv.Description == "" {
 		t.Errorf("server: %+v", srv)
 	}
-	if len(lang.Enum) != 4 || lang.Default != "en" {
+	// no default for the language: models read one as leave it out (see langProperty)
+	if len(lang.Enum) != 4 || lang.Default != nil || lang.Description == "" {
 		t.Errorf("lang: %+v", lang)
 	}
 	if limit.Default != 10.0 || *limit.Minimum != 1 || *limit.Maximum != 25 {
@@ -161,7 +164,7 @@ func TestInputSchema(t *testing.T) {
 func TestInputSchemaThroughTheSDK(t *testing.T) {
 	r, app := testServer(&fakeData{})
 	add(r, &sdkmcp.Tool{Name: "echo", InputSchema: inputSchema[argsIn](map[string]property{
-		"server": serverProperty,
+		"server": rankingServerProperty,
 		"lang":   langProperty,
 		"limit":  intProperty(10, 1, 25),
 	})}, func(_ context.Context, _ *sdkmcp.CallToolRequest, in argsIn) (*sdkmcp.CallToolResult, argsIn, error) {
@@ -173,7 +176,7 @@ func TestInputSchemaThroughTheSDK(t *testing.T) {
 	if err := json.Unmarshal(res.StructuredContent, &got); err != nil {
 		t.Fatal(err)
 	}
-	if res.IsError || got != (argsIn{Query: "orirock", Server: "CN", Lang: "en", Limit: 10}) {
+	if res.IsError || got != (argsIn{Query: "orirock", Server: "CN", Limit: 10}) {
 		t.Errorf("defaults: %+v %s", got, res.StructuredContent)
 	}
 	if serverOf("") != "CN" || serverOf("JP") != "JP" || langOf("") != "en" || langOf("ko") != "ko" {
@@ -190,5 +193,33 @@ func TestInputSchemaThroughTheSDK(t *testing.T) {
 		if res := callTool(t, app, "echo", args); !res.IsError {
 			t.Errorf("%s: not an error: %s", args, res.StructuredContent)
 		}
+	}
+}
+
+type serverIn struct {
+	Server string `json:"server"`
+}
+
+// The server of the tools whose answer depends on it is required and has no default: a call without it is an error
+// naming it, for the model to ask the user rather than to answer for CN.
+func TestRequiredServer(t *testing.T) {
+	s := inputSchema[serverIn](map[string]property{"server": serverProperty})
+	if !slices.Equal(s.Required, []string{"server"}) || s.Properties["server"].Default != nil || len(s.Properties["server"].Enum) != 4 ||
+		!strings.Contains(s.Properties["server"].Description, "ask the user") {
+		t.Errorf("schema: %+v %+v", s, s.Properties["server"])
+	}
+
+	r, app := testServer(&fakeData{})
+	add(r, &sdkmcp.Tool{Name: "echo", InputSchema: s},
+		func(_ context.Context, _ *sdkmcp.CallToolRequest, in serverIn) (*sdkmcp.CallToolResult, serverIn, error) {
+			return textResult(in.Server), in, nil
+		})
+	for _, args := range []string{`{}`, "null"} {
+		if res := callTool(t, app, "echo", args); !res.IsError || !strings.Contains(res.text(t), `"server"`) {
+			t.Errorf("%s: %+v", args, res)
+		}
+	}
+	if res := callTool(t, app, "echo", `{"server":"JP"}`); res.IsError || res.text(t) != "JP" {
+		t.Errorf("JP: %+v", res)
 	}
 }

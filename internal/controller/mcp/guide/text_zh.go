@@ -264,7 +264,7 @@ var zh = &text{
 			"**提示 rate limited：** 见「用量限制」。",
 			"**添加了但 AI 不调用：** 先在对话中启用（Claude：+ → Connectors；ChatGPT：输入 @ 选择；Cherry Studio：在 Agent 中启用 MCP），"+
 				"再在提问里写明「用企鹅物流查」。",
-			"**和网站上的数字不一样：** 先确认是同一个服务器（默认国服）和时间范围；可以让 AI 说明它用的服务器和数据时间。",
+			"**和网站上的数字不一样：** 先确认是同一个服务器（网站默认国服；AI 会先问你玩哪个服，或按你的语言推断）和时间范围；可以让 AI 说明它用的服务器和数据时间。",
 			"**中国大陆网络：** 本服务器暂无 .cn 镜像，本地运行的应用在大陆可能连接较慢或失败；Claude、ChatGPT 等云端助手从海外服务器连接，不受影响。",
 		),
 		para("**不借助 AI 测试：** 运行 `npx @modelcontextprotocol/inspector`，选择 Streamable HTTP，填入地址，Connect 后点 List Tools。或者："),

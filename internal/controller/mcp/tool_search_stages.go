@@ -40,7 +40,8 @@ func searchStagesTool() *sdkmcp.Tool {
 		Title: "Search stages",
 		Description: "Finds stages by code (1-7, S2-12, YW-4; full-width characters work too), by stage ID " +
 			"(main_01-07), or by the name or ID of their zone (第十章, Under Tides), and returns their stage IDs (for " +
-			"get_stage_drops) with their zone, sanity cost and whether they are open on the server now. Codes are not " +
+			"get_stage_drops; to find the stages that drop an item, use get_item_drop_rates) with their zone, sanity " +
+			"cost and whether they are open on the server now. Codes are not " +
 			"unique: the standard and tough versions of a stage of the main story share them, as do an event, its rerun " +
 			"and the stages it left open for good. Best matches first (the code before the zone, exact before prefix " +
 			"before substring), then the stages open now, standard before tough, original before permanent before rerun. " +
@@ -49,7 +50,7 @@ func searchStagesTool() *sdkmcp.Tool {
 		InputSchema: inputSchema[searchStagesIn](map[string]property{
 			"query": lengthProperty(1, queryMaxLength),
 			"server": func(p *jsonschema.Schema) {
-				serverProperty(p)
+				rankingServerProperty(p)
 				p.Description += " The stages open there now rank first."
 			},
 			"lang":  langProperty,

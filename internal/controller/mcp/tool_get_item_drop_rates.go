@@ -31,7 +31,7 @@ const (
 
 type getItemDropRatesIn struct {
 	ItemID        string `json:"item_id" jsonschema:"Item ID, from search_items: 30012. A name or alias that only one item has works too: 固源岩, Orirock Cube"`
-	Server        string `json:"server,omitempty"`
+	Server        string `json:"server"`
 	TopN          int    `json:"top_n,omitempty" jsonschema:"Most stages to return, 1 to 100. Default 10."`
 	IncludeClosed bool   `json:"include_closed,omitempty" jsonschema:"false (default): only the stages open on the server now that still drop the item. true: also the stages of past events and the drops that ended, for history."`
 	SortBy        string `json:"sort_by,omitempty"`
@@ -82,11 +82,14 @@ func getItemDropRatesTool() *sdkmcp.Tool {
 	return &sdkmcp.Tool{
 		Name:  "get_item_drop_rates",
 		Title: "Item drop rates",
-		Description: "Returns where to farm an item on a game server: the stages that drop it, with runs (times), " +
-			"quantity, drop rate (items per run) and sanity per item. By default the stages open now that still drop " +
-			"it, lowest sanity per item first; stages of fewer than 100 runs (lowSample) rank after the others, " +
-			"gachas and the recruitment (no sanity cost) last. sort_by=drop_rate ranks by rate instead; " +
-			"include_closed=true adds past events and ended drops. Takes the item ID from search_items.",
+		Description: "Where to farm an item: ranks every stage of a game server that drops it, with sanity per item, " +
+			"drop rate (items per run), runs (times) and quantity. Use it for any question about where to get an item, " +
+			"its best or most efficient stage, or which of several stages to run for it: one call ranks every stage, " +
+			"so don't look stages up one by one with get_stage_drops (only a named stage left out of the top_n " +
+			"returned). By default the stages open now that still drop it, lowest sanity per item first; stages of " +
+			"fewer than 100 runs (lowSample) rank after the others, gachas and the recruitment (no sanity cost) last. " +
+			"sort_by=drop_rate ranks by rate instead; include_closed=true adds past events and ended drops. item_id " +
+			"takes the item's name in any language; search_items first only when the name may mean several items.",
 		InputSchema: inputSchema[getItemDropRatesIn](map[string]property{
 			"item_id": lengthProperty(1, queryMaxLength),
 			"server":  serverProperty,

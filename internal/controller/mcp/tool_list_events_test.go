@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"encoding/json"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -112,7 +113,7 @@ func ms(t time.Time) *string {
 
 func TestListEventsOpenAndUpcoming(t *testing.T) {
 	now := testNow
-	out, text := listEvents(t, &fakeData{catalog: eventsCatalog(now)}, `{}`)
+	out, text := listEvents(t, &fakeData{catalog: eventsCatalog(now)}, `{"server":"CN"}`)
 
 	if out.Server != "CN" || !out.OpenOnly || out.Truncated || out.Note != "" || out.Source.URL != site+"/en/result/cn/stage" {
 		t.Errorf("result: %+v", out)
@@ -183,7 +184,7 @@ func TestListEventsNoneOpen(t *testing.T) {
 	}
 
 	// CN with none open: no word on the global servers
-	out, _ = listEvents(t, &fakeData{catalog: eventsCatalog(now.Add(-35 * day))}, `{}`)
+	out, _ = listEvents(t, &fakeData{catalog: eventsCatalog(now.Add(-35 * day))}, `{"server":"CN"}`)
 	if len(out.Events) != 3 || out.Events[0].ZoneID != "act53side_zone1" || strings.Contains(out.Note, "global") {
 		t.Errorf("CN: %+v", out)
 	}
@@ -193,7 +194,7 @@ func TestListEventsAll(t *testing.T) {
 	now := testNow
 	data := &fakeData{catalog: eventsCatalog(now)}
 
-	out, text := listEvents(t, data, `{"open_only":false}`)
+	out, text := listEvents(t, data, `{"server":"CN","open_only":false}`)
 	// events only, latest first
 	if ids := zoneIDs(out.Events); strings.Join(ids, ",") != "act53side_zone1,act52side_zone1,act11sre_zone1,act13d2_zone1,act45side_zone1,act10d5_zone1" {
 		t.Errorf("events %v", ids)
@@ -211,7 +212,7 @@ func TestListEventsAll(t *testing.T) {
 	}
 
 	_, app := testServer(data)
-	res := callTool(t, app, "list_events", `{"open_only":false,"limit":3,"lang":"ja"}`)
+	res := callTool(t, app, "list_events", `{"server":"CN","open_only":false,"limit":3,"lang":"ja"}`)
 	if err := json.Unmarshal(res.StructuredContent, &out); err != nil {
 		t.Fatal(err)
 	}
@@ -229,15 +230,18 @@ func TestListEventsAll(t *testing.T) {
 
 func TestListEventsArguments(t *testing.T) {
 	_, app := testServer(&fakeData{catalog: eventsCatalog(testNow)})
-	for _, args := range []string{`{"limit":0}`, `{"limit":51}`, `{"server":"TW"}`, `{"open_only":"yes"}`} {
+	for _, args := range []string{`{"server":"CN","limit":0}`, `{"server":"CN","limit":51}`, `{"server":"TW"}`, `{"server":"CN","open_only":"yes"}`} {
 		if res := callTool(t, app, "list_events", args); !res.IsError {
 			t.Errorf("%s: %s", args, res.StructuredContent)
 		}
 	}
 
-	// no arguments at all: the defaults (see observe)
-	if res := callTool(t, app, "list_events", "null"); res.IsError {
-		t.Errorf("null: %s", res.text(t))
+	// the server is required, so that the model asks the user for it rather than answering for CN: a call without it,
+	// or without arguments at all (see observe), is an error naming it
+	for _, args := range []string{`{}`, "null"} {
+		if res := callTool(t, app, "list_events", args); !res.IsError || !strings.Contains(res.text(t), `"server"`) {
+			t.Errorf("%s: %s", args, res.text(t))
+		}
 	}
 
 	// open_only is a boolean, true unless set
@@ -260,7 +264,7 @@ func TestListEventsArguments(t *testing.T) {
 		}
 		p := tool.InputSchema.Properties
 		if p["open_only"]["type"] != "boolean" || p["open_only"]["default"] != true || p["limit"]["default"] != 20.0 ||
-			p["limit"]["maximum"] != 50.0 || p["server"]["default"] != "CN" || len(tool.InputSchema.Required) != 0 {
+			p["limit"]["maximum"] != 50.0 || p["server"]["default"] != nil || !slices.Equal(tool.InputSchema.Required, []string{"server"}) {
 			t.Errorf("input schema: %v", p)
 		}
 		return
@@ -270,7 +274,7 @@ func TestListEventsArguments(t *testing.T) {
 
 func TestListEventsWhileCold(t *testing.T) {
 	_, app := testServer(&fakeData{})
-	res := callTool(t, app, "list_events", `{}`)
+	res := callTool(t, app, "list_events", `{"server":"CN"}`)
 	if !res.IsError || res.text(t) != errCold.Error() {
 		t.Errorf("result: %+v", res)
 	}
@@ -322,7 +326,7 @@ func TestListEventsSize(t *testing.T) {
 		}
 	}
 	_, app := testServer(&fakeData{catalog: service.NewSEOCatalog(nil, stages, zones)})
-	for _, args := range []string{`{"limit":50}`, `{"limit":50,"open_only":false}`} {
+	for _, args := range []string{`{"server":"CN","limit":50}`, `{"server":"CN","limit":50,"open_only":false}`} {
 		res := callTool(t, app, "list_events", args)
 		var out eventList
 		if err := json.Unmarshal(res.StructuredContent, &out); err != nil {

@@ -39,14 +39,15 @@ const (
 	serverDescription = "Crowdsourced Arknights drop rates by stage and item, for the CN, US, JP and KR game servers"
 )
 
-// instructions tell the model what the data is, how to use the tools and how to credit the data (600 characters at
-// most, as clients may cut them)
-const instructions = "Penguin Statistics (penguin-stats.io) publishes crowdsourced Arknights drop statistics: for each " +
-	"game server (CN, US, JP, KR), how often each stage drops each item, from player reports. Find item and stage IDs " +
-	"with search_items and search_stages (any language, aliases, pinyin, codes like 1-7), then get_item_drop_rates " +
-	"(where to farm an item) or get_stage_drops (what a stage drops); list_events lists the events open now. " +
-	"get_dataset_info explains the numbers. When you use these numbers, name the server, the data-as-of time and " +
-	"credit Penguin Statistics (penguin-stats.io), CC BY-NC 4.0."
+// instructions tell the model what the data is, which tool answers which question, to ask for the server of the user
+// and to answer in the user's language, and how to credit the data (600 characters at most, as clients may cut them).
+// They name every tool: a client that loads tools on demand may have loaded only some of them.
+const instructions = "Penguin Statistics (penguin-stats.io): crowdsourced Arknights drop rates per game server (CN, US, " +
+	"JP, KR). Where to farm an item: one get_item_drop_rates call ranks every stage that drops it (item names in any " +
+	"language work); don't check stages one by one or trust remembered drop tables. What a stage drops: " +
+	"get_stage_drops. Events open now: list_events. IDs: search_items, search_stages. The numbers: get_dataset_info. " +
+	"Ask which server the user plays on unless the conversation tells you. Use the user's language (lang). Name the " +
+	"server and data time; credit Penguin Statistics, CC BY-NC 4.0."
 
 // listTTL is how long clients may keep the list of the tools, which only a release changes
 const listTTL = time.Hour

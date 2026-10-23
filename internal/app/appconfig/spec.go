@@ -319,10 +319,12 @@ type ConfigSpec struct {
 	MCPEnabled bool `split_words:"true" default:"false"`
 
 	// MCPRateLimitMax is how many requests to /mcp a client (an IP, an IPv6 /64) may send per MCPRateLimitWindow to
-	// each replica; past it, it is answered 429 with a Retry-After. Not positive: 120.
-	MCPRateLimitMax int `split_words:"true" default:"120"`
+	// each replica; past it, it is answered 429 with a Retry-After. It only stops floods: the tools answer from memory,
+	// and the users of a hosted assistant (Claude.ai, ChatGPT) share the few egress IPs of its provider. Not positive:
+	// 1200.
+	MCPRateLimitMax int `split_words:"true" default:"1200"`
 
-	// MCPRateLimitWindow is the sliding window of MCPRateLimitMax. Not positive: 1m.
+	// MCPRateLimitWindow is the fixed window of MCPRateLimitMax. Not positive: 1m.
 	MCPRateLimitWindow time.Duration `split_words:"true" default:"1m"`
 
 	// MCPPublicURL is the URL clients reach the MCP server at, https://mcp.penguin-stats.io/mcp in production: an

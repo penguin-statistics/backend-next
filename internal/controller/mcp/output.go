@@ -93,7 +93,7 @@ var dropDefinitions = definitions{
 var servers = constant.Servers
 
 // serverOf returns the server argument, or the default server if none was given: the SDK fills in the default of
-// the schema, but a handler called otherwise gets none.
+// the schema or rejects a call without a required one, but a handler called otherwise gets none.
 func serverOf(server string) string {
 	if server == "" {
 		return constant.DefaultServer
@@ -143,24 +143,43 @@ func inputSchema[In any](adjust map[string]property) *jsonschema.Schema {
 	return s
 }
 
-// serverProperty is a server argument, CN by default.
+// serverProperty is the server argument of a tool whose answer depends on the server: required (no omitempty in In)
+// and without a default, so that the model takes the server of the user from the conversation or asks for it, rather
+// than answering for CN a user of another server. Its description names the servers by what players call them.
 func serverProperty(p *jsonschema.Schema) {
-	p.Description = "Game server: CN (China), US (global, English), JP (Japan) or KR (Korea). Default CN."
+	p.Description = "Game server the user plays on: CN (mainland China: 国服, 官服, B服), US (global, English: 国际服, " +
+		"美服), JP (日服) or KR (韩服). Stages, events and drop rates differ by server. Use the server the user named " +
+		"or the conversation makes clear; a user writing Chinese, Japanese or Korean most likely plays CN, JP or KR. " +
+		"If you can't tell, ask the user which server they play on before calling. Name the server in your answer."
+	serverEnum(p)
+}
+
+// rankingServerProperty is the server argument of a tool that finds the same things on every server and only ranks
+// them and marks them open or not by it (search_stages): CN by default.
+func rankingServerProperty(p *jsonschema.Schema) {
+	p.Description = "Game server the user plays on: CN (China), US (global, English), JP (Japan) or KR (Korea). " +
+		"Default CN."
+	serverEnum(p)
+	p.Default = json.RawMessage(strconv.Quote(constant.DefaultServer))
+}
+
+// serverEnum makes the values of p the game servers.
+func serverEnum(p *jsonschema.Schema) {
 	p.Enum = make([]any, len(servers))
 	for i, s := range servers {
 		p.Enum[i] = s
 	}
-	p.Default = json.RawMessage(strconv.Quote(constant.DefaultServer))
 }
 
-// langProperty is a language argument, of the names in results only, en by default.
+// langProperty is a language argument, of the names in results only: the language of the user, en if none is given
+// (see langOf). The schema has no default, which models read as leave it out: the names would then be in English.
 func langProperty(p *jsonschema.Schema) {
-	p.Description = "Language of the names in the result: zh, en, ja or ko. Default en."
+	p.Description = "Language of the names in the result: the language the user writes in, zh, en, ja or ko (en for " +
+		"other languages, and if omitted)."
 	p.Enum = make([]any, len(service.StatsLangs))
 	for i, l := range service.StatsLangs {
 		p.Enum[i] = l
 	}
-	p.Default = json.RawMessage(strconv.Quote(service.StatsDefaultLang))
 }
 
 // intProperty is an integer argument from minimum to maximum, def by default.
