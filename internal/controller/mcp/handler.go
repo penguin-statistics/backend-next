@@ -16,11 +16,13 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/pkg/bininfo"
+	"exusiai.dev/backend-next/internal/pkg/flog"
 	"exusiai.dev/backend-next/internal/pkg/middlewares"
 	"exusiai.dev/backend-next/internal/service"
 	"exusiai.dev/backend-next/internal/util"
@@ -51,8 +53,9 @@ const (
 )
 
 // Register serves the MCP server at /mcp if it is enabled, and its server card and its guide if it has a public URL
-// (MCPPublicURL). Disabled, /mcp is not routed: 404, and neither are the card and the guide. A public URL that is not
-// one fails the startup, enabled or not, rather than be found out when the server is turned on.
+// (MCPPublicURL), which browsers opening /mcp are then sent to. Disabled, /mcp is not routed: 404, and neither are the
+// card and the guide. A public URL that is not one fails the startup, enabled or not, rather than be found out when
+// the server is turned on.
 func Register(app *fiber.App, conf *appconfig.Config, data *service.SEOData) error {
 	public, err := parsePublicURL(conf.MCPPublicURL)
 	if err != nil {
@@ -62,6 +65,10 @@ func Register(app *fiber.App, conf *appconfig.Config, data *service.SEOData) err
 		return nil
 	}
 	limit, window := rateLimitOf(conf.MCPRateLimitMax, conf.MCPRateLimitWindow)
+	if public != nil {
+		// before the server, whose limits it is ahead of
+		mountEndpointHelp(app, guideURL(public))
+	}
 	Mount(app, NewServer(data, conf.SEOSiteURL, bininfo.Version), limit, window)
 	if public != nil {
 		if err := mountServerCard(app, newServerCard(public, conf.SEOSiteURL)); err != nil {
@@ -154,6 +161,11 @@ func serve(h http.Handler) fiber.Handler {
 			// (observe counted the message as timed out)
 			c.Set(fiber.HeaderRetryAfter, "1")
 			_ = sendErrorTo(c, requestID(c.Request().Body()), fiber.StatusServiceUnavailable, codeServerError, "timed out, retry")
+		}
+		// the plugins of penguin-statistics/agent-skills add ?via=plugin to the URL of the server, to count their
+		// requests by a field of its own rather than by the raw query of http.url, which clients fill as they like
+		if c.Query("via") == "plugin" {
+			flog.UpdateContext(c, func(lc zerolog.Context) zerolog.Context { return lc.Str("mcp.via", "plugin") })
 		}
 		rec.log(c)
 		return nil

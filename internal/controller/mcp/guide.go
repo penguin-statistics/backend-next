@@ -195,7 +195,27 @@ const (
 // event stream is asked for without HTML; HTML otherwise, */* and none included: the link previews of QQ, WeChat and
 // Discord need its og: tags, and the tools turning HTML into text read it well.
 func negotiateGuide(accept string) guideFormat {
-	var md, html, plain, eventStream float64
+	q := acceptQ(accept)
+	md := max(q["text/markdown"], q["text/x-markdown"])
+	html := max(q["text/html"], q["application/xhtml+xml"])
+	switch {
+	case q["text/event-stream"] > 0 && html == 0:
+		return guideNotAcceptable
+	case md > 0 && md >= html:
+		return guideMarkdown
+	case html > 0:
+		return guideHTML
+	case q["text/plain"] > 0:
+		return guidePlain
+	default:
+		return guideHTML
+	}
+}
+
+// acceptQ returns the quality the Accept header accept gives each media type it lists, in lower case: the highest
+// it gives, 0 for a q that is not a number from 0 to 1. Wildcards are media types like the others.
+func acceptQ(accept string) map[string]float64 {
+	qs := make(map[string]float64)
 	for _, mediaRange := range strings.Split(accept, ",") {
 		mediaType, params, _ := strings.Cut(mediaRange, ";")
 		q := 1.0
@@ -208,29 +228,11 @@ func negotiateGuide(accept string) guideFormat {
 				}
 			}
 		}
-		switch strings.ToLower(strings.TrimSpace(mediaType)) {
-		case "text/markdown", "text/x-markdown":
-			md = max(md, q)
-		case "text/html", "application/xhtml+xml":
-			html = max(html, q)
-		case "text/plain":
-			plain = max(plain, q)
-		case "text/event-stream":
-			eventStream = max(eventStream, q)
+		if t := strings.ToLower(strings.TrimSpace(mediaType)); t != "" {
+			qs[t] = max(qs[t], q)
 		}
 	}
-	switch {
-	case eventStream > 0 && html == 0:
-		return guideNotAcceptable
-	case md > 0 && md >= html:
-		return guideMarkdown
-	case html > 0:
-		return guideHTML
-	case plain > 0:
-		return guidePlain
-	default:
-		return guideHTML
-	}
+	return qs
 }
 
 // guideLang is the language of the guide for a request: that of ?lang (lang) if the guide has it, else the first of
