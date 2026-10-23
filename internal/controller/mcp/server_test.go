@@ -35,12 +35,13 @@ const initialize = `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"pro
 	`"clientInfo":{"name":"claude-ai","version":"0.1.0"}}}`
 
 // wantServerInfo is what the server tells of itself: in the result of initialize, and in the _meta of every result of
-// the 2026-07-28 protocol
+// the 2026-07-28 protocol. Its name is that of the listing and the card; its version that of a build without a
+// semantic version (the tests build "test"; see TestServerCardMatchesServerInfo for a release).
 var wantServerInfo = &sdkmcp.Implementation{
-	Name:        "penguin-stats",
+	Name:        "io.penguin-stats/penguin-stats",
 	Title:       "Penguin Statistics",
 	Description: "Crowdsourced Arknights drop rates by stage and item, for the CN, US, JP and KR game servers",
-	Version:     "test",
+	Version:     "0.0.0-dev",
 	WebsiteURL:  site,
 	Icons: []sdkmcp.Icon{
 		{Source: "https://penguin-stats.io/favicon/android-chrome-512x512.png", MIMEType: "image/png", Sizes: []string{"512x512"}},

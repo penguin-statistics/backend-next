@@ -71,7 +71,7 @@ func Register(app *fiber.App, conf *appconfig.Config, data *service.SEOData) err
 	}
 	Mount(app, NewServer(data, conf.SEOSiteURL, bininfo.Version), limit, window)
 	if public != nil {
-		if err := mountServerCard(app, newServerCard(public, conf.SEOSiteURL)); err != nil {
+		if err := mountServerCard(app, newServerCard(public, conf.SEOSiteURL, bininfo.Version)); err != nil {
 			return err
 		}
 		if err := mountGuide(app, public, conf.SEOSiteURL, limit, window); err != nil {

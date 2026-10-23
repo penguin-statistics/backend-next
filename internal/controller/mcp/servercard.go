@@ -13,8 +13,10 @@ import (
 // The MCP Server Card (SEP-2127; its format is that of https://github.com/modelcontextprotocol/ext-server-card at
 // 526201bb, the snapshot the SEP accepted) tells clients and directories what the server is and where to reach it,
 // before they connect. It is served at the URL the specification reserves for it, the endpoint followed by
-// /server-card, and an AI Catalog entry or a Link header points to it. It says what serverInfo and server.json say:
-// the specification asks a card not to contradict serverInfo, and checkers compare it with the registry listing.
+// /server-card, and an AI Catalog entry or a Link header points to it. Its name and version are those of serverInfo,
+// as the specification asks a card not to contradict serverInfo and clients reconcile the card with the live server:
+// registryName, and the version of the build (serverVersion). The rest says what server.json says, which checkers
+// compare it with; the version of server.json is that of the listing (listingVersion), not of the build.
 
 const (
 	// serverCardSchema is the $schema every card must have (the pattern of the schema allows no other)
@@ -50,13 +52,13 @@ type cardRemote struct {
 }
 
 // newServerCard returns the card of the server whose public URL is endpoint (MCPPublicURL), on the site of origin
-// site (SEOSiteURL), which has the icons. Its website is the guide to adding the server to clients, at the root of the
-// host of endpoint, as the website of the listing is.
-func newServerCard(endpoint *url.URL, site string) serverCard {
+// site (SEOSiteURL), which has the icons, built as build (bininfo.Version, as given to NewServer). Its website is the
+// guide to adding the server to clients, at the root of the host of endpoint, as the website of the listing is.
+func newServerCard(endpoint *url.URL, site, build string) serverCard {
 	return serverCard{
 		Schema:      serverCardSchema,
 		Name:        registryName,
-		Version:     listingVersion,
+		Version:     serverVersion(build),
 		Description: serverDescription,
 		Title:       serverTitle,
 		WebsiteURL:  guideURL(endpoint),
