@@ -98,6 +98,8 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 	// See compressbench_test.go.
 	app.Use(compress.New(compress.Config{
 		Level: compress.LevelDefault,
+		// but fonts, which WOFF2 compresses with brotli already: the setup guide of the MCP server serves its own
+		Next: func(c *fiber.Ctx) bool { return strings.HasSuffix(c.Path(), ".woff2") },
 	}))
 	// fasthttp adds Vary: Accept-Encoding only to the responses it compresses, but the identity response to a request
 	// without Accept-Encoding varies on it too: without the header a shared cache could serve that uncompressed body

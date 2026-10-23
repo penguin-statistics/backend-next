@@ -8,6 +8,16 @@
 {{end -}}
 **{{.T.Badges}}**
 
+## {{.T.AgentSummary}}
+
+{{t .T.AgentIntro}}
+
+```text
+{{code .T.AgentPrompt}}
+```
+
+## {{.T.Install}}
+
 | | |
 |---|---|
 | {{.T.URLLabel}} | `{{.Endpoint}}` |
@@ -20,16 +30,6 @@
 {{t .T.OneClickNote}}
 
 {{end -}}
-## {{.T.AgentSummary}}
-
-{{t .T.AgentIntro}}
-
-```text
-{{code .T.AgentPrompt}}
-```
-
-## {{.T.Install}}
-
 ### {{.T.ChatApps}}
 
 {{range .Chat}}{{template "client" .}}{{end -}}

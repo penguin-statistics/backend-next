@@ -5,8 +5,9 @@
 //
 // Everything is rendered once, at startup: the texts (text_en.go, text_zh.go, one table per language, which a
 // translation adds to) with the snippets and the one-click links (clients.go), all made of the URL of the server,
-// into the templates of page.gohtml and page.md.tmpl. The HTML has its style and script inline, and no other
-// resource but the icon of the site: its Content-Security-Policy allows those two by their hashes.
+// into the templates of page.gohtml and page.md.tmpl. The HTML has its style and script inline, and loads nothing but
+// its fonts, from its own host (fonts.go), and the icon of the site: its Content-Security-Policy allows the style and
+// the script by their hashes. How the page shows the texts is in display.go.
 package guide
 
 import (
@@ -19,13 +20,14 @@ import (
 	htmltemplate "html/template"
 	"io"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	texttemplate "text/template"
 	"time"
 )
 
-//go:embed page.gohtml page.md.tmpl style.css copy.js
+//go:embed page.gohtml page.md.tmpl style.css page.js
 var assets embed.FS
 
 // pluginsAvailable shows the plugin and the skill of penguin-statistics/agent-skills (the blocks of the texts marked
@@ -71,6 +73,8 @@ type Guide struct {
 	LLMs, Robots []byte
 	// CSP is the Content-Security-Policy of the HTML pages
 	CSP string
+	// Files are the fonts of the pages and their license, served on the host of the guide
+	Files []File
 }
 
 // Page is the guide in a language.
@@ -101,22 +105,39 @@ func Render(c Config) (*Guide, error) {
 	if err != nil {
 		return nil, err
 	}
-	js, err := assets.ReadFile("copy.js")
+	js, err := assets.ReadFile("page.js")
 	if err != nil {
 		return nil, err
 	}
-	css, js = bytes.TrimSpace(css), bytes.TrimSpace(js)
-	g := &Guide{
-		Pages: make(map[string]*Page, len(texts)),
-		CSP: "default-src 'none'; style-src '" + hash(css) + "'; script-src '" + hash(js) + "'; img-src " + c.Site +
-			"; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+	g := &Guide{Pages: make(map[string]*Page, len(texts))}
+	// the fonts, by their path
+	for _, name := range fonts {
+		f, err := fontFile(name)
+		if err != nil {
+			return nil, err
+		}
+		if !bytes.Contains(css, []byte("url(fonts/"+name+")")) {
+			return nil, fmt.Errorf("guide: style.css does not load %s", name)
+		}
+		css = bytes.ReplaceAll(css, []byte("url(fonts/"+name+")"), []byte("url("+f.Path+")"))
+		g.Files = append(g.Files, f)
 	}
+	ofl, err := license()
+	if err != nil {
+		return nil, err
+	}
+	g.Files = append(g.Files, ofl)
+	css, js = []byte(minify(string(css), cssComment)), []byte(minify(string(js), jsComment))
+	css = bytes.Replace(css, []byte("{targeted}"), []byte(targeted()), 1)
+	g.CSP = "default-src 'none'; style-src '" + hash(css) + "'; script-src '" + hash(js) + "'; font-src 'self'; img-src " +
+		c.Site + "; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 	for _, t := range texts {
 		v, err := newView(c, t)
 		if err != nil {
 			return nil, err
 		}
-		v.CSS, v.JS = htmltemplate.CSS(css), htmltemplate.JS(js) //nolint:gosec // the embedded style.css and copy.js
+		v.CSS, v.JS = htmltemplate.CSS(css), htmltemplate.JS(js) //nolint:gosec // the embedded style.css and page.js
+		v.Font = g.Files[0].Path
 		p := &Page{ContentLanguage: t.ContentLanguage}
 		if p.HTML, err = v.html(); err != nil {
 			return nil, err
@@ -152,6 +173,35 @@ Disallow: /mcp
 Content-Signal: search=yes, ai-input=yes, ai-train=yes
 `
 
+// targeted are the selectors of the tab of the app whose section is the target of the URL (/#cursor), which shows it
+// without the script: one per app, as CSS cannot match the tab of a target otherwise.
+func targeted() string {
+	var s []string
+	for _, id := range slices.Concat(en.Chat, en.Coding, []string{"other"}) {
+		s = append(s, `html:not(.tabs) .win:has(#`+id+`:target) [href="#`+id+`"]`)
+	}
+	return strings.Join(s, ",")
+}
+
+// the comments of style.css and of page.js (on lines of their own)
+var (
+	cssComment = regexp.MustCompile(`(?s)/\*.*?\*/\n?`)
+	jsComment  = regexp.MustCompile(`(?m)^\s*//.*$`)
+)
+
+// minify leaves the comments and the indentation of the lines of src, CSS or JavaScript, out, as the page does
+// without them.
+func minify(src string, comment *regexp.Regexp) string {
+	src = comment.ReplaceAllString(src, "")
+	var lines []string
+	for _, line := range strings.Split(src, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 // hash is the CSP source of an inline style or script
 func hash(b []byte) string {
 	sum := sha256.Sum256(b)
@@ -167,6 +217,8 @@ type view struct {
 	LLMs bool
 	CSS  htmltemplate.CSS
 	JS   htmltemplate.JS
+	// Font is the path of the font the page preloads
+	Font string
 
 	Endpoint, Guide, Card, Site, License string
 	// URL is the URL of the page, MarkdownURL and MarkdownPath those of its Markdown, LLMsURL that of llms.txt
@@ -194,7 +246,9 @@ type oneClick struct {
 
 type clientView struct {
 	ID, Summary string
-	Blocks      []block
+	// Blocks are the blocks of the Markdown, ending with the link to the documentation; the page shows Docs apart
+	Blocks []block
+	Docs   string
 }
 
 func newView(c Config, t *text) (*view, error) {
@@ -243,7 +297,7 @@ func newView(c Config, t *text) (*view, error) {
 	}
 	client := func(id string) clientView {
 		ct := t.Clients[id]
-		return clientView{ID: id, Summary: ct.Summary, Blocks: append(visible(ct.Blocks), para(t.Docs+ct.Docs))}
+		return clientView{ID: id, Summary: ct.Summary, Blocks: append(visible(ct.Blocks), para(t.Docs+ct.Docs)), Docs: ct.Docs}
 	}
 	for _, id := range t.Chat {
 		v.Chat = append(v.Chat, client(id))
@@ -277,12 +331,55 @@ func (v *view) expand(s string) string {
 
 // html renders the page as HTML.
 func (v *view) html() ([]byte, error) {
+	ts := typesetter{zh: v.T.Lang == "zh", expand: v.expand, terminal: v.T.Terminal}
+	type name struct{ Name, Qualifier string }
+	type sentence struct{ First, Rest string }
 	t, err := htmltemplate.New("page.gohtml").Funcs(htmltemplate.FuncMap{
-		"t": func(s string) (htmltemplate.HTML, error) { return inline(v.expand(s)) },
+		"t": ts.text,
 		// a text without its markup and links, which html/template escapes
 		"plain": v.expand,
-		// the escaping of an element's text: html/template would escape every quote of the JSON as well
-		"code": func(s string) htmltemplate.HTML { return htmltemplate.HTML(escape(v.expand(s))) }, //nolint:gosec // escaped
+		// the prompt for agents, as it is copied
+		"prompt": ts.prompt,
+		"blocks": ts.blocks,
+		"other":  ts.other,
+		"panel": func(c clientView) (panelView, error) {
+			n, q := splitName(c.Summary)
+			blocks, err := ts.blocks(c.ID, c.Blocks[:len(c.Blocks)-1])
+			return panelView{ID: c.ID, Name: n, Qualifier: q, Blocks: blocks, DocsLabel: label(v.T.Docs),
+				DocsURL: htmltemplate.URL(c.Docs), DocsText: docsText(c.Docs)}, err //nolint:gosec // a URL of the texts
+		},
+		// the title, cut before MCP: the name of the site, and MCP Server
+		"title": func(s string) [2]string {
+			if i := strings.Index(s, " MCP"); i > 0 {
+				return [2]string{s[:i], s[i+1:]}
+			}
+			return [2]string{s, ""}
+		},
+		"name":     func(s string) name { n, q := splitName(s); return name{n, q} },
+		"sentence": func(s string) sentence { f, r := splitSentence(s); return sentence{f, r} },
+		"badges":   func(s string) []string { return strings.Split(s, " · ") },
+		"label":    label,
+		// the URL of the server in the narrow column of the apps: without its scheme, which screen readers still read
+		// and the button next to it copies, and which may break before its path only
+		"shortURL": func(u string) htmltemplate.HTML {
+			e := escape(u)
+			if rest, ok := strings.CutPrefix(e, "https://"); ok {
+				host, path, _ := strings.Cut(rest, "/")
+				e = `<span class="sr">https://</span>` + nowrapWords(host)
+				if path != "" {
+					e += "<wbr>/" + nowrapWords(path)
+				}
+			}
+			return htmltemplate.HTML(e) //nolint:gosec // escaped
+		},
+		// a copy button of the class class, which the script shows
+		"copy": func(class string) htmltemplate.HTML {
+			if class != "" {
+				class = " " + class
+			}
+			return htmltemplate.HTML(`<button type="button" class="cp` + class + `" hidden><svg class="i" aria-hidden="true"><use href="#i-copy"/></svg>` + //nolint:gosec // our markup
+				copyLabel(class, v.T.Copy) + "</button>")
+		},
 	}).ParseFS(assets, "page.gohtml")
 	if err != nil {
 		return nil, err
@@ -312,4 +409,17 @@ func (v *view) execute(execute func(w io.Writer, data any) error) ([]byte, error
 		return nil, fmt.Errorf("guide (%s): unknown placeholder %s", v.T.Lang, p)
 	}
 	return b.Bytes(), nil
+}
+
+// label is s without the colon it ends in: One click: is the label One click
+func label(s string) string {
+	return strings.TrimRight(strings.TrimSpace(s), ":：")
+}
+
+// copyLabel is the text of a copy button: Copy, which only screen readers read on an icon (cp-ico)
+func copyLabel(class, copy string) string {
+	if strings.Contains(class, "cp-ico") {
+		return `<span class="t sr">` + escape(copy) + "</span>"
+	}
+	return `<span class="t">` + escape(copy) + "</span>"
 }

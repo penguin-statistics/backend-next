@@ -1,9 +1,11 @@
 <!doctype html>
-<html lang="{{.T.ContentLanguage}}" data-copy="{{.T.Copy}}" data-copied="{{.T.Copied}}">
+<html lang="{{.T.ContentLanguage}}" data-copied="{{.T.Copied}}" id="top">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f7f7f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14120b" media="(prefers-color-scheme: dark)">
 <title>{{.T.Title}}</title>
 <meta name="description" content="{{.T.Description}}">
 <link rel="icon" type="image/png" href="{{.Site}}/favicon/favicon-32x32.png">
@@ -18,72 +20,106 @@
 <meta property="og:description" content="{{.T.Description}}">
 <meta property="og:url" content="{{.URL}}">
 <meta property="og:image" content="{{.Site}}/favicon/android-chrome-512x512.png">
+<link rel="preload" href="{{.Font}}" as="font" type="font/woff2" crossorigin>
 <style>{{.CSS}}</style>
 </head>
 <body>
-<main>
-<header>
-<nav>{{template "langs" .}} · <a href="{{.MarkdownPath}}" type="text/markdown">{{.T.MarkdownLink}}</a></nav>
-<h1>{{.T.Title}}</h1>
-</header>
+<svg class="sprite" aria-hidden="true"><symbol id="i-copy" viewBox="0 0 16 16"><rect x="5.25" y="5.25" width="8.5" height="8.5" rx="1.75"/><path d="M10.75 5.25V3.5c0-.7-.55-1.25-1.25-1.25h-6c-.7 0-1.25.55-1.25 1.25v6c0 .7.55 1.25 1.25 1.25h1.75"/></symbol><symbol id="i-check" viewBox="0 0 16 16"><path d="M3 8.5l3.2 3.2L13 4.8"/></symbol><symbol id="i-arrow" viewBox="0 0 16 16"><path d="M5.5 4.5h6v6M11.5 4.5l-7 7"/></symbol><symbol id="i-term" viewBox="0 0 16 16"><path d="M3.5 5l3 3-3 3M8.5 11.5h4"/></symbol></svg>
+<a class="skip" href="#main">{{.T.SkipLink}}</a>
+{{$title := title .T.Title -}}
+<header class="top"><div class="wrap top-in">
+<a class="brand" href="#top"><span class="brand-n">{{index $title 0}}</span> <span class="tag">MCP</span></a>
+<nav class="top-nav" aria-label="{{.T.PageNav}}"><a href="#install">{{.T.Install}}</a><a href="#tools">{{.T.ToolsHeading}}</a><a href="#troubleshooting">{{.T.Troubleshooting.Heading}}</a></nav>
+<div class="top-r"><a class="top-md" href="{{.MarkdownPath}}" type="text/markdown">{{.T.MarkdownLink}}</a><nav class="seg" aria-label="{{.T.LangNav}}">{{template "langs" .}}</nav></div>
+</div></header>
+<main id="main">
 <p class="sr">{{plain .T.ForAgents}}</p>
-{{range .T.Lead}}<p>{{t .}}</p>
-{{end}}<p><strong>{{.T.Badges}}</strong></p>
-<p class="url" data-c="{{.Endpoint}}"><strong>{{.T.URLLabel}}</strong> <code>{{.Endpoint}}</code></p>
-<table>
-{{range .T.Card}}<tr><th>{{index . 0}}</th><td>{{t (index . 1)}}</td></tr>
-{{end}}</table>
-<p>{{t .T.URLNote}}</p>
-<p><strong>{{.T.OneClick}}</strong> {{range .OneClick}}<a class="btn" href="{{.URL}}">{{.Label}}</a> {{end}}<br>{{t .T.OneClickNote}}</p>
-<details id="agent"><summary>{{.T.AgentSummary}}</summary>
-<p>{{t .T.AgentIntro}}</p>
-<pre class="w" data-c><code>{{code .T.AgentPrompt}}</code></pre>
-</details>
-<h2 id="install">{{.T.Install}}</h2>
-<h3>{{.T.ChatApps}}</h3>
-{{range .Chat}}{{template "client" .}}{{end -}}
-<h3>{{.T.CodingTools}}</h3>
-{{range .Coding}}{{template "client" .}}{{end -}}
-<details id="other"><summary>{{.T.Other.Summary}}</summary>
-<table>
-<tr>{{range .T.Other.Head}}<th>{{.}}</th>{{end}}</tr>
-{{range .T.Other.Rows}}<tr>{{range .}}<td>{{t .}}</td>{{end}}</tr>
-{{end}}</table>
-</details>
+<section class="hero wrap" aria-labelledby="title">
+<div class="hero-t">
+<p class="pill">{{range $i, $b := badges .T.Badges}}{{if $i}}<span class="sep" aria-hidden="true"></span><span class="sr"> · </span>{{end}}<span>{{$b}}</span>{{end}}</p>
+<h1 id="title"><span>{{index $title 0}}</span> <span class="h1-b">{{index $title 1}}</span></h1>
+{{with sentence (index .T.Lead 0)}}<p class="lead"><span class="l1">{{t .First}}</span>{{t .Rest}}</p>{{end}}
+{{range slice .T.Lead 1}}<p class="aside">{{t .}}</p>
+{{end -}}
+<div class="cta" id="agent" role="group" aria-label="{{.T.AgentSummary}}" data-c="{{plain .T.AgentPrompt}}">
+<button type="button" class="cp cta-b" hidden><svg class="i" aria-hidden="true"><use href="#i-copy"/></svg><span class="t">{{.T.AgentCopy}}</span></button>
+<p class="cta-h">{{t .T.AgentHint}}</p>
+<div class="agent-w"><p class="agent-p" id="agent-p"><span class="agent-t">{{prompt .T.AgentPrompt}}</span></p><button type="button" class="more" aria-controls="agent-p" aria-expanded="true" data-more="{{.T.AgentMore}}" hidden>{{.T.AgentLess}}</button></div>
+</div>
+</div>
+<div class="card">
+<p class="lbl" id="url">{{.T.URLLabel}}</p>
+<div class="url" role="group" aria-labelledby="url" data-c="{{.Endpoint}}"><code>{{.Endpoint}}</code>{{copy "cp-url"}}</div>
+<dl class="specs">{{range .T.Card}}<div><dt>{{index . 0}}</dt><dd>{{t (index . 1)}}</dd></div>{{end}}</dl>
+<p class="small">{{t .T.URLNote}}</p>
+<div class="oc"><p class="lbl">{{label .T.OneClick}}</p>
+<div class="oc-g">{{range .OneClick}}<a class="btn" href="{{.URL}}">{{.Label}}{{template "arrow"}}</a>{{end}}</div>
+<p class="small">{{t .T.OneClickNote}}</p></div>
+</div>
+</section>
+<div class="wrap">
+<section class="sec sec-w" id="install" aria-labelledby="install-h">
+<h2 id="install-h"><a href="#install">{{.T.Install}}</a></h2>
+<div class="win">
+<nav class="win-n" aria-label="{{.T.AppNav}}"><div class="win-s"><div data-tabs>
+<p class="grp">{{.T.ChatApps}}</p><ul>{{range .Chat}}{{template "tab" .}}{{end}}</ul>
+<p class="grp">{{.T.CodingTools}}</p><ul>{{range .Coding}}{{template "tab" .}}{{end}}</ul>
+<ul class="tab-o"><li><a class="tab" href="#other">{{.T.Other.Summary}}</a></li></ul></div>
+<div class="win-u" data-c="{{.Endpoint}}"><p class="lbl">{{.T.URLLabel}}</p><code>{{shortURL .Endpoint}}</code>{{copy "cp-ico"}}</div>
+</div></nav>
+<div class="win-p">
+{{range .Chat}}{{template "panel" panel .}}{{end -}}
+{{range .Coding}}{{template "panel" panel .}}{{end -}}
+<section class="panel" id="other" aria-labelledby="other-h"><h3 id="other-h">{{.T.Other.Summary}}</h3>
+<table class="apps"><thead><tr><th scope="col">{{index .T.Other.Head 0}}</th><th scope="col">{{index .T.Other.Head 1}}</th><th scope="col">{{index .T.Other.Head 2}}</th></tr></thead><tbody>
+{{range other .T.Other.Rows}}<tr><th scope="row">{{.App}}</th><td class="where">{{.Where}}</td><td class="what">{{with .Snip}}{{template "snip" .}}{{end}}{{.What}}</td></tr>
+{{end}}</tbody></table></section>
+</div>
+</div>
+</section>
 {{template "section" .Try}}
 {{- if .Plugins}}{{template "section" .Plugin}}{{end -}}
-<h2 id="tools">{{.T.ToolsHeading}}</h2>
-<p>{{t .T.ToolsIntro}}</p>
-<table>
-<tr><th>{{index .T.ToolsHead 0}}</th><th>{{index .T.ToolsHead 1}}</th></tr>
-{{range .T.Tools}}<tr><td><code>{{.Name}}</code></td><td>{{t .Line}}</td></tr>
-{{end}}</table>
+<section class="sec" id="tools" aria-labelledby="tools-h">
+<h2 id="tools-h"><a href="#tools">{{.T.ToolsHeading}}</a></h2>
+<div class="sec-b"><p>{{t .T.ToolsIntro}}</p>
+<ul class="tools">{{range .T.Tools}}<li><h3><code>{{.Name}}</code></h3><p>{{t .Line}}</p></li>{{end}}</ul></div>
+</section>
+<div class="facts">
 {{template "section" .Data}}
 {{- template "section" .Limits}}
-{{- template "section" .Privacy}}
-{{- template "section" .Troubleshooting}}
+{{- template "section" .Privacy -}}
+</div>
+{{template "section" .Troubleshooting}}
 {{- template "section" .Links -}}
-<footer>
-<p>{{t .T.Footer}}</p>
-<p>{{template "langs" .}}</p>
-</footer>
+</div>
 </main>
+<footer class="foot"><div class="wrap foot-in">
+<div><p class="foot-b">{{index $title 0}} <span class="tag">MCP</span></p><p>{{t .T.Footer}}</p></div>
+<p class="foot-l">{{template "langs" .}}</p>
+</div></footer>
+<div id="live" class="sr" aria-live="polite"></div>
 <script>{{.JS}}</script>
 </body>
 </html>
-{{- define "langs"}}{{range $i, $l := .Langs}}{{if $i}} · {{end}}<a href="{{$l.Path}}" hreflang="{{$l.ContentLanguage}}" lang="{{$l.ContentLanguage}}">{{$l.Name}}</a>{{end}}{{end}}
-{{- define "client"}}<details id="{{.ID}}"><summary>{{.Summary}}</summary>
-{{template "blocks" .Blocks}}</details>
+{{- define "arrow"}}<svg class="i ar" aria-hidden="true"><use href="#i-arrow"/></svg>{{end}}
+{{- define "langs"}}{{$lang := .T.Lang}}{{range .Langs}}<a href="{{.Path}}" hreflang="{{.ContentLanguage}}" lang="{{.ContentLanguage}}"{{if eq .Lang $lang}} aria-current="page"{{end}}>{{.Name}}</a>{{end}}{{end}}
+{{- define "tab"}}<li><a class="tab" href="#{{.ID}}">{{(name .Summary).Name}}</a></li>{{end}}
+{{- define "panel"}}<section class="panel" id="{{.ID}}" aria-labelledby="{{.ID}}-h"><h3 id="{{.ID}}-h">{{.Name}}{{with .Qualifier}} <span class="ph-q">{{.}}</span>{{end}}</h3>
+{{template "blocks" .Blocks}}<p class="docs"><span class="docs-l">{{.DocsLabel}}</span> <a href="{{.DocsURL}}"><span>{{.DocsText}}</span>{{template "arrow"}}</a></p></section>
 {{end}}
-{{- define "section"}}<h2 id="{{.ID}}">{{.Heading}}</h2>
-{{template "blocks" .Blocks}}{{end}}
+{{- define "section"}}{{$n := name .Heading}}<section class="sec" id="{{.ID}}" aria-labelledby="{{.ID}}-h">
+<h2 id="{{.ID}}-h"><a href="#{{.ID}}">{{$n.Name}}</a>{{with $n.Qualifier}} <span class="h2-q">{{.}}</span>{{end}}</h2>
+<div class="sec-b">{{template "blocks" blocks .ID .Blocks}}</div>
+</section>
+{{end}}
+{{- define "snip"}}{{with .Join}}<p class="snip-j">{{.}}</p>{{end}}<div class="snip" data-c="{{.Copy}}"><code>{{.HTML}}</code>{{copy "cp-ico"}}</div>{{end}}
 {{- define "blocks"}}{{range .}}
-{{- if .Text}}<p>{{t .Text}}</p>
-{{else if .Items}}<ul>
-{{range .Items}}<li>{{t .}}</li>
-{{end}}</ul>
-{{else if .Steps}}<ol>
-{{range .Steps}}<li>{{t .}}</li>
-{{end}}</ol>
-{{else if .Code}}<pre data-c><code>{{code .Code}}</code></pre>
+{{- if eq .Kind "p"}}<p{{with .Class}} class="{{.}}"{{end}}>{{.HTML}}</p>
+{{else if eq .Kind "buttons"}}<p class="btns">{{range .Links}}<a class="btn" href="{{.URL}}">{{.Label}}{{template "arrow"}}</a>{{end}}</p>
+{{else if eq .Kind "steps"}}<ol class="steps">{{range .Items}}<li>{{.HTML}}</li>{{end}}</ol>
+{{else if eq .Kind "list"}}<ul class="{{.Class}}">{{range .Items}}<li>{{.HTML}}</li>{{end}}</ul>
+{{else if eq .Kind "prompts"}}<ul class="prompts">{{range .Items}}<li data-c="{{.Copy}}"><p>{{.HTML}}</p>{{copy "cp-ico"}}</li>{{end}}</ul>
+{{else if eq .Kind "rows"}}<dl class="rows">{{range .Items}}<div><dt>{{.Label}}</dt><dd>{{if .Snips}}{{range .Snips}}{{template "snip" .}}{{end}}{{else}}{{.HTML}}{{end}}</dd></div>{{end}}</dl>
+{{else if eq .Kind "faq"}}<dl class="faq">{{range .Items}}<div><dt>{{.Label}}</dt><dd>{{.HTML}}</dd></div>{{end}}</dl>
+{{else if eq .Kind "code"}}{{with .Code}}<div class="cb cb-{{.Kind}}" data-c="{{.Copy}}"><div class="cb-h"><span class="cb-l">{{.Label}}</span>{{copy ""}}</div><pre tabindex="0"><code>{{range .Lines}}<span class="ln i{{.Indent}}">{{.HTML}}{{if .Break}}<span class="nl">{{"\n"}}</span>{{end}}</span>{{end}}</code></pre></div>{{end}}
 {{end}}{{end}}{{end}}

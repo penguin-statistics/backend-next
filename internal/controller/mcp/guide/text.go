@@ -21,6 +21,9 @@ type text struct {
 	MarkdownLink string
 	// Copy and Copied label the copy buttons, before and after a click
 	Copy, Copied string
+	// SkipLink skips to the content; PageNav, LangNav and AppNav name the links to the sections, the language switch
+	// and the list of apps for screen readers; Terminal labels the blocks of shell commands. The Markdown has none.
+	SkipLink, PageNav, LangNav, AppNav, Terminal string
 	// ForAgents points agents reading the HTML to the Markdown and llms.txt; screens do not show it. It is plain text,
 	// with no markup: a link in it would take the focus of keyboard users, who would not see where it went.
 	ForAgents string
@@ -41,8 +44,12 @@ type text struct {
 	OneClickApps []string
 	OneClickNote string
 
-	// a prompt to paste into a coding agent, which then adds the server itself
-	AgentSummary, AgentIntro, AgentPrompt string
+	// a prompt to paste into a coding agent, which then adds the server itself: the first way to install it. The
+	// Markdown has AgentSummary as its heading and AgentIntro before it. The page leads with a button that copies it
+	// (AgentCopy), AgentHint under it, and the prompt itself, which phones show in part until AgentMore unfolds it
+	// (and AgentLess folds it again); AgentSummary names the group of them for screen readers.
+	AgentSummary, AgentIntro, AgentPrompt      string
+	AgentCopy, AgentHint, AgentMore, AgentLess string
 
 	// Install has the sections of the apps: ChatApps and CodingTools in their order, by the id of their section
 	// in clients (which is their anchor, /#cursor), then the table of the others

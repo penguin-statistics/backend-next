@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -216,10 +217,62 @@ func TestGuide(t *testing.T) {
 		})
 	}
 
-	// the HTML only has a CSP
+	// the HTML only has a CSP, which lets it load its fonts from its host
 	resp, _ := guideRequest(t, app, fiber.MethodGet, guideHost, "/")
-	if csp := resp.Header.Get(fiber.HeaderContentSecurityPolicy); !strings.HasPrefix(csp, "default-src 'none'; style-src 'sha256-") {
+	if csp := resp.Header.Get(fiber.HeaderContentSecurityPolicy); !strings.HasPrefix(csp, "default-src 'none'; style-src 'sha256-") ||
+		!strings.Contains(csp, "; font-src 'self'; ") {
 		t.Errorf("CSP %q", csp)
+	}
+}
+
+// guideFonts are the paths of the fonts the page loads.
+func guideFonts(t *testing.T, app *fiber.App) []string {
+	t.Helper()
+	_, page := guideRequest(t, app, fiber.MethodGet, guideHost, "/")
+	var paths []string
+	for _, m := range regexp.MustCompile(`url\((/fonts/[^)]+\.woff2)\)`).FindAllSubmatch(page, -1) {
+		paths = append(paths, string(m[1]))
+	}
+	if len(paths) != 2 {
+		t.Fatalf("fonts %v", paths)
+	}
+	return paths
+}
+
+// The fonts of the page are served on its host, and kept for good: their paths change with them. Their license goes
+// with them.
+func TestGuideFonts(t *testing.T) {
+	app := guideApp(t, nil)
+	for _, path := range guideFonts(t, app) {
+		resp, b := guideRequest(t, app, fiber.MethodGet, guideHost, path)
+		etag := resp.Header.Get(fiber.HeaderETag)
+		if resp.StatusCode != fiber.StatusOK || resp.Header.Get(fiber.HeaderContentType) != "font/woff2" ||
+			resp.Header.Get(fiber.HeaderCacheControl) != "public, max-age=31536000, immutable" || !strings.HasPrefix(etag, `W/"`) ||
+			resp.Header.Get(fiber.HeaderXContentTypeOptions) != "nosniff" || !bytes.HasPrefix(b, []byte("wOF2")) {
+			t.Errorf("%s: status %d, headers %v, %.4q", path, resp.StatusCode, resp.Header, b)
+		}
+		if resp, b := guideRequest(t, app, fiber.MethodHead, guideHost, path); resp.StatusCode != fiber.StatusOK || len(b) != 0 {
+			t.Errorf("HEAD %s: status %d", path, resp.StatusCode)
+		}
+		if resp, _ := guideRequest(t, app, fiber.MethodGet, guideHost, path, fiber.HeaderIfNoneMatch, etag); resp.StatusCode != fiber.StatusNotModified {
+			t.Errorf("%s, If-None-Match: status %d", path, resp.StatusCode)
+		}
+		// the path is the font's
+		if !strings.HasPrefix(path, guide.FontsPath) {
+			t.Errorf("%s is not under %s", path, guide.FontsPath)
+		}
+	}
+	resp, b := guideRequest(t, app, fiber.MethodGet, guideHost, "/fonts/OFL.txt")
+	if resp.StatusCode != fiber.StatusOK || resp.Header.Get(fiber.HeaderContentType) != "text/plain; charset=utf-8" ||
+		resp.Header.Get(fiber.HeaderCacheControl) != "public, max-age=86400" || !bytes.Contains(b, []byte("SIL OPEN FONT LICENSE")) {
+		t.Errorf("OFL.txt: status %d, headers %v", resp.StatusCode, resp.Header)
+	}
+	// a font that is not, or no longer, the page's, is not found for now only: no cache keeps the 404
+	for _, path := range []string{"/fonts/geist-latin-00000000.woff2", "/fonts/", "/fonts/a/b.woff2"} {
+		if resp, _ := guideRequest(t, app, fiber.MethodGet, guideHost, path); resp.StatusCode != fiber.StatusNotFound ||
+			resp.Header.Get(fiber.HeaderCacheControl) != "no-store" {
+			t.Errorf("%s: status %d, Cache-Control %q", path, resp.StatusCode, resp.Header.Get(fiber.HeaderCacheControl))
+		}
 	}
 }
 
@@ -252,7 +305,7 @@ func TestGuideNotModified(t *testing.T) {
 // Other hosts the backend answers never show the guide: their root is not its own.
 func TestGuideOnItsHostOnly(t *testing.T) {
 	app := guideApp(t, nil)
-	for _, path := range []string{"/", "/index.md", "/llms.txt", "/robots.txt"} {
+	for _, path := range append([]string{"/", "/index.md", "/llms.txt", "/robots.txt", "/fonts/OFL.txt", "/fonts/a.woff2"}, guideFonts(t, app)...) {
 		for _, method := range []string{fiber.MethodGet, fiber.MethodHead, fiber.MethodPost} {
 			if method == fiber.MethodPost && path != "/" {
 				continue
@@ -382,7 +435,10 @@ func TestGuideThroughTheService(t *testing.T) {
 	if want := []string{"/", guide.MarkdownPath, guide.LLMsPath, guide.RobotsPath}; !slices.Equal(middlewares.MCPGuidePaths, want) {
 		t.Fatalf("middlewares.MCPGuidePaths = %v, want %v", middlewares.MCPGuidePaths, want)
 	}
-	for _, path := range middlewares.MCPGuidePaths {
+	if guide.FontsPath != middlewares.MCPGuideFontsPath {
+		t.Fatalf("middlewares.MCPGuideFontsPath = %s, want %s", middlewares.MCPGuideFontsPath, guide.FontsPath)
+	}
+	for _, path := range append(slices.Clone(middlewares.MCPGuidePaths), guideFonts(t, app)...) {
 		resp, _ := guideRequest(t, app, fiber.MethodGet, guideHost, path, fiber.HeaderOrigin, "https://penguin-stats.io")
 		if resp.StatusCode != fiber.StatusOK || resp.Header.Get(fiber.HeaderAccessControlAllowOrigin) != "*" ||
 			resp.Header.Get(fiber.HeaderAccessControlAllowCredentials) != "" {

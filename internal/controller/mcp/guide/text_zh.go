@@ -12,6 +12,11 @@ var zh = &text{
 	MarkdownLink: "Markdown",
 	Copy:         "复制",
 	Copied:       "已复制",
+	SkipLink:     "跳到正文",
+	PageNav:      "本页内容",
+	LangNav:      "语言",
+	AppNav:       "应用",
+	Terminal:     "终端",
 	ForAgents:    "给 AI 智能体：本页的 Markdown 版在 {md} ，面向智能体的安装步骤在 {llms} 。",
 	Lead: []string{
 		"让你的 AI 助手直接查明日方舟掉率。企鹅物流数据统计（penguin-stats.io）汇总玩家上报的每一关掉落，覆盖国服、美服（国际服）、" +
@@ -37,6 +42,10 @@ var zh = &text{
 	AgentIntro:   "把下面这段话发给 Claude Code、Codex、Cursor 等编程助手：",
 	AgentPrompt: "请为当前这个 AI 工具添加「企鹅物流数据统计」MCP 服务器：地址 {url} ，传输方式 Streamable HTTP，无需认证。按 " +
 		"{llms} 中对应客户端的步骤，以用户（全局）范围添加，完成后列出它的工具，确认连接成功。",
+	AgentCopy: "复制给 AI 的安装指令",
+	AgentHint: "粘贴给 Claude Code、Codex、Cursor 或其他编程助手即可。",
+	AgentMore: "展开全部",
+	AgentLess: "收起",
 
 	Install:     "安装",
 	ChatApps:    "聊天应用",

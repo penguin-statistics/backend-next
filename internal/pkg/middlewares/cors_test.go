@@ -194,7 +194,13 @@ func TestCORSMCPPathIsPublic(t *testing.T) {
 			return c.SendString("ok")
 		})
 	}
+	app.Get(MCPGuideFontsPath+"*", func(c *fiber.Ctx) error {
+		return c.SendString("ok")
+	})
 	app.Get("/mcpx", func(c *fiber.Ctx) error {
+		return c.SendString("ok")
+	})
+	app.Get("/fonts", func(c *fiber.Ctx) error {
 		return c.SendString("ok")
 	})
 
@@ -229,6 +235,9 @@ func TestCORSMCPPathIsPublic(t *testing.T) {
 			wantACAO: "*", wantAllowHeaders: mcpHeaders},
 		{name: "guide file preflight without request headers", method: fiber.MethodOptions, path: "/llms.txt", origin: "https://evil.example",
 			wantACAO: "*", wantAllowHeaders: "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace,traceparent,tracestate,If-None-Match"},
+		// and its fonts, which Cloudflare caches by their extension
+		{name: "guide font", method: fiber.MethodGet, path: "/fonts/geist-latin-0123abcd.woff2", origin: "https://penguin-stats.io", wantACAO: "*"},
+		{name: "guide font license", method: fiber.MethodGet, path: "/Fonts/OFL.txt", origin: "capacitor://localhost", wantACAO: "*"},
 		// other paths keep the tiers and the fixed list
 		{name: "other path", method: fiber.MethodGet, path: "/mcpx", origin: "https://penguin-stats.io", wantACAO: "https://penguin-stats.io", wantCredentials: true},
 		{name: "other path preflight", method: fiber.MethodOptions, path: "/mcpx", origin: "https://evil.example", requestHeaders: mcpHeaders,
@@ -236,6 +245,8 @@ func TestCORSMCPPathIsPublic(t *testing.T) {
 		{name: "other path under /mcp", method: fiber.MethodGet, path: "/mcp/other", origin: "https://penguin-stats.io", wantACAO: "https://penguin-stats.io",
 			wantCredentials: true},
 		{name: "other file at the root", method: fiber.MethodGet, path: "/llms-full.txt", origin: "https://penguin-stats.io", wantACAO: "https://penguin-stats.io",
+			wantCredentials: true},
+		{name: "the fonts directory itself", method: fiber.MethodGet, path: "/fonts", origin: "https://penguin-stats.io", wantACAO: "https://penguin-stats.io",
 			wantCredentials: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
