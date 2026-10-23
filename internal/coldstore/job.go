@@ -49,6 +49,9 @@ type job struct {
 	// redacted from every error of the job: DuckDB's postgres extension opens new connections after the ATTACH
 	// (e.g. after the server restarted, or to scan in parallel), and an error to connect echoes the whole DSN.
 	dsns []string
+	// orphanExtras counts the rows of the month's drop_report_extras partition that belong to none of the month's
+	// reports, on the schema of the new database (see countOrphanExtras); -1 otherwise.
+	orphanExtras int64
 }
 
 func newJob(ctx context.Context, opts Options, name string, attachPostgres bool) (_ *job, err error) {

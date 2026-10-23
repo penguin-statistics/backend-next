@@ -82,4 +82,18 @@ func TestRecallSingularReport(t *testing.T) {
 	if !keyExists(missing) {
 		t.Error("the recall key of a missing report was deleted")
 	}
+
+	// a report submitted more than RecallMaxAge ago is not looked up (see repo.RecallMaxAge)
+	mustExec(t, db, "INSERT INTO drop_reports (stage_id, pattern_id, times, reliability, server, account_id, created_at) VALUES (1, 1, 1, 0, 'CN', 1, now() - ? * interval '1 hour')",
+		int(repo.RecallMaxAge/time.Hour)+1)
+	old := newKey(2)
+	if err := recall(old); !errors.Is(err, ErrReportNotFound) {
+		t.Errorf("recall of a report older than RecallMaxAge: got %v, want ErrReportNotFound", err)
+	}
+	if err := db.NewRaw("SELECT reliability FROM drop_reports WHERE report_id = 2").Scan(ctx, &reliability); err != nil {
+		t.Fatal(err)
+	}
+	if reliability != 0 {
+		t.Errorf("reliability of the report older than RecallMaxAge = %d, want 0", reliability)
+	}
 }

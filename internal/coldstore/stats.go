@@ -188,7 +188,7 @@ func (j *job) recruitStageID(ctx context.Context) (int, error) {
 
 // loadSource reads a month's reports into the table r and their extras into the table e. The extras are read by
 // the report_id range of the month (drop_report_extras is keyed by report_id alone) and kept only for the month's
-// reports; extras without a report are never archived.
+// reports; extras without a report are never archived (see countOrphanExtras).
 func (j *job) loadSource(ctx context.Context, month Month) error {
 	where := "created_at < " + pgTime(month.End)
 	if !month.IsPre() {
@@ -208,10 +208,34 @@ func (j *job) loadSource(ctx context.Context, month Month) error {
 		// no reports: an empty range, so that e still gets the source's column types
 		lo.Int64, hi.Int64 = 0, -1
 	}
-	return j.exec(ctx, fmt.Sprintf(`CREATE TABLE e AS SELECT x.* FROM postgres_query('pg', $$
+	if err := j.exec(ctx, fmt.Sprintf(`CREATE TABLE e AS SELECT x.* FROM postgres_query('pg', $$
 		SELECT report_id, ip::text AS ip, metadata::text AS metadata, md5
 		FROM drop_report_extras WHERE report_id BETWEEN %d AND %d$$) x
-		SEMI JOIN r ON r.report_id = x.report_id`, lo.Int64, hi.Int64))
+		SEMI JOIN r ON r.report_id = x.report_id`, lo.Int64, hi.Int64)); err != nil {
+		return err
+	}
+	return j.countOrphanExtras(ctx, where)
+}
+
+// countOrphanExtras sets orphanExtras, after loadSource filled r, on the schema of the new database of #752
+// (scripts/newdb), where drop_report_extras has the created_at of its report and is partitioned by it like
+// drop_reports: it counts the rows of the month's drop_report_extras partition (where selects the month by
+// created_at) that belong to none of the month's reports. Those are not archived, and the monthly archiving would
+// lose them with the partition (see VerifyMonth). On a database whose drop_report_extras has no created_at (today's,
+// which the backfill reads), orphanExtras is -1 and nothing more is read.
+func (j *job) countOrphanExtras(ctx context.Context, where string) error {
+	j.orphanExtras = -1
+	var partitioned bool
+	if err := j.queryRow(ctx, `SELECT * FROM postgres_query('pg', $$SELECT EXISTS (SELECT FROM pg_attribute
+		WHERE attrelid = to_regclass('drop_report_extras') AND attname = 'created_at' AND NOT attisdropped)$$)`, &partitioned); err != nil {
+		return err
+	}
+	if !partitioned {
+		return nil
+	}
+	return j.queryRow(ctx, `SELECT count(*) FROM postgres_query('pg', $$
+		SELECT report_id FROM drop_report_extras WHERE `+where+`$$) x
+		ANTI JOIN r ON r.report_id = x.report_id`, &j.orphanExtras)
 }
 
 // sourceStats computes MonthStats over the tables loadSource filled.

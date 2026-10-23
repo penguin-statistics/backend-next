@@ -160,17 +160,9 @@ type ConfigSpec struct {
 	// We don't want to show all patterns because it will be too many. So we set a limit here (default 19)
 	PatternMatrixLimit int `split_words:"true" default:"19"`
 
-	DropReportArchiveEnabled   bool `split_words:"true" default:"false"`
-	DropReportArchiveBatchSize int  `split_words:"true" default:"1000"`
-
-	DropReportArchiveS3Bucket string `required:"true" split_words:"true"`
-	DropReportArchiveS3Region string `required:"true" split_words:"true"`
-	AWSAccessKey              string `required:"true" split_words:"true"`
-	AWSSecretKey              string `required:"true" split_words:"true"`
-
-	NoArchiveDays int `split_words:"true" default:"60"`
-
-	DeleteDropReportAfterArchive bool `split_words:"true" default:"false"`
+	// AWSAccessKey and AWSSecretKey are the keys of the backup bucket of the cold storage (ColdstoreS3Bucket).
+	AWSAccessKey string `split_words:"true"`
+	AWSSecretKey string `split_words:"true"`
 
 	// ColdstoreExtensionDirectory is where the cold storage (#752) loads the DuckDB extensions that are not built
 	// into the binary from: postgres, to export the reports from PostgreSQL (run-script coldstore-export and
@@ -220,8 +212,10 @@ type ConfigSpec struct {
 	// are not compared (counted as skipped).
 	ColdstoreShadowMaxInFlight int `split_words:"true" default:"2"`
 
-	// ColdstoreDirectory is the local cold storage directory (manifest.json and the files it lists), on the disk of
-	// the machine the app runs on. Required when ColdstoreEnabled. DuckDB may read nothing else.
+	// ColdstoreDirectory is the local cold storage directory (manifest.json and the files it lists; coldstore/v1 of
+	// the bucket), on the disk of the machine the app runs on. The app reads the cold storage from it: required when
+	// ColdstoreEnabled, and DuckDB may read nothing else. The monthly archiving (ColdstoreArchiveEnabled) writes the
+	// new months into it.
 	ColdstoreDirectory string `split_words:"true"`
 
 	// ColdstoreThreads caps the threads of the cold storage's DuckDB database.
@@ -242,6 +236,57 @@ type ConfigSpec struct {
 	// the lowest CPU and I/O priority, and compared with the manifest's sha256. Mismatches are logged and counted
 	// (penguinbackend_coldstore_integrity_files_total{result!="ok"}), never repaired. 0 disables the check.
 	ColdstoreIntegrityCheckInterval time.Duration `split_words:"true" default:"168h"`
+
+	// ColdstoreArchiveEnabled runs the monthly archiving of the cold storage (#752, internal/coldstore, see
+	// docs/coldstore.md) in this process: once at start and then every ColdstoreArchiveInterval, it creates the
+	// partitions of the current and the next months, and for every month whose partitions ended more than
+	// ColdstoreArchiveAfter ago, exports the month to ColdstoreDirectory, uploads it to the backup bucket, verifies it
+	// against PostgreSQL, records it in the manifest and, ColdstoreArchiveDropDelay later, drops its partitions. It
+	// needs the partitioned schema of the new database (scripts/newdb): on today's database there are no partitions,
+	// and it does nothing. Turn it on only in the process that runs on the machine holding ColdstoreDirectory. A Redis
+	// lock keeps two processes from archiving at once.
+	ColdstoreArchiveEnabled bool `split_words:"true" default:"false"`
+
+	// ColdstoreWorkDirectory is where the DuckDB jobs of the archiving keep their database and spill files, about as
+	// large as the month's partitions (6 GB for 2026-09). Empty is the system's temp directory.
+	ColdstoreWorkDirectory string `split_words:"true"`
+
+	// ColdstoreArchiveAfter is how long after its end a month is archived: the hot database keeps the last 60 to 90
+	// days.
+	ColdstoreArchiveAfter time.Duration `split_words:"true" default:"1440h"`
+
+	// ColdstoreArchiveInterval is the time between two runs of the archiving. A run that has nothing to archive only
+	// lists the partitions.
+	ColdstoreArchiveInterval time.Duration `split_words:"true" default:"1h"`
+
+	// ColdstoreArchiveDropDelay is how long an archived month stays both in the manifest of ColdstoreDirectory and
+	// in PostgreSQL before its partitions are dropped, by the first run after it: every app reading the directory
+	// must load the new manifest within it (the cold storage reader checks it every minute by default).
+	ColdstoreArchiveDropDelay time.Duration `split_words:"true" default:"15m"`
+
+	// ColdstoreArchiveMinFreeBytes is the free space that must be left on the file systems of ColdstoreDirectory and
+	// of ColdstoreWorkDirectory once a month is exported: a month that would leave less is refused (an error log and
+	// penguinbackend_coldstore_archive_runs_total{outcome="insufficient_space"}), and its partitions are kept.
+	ColdstoreArchiveMinFreeBytes int64 `split_words:"true" default:"10737418240"`
+
+	// ColdstoreArchiveThreads and ColdstoreArchiveMemoryLimit bound the DuckDB jobs of the archiving.
+	ColdstoreArchiveThreads     int    `split_words:"true" default:"2"`
+	ColdstoreArchiveMemoryLimit string `split_words:"true" default:"2GB"`
+
+	// ColdstoreS3Bucket is the backup bucket of the cold storage (AWS S3), with the keys AWSAccessKey and
+	// AWSSecretKey. The app never reads the cold storage from it: the archiving uploads the new months to it, with
+	// their SHA-256 checked by S3 and confirmed with a HEAD of each object. Required by the archiving.
+	ColdstoreS3Bucket string `split_words:"true"`
+	ColdstoreS3Region string `split_words:"true" default:"ap-southeast-1"`
+
+	// ColdstoreS3Endpoint is the URL of an S3-compatible server instead of AWS S3 (e.g. MinIO, for tests).
+	ColdstoreS3Endpoint string `split_words:"true"`
+
+	// ColdstoreS3Prefix is the key prefix of the cold storage directory in the bucket.
+	ColdstoreS3Prefix string `split_words:"true" default:"coldstore/v1"`
+
+	// ColdstoreS3StorageClass is the storage class of the uploaded data files (the manifests are always STANDARD).
+	ColdstoreS3StorageClass string `split_words:"true" default:"STANDARD_IA"`
 
 	// SEOPagesEnabled serves the stats pages of the frontend (/{zh,en,ja,ko}/result/...) from here: the frontend's
 	// index.html with the page's title, description, canonical and hreflang links, structured data and a plain HTML

@@ -26,7 +26,6 @@ import (
 	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/model/gamedata"
 	"exusiai.dev/backend-next/internal/model/types"
-	"exusiai.dev/backend-next/internal/pkg/flog"
 	"exusiai.dev/backend-next/internal/pkg/pgerr"
 	"exusiai.dev/backend-next/internal/repo"
 	"exusiai.dev/backend-next/internal/server/svr"
@@ -58,7 +57,6 @@ type AdminController struct {
 	TimeRangeService         *service.TimeRange
 	ExportService            *service.Export
 	AccountService           *service.Account
-	ArchiveService           *service.Archive
 }
 
 func RegisterAdmin(admin *svr.Admin, c AdminController) {
@@ -89,8 +87,6 @@ func RegisterAdmin(admin *svr.Admin, c AdminController) {
 	admin.Post("/export/drop-report", c.ExportDropReport)
 
 	admin.Post("/snapshots", c.CreateSnapshot)
-
-	admin.Post("/archive", c.ArchiveDropReports)
 }
 
 type CliGameDataSeedResponse struct {
@@ -706,27 +702,4 @@ func (c *AdminController) CloneFromCN(ctx *fiber.Ctx) error {
 		return err
 	}
 	return ctx.SendStatus(fiber.StatusCreated)
-}
-
-func (c *AdminController) ArchiveDropReports(ctx *fiber.Ctx) error {
-	var request types.ArchiveDropReportRequest
-	if err := rekuest.ValidBody(ctx, &request); err != nil {
-		return err
-	}
-
-	date, err := time.Parse("2006-01-02", request.Date)
-	if err != nil {
-		return ctx.Status(fiber.StatusBadRequest).SendString("invalid date")
-	}
-
-	err = c.ArchiveService.ArchiveByDate(ctx.UserContext(), date, request.DeleteAfterArchive)
-	if err != nil {
-		flog.ErrorFrom(ctx, "archive.drop_report").
-			Err(err).
-			Time("targetDay", date).
-			Msg("failed to archive drop report")
-
-		return err
-	}
-	return ctx.SendStatus(fiber.StatusOK)
 }

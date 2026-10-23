@@ -11,8 +11,9 @@ Where the files live:
   files and never read S3.
 - A private AWS S3 bucket (`ap-southeast-1`) keeps a backup copy. It is written far more often than it is read.
   Only three things touch it: the uploads at archive time (`backfill.sh --upload` here, the monthly archiving
-  later), wal-g, and manual restores (`coldstore-pull`, see Restoring files from the bucket). Nothing downloads from it to check an
-  upload. Uploads are confirmed by comparing hashes with the bucket's (see Upload).
+  afterwards), wal-g, and manual restores (`coldstore-pull`, see Restoring files from the bucket). Nothing
+  downloads from it to check an upload. Uploads are confirmed by comparing hashes with the bucket's (see Upload and
+  Monthly archiving).
 - The box's local cold store is first filled by an rsync from the backfill machine, not by a download from the
   bucket.
 
@@ -25,6 +26,10 @@ coldstore/v1/
   recruit/recruit_YYYY-MM.parquet                recruit reports with ip/metadata/md5, ORDER BY created_at
   rollup/rollup_YYYY-MM.parquet                  non-recruit reliability = 0, per UTC hour
 ```
+
+The months archived from the new database (see Monthly archiving) have exactly the same files, columns and manifest
+entries as the backfilled ones: its `drop_reports` still holds the recruitment reports, with their `pattern_id`, and
+the same SQL exports them.
 
 Months are UTC calendar months from `2019-05`. The month `pre` holds the 60,226 reports created before 2019-05
 (mostly dated 1970-01-01).
@@ -43,6 +48,7 @@ monthly archiving.
 | `coldstore-recover --dir DIR [--month M]` | Completes or undoes a patch that stopped partway, from its journal and the manifest, without PostgreSQL. |
 | `coldstore-prodcheck --dir DIR` | Counts every archived month in the production database by UTC day and lists the months whose count differs from the manifest. |
 | `coldstore-pull --dir DIR --month M \| --dims \| --all` | Restores missing or corrupt files of the local copy from the bucket, checking their sha256 before moving them into place. The only command that reads the bucket. |
+| `coldstore-archive [--dry-run]` | Runs the monthly archiving once, as the app does (see Monthly archiving). |
 | `scripts/coldstore/backfill.sh` | Runs export, verify and upload for many months in parallel, resumably. |
 
 The commands read the app's configuration from the environment without starting the app (no Redis or NATS needed).
@@ -55,8 +61,6 @@ They need:
   out as `<dir>/v1.5.6/linux_amd64/postgres_scanner.duckdb_extension`, from
   `https://extensions.duckdb.org/v1.5.6/linux_amd64/postgres_scanner.duckdb_extension.gz` (gunzip it). The version
   must be the DuckDB version the binary links (see `ARG DUCKDB_VERSION` in the Dockerfile).
-- the app's other required settings (`PENGUIN_V3_DROP_REPORT_ARCHIVE_S3_BUCKET`, `..._S3_REGION`,
-  `PENGUIN_V3_AWS_ACCESS_KEY`, `PENGUIN_V3_AWS_SECRET_KEY`). The commands do not use them, so any value works.
 
 They log to stdout and to `./logs` in the working directory, like the app.
 
@@ -109,8 +113,6 @@ Run it:
 ```sh
 export PENGUIN_V3_POSTGRES_DSN='postgres://user:pass@127.0.0.1:5434/penguinprod?sslmode=disable'
 export PENGUIN_V3_COLDSTORE_EXTENSION_DIRECTORY=$PWD/duckdb-extensions
-export PENGUIN_V3_DROP_REPORT_ARCHIVE_S3_BUCKET=x PENGUIN_V3_DROP_REPORT_ARCHIVE_S3_REGION=x \
-       PENGUIN_V3_AWS_ACCESS_KEY=x PENGUIN_V3_AWS_SECRET_KEY=x
 
 scripts/coldstore/backfill.sh --bin ./backend --out /data/coldstore-v1 --to 2026-08 \
     --jobs 3 --threads 4 --memory-limit 6GB
@@ -233,12 +235,13 @@ month, compare every archived month with it. Two kinds of change are possible, a
 first:
 
 - rows added or removed outside the app (manual SQL, a restore, a late insert into an archived month). The app
-  itself never deletes a report (the old archiver is disabled in production,
-  `PENGUIN_V3_DROP_REPORT_ARCHIVE_ENABLED=false`), and dates new reports when it accepts them, so it adds reports
+  itself never deletes a report (the old jsonl archiver, removed since, was disabled in production,
+  `PENGUIN_V3_DROP_REPORT_ARCHIVE_ENABLED=false`; the monthly archiving below only drops the partitions of the new
+  database), and dates new reports when it accepts them, so it adds reports
   only to the current month (and to the previous one while the report queue drains, see `--grace-days`).
 - reliability changes. These are the only changes the app makes to existing reports, and they keep the row count:
-  - a recall (`reliability = -1`) works only within 24 hours of the report (the recall key's TTL), so it never
-    reaches an archived month after the restore;
+  - a recall (`reliability = -1`) works only within 24 hours of the report (the recall key's TTL), and only on a
+    report submitted in the last 7 days, so it never reaches an archived month after the restore;
   - a reject-rules reevaluation (`POST /api/admin/rejections/reject-rules/reevaluation/apply`) sets the
     reliability of every matching report in its `reevaluateRange`, in any month. This is the change to look for.
 
@@ -466,6 +469,133 @@ backend run-script coldstore-pull --dir /data/coldstore-v1 --month 2023-10    # 
 - A running app picks a restored file up by itself (DuckDB checks the cached footers against the files); a restored
   manifest is picked up at the next reload.
 
+## Monthly archiving
+
+On the new database (`scripts/newdb`: `drop_reports`, the recruitment reports included, and `drop_report_extras`
+partitioned by month of `created_at`), the app archives the months itself once they
+are old enough, and drops their partitions. It replaces the jsonl.gz archiver of `internal/pkg/archiver` (one
+`drop_reports` and one `drop_report_extras` file per day, then a `DELETE`), which is removed, with its
+`archive_drop_reports` run-script, its admin endpoint (`POST /admin/archive`) and its settings
+(`PENGUIN_V3_DROP_REPORT_ARCHIVE_*`, `PENGUIN_V3_NO_ARCHIVE_DAYS`, `PENGUIN_V3_DELETE_DROP_REPORT_AFTER_ARCHIVE`).
+It was disabled in production.
+
+It runs in the app process that has `PENGUIN_V3_COLDSTORE_ARCHIVE_ENABLED=true` (default off), once a minute after
+the start and then every `PENGUIN_V3_COLDSTORE_ARCHIVE_INTERVAL` (default 1h), holding the Redis lock
+`mutex:coldstore-archive`. Turn it on only in the process that runs on the machine holding the cold storage
+directory. `run-script coldstore-archive` runs it once by hand, with the same settings and lock (`--dry-run` lists
+the month partitions and which are due). On today's database there are no partitions, and it does nothing.
+
+| Setting (`PENGUIN_V3_...`) | Default | |
+|---|---|---|
+| `COLDSTORE_DIRECTORY` | | The cold storage directory the app serves from, on the local disk. Required. |
+| `COLDSTORE_WORK_DIRECTORY` | system temp | DuckDB database and spill files, about the size of the month's partitions. |
+| `COLDSTORE_ARCHIVE_AFTER` | `1440h` | A month is archived once it ended this long ago (60 days: the database keeps 60 to 90 days). At least 31 days. |
+| `COLDSTORE_ARCHIVE_DROP_DELAY` | `15m` | How long a month stays both in the manifest and in PostgreSQL before its partitions are dropped. Longer than the time every app reading the directory takes to load a new manifest (`COLDSTORE_RELOAD_INTERVAL`, 1m by default). |
+| `COLDSTORE_ARCHIVE_MIN_FREE_BYTES` | 10 GiB | Free space that must be left after the month's files and work files. |
+| `COLDSTORE_ARCHIVE_THREADS`, `COLDSTORE_ARCHIVE_MEMORY_LIMIT` | 2, `2GB` | Limits of the DuckDB jobs. |
+| `COLDSTORE_S3_BUCKET`, `AWS_ACCESS_KEY`, `AWS_SECRET_KEY` | | The backup bucket and its keys. Required. |
+| `COLDSTORE_S3_REGION` | `ap-southeast-1` | |
+| `COLDSTORE_S3_PREFIX` | `coldstore/v1` | |
+| `COLDSTORE_S3_STORAGE_CLASS` | `STANDARD_IA` | Storage class of the data files. The manifests are always `STANDARD`. |
+| `COLDSTORE_S3_ENDPOINT` | | An S3-compatible server instead of AWS (tests). |
+
+A missing or unwritable directory, a missing or unreadable manifest, a manifest that does not hold `pre` and every
+month from 2019-05 to its last one without a gap, or a missing bucket setting fails the start of the app. The
+archiving only adds months to a directory that already holds the earlier ones (the backfill's, or one restored with
+`coldstore-pull --all`): an empty directory (e.g. a mount point without its disk) would otherwise get a manifest with
+one month, which would replace the bucket's.
+
+Each run first creates the partitions of the current month and of the next two that are missing
+(`create_report_partitions`, waiting at most 10 s for the lock of the partitioned tables). There is no default
+partition, so a month without partitions would refuse every report. Then, for every month whose partitions ended more
+than `COLDSTORE_ARCHIVE_AFTER` ago, oldest first:
+
+0. The local manifest must still hold `pre` and every month up to its last one, and either the month already or the
+   month just before it. Otherwise the run stops with an error (e.g. a month missing between the backfill and the
+   partitions of the new database must be backfilled first).
+1. Free space: the directory must keep `COLDSTORE_ARCHIVE_MIN_FREE_BYTES` free after the month's files (estimated as a
+   tenth of the partitions' size) and the work directory after the DuckDB database (about the partitions' size; both
+   are counted against one file system when they share it). Otherwise the month is refused (error log,
+   `penguinbackend_coldstore_archive_runs_total{outcome="insufficient_space"}`), and nothing is written.
+2. The drop pattern elements are exported again (append-only, so a superset) and verified against PostgreSQL.
+3. The month is exported into the directory with the export's SQL (`coldstore-export`'s, so the files are those
+   the backfill writes for the month, recruit file included): files written to temporary names, checked against
+   the rows read, then renamed into place. They are not in the manifest yet, so the app does not read them. A month
+   already in the manifest (a run that stopped after step 6) is checked against the manifest instead.
+4. The month's files and the drop pattern elements are uploaded with `x-amz-checksum-sha256`: S3 computes the SHA-256
+   of what it receives and rejects the upload unless it matches. Each local file is hashed against its manifest
+   entry right before its upload, and a `HEAD` of each object must then report the same SHA-256 and size. Nothing is
+   downloaded. An object already in the bucket with the same SHA-256 is not uploaded again (a `HEAD` per file). The
+   other files of the local manifest go through the same check, so a month patched since its upload is uploaded
+   too: the bucket's manifest never lists an object the bucket does not hold. The drop pattern elements and a
+   patched month are overwritten in place, so the bucket's previous manifests (under `manifests/`) can list an older
+   SHA-256 for them.
+5. In one transaction, the month's partitions are locked in `SHARE` mode: they can still be read, but no row of them
+   can change until they are dropped. The month is read again from PostgreSQL and compared with the files
+   (full-column content hashes). PostgreSQL rows of the month that would not be archived (a row of the month's
+   `drop_report_extras` partition without a report of the month) fail the comparison too. An `UPDATE` through
+   `drop_reports` by `report_id` alone locks every partition, so it waits for this step (the read time of a month,
+   about a minute and a half for 50M reports). A recall is not one: it looks only at the reports submitted in the
+   last 7 days (`repo.RecallMaxAge`), so it never locks the partitions of a month old enough to archive.
+6. The new `manifest.json` with the month is uploaded to the bucket (after the one it replaces is copied to
+   `manifests/manifest-<its LastModified>-<its sha256>.json` in the bucket), then the local manifest is replaced
+   atomically (written to a temporary file, then renamed). Every file it lists must be in the bucket with its
+   SHA-256. Then, the month being in the local manifest (the app can load it from then on), the time is recorded
+   as its `recorded_at`, in both manifests the same way. So the delay below starts once the month is in the local
+   manifest, however long the uploads took. A month that is in the local manifest without `recorded_at` (a run
+   that stopped in between) gets it at the next run. A month already recorded is left as it is, but the bucket's
+   manifest is still replaced if it is not the local one.
+7. If the month was recorded at least `COLDSTORE_ARCHIVE_DROP_DELAY` ago, by an earlier run, its partitions of
+   `drop_reports` and `drop_report_extras` (the only partitioned tables, and the only partitions it creates) are
+   detached and dropped in the same transaction, and it commits. Otherwise the transaction rolls back and the
+   partitions are kept: the run that adds a month to the manifest or records its time never drops it. The first run
+   after the delay (the next one, with the default interval) goes through the steps again, checking the files
+   instead of exporting them and uploading nothing, and drops the partitions. Until then, runs skip the month.
+
+The lock of step 5 and `DETACH` (the lock of the partitioned tables, which every query of them waits behind) each
+wait at most 10 s. A query through `drop_reports` (an `UPDATE` by `report_id` alone) locks the partitioned table
+before the partitions, so one that waits for the locks of step 5 holds the lock `DETACH` waits for: if a query waits
+for them before a `DETACH` (looked up before each one, since a query can come while the one before waits for its
+lock), that `DETACH` is not issued. On any of these conflicts the transaction rolls back, which releases its locks
+so that the query finishes and undoes a partition already detached, and steps 5 to 7 are tried again (the month
+locked and compared with PostgreSQL again) after 10 s, 6 times in all. If such queries kept coming more often than
+once per comparison, every try would fail, and so would the run (the next run tries again). The only one the app
+sends often, the recall, never locks a month old enough to archive (see step 5); the others are rare (a reject-rules
+reevaluation, a manual query).
+
+The delay is there because of how the app reads (`coldstore.Reader`): it serves the months of the manifest it last
+loaded, and PostgreSQL from the end of their last month on (the hot boundary). It loads a changed manifest within
+`COLDSTORE_RELOAD_INTERVAL` (1m by default), and keeps the previous one while a new one fails its checks. Until it
+loads the manifest with the month, it reads the month from PostgreSQL, so the partitions must still be there. While
+the month is in both, the queries read it from the cold storage once the manifest is loaded, and from PostgreSQL
+before. A reader that does not reload (`COLDSTORE_RELOAD_INTERVAL=0`), or keeps failing to (see
+`coldstore_manifest_reload_failures_total`), loses the month from its queries once the partitions are dropped, until
+it restarts.
+
+Any failure rolls the transaction back, so no partition is dropped unless every step passed, and the run stops at
+that month (`outcome` `error` or `verification_failed`; it is tried again at the next run). Every step can run again
+after a crash: a month still in PostgreSQL is exported to the same bytes, objects already uploaded are kept, and a
+month already in the local manifest is checked instead of exported.
+
+When a month fails the comparison with PostgreSQL, look at what changed (an admin reevaluation, a manual fix).
+While its partitions are there, PostgreSQL is the source: export the month again with
+`coldstore-export --month M --out <dir> --replace` and let the next run archive it.
+
+Metrics: `penguinbackend_coldstore_archive_runs_total{outcome}` (`ok`, `error`, `verification_failed`,
+`insufficient_space`, `lock_not_acquired`), `penguinbackend_coldstore_archived_months_total`,
+`penguinbackend_coldstore_archive_last_success_timestamp_seconds` and `penguinbackend_coldstore_free_bytes{dir}`
+(`store`, `work`).
+
+### How the app picks up a new month
+
+The archiving writes into the directory the app reads, so a new month needs no copy: once the local manifest is
+replaced, the files it lists are complete and checked. A reader keeps using the files of the manifest it loaded, and
+picks up the new month by loading `manifest.json` again when it changes (the file is only ever replaced by a rename,
+never written in place). Files are only added or replaced by a rename, so an open file keeps its content. Another
+copy of the directory (e.g. on a second machine) is not updated by the archiving: sync it from the bucket (manifest
+last), or rsync it from this one, within `COLDSTORE_ARCHIVE_DROP_DELAY` of the recording, or its app misses the month
+from the drop on until the copy has it.
+
 ## Verification, summarized
 
 | Check | Where | Catches |
@@ -474,6 +604,8 @@ backend run-script coldstore-pull --dir /data/coldstore-v1 --month 2023-10    # 
 | Files vs manifest (sha256, size, content hashes, rows, rollup totals) | `coldstore-verify --no-source`, on a copy without a marker for its files, before a patch | a changed or truncated file, a bad copy |
 | Local files vs manifest (sha256 only, no PostgreSQL) | `backfill.sh --upload`, before and after every month's upload | a file changed or corrupted after its verification |
 | Uploaded objects vs local files (size, MD5 from a HEAD, nothing downloaded) | `backfill.sh --upload`, after every month and after the manifest | a bad or missing upload, an object without an MD5 |
+| Uploads vs local files (`x-amz-checksum-sha256` checked by S3, then the SHA-256 from a HEAD) | monthly archiving, every file and the manifest | a bad or missing upload |
+| Files vs PostgreSQL read again, the partitions locked | monthly archiving, right before the manifest and the drop | a bad read, a change in PostgreSQL after the export, rows that would not be archived |
 | Files vs PostgreSQL read again | `coldstore-verify` | a bad read, a change in PostgreSQL after the export |
 | Daily counts vs production | `coldstore-prodcheck` | reports added or removed in production after the restore, outside the app; not reliability changes |
 | Daily reliable counts vs production | `coldstore-prodcheck --reliability`, for the months of the reevaluations applied after the restore | reliability changes that change the number of reliable reports |

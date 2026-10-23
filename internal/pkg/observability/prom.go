@@ -144,7 +144,7 @@ var (
 		Help: "Calc worker batches by outcome",
 	}, []string{"outcome"})
 	// WorkerCalcPhaseDuration covers the microtasks of a batch for a server: phase is one of dropMatrix,
-	// patternMatrix, siteStats and archive. The top bucket, 512s, sits close to the 10 minute default timeout of a
+	// patternMatrix and siteStats. The top bucket, 512s, sits close to the 10 minute default timeout of a
 	// batch.
 	WorkerCalcPhaseDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    prometheus.BuildFQName(ServiceName, "worker", "calc_phase_duration_seconds"),
@@ -163,6 +163,27 @@ var (
 		Name: prometheus.BuildFQName(ServiceName, "worker", "refreshes_total"),
 		Help: "Background global matrix refreshes by outcome",
 	}, []string{"refresh", "server", "outcome"})
+	// ColdstoreArchiveRuns covers the runs of the monthly archiving of the cold storage (#752): outcome is one of ok
+	// (also when there was nothing to archive), error, verification_failed, insufficient_space and
+	// lock_not_acquired. No partition is dropped by a run that did not end ok.
+	ColdstoreArchiveRuns = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "coldstore", "archive_runs_total"),
+		Help: "Runs of the monthly archiving of the cold storage by outcome",
+	}, []string{"outcome"})
+	ColdstoreArchivedMonths = promauto.NewCounter(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "coldstore", "archived_months_total"),
+		Help: "Months archived to the cold storage whose partitions were dropped",
+	})
+	ColdstoreArchiveLastSuccess = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: prometheus.BuildFQName(ServiceName, "coldstore", "archive_last_success_timestamp_seconds"),
+		Help: "Unix time of the end of the last run of the monthly archiving that ended ok",
+	})
+	// ColdstoreFreeBytes is the free space the monthly archiving found before its last month: dir is store (the cold
+	// storage directory) or work (its DuckDB work directory).
+	ColdstoreFreeBytes = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: prometheus.BuildFQName(ServiceName, "coldstore", "free_bytes"),
+		Help: "Free bytes of the file systems of the cold storage directory and of its work directory",
+	}, []string{"dir"})
 )
 
 // ReportSubjectLabel bounds the subject label of the report metrics to the subjects reports are published to.

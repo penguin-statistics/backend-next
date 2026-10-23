@@ -1,5 +1,5 @@
-// Package script_coldstore exports, verifies, indexes and patches the cold storage of the drop reports (#752),
-// checks it against the production database, and restores the local copy from the backup bucket. See
+// Package script_coldstore exports, verifies, indexes, patches and archives the cold storage of the drop reports
+// (#752), checks it against the production database, and restores the local copy from the backup bucket. See
 // internal/coldstore for the layout of the files, and docs/coldstore.md for how the commands are used.
 package script_coldstore
 
@@ -14,7 +14,7 @@ import (
 
 // CommandDeps is what the commands need. They only read the configuration (the PostgreSQL DSN and the extension
 // directory) instead of starting the app, so that they run on any machine that reaches the database, without Redis
-// or NATS.
+// or NATS (but coldstore-archive, which takes the Redis lock of the archiving).
 type CommandDeps struct {
 	Config *appconfig.Config
 }
@@ -190,6 +190,22 @@ func Commands(depsFn func() CommandDeps) []*cli.Command {
 			},
 			Action: func(ctx *cli.Context) error {
 				return runRecover(ctx)
+			},
+		},
+		{
+			Name: "coldstore-archive",
+			Description: "run the monthly archiving once, as the app does with PENGUIN_V3_COLDSTORE_ARCHIVE_ENABLED, with its settings " +
+				"(PENGUIN_V3_COLDSTORE_*) and its Redis lock: create the partitions ahead, then for every month whose partitions ended " +
+				"more than PENGUIN_V3_COLDSTORE_ARCHIVE_AFTER ago, export it to PENGUIN_V3_COLDSTORE_DIRECTORY, upload it to the bucket, " +
+				"verify it against PostgreSQL and drop its partitions. Run it on the machine that holds the directory",
+			Flags: []cli.Flag{
+				&cli.BoolFlag{
+					Name:  "dry-run",
+					Usage: "only list the month partitions and which of them are due",
+				},
+			},
+			Action: func(ctx *cli.Context) error {
+				return runArchive(ctx, depsFn())
 			},
 		},
 		{

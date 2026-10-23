@@ -79,6 +79,19 @@ func newTestPostgres(t *testing.T, d *testData) (Options, *sql.DB) {
 // schema) and a connection to it.
 func newTestSchema(t *testing.T, d *testData) (string, *sql.DB) {
 	t.Helper()
+	dsn, db := newEmptyTestSchema(t)
+	for _, s := range append([]string{testSchema}, d.insertSQL("drop_reports", "drop_report_extras", nil)...) {
+		if _, err := db.ExecContext(context.Background(), s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dsn, db
+}
+
+// newEmptyTestSchema creates a fresh schema, dropped after the test, and returns its DSN (which selects the schema)
+// and a connection to it.
+func newEmptyTestSchema(t *testing.T) (string, *sql.DB) {
+	t.Helper()
 	dsn := os.Getenv("PENGUIN_TEST_POSTGRES_DSN")
 	if dsn == "" {
 		t.Skip("PENGUIN_TEST_POSTGRES_DSN is not set")
@@ -105,11 +118,6 @@ func newTestSchema(t *testing.T, d *testData) (string, *sql.DB) {
 	dsn += sep + "search_path=" + schema
 	db := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
 	t.Cleanup(func() { db.Close() })
-	for _, s := range append([]string{testSchema}, d.insertSQL("drop_reports", "drop_report_extras", nil)...) {
-		if _, err := db.ExecContext(ctx, s); err != nil {
-			t.Fatal(err)
-		}
-	}
 	return dsn, db
 }
 
