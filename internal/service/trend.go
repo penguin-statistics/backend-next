@@ -89,6 +89,18 @@ func (s *Trend) RefreshShimTrend(ctx context.Context, server string) error {
 	return nil
 }
 
+// ShimTrendUsed reports whether the trend of server is used (see cache.Set.Used): whether this process serves it, and
+// should follow its refreshes (cachesync).
+func (s *Trend) ShimTrendUsed(server string) bool {
+	return cache.ShimTrend.Used(server)
+}
+
+// DropShimTrend deletes the cached trend of server, if it is cached: a refresh of it in another process left it
+// stale, and requests recalculate it.
+func (s *Trend) DropShimTrend(server string) {
+	deleteCached(cache.ShimTrend, server)
+}
+
 func (s *Trend) calcShimTrend(ctx context.Context, server string) (*modelv2.TrendQueryResult, error) {
 	queryResult, err := s.calcTrendFromDropMatrixElements(ctx, server)
 	if err != nil {

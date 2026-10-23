@@ -412,6 +412,44 @@ func (s *DropMatrix) deleteGlobalDropMatrixCaches(server string) {
 	}
 }
 
+// GlobalDropMatrixCachesUsed reports whether any of the global drop matrices of server that
+// RefreshGlobalDropMatrixCaches replaces is used (see cache.Set.Used): whether this process serves them, and should
+// follow their refreshes (cachesync).
+func (s *DropMatrix) GlobalDropMatrixCachesUsed(server string) bool {
+	for _, sourceCategory := range s.Config.MatrixWorkerSourceCategories {
+		if cache.GlobalDropMatrix.Used(server + constant.CacheSep + sourceCategory) {
+			return true
+		}
+		for _, showClosedZones := range []string{"true", "false"} {
+			if cache.ShimGlobalDropMatrix.Used(server + constant.CacheSep + showClosedZones + constant.CacheSep + sourceCategory) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// DropGlobalDropMatrixCaches deletes the cached global drop matrices of server that RefreshGlobalDropMatrixCaches
+// replaces, those cached only: a refresh of them in another process left them stale, and requests recalculate them.
+func (s *DropMatrix) DropGlobalDropMatrixCaches(server string) {
+	for _, sourceCategory := range s.Config.MatrixWorkerSourceCategories {
+		deleteCached(cache.GlobalDropMatrix, server+constant.CacheSep+sourceCategory)
+		for _, showClosedZones := range []string{"true", "false"} {
+			deleteCached(cache.ShimGlobalDropMatrix, server+constant.CacheSep+showClosedZones+constant.CacheSep+sourceCategory)
+		}
+	}
+}
+
+// deleteCached deletes key from c if it is cached: deleting a key not cached would count a cache write for nothing.
+func deleteCached(c interface {
+	Has(key string) bool
+	Delete(key string) error
+}, key string) {
+	if c.Has(key) {
+		_ = c.Delete(key)
+	}
+}
+
 func (s *DropMatrix) calcGlobalDropMatrixUncached(ctx context.Context, server string, sourceCategory string) (*model.DropMatrixQueryResult, error) {
 	results, err := s.calcGlobalDropMatrices(ctx, server, []string{sourceCategory})
 	if err != nil {

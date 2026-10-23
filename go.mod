@@ -8,6 +8,7 @@ godebug default=go1.19
 
 require (
 	exusiai.dev/gommon v0.0.9
+	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/ansrivas/fiberprometheus/v2 v2.6.1
 	github.com/antonmedv/expr v1.12.7
 	github.com/avast/retry-go/v4 v4.3.4
@@ -129,6 +130,7 @@ require (
 	github.com/tinylib/msgp v1.2.5 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib v1.17.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.1 // indirect

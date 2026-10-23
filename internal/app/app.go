@@ -16,6 +16,7 @@ import (
 	"exusiai.dev/backend-next/internal/server"
 	"exusiai.dev/backend-next/internal/service"
 	"exusiai.dev/backend-next/internal/workers/archivewkr"
+	"exusiai.dev/backend-next/internal/workers/cachesync"
 	"exusiai.dev/backend-next/internal/workers/calcwkr"
 	"exusiai.dev/backend-next/internal/workers/reportwkr"
 )
@@ -60,6 +61,9 @@ func options(ctx appcontext.Ctx, withWorkers bool, additionalOpts ...fx.Option) 
 		// Services
 		service.Module(),
 
+		// the cache sync of calcwkr's refreshes, which calcwkr bumps (also in the tools that run worker code)
+		fx.Provide(cachesync.New),
+
 		// Global Singleton Inits: Keep those before controllers to ensure they are initialized
 		// before controllers are registered as controllers are also fx#Invoke functions which
 		// are called in the order of their registration.
@@ -73,6 +77,9 @@ func options(ctx appcontext.Ctx, withWorkers bool, additionalOpts ...fx.Option) 
 	if withWorkers {
 		baseOpts = append(baseOpts,
 			// Workers
+			// in every process, also without calcwkr: it follows the refreshes of the calcwkr of another. Before
+			// calcwkr.Start: its first poll must record the generations before calcwkr's warm-up caches anything
+			fx.Invoke(cachesync.Start),
 			fx.Invoke(calcwkr.Start),
 			fx.Invoke(reportwkr.Start),
 			fx.Invoke(archivewkr.Start),

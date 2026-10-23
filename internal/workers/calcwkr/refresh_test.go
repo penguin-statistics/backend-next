@@ -11,6 +11,8 @@ import (
 
 	"exusiai.dev/gommon/constant"
 	"github.com/go-redsync/redsync/v4"
+
+	"exusiai.dev/backend-next/internal/workers/cachesync"
 )
 
 func TestGlobalMatrixRefreshRunsInTheBackgroundOneAtATime(t *testing.T) {
@@ -87,7 +89,7 @@ func TestGlobalMatrixRefreshRecoversFromAPanic(t *testing.T) {
 	done.Wait()
 }
 
-func TestGlobalCachesWarmUpRunsEveryServerOneAtATimeHoldingTheLock(t *testing.T) {
+func TestGlobalCachesWarmUpRunsEveryServerOneAtATimeHoldingTheLocks(t *testing.T) {
 	rs := newTestRedSync(t)
 	w := newTestWorker(t, rs, 2*time.Second)
 	w.timeout = time.Minute
@@ -102,6 +104,7 @@ func TestGlobalCachesWarmUpRunsEveryServerOneAtATimeHoldingTheLock(t *testing.T)
 		mu                  sync.Mutex
 		warmed              []string
 		refreshedAfter      int
+		refreshedDuring     bool
 		refreshed           = make(chan struct{})
 	)
 	// the batch's context: the lock renewals of the microtasks end with it
@@ -117,10 +120,12 @@ func TestGlobalCachesWarmUpRunsEveryServerOneAtATimeHoldingTheLock(t *testing.T)
 		mu.Unlock()
 		switch server {
 		case constant.Servers[0]:
-			// a refresh scheduled meanwhile waits for the warm-up
+			// a refresh scheduled meanwhile waits for the warm-up of the server (each holds the refresh lock), and
+			// may run before the next server's
 			w.globalMatrixRefresh(ctx, "globalDropMatrixRefresh", server, func(context.Context, string) error {
 				mu.Lock()
 				refreshedAfter = len(warmed)
+				refreshedDuring = running.Load() > 0
 				mu.Unlock()
 				close(refreshed)
 				return nil
@@ -146,8 +151,8 @@ func TestGlobalCachesWarmUpRunsEveryServerOneAtATimeHoldingTheLock(t *testing.T)
 	if maxRunning.Load() != 1 {
 		t.Errorf("%d servers warmed up at the same time, want one", maxRunning.Load())
 	}
-	if refreshedAfter != len(constant.Servers) {
-		t.Errorf("a refresh ran after %d of %d servers warmed up, want after all", refreshedAfter, len(constant.Servers))
+	if refreshedDuring || refreshedAfter < 1 {
+		t.Errorf("a refresh ran during a server's warm-up (after %d servers started), want between them", refreshedAfter)
 	}
 	other := rs.NewMutex(w.syncMutex.Name(), redsync.WithExpiry(time.Second), redsync.WithTries(1))
 	if err := other.Lock(); err == nil {
@@ -184,4 +189,83 @@ func TestGlobalCachesWarmUpRunsEveryWarmUpDespiteFailures(t *testing.T) {
 	if err := warmUpEach(context.Background(), "CN", []cacheWarmUp{warmUp("globalDropMatrix", nil)}); err != nil {
 		t.Errorf("got error %v, want none", err)
 	}
+}
+
+// recordingBumper records the bumps of the generations of cached results.
+type recordingBumper struct {
+	mu     sync.Mutex
+	bumped []string
+
+	refreshMu sync.Mutex
+}
+
+func (b *recordingBumper) RefreshLock() sync.Locker { return &b.refreshMu }
+
+func (b *recordingBumper) Bump(_ context.Context, kind cachesync.Kind, server string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.bumped = append(b.bumped, string(kind)+" "+server)
+}
+
+func (b *recordingBumper) bumps() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return strings.Join(b.bumped, ", ")
+}
+
+func TestGlobalMatrixRefreshTellsTheOtherProcessesOnceItSucceeded(t *testing.T) {
+	bumper := &recordingBumper{}
+	w := &Worker{timeout: time.Minute, refreshGlobalMatrices: true, cacheSync: bumper}
+	var done sync.WaitGroup
+	done.Add(3)
+	refresh := func(err error) func(context.Context, string) error {
+		return func(context.Context, string) error {
+			defer done.Done()
+			return err
+		}
+	}
+	w.globalMatrixRefresh(context.Background(), "globalDropMatrixRefresh", "CN", w.bumping(cachesync.KindGlobalDropMatrix, refresh(nil)))
+	// a failed refresh dropped the results: the other processes keep theirs until the next refresh
+	w.globalMatrixRefresh(context.Background(), "shimTrendRefresh", "US", w.bumping(cachesync.KindShimTrend, refresh(errors.New("failed"))))
+	w.globalMatrixRefresh(context.Background(), "globalPatternMatrixRefresh", "JP", w.bumping(cachesync.KindGlobalPatternMatrix, func(context.Context, string) error {
+		defer done.Done()
+		var timesResult *struct{ Times int }
+		_ = timesResult.Times // panics
+		return nil
+	}))
+	done.Wait()
+	// every refresh ran, holding the refresh lock of the cache sync: the last one bumped by the time it releases it
+	bumper.refreshMu.Lock()
+	defer bumper.refreshMu.Unlock()
+
+	if got, want := bumper.bumps(), "globalDropMatrix CN"; got != want {
+		t.Errorf("bumped %q, want %q", got, want)
+	}
+}
+
+func TestBumpWithoutCacheSync(t *testing.T) {
+	w := &Worker{} // e.g. the workerbench worker
+	if err := w.bumping(cachesync.KindSiteStats, func(context.Context, string) error { return nil })(context.Background(), "CN"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The refreshes of the worker take the refresh lock of the cache sync, which its refreshes following the worker of
+// another process take too: the process runs one at a time.
+func TestGlobalMatrixRefreshWaitsForAFollowedRefresh(t *testing.T) {
+	bumper := &recordingBumper{}
+	w := &Worker{timeout: time.Minute, refreshGlobalMatrices: true, cacheSync: bumper}
+	bumper.refreshMu.Lock() // a followed refresh runs
+	refreshed := make(chan struct{})
+	w.globalMatrixRefresh(context.Background(), "shimTrendRefresh", "CN", func(context.Context, string) error {
+		close(refreshed)
+		return nil
+	})
+	select {
+	case <-refreshed:
+		t.Fatal("refreshed while a followed refresh runs")
+	case <-time.After(50 * time.Millisecond):
+	}
+	bumper.refreshMu.Unlock()
+	<-refreshed
 }

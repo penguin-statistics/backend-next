@@ -200,6 +200,31 @@ func (s *PatternMatrix) deleteGlobalPatternMatrixCaches(server string) {
 	}
 }
 
+// GlobalPatternMatrixCachesUsed reports whether any of the global pattern matrices of server that
+// RefreshGlobalPatternMatrixCaches replaces is used (see cache.Set.Used): whether this process serves them, and should
+// follow their refreshes (cachesync).
+func (s *PatternMatrix) GlobalPatternMatrixCachesUsed(server string) bool {
+	for _, sourceCategory := range s.Config.MatrixWorkerSourceCategories {
+		for _, showAllPatterns := range []string{"true", "false"} {
+			if cache.ShimGlobalPatternMatrix.Used(server + constant.CacheSep + sourceCategory + constant.CacheSep + showAllPatterns) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// DropGlobalPatternMatrixCaches deletes the cached global pattern matrices of server that
+// RefreshGlobalPatternMatrixCaches replaces, those cached only: a refresh of them in another process left them stale,
+// and requests recalculate them.
+func (s *PatternMatrix) DropGlobalPatternMatrixCaches(server string) {
+	for _, sourceCategory := range s.Config.MatrixWorkerSourceCategories {
+		for _, showAllPatterns := range []string{"true", "false"} {
+			deleteCached(cache.ShimGlobalPatternMatrix, server+constant.CacheSep+sourceCategory+constant.CacheSep+showAllPatterns)
+		}
+	}
+}
+
 // Update pattern matrix elements for a given date (entire day)
 // Called by admin api
 func (s *PatternMatrix) UpdatePatternMatrixByGivenDate(ctx context.Context, server string, date *time.Time) error {

@@ -415,3 +415,62 @@ func TestRefreshFailure(t *testing.T) {
 		t.Errorf("calculating %v after failed refreshes, want nothing", c.calculating)
 	}
 }
+
+func TestUsed(t *testing.T) {
+	c := NewSet[int]("test")
+	if c.Used("key") {
+		t.Error("a key never cached is used")
+	}
+
+	// written only, e.g. by the worker's refreshes: not used until read
+	c.Set("key", 1, time.Minute)
+	if c.Used("key") || !c.Has("key") {
+		t.Errorf("Used %v, Has %v after a Set, want only cached", c.Used("key"), c.Has("key"))
+	}
+	var v int
+	if err := c.Get("key", &v); err != nil {
+		t.Fatal(err)
+	}
+	if !c.Used("key") {
+		t.Error("a key read is not used")
+	}
+	c.Set("key", 2, time.Minute)
+	if c.Used("key") {
+		t.Error("a key written after it was read is used")
+	}
+	if _, err := c.MutexGetSet("key", &v, nil, time.Minute); err != nil || !c.Used("key") {
+		t.Errorf("a key MutexGetSet read is not used (%v)", err)
+	}
+	if _, err := c.Refresh("key", func() (*int, error) { three := 3; return &three, nil }, time.Minute, nil); err != nil {
+		t.Fatal(err)
+	}
+	if c.Used("key") {
+		t.Error("a key refreshed is used")
+	}
+
+	// calculated for a request: used, also while it is calculated
+	release, result := calculateBlocked(c, "requested", 4)
+	if !c.Used("requested") || c.Has("requested") {
+		t.Errorf("Used %v, Has %v while MutexGetSet calculates the key, want used only", c.Used("requested"), c.Has("requested"))
+	}
+	release()
+	<-result
+	if !c.Used("requested") {
+		t.Error("a key MutexGetSet calculated is not used")
+	}
+
+	// a calculation that failed or panicked leaves nothing used
+	if _, err := c.MutexGetSet("failed", &v, func() (*int, error) { return nil, ErrNotFound }, time.Minute); err == nil {
+		t.Error("MutexGetSet succeeded without a value")
+	}
+	func() {
+		defer func() { _ = recover() }()
+		_, _ = c.MutexGetSet("panicked", &v, func() (*int, error) { panic("calculation") }, time.Minute)
+	}()
+	if c.Used("failed") || c.Used("panicked") {
+		t.Error("a key whose calculation failed is used")
+	}
+	if len(c.calculating) != 0 || len(c.requested) != 0 {
+		t.Errorf("calculating %v, requested %v after the calculations, want nothing", c.calculating, c.requested)
+	}
+}
