@@ -65,6 +65,8 @@
     a.setAttribute('aria-controls', panels[i].id);
     panels[i].setAttribute('role', 'tabpanel');
     panels[i].setAttribute('aria-labelledby', a.id);
+    // a stop of its own, so that Tab reaches the steps before their links and copy buttons (APG tabs pattern)
+    panels[i].tabIndex = 0;
     // find in page reaches the other apps (Chrome): it shows the one it found
     panels[i].addEventListener('beforematch', function () { select(i, false, true); });
     a.addEventListener('click', function (e) {
