@@ -27,9 +27,9 @@ RUN export BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ"); export CGO_ENABLED=1; go
 
 # duckdb extensions: the app never installs extensions at runtime (see internal/pkg/duckdbx), so the ones it loads
 # are preinstalled here. The version must be the DuckDB release of github.com/duckdb/duckdb-go/v2 in go.mod
-# (v2.10506.0 -> v1.5.6); the extension files are signed, and DuckDB checks the signature on LOAD.
+# (v2.20000.0 -> v2.0.0); the extension files are signed, and DuckDB checks the signature on LOAD.
 FROM base AS duckdb-extensions
-ARG DUCKDB_VERSION=v1.5.6
+ARG DUCKDB_VERSION=v2.0.0
 RUN dir=/opt/duckdb/extensions/$DUCKDB_VERSION/linux_amd64 && mkdir -p $dir && \
     curl -fsSL https://extensions.duckdb.org/$DUCKDB_VERSION/linux_amd64/postgres_scanner.duckdb_extension.gz \
     | gunzip > $dir/postgres_scanner.duckdb_extension

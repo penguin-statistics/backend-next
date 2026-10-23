@@ -58,8 +58,8 @@ They need:
   database.
 - `PENGUIN_V3_COLDSTORE_EXTENSION_DIRECTORY`: where DuckDB's postgres extension is installed. The default is
   `/opt/duckdb/extensions`, as in the image. The binary never downloads extensions. For another directory, lay it
-  out as `<dir>/v1.5.6/linux_amd64/postgres_scanner.duckdb_extension`, from
-  `https://extensions.duckdb.org/v1.5.6/linux_amd64/postgres_scanner.duckdb_extension.gz` (gunzip it). The version
+  out as `<dir>/v2.0.0/linux_amd64/postgres_scanner.duckdb_extension`, from
+  `https://extensions.duckdb.org/v2.0.0/linux_amd64/postgres_scanner.duckdb_extension.gz` (gunzip it). The version
   must be the DuckDB version the binary links (see `ARG DUCKDB_VERSION` in the Dockerfile).
 
 They log to stdout and to `./logs` in the working directory, like the app.

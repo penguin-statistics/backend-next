@@ -208,10 +208,10 @@ func (j *job) loadSource(ctx context.Context, month Month) error {
 		// no reports: an empty range, so that e still gets the source's column types
 		lo.Int64, hi.Int64 = 0, -1
 	}
-	if err := j.exec(ctx, fmt.Sprintf(`CREATE TABLE e AS SELECT x.* FROM postgres_query('pg', $$
+	if err := j.exec(ctx, `CREATE TABLE e AS WITH x AS MATERIALIZED (`+pgRows(fmt.Sprintf(`
 		SELECT report_id, ip::text AS ip, metadata::text AS metadata, md5
-		FROM drop_report_extras WHERE report_id BETWEEN %d AND %d$$) x
-		SEMI JOIN r ON r.report_id = x.report_id`, lo.Int64, hi.Int64)); err != nil {
+		FROM drop_report_extras WHERE report_id BETWEEN %d AND %d`, lo.Int64, hi.Int64))+`)
+		SELECT x.* FROM x SEMI JOIN r ON r.report_id = x.report_id`); err != nil {
 		return err
 	}
 	return j.countOrphanExtras(ctx, where)
@@ -233,9 +233,15 @@ func (j *job) countOrphanExtras(ctx context.Context, where string) error {
 	if !partitioned {
 		return nil
 	}
-	return j.queryRow(ctx, `SELECT count(*) FROM postgres_query('pg', $$
-		SELECT report_id FROM drop_report_extras WHERE `+where+`$$) x
-		ANTI JOIN r ON r.report_id = x.report_id`, &j.orphanExtras)
+	return j.queryRow(ctx, `WITH x AS MATERIALIZED (`+pgRows(`SELECT report_id FROM drop_report_extras WHERE `+where)+`)
+		SELECT count(*) FROM x ANTI JOIN r ON r.report_id = x.report_id`, &j.orphanExtras)
+}
+
+// pgRows reads the rows of a PostgreSQL query through the attached database. A query that joins them with other
+// tables must materialize them first (WITH ... AS MATERIALIZED): DuckDB 2.0.0 can push the joins down into the
+// postgres_query scan and return wrong results (a SEMI JOIN then an ANTI JOIN counted 0 rows instead of 1).
+func pgRows(query string) string {
+	return `SELECT * FROM postgres_query('pg', $$` + query + `$$)`
 }
 
 // sourceStats computes MonthStats over the tables loadSource filled.

@@ -201,8 +201,10 @@ func verifyDimsCoverMonth(ctx context.Context, opts Options, dir string, month M
 		return quote(filepath.Join(dir, filepath.FromSlash(p)))
 	}
 	var missing int64
-	if err := j.queryRow(ctx, `SELECT count(DISTINCT s.drop_pattern_id)
-		FROM postgres_query('pg', $$SELECT element_id, drop_pattern_id FROM drop_pattern_elements$$) s
+	// s is materialized before the joins: DuckDB 2.0.0 counts 0 here when they read postgres_query directly (see
+	// pgRows), although the file lacks an element (TestArchiveLatePatternReachesDims)
+	if err := j.queryRow(ctx, `WITH s AS MATERIALIZED (`+pgRows(`SELECT element_id, drop_pattern_id FROM drop_pattern_elements`)+`)
+		SELECT count(DISTINCT s.drop_pattern_id) FROM s
 		SEMI JOIN (SELECT pattern_id FROM read_parquet([`+file(FilePath(KindDropReports, month.Key))+`])
 			UNION ALL SELECT pattern_id FROM read_parquet([`+file(FilePath(KindRecruit, month.Key))+`])) r ON r.pattern_id = s.drop_pattern_id
 		ANTI JOIN read_parquet([`+file(DropPatternElementsFile)+`]) f ON f.element_id = s.element_id`, &missing); err != nil {

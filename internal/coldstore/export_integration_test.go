@@ -2,7 +2,7 @@ package coldstore
 
 // Integration tests exporting from a real PostgreSQL through DuckDB's postgres extension. They are skipped unless
 // PENGUIN_TEST_POSTGRES_DSN points at a disposable database and PENGUIN_TEST_DUCKDB_EXTENSION_DIR at a directory
-// holding the extension (<dir>/v1.5.6/linux_amd64/postgres_scanner.duckdb_extension, as in the image), e.g.
+// holding the extension (<dir>/v2.0.0/linux_amd64/postgres_scanner.duckdb_extension, as in the image), e.g.
 //
 //	docker run -d --rm -p 127.0.0.1:55432:5432 -e POSTGRES_PASSWORD=test postgres:14-alpine
 //	PENGUIN_TEST_POSTGRES_DSN='postgres://postgres:test@127.0.0.1:55432/postgres?sslmode=disable' \

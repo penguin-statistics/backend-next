@@ -66,7 +66,7 @@ jobs:
       # DUCKDB_VERSION equal to its ARG DUCKDB_VERSION
       - name: Download DuckDB extensions
         env:
-          DUCKDB_VERSION: v1.5.6
+          DUCKDB_VERSION: v2.0.0
         # bash -eo pipefail, so that a failed download fails the step
         shell: bash
         run: |
