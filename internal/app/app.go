@@ -77,9 +77,10 @@ func options(ctx appcontext.Ctx, withWorkers bool, additionalOpts ...fx.Option) 
 	if withWorkers {
 		baseOpts = append(baseOpts,
 			// Workers
-			fx.Invoke(calcwkr.Start),
-			// in every process, also without calcwkr: it follows the refreshes of the calcwkr of another
+			// in every process, also without calcwkr: it follows the refreshes of the calcwkr of another. Before
+			// calcwkr.Start: its first poll must record the generations before calcwkr's warm-up caches anything
 			fx.Invoke(cachesync.Start),
+			fx.Invoke(calcwkr.Start),
 			fx.Invoke(reportwkr.Start),
 			fx.Invoke(archivewkr.Start),
 		)

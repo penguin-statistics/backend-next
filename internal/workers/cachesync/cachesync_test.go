@@ -790,6 +790,13 @@ func TestStartFollowsThePolledChanges(t *testing.T) {
 	if err := Start(lc, s); err != nil {
 		t.Fatal(err)
 	}
+	// the first poll runs in Start, as the app is built: before every OnStart hook, the HTTP server's among them
+	store.mu.Lock()
+	loads := store.loads
+	store.mu.Unlock()
+	if loads != 1 {
+		t.Fatalf("%d polls when Start returned, want the first one", loads)
+	}
 	if len(lc.hooks) != 1 {
 		t.Fatalf("appended %d hooks, want 1", len(lc.hooks))
 	}
@@ -801,14 +808,6 @@ func TestStartFollowsThePolledChanges(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-
-	// the first poll runs in OnStart, before the hooks after it (the HTTP server's) start
-	store.mu.Lock()
-	loads := store.loads
-	store.mu.Unlock()
-	if loads != 1 {
-		t.Fatalf("%d polls when OnStart returned, want the first one", loads)
-	}
 	store.set(KindGlobalPatternMatrix, "CN", 1)
 	waitFor(t, "the refresh", func() bool { return len(caches.refreshes()) == 1 })
 	if got := caches.refreshes()[0]; got != (target{KindGlobalPatternMatrix, "CN"}) {

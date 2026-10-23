@@ -244,13 +244,15 @@ func Start(lc fx.Lifecycle, s *Syncer) error {
 		return nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	// The first poll runs here, as the app is built: before every OnStart hook (the HTTP server's, which accepts the
+	// requests) and before calcwkr starts (invoked after this), so that the generations are recorded before anything
+	// is cached, and no change after a result was cached is taken for the baseline. Not in OnStart, whose hooks share
+	// a short start timeout (fx.StartTimeout). If it fails, the next polls follow from what this process bumped (see
+	// poll).
+	s.pollAndLog(ctx)
 	var wg sync.WaitGroup
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
-			// the first poll runs before the hooks registered after this one, the HTTP server's among them: it
-			// records the generations before a request caches anything, so that no change after a result was cached
-			// is taken for the baseline. If it fails, the next ones follow from what this process bumped (see poll).
-			s.pollAndLog(ctx)
 			wg.Add(2)
 			go func() {
 				defer wg.Done()
