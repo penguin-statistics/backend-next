@@ -16,12 +16,15 @@ import (
 	"exusiai.dev/backend-next/internal/service"
 )
 
-// The Markdown views of the pages (meta#18), for agents that read Markdown rather than HTML: the path of the page of
-// an item or a stage with .md appended (/en/result/cn/item/30012.md) serves the data of the page as Markdown. A view
+// The Markdown views of the pages (meta#18), for agents that read Markdown rather than HTML: the path of a page with
+// .md appended (/en/result/cn/item/30012.md, /en/result/cn/stage.md) serves the data of the page as Markdown. A view
 // starts with YAML front matter: the title of the page, its server and IDs, when the matrix it shows was calculated
 // (as_of), the page itself (canonical), the API call that gives the same numbers (api), the license and how to
-// attribute the data. Then come the table of the page, with the IDs of its rows, and the notes under it. Its links
-// to other pages are to their views.
+// attribute the data. Then come the table of the page, with the IDs of its rows, and the notes under it, or the
+// items or stages a list links, with their IDs. Its links to other pages are to their views, but for the stages of
+// the stage list, which would take about 150,000 characters on CN (October 2026) with links: they are listed by
+// their codes and IDs, under the names and IDs of their zones, and the front matter gives the URL of their views
+// (stage_url_template), which keeps the view under about 50,000 characters.
 //
 // A view is made of the same data as its page, never of the frontend's index.html, so it is served whatever the
 // shell. It has the status, Cache-Control and Last-Modified of the page, so the same 304s (and no ETag: neither has
@@ -42,7 +45,7 @@ const (
 
 // hasMarkdown tells whether the pages of kind have a Markdown view
 func hasMarkdown(kind pageKind) bool {
-	return kind == kindItem || kind == kindStage
+	return kind == kindItem || kind == kindItemList || kind == kindStage || kind == kindStageList
 }
 
 // mdKind is what the Markdown view of a page of kind is counted as
@@ -68,6 +71,19 @@ func (h *Handler) serveMarkdown(c *fiber.Ctx, r route, path string) {
 		return
 	}
 	matrix := h.data.Matrix(r.server)
+
+	// the lists are the largest, and the same until the data changes
+	var key listKey
+	if r.kind == kindItemList || r.kind == kindStageList {
+		key = listKey{lang: r.lang, server: r.server, kind: r.kind, md: true}
+		if e, ok := h.lists.Load(key); ok {
+			if e := e.(*listEntry); e.catalog == catalog && e.matrix == matrix {
+				h.sendMarkdown(c, catalog, matrix, e.page, e.body)
+				return
+			}
+		}
+	}
+
 	p, md, ok := h.buildMarkdown(r, catalog, matrix)
 	if !ok {
 		count(mdKind(r.kind), "error")
@@ -80,6 +96,9 @@ func (h *Handler) serveMarkdown(c *fiber.Ctx, r route, path string) {
 	if p.Redirect != "" {
 		h.redirect(c, mdKind(p.Kind), p.Redirect+mdSuffix)
 		return
+	}
+	if key.kind != "" {
+		h.lists.Store(key, &listEntry{catalog: catalog, matrix: matrix, page: p, body: md})
 	}
 	h.sendMarkdown(c, catalog, matrix, p, md)
 }
@@ -174,8 +193,18 @@ func (b *builder) markdown(p *Page) []byte {
 		line += mdText(n.LicenseLabel) + "[" + mdText(n.LicenseName) + "](" + mdURL(n.LicenseURL) + ")"
 		blocks = append(blocks, mdParagraph(n.Definitions), mdLineStart(line))
 	}
+	for _, g := range body.Groups {
+		blocks = append(blocks, "## "+mdText(g.Heading))
+		if len(g.Links) > 0 {
+			blocks = append(blocks, b.mdList(g.Links, true))
+		}
+		for _, sub := range g.Subgroups {
+			// the stages of the stage list, without links (see above)
+			blocks = append(blocks, "### "+mdText(sub.Heading)+" "+mdCode(sub.ID), b.mdList(sub.Links, false))
+		}
+	}
 	if g := body.Related; g != nil {
-		blocks = append(blocks, "## "+mdText(g.Heading), b.mdList(g.Links))
+		blocks = append(blocks, "## "+mdText(g.Heading), b.mdList(g.Links, true))
 	}
 	if body.Back != nil {
 		blocks = append(blocks, b.mdLink(*body.Back))
@@ -206,6 +235,12 @@ func (b *builder) frontMatter(p *Page) string {
 	case kindStage:
 		field("zone_id", yamlString(b.r.zoneID))
 		field("stage_id", yamlString(b.r.stageID))
+	case kindItemList:
+		field("items", strconv.Itoa(listed(p.Body.Groups)))
+		field("item_url_template", yamlString(b.abs(b.path(b.t.Lang, kindItemList))+"/{item_id}"+mdSuffix))
+	case kindStageList:
+		field("stages", strconv.Itoa(listed(p.Body.Groups)))
+		field("stage_url_template", yamlString(b.abs(b.path(b.t.Lang, kindStageList))+"/{zone_id}/{stage_id}"+mdSuffix))
 	}
 	if b.matrix != nil && !b.matrix.LastModified.IsZero() {
 		field("as_of", b.matrix.LastModified.UTC().Format(time.RFC3339))
@@ -219,6 +254,9 @@ func (b *builder) frontMatter(p *Page) string {
 	field("canonical", yamlString(b.abs(b.r.pagePath())))
 	if n := p.Body.Notes; n != nil && n.Data != nil {
 		field("api", yamlString(n.Data.Href))
+	} else if (b.r.kind == kindItemList || b.r.kind == kindStageList) && b.matrix != nil {
+		// the matrix of the server tells which items and stages have rows, the ones the lists link
+		field("api", yamlString(b.site+"/PenguinStats/api/v2/result/matrix?server="+b.r.server+"&show_closed_zones=true"))
 	}
 	field("license", service.DropDataLicenseName)
 	field("license_url", service.DropDataLicenseURL)
@@ -258,12 +296,30 @@ func (b *builder) mdTable(t *Table) string {
 	return sb.String()
 }
 
-func (b *builder) mdList(links []Link) string {
+// mdList is a list of links, each with the ID of the page it links if any; linked false lists their names alone,
+// escaped as paragraphs (see mdParagraph): at the start of an item, a name could start a list or code of its own
+func (b *builder) mdList(links []Link, linked bool) string {
 	items := make([]string, len(links))
 	for i, l := range links {
-		items[i] = "- " + b.mdLink(l)
+		if linked {
+			items[i] = "- " + b.mdLink(l)
+		} else {
+			items[i] = "- " + mdParagraph(l.Name)
+		}
+		if l.ID != "" {
+			items[i] += " " + mdCode(l.ID)
+		}
 	}
 	return strings.Join(items, "\n")
+}
+
+// listed is the number of links in groups and their subgroups
+func listed(groups []Group) int {
+	n := 0
+	for _, g := range groups {
+		n += len(g.Links) + listed(g.Subgroups)
+	}
+	return n
 }
 
 // mdLink is l as a Markdown link, to the view of its page if that has one; its text alone if it links nothing

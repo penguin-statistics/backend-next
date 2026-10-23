@@ -1,8 +1,8 @@
 // Package seo serves the stats pages of the frontend (/{lang}/result/{server}/item[/{itemId}] and
 // /{lang}/result/{server}/stage[/{zoneId}/{stageId}]) as the frontend's index.html with the page's metadata,
 // structured data and a plain HTML table of its data spliced in, for search engines and link previews. The app
-// replaces the table once it starts; everyone gets the same HTML. The pages of items and stages have a Markdown view
-// too, at their path with .md appended, for agents (see markdown.go).
+// replaces the table once it starts; everyone gets the same HTML. The pages have a Markdown view too, at their path
+// with .md appended, for agents (see markdown.go).
 package seo
 
 import (
@@ -283,7 +283,7 @@ func (h *Handler) Serve(c *fiber.Ctx) error {
 		key = listKey{lang: r.lang, server: r.server, kind: r.kind}
 		if e, ok := h.lists.Load(key); ok {
 			if e := e.(*listEntry); e.catalog == catalog && e.matrix == matrix && e.shell == shell {
-				h.send(c, shell, catalog, matrix, e.page, e.html)
+				h.send(c, shell, catalog, matrix, e.page, e.body)
 				return nil
 			}
 		}
@@ -299,24 +299,27 @@ func (h *Handler) Serve(c *fiber.Ctx) error {
 		return nil
 	}
 	if key.kind != "" {
-		h.lists.Store(key, &listEntry{catalog: catalog, matrix: matrix, shell: shell, page: p, html: html})
+		h.lists.Store(key, &listEntry{catalog: catalog, matrix: matrix, shell: shell, page: p, body: html})
 	}
 	h.send(c, shell, catalog, matrix, p, html)
 	return nil
 }
 
-// listKey and listEntry hold a list page rendered from a catalog, matrix and shell
+// listKey and listEntry hold a list page rendered from a catalog, matrix and shell, or its Markdown view rendered
+// from a catalog and matrix
 type listKey struct {
 	lang, server string
 	kind         pageKind
+	md           bool
 }
 
 type listEntry struct {
 	catalog *service.SEOCatalog
 	matrix  *service.SEOMatrix
-	shell   *spashell.Shell
-	page    *Page
-	html    []byte
+	// shell is nil for a Markdown view
+	shell *spashell.Shell
+	page  *Page
+	body  []byte
 }
 
 // build builds and renders the page of r; ok is false if that failed
