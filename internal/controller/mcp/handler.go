@@ -50,9 +50,9 @@ const (
 	defaultRateLimitWindow = time.Minute
 )
 
-// Register serves the MCP server at /mcp if it is enabled, and its server card if it has a public URL
-// (MCPPublicURL). Disabled, /mcp is not routed: 404, and neither is the card. A public URL that is not one fails the
-// startup, enabled or not, rather than be found out when the server is turned on.
+// Register serves the MCP server at /mcp if it is enabled, and its server card and its guide if it has a public URL
+// (MCPPublicURL). Disabled, /mcp is not routed: 404, and neither are the card and the guide. A public URL that is not
+// one fails the startup, enabled or not, rather than be found out when the server is turned on.
 func Register(app *fiber.App, conf *appconfig.Config, data *service.SEOData) error {
 	public, err := parsePublicURL(conf.MCPPublicURL)
 	if err != nil {
@@ -67,6 +67,9 @@ func Register(app *fiber.App, conf *appconfig.Config, data *service.SEOData) err
 		if err := mountServerCard(app, newServerCard(public, conf.SEOSiteURL)); err != nil {
 			return err
 		}
+		if err := mountGuide(app, public, conf.SEOSiteURL, limit, window); err != nil {
+			return err
+		}
 	}
 	log.Info().
 		Str("evt.name", "mcp.enabled").
@@ -79,7 +82,8 @@ func Register(app *fiber.App, conf *appconfig.Config, data *service.SEOData) err
 }
 
 // publicURLPattern is the form of a public URL: https, a host name in lower case, maybe a port, and the path /mcp with
-// nothing after it. The card gives it to clients as it is, so it must be the one URL of the endpoint.
+// nothing after it. The card and the guide give it to clients and people as it is, in links, commands and JSON, so it
+// must be the one URL of the endpoint, and a plain one.
 var publicURLPattern = regexp.MustCompile(`^https://[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?/mcp$`)
 
 // parsePublicURL parses the public URL of the server (MCPPublicURL), nil for none.

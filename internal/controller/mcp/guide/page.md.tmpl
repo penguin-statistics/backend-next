@@ -1,0 +1,80 @@
+# {{.T.Title}}
+
+{{if .LLMs}}{{range .T.LLMsPreface}}{{t .}}
+
+{{end}}{{end -}}
+{{range .T.Lead}}{{t .}}
+
+{{end -}}
+**{{.T.Badges}}**
+
+| | |
+|---|---|
+| {{.T.URLLabel}} | `{{.Endpoint}}` |
+{{range .T.Card}}| {{index . 0}} | {{t (index . 1)}} |
+{{end}}
+{{t .T.URLNote}}
+
+{{if not .LLMs}}**{{.T.OneClick}}** {{range $i, $l := .OneClick}}{{if $i}} · {{end}}[{{$l.Label}}]({{$l.URL}}){{end}}
+
+{{t .T.OneClickNote}}
+
+{{end -}}
+## {{.T.AgentSummary}}
+
+{{t .T.AgentIntro}}
+
+```text
+{{code .T.AgentPrompt}}
+```
+
+## {{.T.Install}}
+
+### {{.T.ChatApps}}
+
+{{range .Chat}}{{template "client" .}}{{end -}}
+### {{.T.CodingTools}}
+
+{{range .Coding}}{{template "client" .}}{{end -}}
+### {{.T.Other.Summary}}
+
+| {{index .T.Other.Head 0}} | {{index .T.Other.Head 1}} | {{index .T.Other.Head 2}} |
+|---|---|---|
+{{range .T.Other.Rows}}| {{t (index . 0)}} | {{t (index . 1)}} | {{t (index . 2)}} |
+{{end}}
+{{template "section" .Try}}
+{{- if .Plugins}}{{template "section" .Plugin}}{{end -}}
+## {{.T.ToolsHeading}}
+
+{{t .T.ToolsIntro}}
+
+| {{index .T.ToolsHead 0}} | {{index .T.ToolsHead 1}} |
+|---|---|
+{{range .T.Tools}}| `{{.Name}}` | {{t .Line}} |
+{{end}}
+{{template "section" .Data}}
+{{- template "section" .Limits}}
+{{- template "section" .Privacy}}
+{{- template "section" .Troubleshooting}}
+{{- template "section" .Links -}}
+---
+
+{{t .T.Footer}}{{if not .LLMs}} · {{range $i, $l := .Langs}}{{if $i}} · {{end}}[{{$l.Name}}]({{$l.Markdown}}){{end}}{{end}}
+{{- define "client"}}#### {{.Summary}}
+
+{{template "blocks" .Blocks}}{{end}}
+{{- define "section"}}## {{.Heading}}
+
+{{template "blocks" .Blocks}}{{end}}
+{{- define "blocks"}}{{range .}}
+{{- if .Text}}{{t .Text}}
+
+{{else if .Items}}{{range .Items}}- {{t .}}
+{{end}}
+{{else if .Steps}}{{range $i, $s := .Steps}}{{add1 $i}}. {{t $s}}
+{{end}}
+{{else if .Code}}```{{.Lang}}
+{{code .Code}}
+```
+
+{{end}}{{end}}{{end}}

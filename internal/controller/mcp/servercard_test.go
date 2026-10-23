@@ -37,10 +37,14 @@ func cardApp(t *testing.T, app *fiber.App, endpoint string) *fiber.App {
 	return app
 }
 
-// request sends a request of method to path, with the headers given, and returns the response and its body.
+// request sends a request of method to path, with the headers given, and returns the response and its body. A path
+// can be a URL, whose host is then sent in Host.
 func request(t *testing.T, app *fiber.App, method, path string, header ...string) (*http.Response, []byte) {
 	t.Helper()
 	req := httptest.NewRequest(method, path, nil)
+	// the request line has the path only, as clients and proxies send it: fasthttp loses the host of a URL in the
+	// request line once the URI is rewritten (otelfiber reads RequestURI)
+	req.RequestURI = ""
 	for i := 0; i+1 < len(header); i += 2 {
 		req.Header.Set(header[i], header[i+1])
 	}

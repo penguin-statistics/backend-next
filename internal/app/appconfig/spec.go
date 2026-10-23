@@ -327,8 +327,9 @@ type ConfigSpec struct {
 
 	// MCPPublicURL is the URL clients reach the MCP server at, https://mcp.penguin-stats.io/mcp in production: an
 	// https URL whose path is /mcp, with nothing after it, or the startup fails. Set (and MCPEnabled), the server
-	// describes itself at /mcp/server-card, its MCP Server Card, which gives clients this URL; the ingress has to route
-	// that path here. Empty, /mcp/server-card is not routed (404).
+	// describes itself at /mcp/server-card, its MCP Server Card, which gives clients this URL, and serves the guide to
+	// adding it to apps at /, /index.md, /llms.txt and /robots.txt of the host of this URL only; the ingress has to
+	// route those paths here. Empty, none of them is routed (404).
 	MCPPublicURL string `split_words:"true"`
 }
 

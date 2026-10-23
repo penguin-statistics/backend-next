@@ -1,6 +1,7 @@
 package middlewares
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -24,9 +25,9 @@ var (
 	// Mcp-Protocol-Version (after the 2025 handshake), Mcp-Method and Mcp-Name (the 2026-07-28 protocol, whose
 	// Mcp-Param-* headers are allowed by echoing the list of a preflight)
 	corsMCPAllowHeaders = corsAllowHeaders + ",Mcp-Protocol-Version,Mcp-Method,Mcp-Name"
-	// the headers allowed by a preflight to MCPServerCardPath that lists none: the usual ones and If-None-Match, which
-	// a client revalidating the card it keeps sends (and which makes a browser send a preflight)
-	corsServerCardAllowHeaders = corsAllowHeaders + "," + fiber.HeaderIfNoneMatch
+	// the headers allowed by a preflight to MCPServerCardPath or MCPGuidePaths that lists none: the usual ones and
+	// If-None-Match, which a client revalidating a copy it keeps sends (and which makes a browser send a preflight)
+	corsPublicFileAllowHeaders = corsAllowHeaders + "," + fiber.HeaderIfNoneMatch
 	corsMaxAge                 = "600"
 	// response headers outside the CORS-safelisted set must be listed here for cross-origin scripts to read them
 	corsExposeHeaders = strings.Join([]string{
@@ -51,9 +52,16 @@ const MCPPath = "/mcp"
 // from any page before connecting. It is public as MCPPath is, and CORS answers it the same way.
 const MCPServerCardPath = MCPPath + "/server-card"
 
+// MCPGuidePaths are the paths of the setup guide of the MCP server (controller/mcp/guide), which only the host of the
+// server serves: the page, the page as Markdown, llms.txt and robots.txt. They are public as MCPPath is, and CORS
+// answers them the same way. Their responses are then the same for every Origin, as they must be: Cloudflare caches
+// robots.txt, and any response a rule caches, by its URL whatever its Vary. And an MCP client in a browser given the
+// URL of the page, whose POST is redirected to MCPPath, may send the page the headers of MCP.
+var MCPGuidePaths = []string{"/", "/index.md", "/llms.txt", "/robots.txt"}
+
 // routedTo tells whether path, as requested, is routed to route: fiber routes ignore case and a trailing slash
 func routedTo(path, route string) bool {
-	return strings.EqualFold(strings.TrimSuffix(path, "/"), route)
+	return strings.EqualFold(strings.TrimSuffix(path, "/"), strings.TrimSuffix(route, "/"))
 }
 
 // CORS answers cross-origin requests in two tiers.
@@ -75,9 +83,9 @@ func routedTo(path, route string) bool {
 //
 // Every OPTIONS request is answered here as a preflight with 204, for both tiers.
 //
-// The requests to MCPPath and MCPServerCardPath are always in the public tier, and their preflights allow the headers
-// they ask for: the 2026-07-28 MCP protocol sends Mcp-Param-* headers named after the arguments of a tool, and a
-// client revalidating the card sends If-None-Match.
+// The requests to MCPPath, MCPServerCardPath and MCPGuidePaths are always in the public tier, and their preflights
+// allow the headers they ask for: the 2026-07-28 MCP protocol sends Mcp-Param-* headers named after the arguments of a
+// tool, and a client revalidating the card or a file of the guide sends If-None-Match.
 func CORS(credentialedOrigins []string) fiber.Handler {
 	allowlist := newOriginAllowlist(credentialedOrigins)
 
@@ -85,10 +93,11 @@ func CORS(credentialedOrigins []string) fiber.Handler {
 		origin := c.Get(fiber.HeaderOrigin)
 		mcp := routedTo(c.Path(), MCPPath)
 		card := routedTo(c.Path(), MCPServerCardPath)
+		guide := slices.ContainsFunc(MCPGuidePaths, func(route string) bool { return routedTo(c.Path(), route) })
 
 		// the answer depends on Origin, whichever tier it falls in
 		c.Vary(fiber.HeaderOrigin)
-		if !mcp && !card && allowlist.allows(origin) {
+		if !mcp && !card && !guide && allowlist.allows(origin) {
 			c.Locals(localsKeyCORSTier, corsTierCredentialed)
 			c.Set(fiber.HeaderAccessControlAllowOrigin, origin)
 			c.Set(fiber.HeaderAccessControlAllowCredentials, "true")
@@ -111,13 +120,13 @@ func CORS(credentialedOrigins []string) fiber.Handler {
 		c.Vary(fiber.HeaderAccessControlRequestHeaders)
 		c.Set(fiber.HeaderAccessControlAllowMethods, corsAllowMethods)
 		switch requested := c.Get(fiber.HeaderAccessControlRequestHeaders); {
-		case (mcp || card) && requested != "":
+		case (mcp || card || guide) && requested != "":
 			// never with credentials: any header is safe to allow
 			c.Set(fiber.HeaderAccessControlAllowHeaders, requested)
 		case mcp:
 			c.Set(fiber.HeaderAccessControlAllowHeaders, corsMCPAllowHeaders)
-		case card:
-			c.Set(fiber.HeaderAccessControlAllowHeaders, corsServerCardAllowHeaders)
+		case card || guide:
+			c.Set(fiber.HeaderAccessControlAllowHeaders, corsPublicFileAllowHeaders)
 		default:
 			c.Set(fiber.HeaderAccessControlAllowHeaders, corsAllowHeaders)
 		}

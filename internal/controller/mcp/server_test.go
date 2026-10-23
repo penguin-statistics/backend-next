@@ -741,6 +741,12 @@ func TestRegister(t *testing.T) {
 			if resp, b := request(t, app, fiber.MethodGet, "/mcp/server-card"); resp.StatusCode != tc.cardStatus {
 				t.Errorf("card: status %d, want %d: %s", resp.StatusCode, tc.cardStatus, b)
 			}
+			// the guide with the card
+			for _, path := range []string{"/", "/index.md", "/llms.txt", "/robots.txt"} {
+				if resp, _ := request(t, app, fiber.MethodGet, "https://mcp.penguin-stats.io"+path); resp.StatusCode != tc.cardStatus {
+					t.Errorf("guide %s: status %d, want %d", path, resp.StatusCode, tc.cardStatus)
+				}
+			}
 			if !tc.enabled {
 				return
 			}
