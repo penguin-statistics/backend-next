@@ -1,0 +1,26 @@
+:root{color-scheme:light dark;--bg:#fff;--fg:#1f2328;--mut:#59636e;--line:#d1d9e0;--code:#f6f8fa;--acc:#0969da;--on:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1117;--fg:#e6edf3;--mut:#9198a1;--line:#3d444d;--code:#151b23;--acc:#4493f8;--on:#0d1117}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+main{max-width:46rem;margin:0 auto;padding:16px 16px 64px}
+a{color:var(--acc);overflow-wrap:anywhere}
+nav,footer{color:var(--mut);font-size:14px}
+h1{font-size:1.75rem;line-height:1.25;margin:.4em 0}
+h2{margin-top:2em;padding-bottom:.2em;border-bottom:1px solid var(--line)}
+pre,code{font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;background:var(--code);border-radius:6px}
+code{padding:.1em .3em;overflow-wrap:anywhere}
+pre{position:relative;padding:12px 64px 12px 12px;overflow-x:auto;border:1px solid var(--line)}
+pre code{padding:0;overflow-wrap:normal}
+pre.w{white-space:pre-wrap}
+details{border:1px solid var(--line);border-radius:8px;margin:8px 0;padding:4px 12px}
+summary{cursor:pointer;font-weight:600}
+.btn{display:inline-block;padding:7px 12px;border-radius:6px;background:var(--acc);color:var(--on);text-decoration:none;margin:3px}
+table{display:block;overflow-x:auto;border-collapse:collapse}
+td,th{border-bottom:1px solid var(--line);padding:6px;text-align:left;vertical-align:top}
+td:first-child code{white-space:nowrap;overflow-wrap:normal}
+th{white-space:nowrap}
+th+th{white-space:normal}
+.copy{position:absolute;top:6px;right:6px;font-size:12px}
+.url code{display:inline-block;font-size:15px;padding:4px 8px}
+.url .copy{position:static;margin-left:8px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+footer{margin-top:3em}

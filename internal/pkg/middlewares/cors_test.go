@@ -189,6 +189,11 @@ func TestCORSMCPPathIsPublic(t *testing.T) {
 	app.Get(MCPServerCardPath, func(c *fiber.Ctx) error {
 		return c.SendString("ok")
 	})
+	for _, path := range MCPGuidePaths {
+		app.All(path, func(c *fiber.Ctx) error {
+			return c.SendString("ok")
+		})
+	}
 	app.Get("/mcpx", func(c *fiber.Ctx) error {
 		return c.SendString("ok")
 	})
@@ -215,11 +220,22 @@ func TestCORSMCPPathIsPublic(t *testing.T) {
 			requestHeaders: "if-none-match", wantACAO: "*", wantAllowHeaders: "if-none-match"},
 		{name: "server card preflight without request headers", method: fiber.MethodOptions, path: "/mcp/server-card/", origin: "https://evil.example",
 			wantACAO: "*", wantAllowHeaders: "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace,traceparent,tracestate,If-None-Match"},
+		// and the guide, whose files are cached by their URL alone, and whose page an MCP client may be given
+		{name: "guide page", method: fiber.MethodGet, path: "/", origin: "https://penguin-stats.io", wantACAO: "*"},
+		{name: "llms.txt", method: fiber.MethodGet, path: "/llms.txt", origin: "https://penguin-stats.io", wantACAO: "*"},
+		{name: "robots.txt", method: fiber.MethodGet, path: "/robots.txt", origin: "capacitor://localhost", wantACAO: "*"},
+		{name: "guide Markdown", method: fiber.MethodGet, path: "/INDEX.md", origin: "https://penguin-stats.io", wantACAO: "*"},
+		{name: "guide page preflight", method: fiber.MethodOptions, path: "/", origin: "https://inspector.example", requestHeaders: mcpHeaders,
+			wantACAO: "*", wantAllowHeaders: mcpHeaders},
+		{name: "guide file preflight without request headers", method: fiber.MethodOptions, path: "/llms.txt", origin: "https://evil.example",
+			wantACAO: "*", wantAllowHeaders: "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace,traceparent,tracestate,If-None-Match"},
 		// other paths keep the tiers and the fixed list
 		{name: "other path", method: fiber.MethodGet, path: "/mcpx", origin: "https://penguin-stats.io", wantACAO: "https://penguin-stats.io", wantCredentials: true},
 		{name: "other path preflight", method: fiber.MethodOptions, path: "/mcpx", origin: "https://evil.example", requestHeaders: mcpHeaders,
 			wantACAO: "*", wantAllowHeaders: "Content-Type,Authorization,X-Requested-With,X-Penguin-Variant,sentry-trace,traceparent,tracestate"},
 		{name: "other path under /mcp", method: fiber.MethodGet, path: "/mcp/other", origin: "https://penguin-stats.io", wantACAO: "https://penguin-stats.io",
+			wantCredentials: true},
+		{name: "other file at the root", method: fiber.MethodGet, path: "/llms-full.txt", origin: "https://penguin-stats.io", wantACAO: "https://penguin-stats.io",
 			wantCredentials: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

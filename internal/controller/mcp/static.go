@@ -17,6 +17,10 @@ type static struct {
 	// the compress middleware sends it unchanged on the gzip and br responses too, and a strong tag has to differ
 	// between encodings (RFC 9110, 8.8.3.3). With the type, the same bytes sent as another type get another tag.
 	etag string
+	// header holds the other headers of the response, by name; vary the request headers it varies by, which are
+	// added to those of the middlewares (Origin, Accept-Encoding)
+	header [][2]string
+	vary   []string
 }
 
 func newStatic(contentType, cacheControl string, body []byte) *static {
@@ -24,11 +28,27 @@ func newStatic(contentType, cacheControl string, body []byte) *static {
 	return &static{contentType: contentType, cacheControl: cacheControl, body: body, etag: `W/"` + hex.EncodeToString(sum[:8]) + `"`}
 }
 
+// with adds the header name to s.
+func (s *static) with(name, value string) *static {
+	s.header = append(s.header, [2]string{name, value})
+	return s
+}
+
+// varies adds request headers that s varies by.
+func (s *static) varies(names ...string) *static {
+	s.vary = append(s.vary, names...)
+	return s
+}
+
 // send answers a GET or a HEAD with s, or with 304 Not Modified to a request whose If-None-Match has its entity tag.
 func (s *static) send(c *fiber.Ctx) error {
 	c.Set(fiber.HeaderContentType, s.contentType)
 	c.Set(fiber.HeaderCacheControl, s.cacheControl)
 	c.Set(fiber.HeaderETag, s.etag)
+	for _, h := range s.header {
+		c.Set(h[0], h[1])
+	}
+	c.Vary(s.vary...)
 	if etagMatches(c.Get(fiber.HeaderIfNoneMatch), s.etag) {
 		c.Status(fiber.StatusNotModified)
 		return nil

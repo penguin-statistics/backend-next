@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="{{.T.ContentLanguage}}" data-copy="{{.T.Copy}}" data-copied="{{.T.Copied}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{{.T.Title}}</title>
+<meta name="description" content="{{.T.Description}}">
+<link rel="icon" type="image/png" href="{{.Site}}/favicon/favicon-32x32.png">
+{{range .Langs}}<link rel="alternate" hreflang="{{.ContentLanguage}}" href="{{.URL}}">
+{{end}}<link rel="alternate" hreflang="x-default" href="{{.Guide}}">
+<link rel="alternate" type="text/markdown" href="{{.MarkdownURL}}">
+<link rel="describedby" type="text/plain" href="{{.LLMsURL}}">
+<link rel="license" href="{{.License}}">
+<link rel="service-desc" type="application/mcp-server-card+json" href="{{.Card}}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{.T.Title}}">
+<meta property="og:description" content="{{.T.Description}}">
+<meta property="og:url" content="{{.URL}}">
+<meta property="og:image" content="{{.Site}}/favicon/android-chrome-512x512.png">
+<style>{{.CSS}}</style>
+</head>
+<body>
+<main>
+<header>
+<nav>{{template "langs" .}} · <a href="{{.MarkdownPath}}" type="text/markdown">{{.T.MarkdownLink}}</a></nav>
+<h1>{{.T.Title}}</h1>
+</header>
+<p class="sr">{{plain .T.ForAgents}}</p>
+{{range .T.Lead}}<p>{{t .}}</p>
+{{end}}<p><strong>{{.T.Badges}}</strong></p>
+<p class="url" data-c="{{.Endpoint}}"><strong>{{.T.URLLabel}}</strong> <code>{{.Endpoint}}</code></p>
+<table>
+{{range .T.Card}}<tr><th>{{index . 0}}</th><td>{{t (index . 1)}}</td></tr>
+{{end}}</table>
+<p>{{t .T.URLNote}}</p>
+<p><strong>{{.T.OneClick}}</strong> {{range .OneClick}}<a class="btn" href="{{.URL}}">{{.Label}}</a> {{end}}<br>{{t .T.OneClickNote}}</p>
+<details id="agent"><summary>{{.T.AgentSummary}}</summary>
+<p>{{t .T.AgentIntro}}</p>
+<pre class="w" data-c><code>{{code .T.AgentPrompt}}</code></pre>
+</details>
+<h2 id="install">{{.T.Install}}</h2>
+<h3>{{.T.ChatApps}}</h3>
+{{range .Chat}}{{template "client" .}}{{end -}}
+<h3>{{.T.CodingTools}}</h3>
+{{range .Coding}}{{template "client" .}}{{end -}}
+<details id="other"><summary>{{.T.Other.Summary}}</summary>
+<table>
+<tr>{{range .T.Other.Head}}<th>{{.}}</th>{{end}}</tr>
+{{range .T.Other.Rows}}<tr>{{range .}}<td>{{t .}}</td>{{end}}</tr>
+{{end}}</table>
+</details>
+{{template "section" .Try}}
+{{- if .Plugins}}{{template "section" .Plugin}}{{end -}}
+<h2 id="tools">{{.T.ToolsHeading}}</h2>
+<p>{{t .T.ToolsIntro}}</p>
+<table>
+<tr><th>{{index .T.ToolsHead 0}}</th><th>{{index .T.ToolsHead 1}}</th></tr>
+{{range .T.Tools}}<tr><td><code>{{.Name}}</code></td><td>{{t .Line}}</td></tr>
+{{end}}</table>
+{{template "section" .Data}}
+{{- template "section" .Limits}}
+{{- template "section" .Privacy}}
+{{- template "section" .Troubleshooting}}
+{{- template "section" .Links -}}
+<footer>
+<p>{{t .T.Footer}}</p>
+<p>{{template "langs" .}}</p>
+</footer>
+</main>
+<script>{{.JS}}</script>
+</body>
+</html>
+{{- define "langs"}}{{range $i, $l := .Langs}}{{if $i}} · {{end}}<a href="{{$l.Path}}" hreflang="{{$l.ContentLanguage}}" lang="{{$l.ContentLanguage}}">{{$l.Name}}</a>{{end}}{{end}}
+{{- define "client"}}<details id="{{.ID}}"><summary>{{.Summary}}</summary>
+{{template "blocks" .Blocks}}</details>
+{{end}}
+{{- define "section"}}<h2 id="{{.ID}}">{{.Heading}}</h2>
+{{template "blocks" .Blocks}}{{end}}
+{{- define "blocks"}}{{range .}}
+{{- if .Text}}<p>{{t .Text}}</p>
+{{else if .Items}}<ul>
+{{range .Items}}<li>{{t .}}</li>
+{{end}}</ul>
+{{else if .Steps}}<ol>
+{{range .Steps}}<li>{{t .}}</li>
+{{end}}</ol>
+{{else if .Code}}<pre data-c><code>{{code .Code}}</code></pre>
+{{end}}{{end}}{{end}}
