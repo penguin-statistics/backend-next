@@ -13,7 +13,9 @@ import (
 
 func TestTypeset(t *testing.T) {
 	en := typesetter{expand: func(s string) string { return s }}
-	zh := typesetter{zh: true, expand: en.expand}
+	zh := typesetter{lang: "zh", expand: en.expand}
+	ja := typesetter{lang: "ja", expand: en.expand}
+	ko := typesetter{lang: "ko", expand: en.expand}
 	for _, tc := range []struct {
 		ts         typesetter
 		text, want string
@@ -52,6 +54,19 @@ func TestTypeset(t *testing.T) {
 		{zh, "粘贴下面的内容后确认：", `粘贴下面的内容<span class="nw">后确认：</span>`},
 		{zh, "以 `/mcp` 结尾", `以 <code class="nw">/mcp</code> <span class="nw">结尾</span>`},
 		{zh, "认证选 **No sign in**", `认证选 <strong>No sign in</strong>`},
+		// Japanese is set as Chinese is, its kana included; its Han words are not marked as Chinese
+		{ja, "このページ（https://a.example/ ）は案内です。",
+			`このページ<span class="nw">（<a href="https://a.example/"><span class="u">https://<wbr>a.example/</span></a></span>）は案<span class="nw">内です。</span>`},
+		{ja, "日本語で質問できます", `日本語で質問<span class="nw">できます</span>`},
+		// Korean has spaces between words: only the words of other languages are marked, and no line is bound
+		{ko, "한국어, 日本語, 中文 모두 됩니다.",
+			`한국어, <span lang="ja">日本語</span>, <span lang="zh-CN">中文</span> 모두 됩니다.`},
+		// and a particle stays with the bracket or the quote before it
+		{ko, "**추가**(Add)를 클릭하고 \"로그인 없음\"을 선택하세요.",
+			`<strong>추가</strong>(Add<span class="nw">)를</span> 클릭하고 "로그인 없음<span class="nw">"을</span> 선택하세요.`},
+		// no line starts with the dot between items, nor breaks a short path of menus
+		{en, "Website: a · b", `Website: a<span class="nw"> ·</span> b`},
+		{zh, "（Claude：+ → Connectors）", `（Claude：<span class="nw">+ →</span> Connectors）`},
 	} {
 		got, err := tc.ts.text(tc.text)
 		if err != nil || string(got) != tc.want {
@@ -61,14 +76,14 @@ func TestTypeset(t *testing.T) {
 }
 
 // What the page shows is what the texts say: the text of the page is that of the Markdown, typeset, but for the space
-// before Chinese punctuation after a URL, which the Markdown needs only.
+// before Chinese or Japanese punctuation after a URL, which the Markdown needs only.
 func TestTypesetKeepsTheText(t *testing.T) {
 	for _, tx := range texts {
 		v, err := newView(prod, tx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		ts := typesetter{zh: tx.Lang == "zh", expand: v.expand}
+		ts := typesetter{lang: tx.Lang, expand: v.expand}
 		for _, ct := range tx.Clients {
 			for _, b := range ct.Blocks {
 				for _, s := range slices.Concat([]string{b.Text}, b.Items, b.Steps) {
@@ -80,7 +95,7 @@ func TestTypesetKeepsTheText(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					if ts.zh {
+					if ts.solid() {
 						want = htmltemplate.HTML(spacedPunct.ReplaceAllString(string(want), "$1")) //nolint:gosec // a test
 					}
 					if plainText(got) != plainText(want) {
@@ -202,7 +217,11 @@ func TestHeroLeadsWithThePrompt(t *testing.T) {
 			t.Fatalf("%s: no button for the prompt", lang)
 		}
 		prompt, label := html.UnescapeString(page[cta[2]:cta[3]]), page[cta[4]:cta[5]]
-		if want := map[string]string{"en": "Copy prompt for your agent", "zh": "复制给 AI 的安装指令"}[lang]; label != want {
+		want := map[string]string{"en": "Copy prompt for your agent", "zh": "复制给 AI 的安装指令"}[lang]
+		if want == "" {
+			want = textOf(t, lang).AgentCopy
+		}
+		if label != want || lang != "en" && label == en.AgentCopy {
 			t.Errorf("%s: the button reads %q", lang, label)
 		}
 		if !strings.Contains(string(p.Markdown), "```text\n"+prompt+"\n```") {
@@ -224,9 +243,17 @@ func TestHeroLeadsWithThePrompt(t *testing.T) {
 		t.Error("a control besides the prompt's button is filled")
 	}
 	// the Markdown, and llms.txt, give the prompt before the URL and the steps of the apps
-	for name, md := range map[string]string{"en": string(g.Pages["en"].Markdown), "zh": string(g.Pages["zh"].Markdown), "llms.txt": string(g.LLMs)} {
-		agent, install, url := strings.Index(md, "\n## "+map[bool]string{true: zh.AgentSummary, false: en.AgentSummary}[name == "zh"]+"\n"),
-			strings.Index(md, "\n## "+map[bool]string{true: zh.Install, false: en.Install}[name == "zh"]+"\n"), strings.Index(md, "| `"+prod.Endpoint+"` |")
+	mds := map[string]string{"llms.txt": string(g.LLMs)}
+	for _, tx := range texts {
+		mds[tx.Lang] = string(g.Pages[tx.Lang].Markdown)
+	}
+	for name, md := range mds {
+		tx := en
+		if name != "llms.txt" {
+			tx = textOf(t, name)
+		}
+		agent, install, url := strings.Index(md, "\n## "+tx.AgentSummary+"\n"),
+			strings.Index(md, "\n## "+tx.Install+"\n"), strings.Index(md, "| `"+prod.Endpoint+"` |")
 		if agent < 0 || agent > install || install > url {
 			t.Errorf("%s: the prompt at %d, the steps at %d, the URL at %d", name, agent, install, url)
 		}
@@ -241,4 +268,16 @@ func TestPageStrings(t *testing.T) {
 			}
 		}
 	}
+}
+
+// textOf is the text of the language lang.
+func textOf(t *testing.T, lang string) *text {
+	t.Helper()
+	for _, tx := range texts {
+		if tx.Lang == lang {
+			return tx
+		}
+	}
+	t.Fatalf("no text in %s", lang)
+	return nil
 }

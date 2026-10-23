@@ -270,15 +270,12 @@ func guideLang(lang, acceptLanguage string) string {
 }
 
 // guideLangOf is the language of the guide for the language tag tag: Chinese for zh, whatever its script or region
-// (there is no Traditional Chinese yet), English for en, and for ja and ko until they are translated: their readers
-// get English rather than a page they may not read at all.
+// (there is no Traditional Chinese yet), and English, Japanese and Korean for en, ja and ko.
 func guideLangOf(tag string) (string, bool) {
 	primary, _, _ := strings.Cut(strings.ToLower(strings.TrimSpace(tag)), "-")
 	switch primary {
-	case "zh":
-		return "zh", true
-	case "en", "ja", "ko":
-		return "en", true
+	case "zh", "en", "ja", "ko":
+		return primary, true
 	}
 	return "", false
 }

@@ -19,9 +19,10 @@ import (
 //	fonttools subset mono.ttf --unicodes=$U --layout-features=kern,ccmp,locl,mark,mkmk,case \
 //	  --flavor=woff2 --no-hinting --desubroutinize --name-IDs='*' --output-file=fonts/geist-mono-latin.woff2
 //
-// The unicode-range of their @font-face in style.css is that of the cut. Chinese text, and the punctuation the cut
-// leaves out (curly quotes, the ellipsis), falls through to the fonts of the system: PingFang SC, Microsoft YaHei,
-// Noto Sans CJK SC.
+// The unicode-range of their @font-face in style.css is that of the cut. Chinese, Japanese and Korean text, and the
+// punctuation the cut leaves out (curly quotes, the ellipsis), falls through to the fonts of the system for its
+// language (--cjk in style.css): PingFang SC, Microsoft YaHei; Hiragino Sans, Meiryo; Apple SD Gothic Neo, Malgun
+// Gothic; and the Noto Sans CJK of each.
 
 //go:embed fonts
 var fontFiles embed.FS

@@ -37,7 +37,7 @@
 <section class="hero wrap" aria-labelledby="title">
 <div class="hero-t">
 <p class="pill">{{range $i, $b := badges .T.Badges}}{{if $i}}<span class="sep" aria-hidden="true"></span><span class="sr"> · </span>{{end}}<span>{{$b}}</span>{{end}}</p>
-<h1 id="title"><span>{{index $title 0}}</span> <span class="h1-b">{{index $title 1}}</span></h1>
+<h1 id="title"><span>{{h1name (index $title 0)}}</span> <span class="h1-b">{{index $title 1}}</span></h1>
 {{with sentence (index .T.Lead 0)}}<p class="lead"><span class="l1">{{t .First}}</span>{{t .Rest}}</p>{{end}}
 {{range slice .T.Lead 1}}<p class="aside">{{t .}}</p>
 {{end -}}
@@ -102,7 +102,7 @@
 </body>
 </html>
 {{- define "arrow"}}<svg class="i ar" aria-hidden="true"><use href="#i-arrow"/></svg>{{end}}
-{{- define "langs"}}{{$lang := .T.Lang}}{{range .Langs}}<a href="{{.Path}}" hreflang="{{.ContentLanguage}}" lang="{{.ContentLanguage}}"{{if eq .Lang $lang}} aria-current="page"{{end}}>{{.Name}}</a>{{end}}{{end}}
+{{- define "langs"}}{{$lang := .T.Lang}}{{range .Langs}}<a href="{{.Path}}" hreflang="{{.ContentLanguage}}" lang="{{.ContentLanguage}}"{{if eq .Lang $lang}} aria-current="page"{{end}}><span class="ln">{{.Name}}</span><span class="ln-s" aria-hidden="true">{{.Abbr}}</span></a>{{end}}{{end}}
 {{- define "tab"}}<li><a class="tab" href="#{{.ID}}">{{(name .Summary).Name}}</a></li>{{end}}
 {{- define "panel"}}<section class="panel" id="{{.ID}}" aria-labelledby="{{.ID}}-h"><h3 id="{{.ID}}-h">{{.Name}}{{with .Qualifier}} <span class="ph-q">{{.}}</span>{{end}}</h3>
 {{template "blocks" .Blocks}}<p class="docs"><span class="docs-l">{{.DocsLabel}}</span> <a href="{{.DocsURL}}"><span>{{.DocsText}}</span>{{template "arrow"}}</a></p></section>

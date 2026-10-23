@@ -59,7 +59,9 @@
 {{- template "section" .Links -}}
 ---
 
-{{t .T.Footer}}{{if not .LLMs}} · {{range $i, $l := .Langs}}{{if $i}} · {{end}}[{{$l.Name}}]({{$l.Markdown}}){{end}}{{end}}
+{{t .T.Footer}}{{if not .LLMs}}
+
+{{range $i, $l := .Langs}}{{if $i}} · {{end}}[{{$l.Name}}]({{$l.Markdown}}){{end}}{{end}}
 {{- define "client"}}#### {{.Summary}}
 
 {{template "blocks" .Blocks}}{{end}}

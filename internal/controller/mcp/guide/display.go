@@ -90,10 +90,17 @@ var listKinds = map[string]string{"try": "prompts", "plugin": "rows", "troublesh
 
 // typesetter typesets the texts of a language.
 type typesetter struct {
-	zh     bool
+	// lang is the language of the texts (text.Lang)
+	lang   string
 	expand func(string) string
 	// terminal labels the blocks of shell commands
 	terminal string
+}
+
+// solid tells whether the language is written without spaces between words, with punctuation of full width: Chinese
+// and Japanese.
+func (ts typesetter) solid() bool {
+	return ts.lang == "zh" || ts.lang == "ja"
 }
 
 // text renders s, a text, as HTML, typeset.
@@ -112,9 +119,16 @@ var (
 	hyphenated = regexp.MustCompile(`[(\[“"「（]?[A-Za-z0-9][A-Za-z0-9.:/@_]*-[A-Za-z0-9.:/@_-]*[A-Za-z0-9/][)\]”"」）.,;:]?`)
 	// a name joined by hyphens, or a flag: penguin-stats, agent-skills, mcp-remote, --transport, -y
 	hyphenWord = regexp.MustCompile(`-{1,2}[A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*|[A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)+`)
-	// a space before Chinese punctuation, which follows a URL in the Chinese texts so that the Markdown does not take
-	// the punctuation into the URL
-	spacedPunct = regexp.MustCompile(` ([，。）、；：])`)
+	// a space before Chinese or Japanese punctuation, which follows a URL in the texts in these languages so that the
+	// Markdown does not take the punctuation into the URL
+	spacedPunct = regexp.MustCompile(` ([，。（）、；：])`)
+	// a closing bracket or quote (after a letter: a straight quote also opens) and the Korean particle after it, which
+	// a line must not separate: (Add)를
+	particle = regexp.MustCompile(`([^\s(\[“‘])([)\]"'”’]\p{Hangul}+)`)
+	// the separator of the items of a line, which no line starts with; and a short path of menus, which no line
+	// breaks: + → Connectors
+	separator = regexp.MustCompile(` ·`)
+	plusPath  = regexp.MustCompile(`\+ →`)
 	// a word of Chinese, Japanese or Korean in an English text: 中文, 日本語, 한국어, 狗粮
 	cjkWord   = regexp.MustCompile(`[\p{Han}\p{Hiragana}\p{Katakana}\p{Hangul}]+`)
 	tagOrText = regexp.MustCompile(`<[^>]*>|[^<]+`)
@@ -139,9 +153,10 @@ const shortWord = 24
 
 // typeset typesets h, HTML from inline: codes and links are kept on a line with the punctuation around them; short
 // codes do not break, long ones only at a slash, a comma or a brace; URLs break after a slash of their path; names
-// never break at a hyphen; in English, the words of other languages are marked with their language; and in Chinese,
-// no line starts with punctuation, there is no space before it, and the last line of a paragraph is not a lone
-// character.
+// never break at a hyphen; no line starts with the dot between items, nor breaks a short path of menus; in English
+// and Korean, the words of other languages are marked with their language; in Korean, a particle stays with the
+// bracket or quote before it; and in Chinese and Japanese, no line starts with punctuation, there is no space before
+// it, and the last line of a paragraph is not a lone character.
 func (ts typesetter) typeset(h string) string {
 	h = gluedCode.ReplaceAllStringFunc(h, func(m string) string {
 		if strings.HasPrefix(m, "<code>") && strings.HasSuffix(m, "</code>") {
@@ -202,19 +217,27 @@ func (ts typesetter) typeset(h string) string {
 				}
 				return `<span class="nw">` + w + "</span>"
 			})
-			if ts.zh {
+			if ts.solid() {
 				// full-width punctuation has its own space, and no line starts with it (line-break: strict)
 				seg = spacedPunct.ReplaceAllString(seg, "$1")
 			} else {
 				seg = cjkWord.ReplaceAllStringFunc(seg, func(w string) string {
-					return `<span lang="` + wordLang(w) + `">` + w + "</span>"
+					if l := wordLang(w); l != ts.lang {
+						return `<span lang="` + l + `">` + w + "</span>"
+					}
+					return w
 				})
+				if ts.lang == "ko" {
+					seg = particle.ReplaceAllString(seg, `$1<span class="nw">$2</span>`)
+				}
 			}
+			seg = separator.ReplaceAllString(seg, `<span class="nw">$0</span>`)
+			seg = plusPath.ReplaceAllString(seg, `<span class="nw">$0</span>`)
 			b.WriteString(seg)
 		}
 	}
 	h = b.String()
-	if ts.zh {
+	if ts.solid() {
 		h = bindLastLine(h)
 	}
 	return h
@@ -298,25 +321,27 @@ func breakLong(s string) string {
 	return b.String()
 }
 
-// lastLine is how many characters of a Chinese paragraph its last line keeps at least
+// lastLine is how many characters of a Chinese or Japanese paragraph its last line keeps at least
 const lastLine = 4
 
-// bindLastLine keeps the last characters of h, Chinese text, on one line, should the paragraph end in Chinese.
+// bindLastLine keeps the last characters of h, Chinese or Japanese text, on one line, should the paragraph end in
+// either.
 func bindLastLine(h string) string {
 	if strings.HasSuffix(h, ">") {
 		return h
 	}
-	i, n, han := len(h), 0, false
+	i, n, word := len(h), 0, false
 	for i > 0 && n < lastLine {
 		r, size := utf8.DecodeLastRuneInString(h[:i])
-		if !unicode.Is(unicode.Han, r) && !isCJKPunct(r) {
+		letter := unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana)
+		if !letter && !isCJKPunct(r) {
 			break
 		}
-		han = han || unicode.Is(unicode.Han, r)
+		word = word || letter
 		i -= size
 		n++
 	}
-	if n < 2 || !han {
+	if n < 2 || !word {
 		return h
 	}
 	return h[:i] + `<span class="nw">` + h[i:] + "</span>"
@@ -347,11 +372,11 @@ func wordLang(w string) string {
 }
 
 // prompt typesets s, a text shown as it is copied (the prompt for agents): escaped, its URLs broken after slashes.
-// The space before Chinese punctuation after a URL is shown, as it is copied: it keeps the punctuation out of the
-// URL for the agent that reads it.
+// The space before Chinese or Japanese punctuation after a URL is shown, as it is copied: it keeps the punctuation out
+// of the URL for the agent that reads it.
 func (ts typesetter) prompt(s string) htmltemplate.HTML {
 	h := bareURL.ReplaceAllStringFunc(escape(ts.expand(s)), breakURL)
-	if ts.zh {
+	if ts.solid() {
 		h = spacedPunct.ReplaceAllString(h, `<span class="nw"> $1</span>`)
 	}
 	return htmltemplate.HTML(h) //nolint:gosec // escaped
@@ -654,11 +679,12 @@ func plainText(h htmltemplate.HTML) string {
 	return html.UnescapeString(tag.ReplaceAllString(string(h), ""))
 }
 
-// splitName cuts the title of an app into its name and what follows in parentheses: Claude, claude.ai, …
+// splitName cuts the title of an app into its name and what follows in parentheses: Claude, claude.ai, …; the
+// parenthesis may follow the name without a space, as Korean writes it.
 func splitName(s string) (name, qualifier string) {
-	for _, p := range [][2]string{{" (", ")"}, {"（", "）"}} {
+	for _, p := range [][2]string{{"(", ")"}, {"（", "）"}} {
 		if i := strings.Index(s, p[0]); i > 0 && strings.HasSuffix(s, p[1]) {
-			return s[:i], strings.TrimSuffix(s[i+len(p[0]):], p[1])
+			return strings.TrimRight(s[:i], " "), strings.TrimSuffix(s[i+len(p[0]):], p[1])
 		}
 	}
 	return s, ""
