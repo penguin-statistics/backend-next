@@ -40,7 +40,7 @@ func itemIDs(rows []itemRate) []string {
 
 func TestGetStageDrops(t *testing.T) {
 	_, app := testServer(&fakeData{catalog: testCatalog(), matrices: testMatrices()})
-	out, text := getStageDrops(t, app, `{"stage_id":"main_01-07"}`)
+	out, text := getStageDrops(t, app, `{"server":"CN","stage_id":"main_01-07"}`)
 	// by rate, the bonus drop of an event that ended last, though its rate is higher than that of Orirock
 	if got, want := itemIDs(out.Rows), []string{"30012", "30011", "randomMaterial_1"}; !slices.Equal(got, want) {
 		t.Errorf("rows %q, want %q", got, want)
@@ -97,7 +97,7 @@ func TestGetStageDropsByCode(t *testing.T) {
 		// on CN only: the stage anyway
 		{"YW-4", "US", "act52side_04"},
 	} {
-		if out, _ := getStageDrops(t, app, `{"stage_id":`+strconv.Quote(tc.id)+`,"server":"`+tc.server+`"}`); out.Stage.StageID != tc.want {
+		if out, _ := getStageDrops(t, app, `{"server":"CN","stage_id":`+strconv.Quote(tc.id)+`,"server":"`+tc.server+`"}`); out.Stage.StageID != tc.want {
 			t.Errorf("%s on %s: stage %+v", tc.id, tc.server, out.Stage)
 		}
 	}
@@ -112,7 +112,7 @@ func TestGetStageDropsByCode(t *testing.T) {
 		{"0-1", `unknown stage_id "0-1": no stage has this ID or code. Find the stage with search_stages`},
 		{"・", `unknown stage_id "・": no stage has this ID or code.`},
 	} {
-		res := callTool(t, app, "get_stage_drops", `{"stage_id":`+strconv.Quote(tc.id)+`}`)
+		res := callTool(t, app, "get_stage_drops", `{"server":"CN","stage_id":`+strconv.Quote(tc.id)+`}`)
 		if text := res.text(t); !res.IsError || !strings.Contains(text, tc.want) {
 			t.Errorf("%s: error %v: %s", tc.id, res.IsError, text)
 		}
@@ -138,7 +138,7 @@ func TestGetStageDropsNotes(t *testing.T) {
 	matrices := testMatrices()
 	matrices["JP"] = service.NewSEOMatrix("JP", nil, lastModified)
 	_, app := testServer(&fakeData{catalog: testCatalog(), matrices: matrices})
-	out, text := getStageDrops(t, app, `{"stage_id":"recruit"}`)
+	out, text := getStageDrops(t, app, `{"server":"CN","stage_id":"recruit"}`)
 	if r := out.Rows[0]; len(out.Rows) != 1 || out.Stage.APCost != nil || out.Stage.ZoneType != "RECRUIT" || r.SanityPerItem != nil ||
 		r.ItemName != "Senior Operator" || !strings.HasPrefix(out.Note, "This is the recruitment: times count recruitments") {
 		t.Errorf("recruitment %+v", out)
@@ -148,13 +148,13 @@ func TestGetStageDropsNotes(t *testing.T) {
 		t.Errorf("recruitment text:\n%s", text)
 	}
 
-	out, _ = getStageDrops(t, app, `{"stage_id":"randomMaterial_1"}`)
+	out, _ = getStageDrops(t, app, `{"server":"CN","stage_id":"randomMaterial_1"}`)
 	if len(out.Rows) != 1 || out.Stage.APCost != nil || out.Rows[0].SanityPerItem != nil || out.Rows[0].DropRate != 0.07044 ||
 		out.Note != "The stage is a gacha: times count the items drawn, so a drop rate is per draw, and it has no sanity cost." {
 		t.Errorf("gacha %+v", out)
 	}
 
-	out, text = getStageDrops(t, app, `{"stage_id":"BD-5","lang":"ja"}`)
+	out, text = getStageDrops(t, app, `{"server":"CN","stage_id":"BD-5","lang":"ja"}`)
 	if out.Stage.StageID != "act21mini_05" || out.Stage.OpenNow || len(out.Rows) != 1 ||
 		out.Note != "The stage is not open on CN now: these are the drops of when it was." {
 		t.Errorf("closed stage %+v", out)
@@ -165,7 +165,7 @@ func TestGetStageDropsNotes(t *testing.T) {
 	}
 
 	// no drops: an empty result, not an error
-	out, text = getStageDrops(t, app, `{"stage_id":"act10d5_01"}`)
+	out, text = getStageDrops(t, app, `{"server":"CN","stage_id":"act10d5_01"}`)
 	if len(out.Rows) != 0 || !strings.Contains(string(mustMarshal(t, out)), `"rows":[]`) || out.Note != "No drop of SV-1 Children of Ursus is recorded on CN." {
 		t.Errorf("no drops %+v", out)
 	}
@@ -184,9 +184,9 @@ func TestGetStageDropsNotes(t *testing.T) {
 func TestGetStageDropsBadInput(t *testing.T) {
 	_, app := testServer(&fakeData{catalog: testCatalog(), matrices: testMatrices()})
 	for _, args := range []string{
-		`{"stage_id":""}`,
+		`{"server":"CN","stage_id":""}`,
 		`{"stage_id":"main_01-07","server":"TW"}`,
-		`{"stage_id":"main_01-07","lang":"fr"}`,
+		`{"server":"CN","stage_id":"main_01-07","lang":"fr"}`,
 		`{}`,
 	} {
 		if res := callTool(t, app, "get_stage_drops", args); !res.IsError {
@@ -198,7 +198,7 @@ func TestGetStageDropsBadInput(t *testing.T) {
 func TestGetStageDropsWhileCold(t *testing.T) {
 	data := &fakeData{}
 	_, app := testServer(data)
-	if res := callTool(t, app, "get_stage_drops", `{"stage_id":"main_01-07"}`); !res.IsError || res.text(t) != errCold.Error() {
+	if res := callTool(t, app, "get_stage_drops", `{"server":"CN","stage_id":"main_01-07"}`); !res.IsError || res.text(t) != errCold.Error() {
 		t.Errorf("no catalog: %+v", res)
 	}
 	data.catalog, data.matrices = testCatalog(), testMatrices()
@@ -225,7 +225,7 @@ func TestGetStageDropsSize(t *testing.T) {
 		{ArkZoneID: "main_1", ZoneID: 1, Category: "MAINLINE", Name: i18n("第一章", "Episode 1", "第一章", "에피소드 1"), Existence: existence(all...)},
 	}), matrices: map[string]*service.SEOMatrix{"CN": service.NewSEOMatrix("CN", rows, lastModified)}})
 
-	res := callTool(t, app, "get_stage_drops", `{"stage_id":"main_01-07"}`)
+	res := callTool(t, app, "get_stage_drops", `{"server":"CN","stage_id":"main_01-07"}`)
 	var out stageDrops
 	if err := json.Unmarshal(res.StructuredContent, &out); err != nil || len(out.Rows) != 100 || !out.Truncated {
 		t.Fatalf("result %.300s", res.StructuredContent)

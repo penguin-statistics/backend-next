@@ -285,8 +285,9 @@ var en = &text{
 			`**"rate limited":** see Limits.`,
 			"**The tools are added but not used:** turn the connector on in the chat (Claude: + → Connectors; ChatGPT: "+
 				`type @; Cherry Studio: enable MCP for the agent) and say "use Penguin Statistics".`,
-			"**The numbers differ from the website:** check the server (CN is the default) and the time range, and ask "+
-				"the assistant which server and data time it used.",
+			"**The numbers differ from the website:** check the server (the website shows CN unless you pick another; the "+
+				"assistant asks yours or infers it from your language) and the time range, and ask the assistant which "+
+				"server and data time it used.",
 			"**From mainland China:** there is no .cn mirror of this server yet. Local apps may be slow or fail to "+
 				"connect; Claude and ChatGPT connect from their own servers and are not affected.",
 		),

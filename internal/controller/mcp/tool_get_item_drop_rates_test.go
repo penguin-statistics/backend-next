@@ -43,7 +43,7 @@ func stageIDs(rows []stageRate) []string {
 // Where to farm Orirock Cube on CN on 2026-10-22: 1-7 first, as on the frontend sorted by sanity per item.
 func TestGetItemDropRates(t *testing.T) {
 	_, app := testServer(&fakeData{catalog: testCatalog(), matrices: testMatrices()})
-	out, text := getItemDropRates(t, app, `{"item_id":"30012"}`)
+	out, text := getItemDropRates(t, app, `{"server":"CN","item_id":"30012"}`)
 	// the stages open now (not BD-5), by sanity per item; then the rows of few runs, then those without a sanity cost
 	want := []string{"main_01-07", "sub_02-12", "act19side_05_perm", "act9d0_05_perm", "act11d0_01_perm", "act52side_04",
 		"main_10-01", "tough_10-01", "act18d3_01_perm", "randomMaterial_1"}
@@ -104,15 +104,15 @@ func TestGetItemDropRatesOptions(t *testing.T) {
 		// total stages
 		total int
 	}{
-		{`{"item_id":"30012","top_n":3}`, []string{"main_01-07", "sub_02-12", "act19side_05_perm"}, 10},
+		{`{"server":"CN","item_id":"30012","top_n":3}`, []string{"main_01-07", "sub_02-12", "act19side_05_perm"}, 10},
 		// the page order: rate, then times; few runs are not set apart
-		{`{"item_id":"30012","sort_by":"drop_rate"}`, []string{"act18d3_01_perm", "sub_02-12", "act19side_05_perm", "act9d0_05_perm",
+		{`{"server":"CN","item_id":"30012","sort_by":"drop_rate"}`, []string{"act18d3_01_perm", "sub_02-12", "act19side_05_perm", "act9d0_05_perm",
 			"act52side_04", "act11d0_01_perm", "main_01-07", "main_10-01", "tough_10-01", "randomMaterial_1"}, 10},
 		// the past event BD-5, by sanity per item second
-		{`{"item_id":"30012","include_closed":true,"top_n":3}`, []string{"main_01-07", "act21mini_05", "sub_02-12"}, 11},
+		{`{"server":"CN","item_id":"30012","include_closed":true,"top_n":3}`, []string{"main_01-07", "act21mini_05", "sub_02-12"}, 11},
 		// Orirock on 14-3, open, before its drop table changed
-		{`{"item_id":"30011"}`, []string{"main_01-07", "sub_02-12"}, 2},
-		{`{"item_id":"30011","include_closed":true}`, []string{"main_14-02", "main_01-07", "sub_02-12"}, 3},
+		{`{"server":"CN","item_id":"30011"}`, []string{"main_01-07", "sub_02-12"}, 2},
+		{`{"server":"CN","item_id":"30011","include_closed":true}`, []string{"main_14-02", "main_01-07", "sub_02-12"}, 3},
 	} {
 		out, _ := getItemDropRates(t, app, tc.args)
 		if got := stageIDs(out.Rows); !slices.Equal(got, tc.want) {
@@ -123,11 +123,11 @@ func TestGetItemDropRatesOptions(t *testing.T) {
 		}
 	}
 
-	out, _ := getItemDropRates(t, app, `{"item_id":"30012","sort_by":"drop_rate"}`)
+	out, _ := getItemDropRates(t, app, `{"server":"CN","item_id":"30012","sort_by":"drop_rate"}`)
 	if out.Note != "Rates of fewer than 100 runs (lowSample) are noisy." || !out.Rows[0].LowSample {
 		t.Errorf("note %q, first row %+v", out.Note, out.Rows[0])
 	}
-	out, text := getItemDropRates(t, app, `{"item_id":"30012","include_closed":true,"top_n":3,"lang":"zh"}`)
+	out, text := getItemDropRates(t, app, `{"server":"CN","item_id":"30012","include_closed":true,"top_n":3,"lang":"zh"}`)
 	if r := out.Rows[1]; r.OpenNow || r.DropsNow || r.End == nil || *r.End != "2026-07-16T20:00:00Z" || r.Start != "2026-07-10T04:00:00Z" || r.ZoneName != "丛林症结" ||
 		*r.PageURL != "https://penguin-stats.io/zh/result/cn/stage/act21mini_zone1/act21mini_05" {
 		t.Errorf("past event %+v", r)
@@ -143,7 +143,7 @@ func TestGetItemDropRatesOptions(t *testing.T) {
 			t.Errorf("text lacks %q:\n%s", s, text)
 		}
 	}
-	out, _ = getItemDropRates(t, app, `{"item_id":"30011","include_closed":true}`)
+	out, _ = getItemDropRates(t, app, `{"server":"CN","item_id":"30011","include_closed":true}`)
 	// 14-3 is open, but no longer drops it
 	if r := out.Rows[0]; !r.OpenNow || r.DropsNow || *r.End != "2024-05-14T20:00:00Z" {
 		t.Errorf("ended row %+v", r)
@@ -155,7 +155,7 @@ func TestGetItemDropRatesOptions(t *testing.T) {
 	}}, "test")
 	app = fiber.New()
 	Mount(app, srv, 1000, time.Minute)
-	if out, _ := getItemDropRates(t, app, `{"item_id":"30012"}`); slices.Contains(stageIDs(out.Rows), "act52side_04") || out.TotalStages != 9 {
+	if out, _ := getItemDropRates(t, app, `{"server":"CN","item_id":"30012"}`); slices.Contains(stageIDs(out.Rows), "act52side_04") || out.TotalStages != 9 {
 		t.Errorf("closed: rows %q", stageIDs(out.Rows))
 	}
 }
@@ -165,12 +165,12 @@ func TestGetItemDropRatesOptions(t *testing.T) {
 func TestGetItemDropRatesByName(t *testing.T) {
 	_, app := testServer(&fakeData{catalog: testCatalog(), matrices: testMatrices()})
 	for _, id := range []string{"固源岩", "Orirock Cube", "ORIROCK-CUBE", "初級源岩", "guyuanyan", "shokyuugengan"} {
-		if out, _ := getItemDropRates(t, app, `{"item_id":`+strconv.Quote(id)+`}`); out.Item.ItemID != "30012" {
+		if out, _ := getItemDropRates(t, app, `{"server":"CN","item_id":`+strconv.Quote(id)+`}`); out.Item.ItemID != "30012" {
 			t.Errorf("%s: item %+v", id, out.Item)
 		}
 	}
 	// an ID given as a number, as models do
-	if out, _ := getItemDropRates(t, app, `{"item_id":30012}`); out.Item.ItemID != "30012" {
+	if out, _ := getItemDropRates(t, app, `{"server":"CN","item_id":30012}`); out.Item.ItemID != "30012" {
 		t.Errorf("30012 as a number: item %+v", out.Item)
 	}
 	for _, tc := range []struct{ id, want string }{
@@ -182,28 +182,28 @@ func TestGetItemDropRatesByName(t *testing.T) {
 		{"Orundum", `unknown item_id "Orundum": no item has this ID, name or alias. Find the item with search_items`},
 		{"・", `unknown item_id "・": no item has this ID, name or alias.`},
 	} {
-		res := callTool(t, app, "get_item_drop_rates", `{"item_id":`+strconv.Quote(tc.id)+`}`)
+		res := callTool(t, app, "get_item_drop_rates", `{"server":"CN","item_id":`+strconv.Quote(tc.id)+`}`)
 		if text := res.text(t); !res.IsError || !strings.Contains(text, tc.want) {
 			t.Errorf("%s: error %v: %s", tc.id, res.IsError, text)
 		}
 	}
 	// the names in the language asked for
-	res := callTool(t, app, "get_item_drop_rates", `{"item_id":"石头","lang":"zh"}`)
+	res := callTool(t, app, "get_item_drop_rates", `{"server":"CN","item_id":"石头","lang":"zh"}`)
 	if text := res.text(t); !strings.Contains(text, "30011 (源岩); 30012 (固源岩)") {
 		t.Errorf("text %s", text)
 	}
 
 	// the items of the types not listed, when no listed item has the name: with a note on what they are
-	out, _ := getItemDropRates(t, app, `{"item_id":"D32 Steel"}`)
+	out, _ := getItemDropRates(t, app, `{"server":"CN","item_id":"D32 Steel"}`)
 	if out.Item.ItemID != "30135" || len(out.Rows) != 0 || !strings.Contains(out.Note, "crafted in the workshop") ||
 		!strings.Contains(out.Note, "No drop of D32 Steel is recorded on CN") {
 		t.Errorf("D32 Steel: %+v", out)
 	}
-	out, _ = getItemDropRates(t, app, `{"item_id":"资深干员"}`)
+	out, _ = getItemDropRates(t, app, `{"server":"CN","item_id":"资深干员"}`)
 	if out.Item.ItemID != "recruit_tag_senior_operator" || len(out.Rows) != 1 || !strings.Contains(out.Note, "recruitment tags") {
 		t.Errorf("资深干员: %+v", out)
 	}
-	if out, _ := getItemDropRates(t, app, `{"item_id":"绿票"}`); out.Item.ItemID != "4005" {
+	if out, _ := getItemDropRates(t, app, `{"server":"CN","item_id":"绿票"}`); out.Item.ItemID != "4005" {
 		t.Errorf("绿票: %+v", out.Item)
 	}
 }
@@ -211,7 +211,7 @@ func TestGetItemDropRatesByName(t *testing.T) {
 // Items of the types the frontend does not list have rows too (the tags of the recruitment), or none.
 func TestGetItemDropRatesWithoutPage(t *testing.T) {
 	_, app := testServer(&fakeData{catalog: testCatalog(), matrices: testMatrices()})
-	out, text := getItemDropRates(t, app, `{"item_id":"recruit_tag_senior_operator"}`)
+	out, text := getItemDropRates(t, app, `{"server":"CN","item_id":"recruit_tag_senior_operator"}`)
 	if len(out.Rows) != 1 || out.Item.PageURL != nil || out.Source.URL != site {
 		t.Fatalf("result %+v", out)
 	}
@@ -224,7 +224,7 @@ func TestGetItemDropRatesWithoutPage(t *testing.T) {
 	}
 
 	// no drops: an empty result, not an error
-	out, text = getItemDropRates(t, app, `{"item_id":"4005"}`)
+	out, text = getItemDropRates(t, app, `{"server":"CN","item_id":"4005"}`)
 	if len(out.Rows) != 0 || out.TotalStages != 0 || out.Item.PageURL != nil || !strings.Contains(string(mustMarshal(t, out)), `"rows":[]`) ||
 		out.Note != "LGG_SHD items are not ones Penguin Statistics lists drop rates for: few stages drop them, if any. "+
 			"No drop of Commendation Certificate is recorded on CN: no stage drops it there, or Penguin Statistics does not record it." {
@@ -244,14 +244,14 @@ func TestGetItemDropRatesAllClosed(t *testing.T) {
 			{StageID: "act99side_01", ItemID: "30013", Times: 100, Quantity: 10, StartTime: 1783656000000},
 		}, lastModified),
 	}})
-	out, text := getItemDropRates(t, app, `{"item_id":"30013"}`)
+	out, text := getItemDropRates(t, app, `{"server":"CN","item_id":"30013"}`)
 	if len(out.Rows) != 0 || out.Note != "No stage open on CN now drops Orirock Cluster, but 2 did: set include_closed to true to see them." {
 		t.Errorf("result %+v", out)
 	}
 	if !strings.Contains(text, out.Note) {
 		t.Errorf("text:\n%s", text)
 	}
-	out, _ = getItemDropRates(t, app, `{"item_id":"30013","include_closed":true}`)
+	out, _ = getItemDropRates(t, app, `{"server":"CN","item_id":"30013","include_closed":true}`)
 	if got := stageIDs(out.Rows); !slices.Equal(got, []string{"act21mini_05", "act99side_01"}) {
 		t.Fatalf("rows %q", got)
 	}
@@ -264,12 +264,12 @@ func TestGetItemDropRatesAllClosed(t *testing.T) {
 func TestGetItemDropRatesBadInput(t *testing.T) {
 	_, app := testServer(&fakeData{catalog: testCatalog(), matrices: testMatrices()})
 	for _, args := range []string{
-		`{"item_id":""}`,
-		`{"item_id":"30012","top_n":0}`,
-		`{"item_id":"30012","top_n":101}`,
-		`{"item_id":"30012","sort_by":"best"}`,
+		`{"server":"CN","item_id":""}`,
+		`{"server":"CN","item_id":"30012","top_n":0}`,
+		`{"server":"CN","item_id":"30012","top_n":101}`,
+		`{"server":"CN","item_id":"30012","sort_by":"best"}`,
 		`{"item_id":"30012","server":"TW"}`,
-		`{"item_id":"30012","include_closed":"yes"}`,
+		`{"server":"CN","item_id":"30012","include_closed":"yes"}`,
 		`{}`,
 	} {
 		if res := callTool(t, app, "get_item_drop_rates", args); !res.IsError {
@@ -281,7 +281,7 @@ func TestGetItemDropRatesBadInput(t *testing.T) {
 func TestGetItemDropRatesWhileCold(t *testing.T) {
 	data := &fakeData{}
 	_, app := testServer(data)
-	if res := callTool(t, app, "get_item_drop_rates", `{"item_id":"30012"}`); !res.IsError || res.text(t) != errCold.Error() {
+	if res := callTool(t, app, "get_item_drop_rates", `{"server":"CN","item_id":"30012"}`); !res.IsError || res.text(t) != errCold.Error() {
 		t.Errorf("no catalog: %+v", res)
 	}
 	// the matrix of US is not calculated yet
@@ -313,7 +313,7 @@ func TestGetItemDropRatesSize(t *testing.T) {
 	big.Items, big.ItemList = catalog.Items, catalog.ItemList
 	_, app := testServer(&fakeData{catalog: big, matrices: map[string]*service.SEOMatrix{"CN": service.NewSEOMatrix("CN", rows, lastModified)}})
 
-	res := callTool(t, app, "get_item_drop_rates", `{"item_id":"30012","top_n":100,"include_closed":true}`)
+	res := callTool(t, app, "get_item_drop_rates", `{"server":"CN","item_id":"30012","top_n":100,"include_closed":true}`)
 	var out itemDropRates
 	if err := json.Unmarshal(res.StructuredContent, &out); err != nil || len(out.Rows) != 100 || out.TotalStages != 150 || !out.Truncated {
 		t.Fatalf("result %.300s", res.StructuredContent)

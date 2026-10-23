@@ -39,11 +39,11 @@ func TestDropsWeekly(t *testing.T) {
 			{StageID: "wk_fly_5", ItemID: "3303", Times: 100000, Quantity: 150000, StartTime: 1556676000000},
 		}, lastModified),
 	}})
-	if out, text := getStageDrops(t, app, `{"stage_id":"wk_fly_5"}`); !out.Stage.OpenNow || !strings.Contains(out.Note, rotationCaveat) ||
+	if out, text := getStageDrops(t, app, `{"server":"CN","stage_id":"wk_fly_5"}`); !out.Stage.OpenNow || !strings.Contains(out.Note, rotationCaveat) ||
 		!strings.Contains(text, rotationCaveat) {
 		t.Errorf("stage drops %+v", out)
 	}
-	if out, text := getItemDropRates(t, app, `{"item_id":"3303"}`); len(out.Rows) != 1 || !strings.Contains(out.Note, rotationCaveat) ||
+	if out, text := getItemDropRates(t, app, `{"server":"CN","item_id":"3303"}`); len(out.Rows) != 1 || !strings.Contains(out.Note, rotationCaveat) ||
 		!strings.Contains(text, rotationCaveat) {
 		t.Errorf("item drop rates %+v", out)
 	}

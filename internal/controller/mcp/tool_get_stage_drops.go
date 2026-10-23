@@ -18,7 +18,7 @@ const maxStageRows = 100
 
 type getStageDropsIn struct {
 	StageID string `json:"stage_id" jsonschema:"Stage ID, from search_stages: main_01-07. A code works too if only one stage on the server has it: 1-7"`
-	Server  string `json:"server,omitempty"`
+	Server  string `json:"server"`
 	Lang    string `json:"lang,omitempty"`
 }
 
@@ -49,10 +49,12 @@ func getStageDropsTool() *sdkmcp.Tool {
 	return &sdkmcp.Tool{
 		Name:  "get_stage_drops",
 		Title: "Stage drops",
-		Description: "Returns what a stage drops on a game server: each item with runs (times), quantity, drop rate " +
-			"(items per run) and sanity per item, highest rate first, then the items it no longer drops; with the " +
-			"sanity cost of the stage and whether it is open now. Takes the stage ID from search_stages (codes are " +
-			"shared by several stages); a code works too if only one stage on the server has it.",
+		Description: "What one stage drops on a game server: each item with drop rate (items per run), sanity per " +
+			"item, runs (times) and quantity, highest rate first, then the items it no longer drops; with the sanity " +
+			"cost of the stage and whether it is open now. For questions about a given stage. To find where to farm an " +
+			"item, call get_item_drop_rates instead: one call ranks every stage that drops it. Takes the stage ID from " +
+			"search_stages (codes are shared by several stages); a code works too if only one stage on the server has " +
+			"it.",
 		InputSchema: inputSchema[getStageDropsIn](map[string]property{
 			"stage_id": lengthProperty(1, queryMaxLength),
 			"server":   serverProperty,

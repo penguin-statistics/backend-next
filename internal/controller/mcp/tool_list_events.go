@@ -32,7 +32,7 @@ const (
 )
 
 type listEventsIn struct {
-	Server string `json:"server,omitempty"`
+	Server string `json:"server"`
 	// a pointer, as it is true by default: the SDK fills in the default of the schema, nil is the default to a
 	// handler called otherwise
 	OpenOnly *bool  `json:"open_only,omitempty" jsonschema:"true (default): the events open or upcoming on the server, with their stages; if there are none, the latest 3. false: every event of the server, latest first, without their stages."`

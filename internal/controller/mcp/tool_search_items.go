@@ -55,7 +55,8 @@ func searchItemsTool() *sdkmcp.Tool {
 		Title: "Search items",
 		Description: "Finds items (materials, battle records, chips, furniture, event items) by name in any language " +
 			"(zh, en, ja, ko), by alias or nickname (土块, 狗粮), by pinyin (guyuanyan) or by item ID, and returns their " +
-			"item IDs (for get_item_drop_rates) and names in every language. Best matches first: exact before prefix " +
+			"item IDs (get_item_drop_rates takes a name too; search first when unsure which item is meant) and names in " +
+			"every language. Best matches first: exact before prefix " +
 			"before substring, names before aliases. Several items can share an alias (石头 is each tier of Orirock): " +
 			"ambiguous is then true; ask the user which one is meant or decide by context. Items of other types " +
 			"(workshop-crafted materials such as D32 Steel, recruitment tags) are returned only when no listed item " +
