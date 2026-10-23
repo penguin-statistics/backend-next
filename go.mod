@@ -21,7 +21,7 @@ require (
 	github.com/duckdb/duckdb-go/v2 v2.10506.0
 	github.com/felixge/fgprof v0.9.3
 	github.com/getsentry/sentry-go v0.22.0
-	github.com/go-playground/locales v0.14.1
+	github.com/go-playground/locales v0.14.2
 	github.com/go-playground/universal-translator v0.18.1
 	github.com/go-playground/validator/v10 v10.16.0
 	github.com/go-redsync/redsync/v4 v4.9.4
