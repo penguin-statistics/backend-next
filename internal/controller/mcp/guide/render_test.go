@@ -2,9 +2,12 @@ package guide
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	htmltemplate "html/template"
 	"net/url"
 	"regexp"
 	"slices"
@@ -34,34 +37,106 @@ func render(t *testing.T, c Config) *Guide {
 	return g
 }
 
-// The page loads fast on a phone: one request, under 30 KB before compression.
+// The page loads fast on a phone: the HTML, with its style and script, is under 100 KB, 23 KB compressed, and each of
+// its two fonts under 20 KB.
 func TestPageSize(t *testing.T) {
-	for lang, p := range render(t, prod).Pages {
-		if n := len(p.HTML); n >= 30000 {
-			t.Errorf("%s: %d bytes of HTML", lang, n)
+	g := render(t, prod)
+	for lang, p := range g.Pages {
+		var gz bytes.Buffer
+		w, _ := gzip.NewWriterLevel(&gz, gzip.BestCompression)
+		_, _ = w.Write(p.HTML)
+		_ = w.Close()
+		if n, z := len(p.HTML), gz.Len(); n >= 100000 || z >= 23000 {
+			t.Errorf("%s: %d bytes of HTML, %d gzipped", lang, n, z)
+		}
+	}
+	for _, f := range g.Files {
+		if f.ContentType == "font/woff2" && len(f.Body) >= 20000 {
+			t.Errorf("%s: %d bytes", f.Path, len(f.Body))
 		}
 	}
 }
 
-// The page loads nothing but the icon of the site: no script, style or font of another origin, which its CSP would
-// block anyway.
+// The page loads nothing but its fonts, from its own host, and the icon of the site: no script, style or font of
+// another origin, which its CSP would block anyway.
 func TestNoExternalResources(t *testing.T) {
 	g := render(t, prod)
+	files := map[string]bool{}
+	for _, f := range g.Files {
+		files[f.Path] = true
+	}
 	for lang, p := range g.Pages {
 		html := string(p.HTML)
 		if strings.Count(html, "<script") != 1 || !strings.Contains(html, "<script>") || strings.Count(html, "<style") != 1 ||
-			strings.Contains(html, `rel="stylesheet"`) || strings.Contains(html, "@import") || strings.Contains(html, "url(") {
+			strings.Contains(html, `rel="stylesheet"`) || strings.Contains(html, "@import") {
 			t.Errorf("%s: a script or a style that is not inline", lang)
+		}
+		// the fonts are the only URLs of the style
+		fonts := regexp.MustCompile(`url\(([^)]*)\)`).FindAllStringSubmatch(html, -1)
+		if len(fonts) != 2 {
+			t.Errorf("%s: %d url() in the style", lang, len(fonts))
+		}
+		for _, u := range fonts {
+			if !files[u[1]] || !strings.HasPrefix(u[1], FontsPath) {
+				t.Errorf("%s: url(%s)", lang, u[1])
+			}
 		}
 		for _, src := range regexp.MustCompile(`\ssrc="([^"]*)"`).FindAllStringSubmatch(html, -1) {
 			t.Errorf("%s: src %s", lang, src[1])
 		}
-		// the icon is the only <link> a browser fetches
+		// the icon and the preloaded font are the only <link>s a browser fetches
+		preloads := 0
 		for _, link := range regexp.MustCompile(`<link rel="([^"]+)"[^>]*href="([^"]+)"`).FindAllStringSubmatch(html, -1) {
-			if link[1] == "icon" && !strings.HasPrefix(link[2], prod.Site+"/") {
-				t.Errorf("%s: icon %s", lang, link[2])
+			switch link[1] {
+			case "icon":
+				if !strings.HasPrefix(link[2], prod.Site+"/") {
+					t.Errorf("%s: icon %s", lang, link[2])
+				}
+			case "preload":
+				preloads++
+				if link[2] != g.Files[0].Path {
+					t.Errorf("%s: preload %s", lang, link[2])
+				}
 			}
 		}
+		if preloads != 1 || !strings.Contains(html, `as="font" type="font/woff2" crossorigin>`) {
+			t.Errorf("%s: %d fonts preloaded", lang, preloads)
+		}
+		// and the only <use> are of the icons on the page
+		for _, use := range regexp.MustCompile(`<use href="([^"]*)"`).FindAllStringSubmatch(html, -1) {
+			if !strings.Contains(html, `<symbol id="`+strings.TrimPrefix(use[1], "#")+`"`) {
+				t.Errorf("%s: <use href=%s>", lang, use[1])
+			}
+		}
+	}
+}
+
+// The fonts are served at a path made of their hash, which changes with them, and their license with them.
+func TestFonts(t *testing.T) {
+	g := render(t, prod)
+	var paths []string
+	for _, f := range g.Files {
+		paths = append(paths, f.Path)
+		switch {
+		case f.ContentType == "font/woff2":
+			if !regexp.MustCompile(`^/fonts/geist(-mono)?-latin-[0-9a-f]{8}\.woff2$`).MatchString(f.Path) || !f.Immutable ||
+				!bytes.HasPrefix(f.Body, []byte("wOF2")) {
+				t.Errorf("%s: immutable %v, %.4q", f.Path, f.Immutable, f.Body)
+			}
+			sum := sha256.Sum256(f.Body)
+			if !strings.Contains(f.Path, hex.EncodeToString(sum[:4])) {
+				t.Errorf("%s: not the hash of the font", f.Path)
+			}
+		case f.Path == "/fonts/OFL.txt":
+			if f.Immutable || f.ContentType != "text/plain; charset=utf-8" || !bytes.Contains(f.Body, []byte("SIL OPEN FONT LICENSE Version 1.1")) {
+				t.Errorf("%s: %s, %.80s", f.Path, f.ContentType, f.Body)
+			}
+		default:
+			t.Errorf("a file %s of %s", f.Path, f.ContentType)
+		}
+	}
+	if len(paths) != 3 || !strings.HasPrefix(paths[0], "/fonts/geist-latin-") {
+		t.Errorf("files %v", paths)
 	}
 }
 
@@ -80,7 +155,7 @@ func TestCSPHashes(t *testing.T) {
 			}
 		}
 	}
-	for _, directive := range []string{"default-src 'none'", "img-src https://penguin-stats.io;", "base-uri 'none'",
+	for _, directive := range []string{"default-src 'none'", "font-src 'self';", "img-src https://penguin-stats.io;", "base-uri 'none'",
 		"form-action 'none'", "frame-ancestors 'none'"} {
 		if !strings.Contains(g.CSP, directive) {
 			t.Errorf("CSP %q lacks %q", g.CSP, directive)
@@ -316,22 +391,26 @@ func TestAnchors(t *testing.T) {
 func TestPageContents(t *testing.T) {
 	g := render(t, prod)
 	for lang, want := range map[string][]string{
-		"en": {`<html lang="en" data-copy="Copy" data-copied="Copied">`, "<title>Penguin Statistics MCP Server</title>",
-			`<p class="url" data-c="https://mcp.penguin-stats.io/mcp"><strong>Server URL</strong> <code>https://mcp.penguin-stats.io/mcp</code></p>`,
+		"en": {`<html lang="en" data-copied="Copied" id="top">`, "<title>Penguin Statistics MCP Server</title>",
+			`<p class="lbl" id="url">Server URL</p>` + "\n" + `<div class="url" role="group" aria-labelledby="url" data-c="https://mcp.penguin-stats.io/mcp"><code>https://mcp.penguin-stats.io/mcp</code>`,
+			`<h1 id="title"><span>Penguin Statistics</span> <span class="h1-b">MCP Server</span></h1>`,
 			`<link rel="alternate" type="text/markdown" href="https://mcp.penguin-stats.io/index.md?lang=en">`,
 			`<link rel="service-desc" type="application/mcp-server-card+json" href="https://mcp.penguin-stats.io/mcp/server-card">`,
 			`<link rel="alternate" hreflang="zh-CN" href="https://mcp.penguin-stats.io/?lang=zh">`,
 			`<meta property="og:image" content="https://penguin-stats.io/favicon/android-chrome-512x512.png">`,
-			"Logs are kept for 15 days", "CC BY-NC 4.0", "<code>Data: Penguin Statistics (penguin-stats.io), CC BY-NC 4.0</code>",
-			"120 requests per minute"},
-		"zh": {`<html lang="zh-CN" data-copy="复制" data-copied="已复制">`, "<title>企鹅物流数据统计 MCP 服务器</title>",
-			"保存 15 天", "每分钟 120 次请求"},
+			"Logs are kept for 15 days", "CC BY-NC 4.0", "120 requests per minute"},
+		"zh": {`<html lang="zh-CN" data-copied="已复制" id="top">`, "<title>企鹅物流数据统计 MCP 服务器</title>",
+			`<h1 id="title"><span>企鹅物流数据统计</span> <span class="h1-b">MCP 服务器</span></h1>`, "保存 15 天", "每分钟 120 次请求"},
 	} {
 		html := string(g.Pages[lang].HTML)
 		for _, s := range want {
 			if !strings.Contains(html, s) {
 				t.Errorf("%s: no %s", lang, s)
 			}
+		}
+		// the credit, as text (the page lets it break after its comma)
+		if text := plainText(htmltemplate.HTML(html)); !strings.Contains(text, "Data: Penguin Statistics (penguin-stats.io), CC BY-NC 4.0") {
+			t.Errorf("%s: no credit line", lang)
 		}
 		// the data is CC BY-NC 4.0, with no other terms
 		if strings.Contains(html, "ask us first") || strings.Contains(html, "商业用途请先联系") {

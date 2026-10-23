@@ -203,6 +203,22 @@ func TestServiceAppCompressesByAcceptEncoding(t *testing.T) {
 
 // The response cache of RegisterResult runs inside compression, so it keeps the uncompressed body: a hit is encoded
 // for the request that hits it, whatever the request that filled it accepted.
+// WOFF2 fonts are compressed already: they are sent as they are, whatever the request accepts.
+func TestServiceAppDoesNotCompressFonts(t *testing.T) {
+	app, payload, _ := newCompressTestApp(t)
+	app.Get("/fonts/a.woff2", func(ctx *fiber.Ctx) error {
+		ctx.Set(fiber.HeaderContentType, "font/woff2")
+		return ctx.Send(payload)
+	})
+	for _, acceptEncoding := range []string{"", "gzip", "br, gzip"} {
+		resp, body := get(t, app, "/fonts/a.woff2", acceptEncoding)
+		if resp.StatusCode != fiber.StatusOK || resp.Header.Get(fiber.HeaderContentEncoding) != "" || !bytes.Equal(body, payload) {
+			t.Errorf("Accept-Encoding %q: status %d, Content-Encoding %q, %d bytes of %d", acceptEncoding, resp.StatusCode,
+				resp.Header.Get(fiber.HeaderContentEncoding), len(body), len(payload))
+		}
+	}
+}
+
 func TestServiceAppCompressesResultCacheHits(t *testing.T) {
 	app, payload, resultCalls := newCompressTestApp(t)
 

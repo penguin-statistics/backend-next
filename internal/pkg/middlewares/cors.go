@@ -59,6 +59,10 @@ const MCPServerCardPath = MCPPath + "/server-card"
 // URL of the page, whose POST is redirected to MCPPath, may send the page the headers of MCP.
 var MCPGuidePaths = []string{"/", "/index.md", "/llms.txt", "/robots.txt"}
 
+// MCPGuideFontsPath is the prefix of the paths of the fonts of the guide and their license, which CORS answers as it
+// does MCPGuidePaths: Cloudflare caches fonts, by their extension, whatever their Vary.
+const MCPGuideFontsPath = "/fonts/"
+
 // routedTo tells whether path, as requested, is routed to route: fiber routes ignore case and a trailing slash
 func routedTo(path, route string) bool {
 	return strings.EqualFold(strings.TrimSuffix(path, "/"), strings.TrimSuffix(route, "/"))
@@ -83,9 +87,9 @@ func routedTo(path, route string) bool {
 //
 // Every OPTIONS request is answered here as a preflight with 204, for both tiers.
 //
-// The requests to MCPPath, MCPServerCardPath and MCPGuidePaths are always in the public tier, and their preflights
-// allow the headers they ask for: the 2026-07-28 MCP protocol sends Mcp-Param-* headers named after the arguments of a
-// tool, and a client revalidating the card or a file of the guide sends If-None-Match.
+// The requests to MCPPath, MCPServerCardPath, MCPGuidePaths and under MCPGuideFontsPath are always in the public
+// tier, and their preflights allow the headers they ask for: the 2026-07-28 MCP protocol sends Mcp-Param-* headers
+// named after the arguments of a tool, and a client revalidating the card or a file of the guide sends If-None-Match.
 func CORS(credentialedOrigins []string) fiber.Handler {
 	allowlist := newOriginAllowlist(credentialedOrigins)
 
@@ -93,7 +97,8 @@ func CORS(credentialedOrigins []string) fiber.Handler {
 		origin := c.Get(fiber.HeaderOrigin)
 		mcp := routedTo(c.Path(), MCPPath)
 		card := routedTo(c.Path(), MCPServerCardPath)
-		guide := slices.ContainsFunc(MCPGuidePaths, func(route string) bool { return routedTo(c.Path(), route) })
+		guide := slices.ContainsFunc(MCPGuidePaths, func(route string) bool { return routedTo(c.Path(), route) }) ||
+			len(c.Path()) > len(MCPGuideFontsPath) && strings.EqualFold(c.Path()[:len(MCPGuideFontsPath)], MCPGuideFontsPath)
 
 		// the answer depends on Origin, whichever tier it falls in
 		c.Vary(fiber.HeaderOrigin)

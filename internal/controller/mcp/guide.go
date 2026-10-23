@@ -18,9 +18,9 @@ import (
 // a person or an agent who opens the host finds out how to add the server to an app; until then the root was a bare
 // 404. It is negotiated: browsers and link previews get the HTML, agents asking for Markdown get the Markdown, in the
 // language of ?lang or Accept-Language. /index.md?lang= serves the Markdown of a language whatever the request,
-// /llms.txt the English Markdown for agents, /robots.txt keeps crawlers off the endpoint. The guide is served to its
-// host only: the backend answers other hosts too (penguin-stats.cn, through its gateway), whose root is something
-// else.
+// /llms.txt the English Markdown for agents, /robots.txt keeps crawlers off the endpoint, and /fonts/ the fonts of the
+// page, whose names change with them, and their license. The guide is served to its host only: the backend answers
+// other hosts too (penguin-stats.cn, through its gateway), whose root is something else.
 //
 // An MCP client given the URL of the guide instead of the endpoint is helped on: its POST is redirected to the
 // endpoint with a 307, which keeps the method and the body (fetch, Python's requests and httpx, and Go follow it),
@@ -37,6 +37,9 @@ const (
 	// the others should a rule cache them
 	guideFileCacheControl = "public, max-age=3600"
 	robotsCacheControl    = "public, max-age=86400"
+	// a font's path changes with the font (guide.File.Immutable): browsers and Cloudflare, which caches fonts by their
+	// extension, keep it for good
+	immutableCacheControl = "public, max-age=31536000, immutable"
 )
 
 // guideHandler serves the guide.
@@ -57,7 +60,8 @@ type guidePage struct {
 }
 
 // mountGuide serves the guide of the server whose public URL is endpoint on the host of endpoint, at /, /index.md,
-// /llms.txt and /robots.txt. site is the website (SEOSiteURL); limit requests per window is the rate limit of /mcp.
+// /llms.txt, /robots.txt and under /fonts/. site is the website (SEOSiteURL); limit requests per window is the rate
+// limit of /mcp.
 func mountGuide(r fiber.Router, endpoint *url.URL, site string, limit int, window time.Duration) error {
 	root := guideURL(endpoint)
 	origin := strings.TrimSuffix(root, "/")
@@ -115,6 +119,19 @@ func mountGuide(r fiber.Router, endpoint *url.URL, site string, limit int, windo
 	r.Get(guide.MarkdownPath, h.onHost, h.index)
 	r.Get(guide.LLMsPath, h.onHost, h.llms.send)
 	r.Get(guide.RobotsPath, h.onHost, h.robots.send)
+	for _, f := range g.Files {
+		cacheControl := robotsCacheControl
+		if f.Immutable {
+			cacheControl = immutableCacheControl
+		}
+		r.Get(f.Path, h.onHost, guideHeaders(newStatic(f.ContentType, cacheControl, f.Body), "").send)
+	}
+	// any other file there, such as a font of another version of the page while a release rolls out, is not found for
+	// now only: Cloudflare would otherwise keep the 404 of a font for minutes, for every visitor
+	r.Get(guide.FontsPath+"*", h.onHost, func(c *fiber.Ctx) error {
+		c.Set(fiber.HeaderCacheControl, "no-store")
+		return fiber.ErrNotFound
+	})
 	return nil
 }
 

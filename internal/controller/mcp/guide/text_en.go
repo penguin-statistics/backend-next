@@ -10,6 +10,11 @@ var en = &text{
 	MarkdownLink: "Markdown",
 	Copy:         "Copy",
 	Copied:       "Copied",
+	SkipLink:     "Skip to content",
+	PageNav:      "On this page",
+	LangNav:      "Language",
+	AppNav:       "Apps",
+	Terminal:     "Terminal",
 	ForAgents:    "For AI agents: this page is at {md} as Markdown, and the setup steps for agents are at {llms}.",
 	Lead: []string{
 		"Arknights drop rates for your AI assistant. Penguin Statistics (penguin-stats.io) counts the drops players " +
@@ -37,6 +42,10 @@ var en = &text{
 	AgentPrompt: "Add the Penguin Statistics MCP server to this agent: URL {url}, transport Streamable HTTP, no " +
 		"authentication. Follow the steps for this client in {llms}, add it at user (global) scope, then list its " +
 		"tools to confirm it works.",
+	AgentCopy: "Copy prompt for your agent",
+	AgentHint: "Paste it into Claude Code, Codex, Cursor or another coding agent.",
+	AgentMore: "Show all",
+	AgentLess: "Show less",
 
 	Install:     "Install",
 	ChatApps:    "Chat apps",
