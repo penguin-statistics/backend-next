@@ -1,6 +1,6 @@
 module exusiai.dev/backend-next
 
-go 1.25.0
+go 1.26
 
 // go-sdk needs the go 1.25 directive (duckdb-go 1.24); keep the runtime defaults (TLS, x509, panic(nil),
 // rand.Seed, ...) of the go 1.19 the module declared before, so that raising it changes no behavior of the binary
@@ -22,7 +22,7 @@ require (
 	github.com/felixge/fgprof v0.9.3
 	github.com/getsentry/sentry-go v0.22.0
 	github.com/go-playground/locales v0.14.1
-	github.com/go-playground/universal-translator v0.18.1
+	github.com/go-playground/universal-translator v0.18.2
 	github.com/go-playground/validator/v10 v10.16.0
 	github.com/go-redsync/redsync/v4 v4.9.4
 	github.com/goccy/go-json v0.10.5
