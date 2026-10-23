@@ -88,7 +88,10 @@ old_select() {
 			r.source_name, r.version
 			FROM drop_reports r WHERE $month" ;;
 	extras)
-		ids=$(oldq -c "SELECT coalesce(min(report_id), 0) || ' AND ' || coalesce(max(report_id), 0) FROM drop_reports r WHERE $month") ||
+		# report_id + 0: on min(report_id) and max(report_id), PostgreSQL walks the primary key from either end and
+		# filters every row by created_at, through billions of rows for a recent month; on the expression it reads
+		# the month's rows through the created_at index instead
+		ids=$(oldq -c "SELECT coalesce(min(report_id + 0), 0) || ' AND ' || coalesce(max(report_id + 0), 0) FROM drop_reports r WHERE $month") ||
 			return 1
 		echo "SELECT e.report_id, e.ip, e.metadata, e.md5, r.created_at
 			FROM drop_reports r JOIN drop_report_extras e ON e.report_id = r.report_id AND e.report_id BETWEEN $ids
