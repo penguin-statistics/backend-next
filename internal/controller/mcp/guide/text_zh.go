@@ -251,7 +251,7 @@ var zh = &text{
 			"**VS Code 里看不到服务器：** `~/.copilot/mcp-config.json` 和工作区的 `.mcp.json` 顶层键是 `mcpServers`；"+
 				"`.vscode/mcp.json` 和用户配置的 `mcp.json` 顶层键是 `servers`。",
 			"**要求登录或授权：** 本服务器无需认证，选「No sign in」或「No authentication」。",
-			"**在浏览器打开 `/mcp` 显示 405 错误：** 正常。这个地址只接受 AI 应用的 POST 请求，请打开本页。",
+			"**在浏览器打开 `/mcp` 跳到了本页：** 正常。这个地址只接受 AI 应用的 POST 请求。",
 			"**提示 rate limited：** 见「用量限制」。",
 			"**添加了但 AI 不调用：** 先在对话中启用（Claude：+ → Connectors；ChatGPT：输入 @ 选择；Cherry Studio：在 Agent 中启用 MCP），"+
 				"再在提问里写明「用企鹅物流查」。",

@@ -271,8 +271,8 @@ var en = &text{
 			"**The server doesn't appear in VS Code:** the top-level key is `mcpServers` in `~/.copilot/mcp-config.json` "+
 				"and a workspace `.mcp.json`, but `servers` in `.vscode/mcp.json` and the user-profile `mcp.json`.",
 			`**The app asks you to sign in:** no sign-in is needed. Choose "No sign in" or "No authentication".`,
-			"**A 405 error when you open `/mcp` in a browser:** that's expected. The endpoint only takes POST requests "+
-				"from AI apps; this page is the one to open.",
+			"**Opening `/mcp` in a browser brings you here:** that's expected. The endpoint only takes POST requests "+
+				"from AI apps.",
 			`**"rate limited":** see Limits.`,
 			"**The tools are added but not used:** turn the connector on in the chat (Claude: + → Connectors; ChatGPT: "+
 				`type @; Cherry Studio: enable MCP for the agent) and say "use Penguin Statistics".`,
