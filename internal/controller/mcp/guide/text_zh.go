@@ -5,6 +5,7 @@ package guide
 var zh = &text{
 	Lang:            "zh",
 	Name:            "中文",
+	Abbr:            "中",
 	ContentLanguage: "zh-CN",
 	Title:           "企鹅物流数据统计 MCP 服务器",
 	Description: "让 AI 助手直接查明日方舟掉率：免费、只读、无需注册和 API Key 的 MCP 服务器。介绍如何添加到 Cherry Studio、" +

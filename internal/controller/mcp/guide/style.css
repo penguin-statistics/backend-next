@@ -1,5 +1,5 @@
 /* The setup guide. Warm neutrals, hairlines and no color but that of the strings in code; Geist and Geist Mono for
-   Latin, the system's fonts for Chinese. Dark and light follow the system. */
+   Latin, the system's fonts for Chinese, Japanese and Korean. Dark and light follow the system. */
 @font-face{font-family:"Geist";src:url(fonts/geist-latin.woff2) format("woff2");font-weight:400 600;font-display:swap;unicode-range:U+0020-007E,U+00A0-00FF,U+0131,U+0152-0153,U+02C6,U+02DA,U+02DC,U+2013-2014,U+2022,U+20AC,U+2122,U+2190-2193,U+2197,U+2212}
 @font-face{font-family:"Geist Mono";src:url(fonts/geist-mono-latin.woff2) format("woff2");font-weight:400 500;font-display:swap;unicode-range:U+0020-007E,U+00A0-00FF,U+0131,U+0152-0153,U+02C6,U+02DA,U+02DC,U+2013-2014,U+2022,U+20AC,U+2122,U+2190-2193,U+2197,U+2212}
 /* Arial with the metrics of Geist, until it loads: the text does not move when it does */
@@ -11,8 +11,9 @@
 --line:rgba(237,236,236,.08);--line2:rgba(237,236,236,.14);--line3:rgba(237,236,236,.32);
 --acc:#a3c9f5;--btn:#edecec;--btn-fg:#14120b;--btn-h:#fff;--raised:var(--bg3);--raised-h:var(--bg4);
 --sh:none;
---sans:"Geist","Geist Fallback",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei UI","Microsoft YaHei","Noto Sans CJK SC","Source Han Sans SC","Noto Sans SC",system-ui,sans-serif;
---mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+--sans:"Geist","Geist Fallback",-apple-system,BlinkMacSystemFont,"Segoe UI",var(--cjk),system-ui,sans-serif;
+--cjk:"PingFang SC","Hiragino Sans GB","Microsoft YaHei UI","Microsoft YaHei","Noto Sans CJK SC","Source Han Sans SC","Noto Sans SC";
+--mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",var(--cjk),monospace;
 --ease:cubic-bezier(.4,0,.2,1);
 color-scheme:dark}
 @media (prefers-color-scheme:light){:root{
@@ -26,7 +27,14 @@ color-scheme:light}}
 *,::before,::after{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:72px}
 body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.65 var(--sans);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;font-feature-settings:"kern"}
-:lang(zh) body{line-height:1.8;line-break:strict}
+/* Chinese, Japanese and Korean share characters but not their shapes: each takes the fonts of its language */
+[lang]{--sans:"Geist","Geist Fallback",-apple-system,BlinkMacSystemFont,"Segoe UI",var(--cjk),system-ui,sans-serif;--mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",var(--cjk),monospace}
+:lang(zh){--cjk:"PingFang SC","Hiragino Sans GB","Microsoft YaHei UI","Microsoft YaHei","Noto Sans CJK SC","Source Han Sans SC","Noto Sans SC"}
+:lang(ja){--cjk:"Hiragino Sans","Hiragino Kaku Gothic ProN","BIZ UDPGothic","Meiryo","Yu Gothic UI","Noto Sans CJK JP","Source Han Sans JP","Noto Sans JP"}
+:lang(ko){--cjk:"Apple SD Gothic Neo","Malgun Gothic","Noto Sans CJK KR","Source Han Sans KR","Noto Sans KR"}
+:not(html)[lang]{font-family:var(--sans)}
+:is(:lang(zh),:lang(ja),:lang(ko)) body{line-height:1.8}
+:is(:lang(zh),:lang(ja)) body{line-break:strict}
 ::selection{background:var(--fg);color:var(--bg)}
 a{color:inherit;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.24em;text-decoration-color:var(--line3);transition:text-decoration-color .15s var(--ease),color .15s var(--ease),background-color .15s var(--ease),border-color .15s var(--ease)}
 a:hover{text-decoration-color:currentColor}
@@ -35,15 +43,22 @@ p a,li a,dd a,td a{overflow-wrap:break-word}
 :focus-visible{outline:2px solid var(--fg);outline-offset:2px}
 a:not([class]):focus-visible{border-radius:3px}
 strong{font-weight:550;color:var(--fg)}
-:lang(zh) strong{font-weight:600}
+:is(:lang(zh),:lang(ja),:lang(ko)) strong{font-weight:600}
 code{font-family:var(--mono);font-size:.86em;font-feature-settings:normal}
 :not(pre)>code{padding:.1em .4em;border-radius:5px;background:var(--bg3);box-shadow:inset 0 0 0 1px var(--line);color:var(--fg);-webkit-box-decoration-break:clone;box-decoration-break:clone;overflow-wrap:break-word}
 h1,h2,h3{text-wrap:balance}
 p,li,dd{text-wrap:pretty}
-:lang(zh) :is(p,li,dd){text-wrap:wrap}
+dt,.cta-b .t{text-wrap:balance}
+:is(:lang(zh),:lang(ja)) :is(p,li,dd){text-wrap:wrap}
 /* Korean and Chinese words in English text break between words only */
-:lang(en) :is(p,li,dd){word-break:keep-all}
-:lang(zh) :is(h1,h2,h3,dt,.tab,.ph-q,.cta-b,.cta-h){word-break:keep-all}
+:is(:lang(en),:lang(ko)) :is(p,li,dd,th,td){word-break:keep-all}
+:is(:lang(zh),:lang(ko)) :is(h1,h2,h3,dt,.tab,.ph-q,.cta-b,.cta-h){word-break:keep-all}
+/* Japanese breaks between phrases where the browser can tell them */
+:lang(ja) :is(h1,h2,h3,dt,th,td,.tab,.ph-q,.cta-b,.cta-h){word-break:auto-phrase}
+/* the name of the site breaks between its words only, where the heading has a <wbr> (TitleWords) */
+:lang(ja) h1{word-break:keep-all}
+/* no half blank before an opening bracket at the start of a line */
+:is(:lang(zh),:lang(ja)) :is(dt,dd,.callout){text-spacing-trim:trim-start}
 .nb,.nw{white-space:nowrap}
 .nb>code{white-space:normal}
 code.nw{white-space:nowrap}
@@ -76,6 +91,7 @@ code.nw{white-space:nowrap}
 .seg{display:inline-flex;padding:2px;border-radius:999px;background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line2)}
 .seg a{display:inline-flex;align-items:center;min-height:28px;padding:0 12px;border-radius:999px;font-size:13px;line-height:1;text-decoration:none;color:var(--mut);white-space:nowrap}
 .seg a:not([aria-current]):hover{color:var(--fg)}
+.ln-s{display:none}
 /* the language shown: outlined, as no control but the prompt's is filled */
 .seg a[aria-current]{background:var(--raised);color:var(--fg);font-weight:500;box-shadow:inset 0 0 0 1px var(--mut)}
 
@@ -86,10 +102,10 @@ code.nw{white-space:nowrap}
 h1{margin:0 0 28px;font-size:60px;line-height:1.02;font-weight:400;letter-spacing:-.045em}
 h1 span{display:block}
 .h1-b{color:var(--mut)}
-:lang(zh) h1{font-size:54px;line-height:1.14;letter-spacing:-.01em}
+:is(:lang(zh),:lang(ja),:lang(ko)) h1{font-size:54px;line-height:1.14;letter-spacing:-.01em}
 .lead{margin:0 0 16px;max-width:36em;font-size:18px;line-height:1.6;color:var(--mut);letter-spacing:-.006em}
 .l1{color:var(--fg)}
-:lang(zh) .lead{font-size:17px;line-height:1.85;letter-spacing:0;color:var(--fg2)}
+:is(:lang(zh),:lang(ja),:lang(ko)) .lead{font-size:17px;line-height:1.85;letter-spacing:0;color:var(--fg2)}
 .aside{margin:0;max-width:40em;font-size:14px;color:var(--mut)}
 .card{padding:24px;border-radius:18px;background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line2),var(--sh)}
 .lbl{margin:0 0 10px;font-size:12px;line-height:1.3;color:var(--mut)}
@@ -102,7 +118,7 @@ h1 span{display:block}
 .specs dt{color:var(--mut)}
 .specs dd{margin:0;color:var(--fg2)}
 .small{margin:12px 0 0;font-size:13px;line-height:1.55;color:var(--mut)}
-:lang(zh) .small{line-height:1.75}
+:is(:lang(zh),:lang(ja),:lang(ko)) .small{line-height:1.75}
 .oc{margin-top:20px;padding-top:20px;border-top:1px solid var(--line)}
 .oc-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 /* the one-click links: outlined, second to the prompt for an agent */
@@ -126,7 +142,7 @@ h1 span{display:block}
 .cta-b:not([hidden])+.cta-h{margin-top:14px}
 .agent-w{margin-top:16px}
 .agent-p{margin:0;padding:14px 16px;border-radius:12px;background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line);font-size:14px;line-height:1.65;color:var(--fg2);overflow-wrap:break-word}
-:lang(zh) .agent-p{line-height:1.85}
+:is(:lang(zh),:lang(ja),:lang(ko)) .agent-p{line-height:1.85}
 .more{display:none;align-items:center;min-height:28px;margin-top:6px;padding:0 2px;border:0;border-radius:6px;background:none;color:var(--fg2);font:500 13px/1 var(--sans);cursor:pointer;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.24em;text-decoration-color:var(--line3)}
 .more:hover{color:var(--fg);text-decoration-color:currentColor}
 
@@ -145,7 +161,7 @@ h1 span{display:block}
 /* sections: the heading stays in view beside the text */
 .sec{display:grid;grid-template-columns:232px minmax(0,1fr);column-gap:48px;align-items:start;padding:72px 0;border-top:1px solid var(--line)}
 .sec>h2{position:sticky;top:88px;margin:0;font-size:30px;line-height:1.15;font-weight:400;letter-spacing:-.035em}
-:lang(zh) .sec>h2{letter-spacing:-.01em}
+:is(:lang(zh),:lang(ja),:lang(ko)) .sec>h2{letter-spacing:-.01em}
 h2 a{text-decoration:none;border-radius:4px}
 h2 a::after{content:"#";content:"#"/"";margin-left:.25em;color:var(--mut2);opacity:0;transition:opacity .15s var(--ease)}
 h2 a:hover::after,h2 a:focus-visible::after{opacity:1}
@@ -183,7 +199,7 @@ html:not(.tabs) .win-p:has(>.panel:target)>.panel:not(:target),html:not(.tabs) .
 .win-p{min-width:0;padding:36px 44px}
 .panel:focus-visible{outline-offset:8px}
 .panel h3{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;margin:0 0 24px;font-size:24px;line-height:1.25;font-weight:400;letter-spacing:-.025em}
-:lang(zh) .panel h3{letter-spacing:-.01em}
+:is(:lang(zh),:lang(ja),:lang(ko)) .panel h3{letter-spacing:-.01em}
 .ph-q{font-size:14px;letter-spacing:-.005em;color:var(--mut)}
 .panel>p{margin:0 0 16px;max-width:70ch;color:var(--fg2)}
 .steps~p{font-size:14px;color:var(--mut)}
@@ -191,7 +207,7 @@ html:not(.tabs) .win-p:has(>.panel:target)>.panel:not(:target),html:not(.tabs) .
 .steps li{counter-increment:s;position:relative;padding:0 0 0 40px;margin:0 0 16px}
 .steps li::before{content:counter(s);position:absolute;left:0;top:1px;width:24px;height:24px;border-radius:7px;background:var(--bg2);box-shadow:inset 0 0 0 1px var(--line2);font:500 12px/24px var(--mono);font-variant-numeric:tabular-nums;text-align:center;color:var(--fg)}
 .steps li:not(:last-child)::after{content:"";position:absolute;left:12px;top:31px;bottom:-12px;width:1px;background:var(--line)}
-:lang(zh) .steps li::before{top:3px}
+:is(:lang(zh),:lang(ja),:lang(ko)) .steps li::before{top:3px}
 .docs{display:flex;gap:10px;margin:28px 0 0;padding-top:16px;border-top:1px solid var(--line);font-size:13px;line-height:1.5;color:var(--mut)}
 .docs-l{flex:none}
 .docs a{display:inline-flex;align-items:center;gap:4px;min-width:0;color:var(--fg2);text-decoration:none}
@@ -242,7 +258,7 @@ html:not(.tabs) .win-p:has(>.panel:target)>.panel:not(:target),html:not(.tabs) .
 .prompts p{flex:1;margin:3px 0;font-size:15px;color:var(--fg)}
 .callout{position:relative;margin:20px 0 0!important;padding:14px 18px 14px 46px;border-radius:12px;box-shadow:inset 0 0 0 1px var(--line);font-size:14px;color:var(--mut)!important}
 .callout::before{content:"";position:absolute;left:22px;top:19px;width:5px;height:10px;border:solid var(--fg);border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
-:lang(zh) .callout::before{top:22px}
+:is(:lang(zh),:lang(ja),:lang(ko)) .callout::before{top:22px}
 .callout strong{font-weight:500}
 
 /* rows: a label and its value */
@@ -260,7 +276,7 @@ html:not(.tabs) .win-p:has(>.panel:target)>.panel:not(:target),html:not(.tabs) .
 .tools h3{margin:0 0 6px;font:500 14px/1.4 var(--mono);color:var(--fg)}
 .tools h3 code{padding:0;background:none;box-shadow:none;font-size:inherit}
 .tools p{margin:0;font-size:14px;line-height:1.55;color:var(--mut)}
-:lang(zh) .tools p{line-height:1.75}
+:is(:lang(zh),:lang(ja),:lang(ko)) .tools p{line-height:1.75}
 
 /* data, limits, privacy: fine print side by side */
 .dash{list-style:none;margin:0;padding:0;max-width:70ch}
@@ -272,7 +288,7 @@ html:not(.tabs) .win-p:has(>.panel:target)>.panel:not(:target),html:not(.tabs) .
 .facts .sec{display:block;padding:0;border:0}
 .facts .sec>h2{position:static;margin:0 0 20px;font-size:20px;line-height:1.3;letter-spacing:-.02em}
 .facts .sec-b{font-size:14px;line-height:1.6}
-:lang(zh) .facts .sec-b{line-height:1.75}
+:is(:lang(zh),:lang(ja),:lang(ko)) .facts .sec-b{line-height:1.75}
 .facts .dash li{padding-left:18px;margin-bottom:12px}
 .facts .dash li::before{width:7px}}
 
@@ -344,12 +360,16 @@ html:not(.tabs) .win-p:has(>.panel:target)>.panel:not(:target),html:not(.tabs) .
 @media (max-width:640px){
 .wrap{padding:0 16px}
 .top-md{display:none}
+/* the languages by their abbreviation, so that the name of the site keeps its room; the name stays for screen readers */
+.seg a{padding:0 10px}
+.seg .ln{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.seg .ln-s{display:inline}
 .hero{padding-top:48px;padding-bottom:56px}
 .pill{margin-bottom:24px}
 h1{font-size:40px;line-height:1.05;letter-spacing:-.04em;margin-bottom:20px}
-:lang(zh) h1{font-size:36px;line-height:1.2}
+:is(:lang(zh),:lang(ja),:lang(ko)) h1{font-size:36px;line-height:1.2}
 .lead{font-size:17px}
-:lang(zh) .lead{font-size:16px}
+:is(:lang(zh),:lang(ja),:lang(ko)) .lead{font-size:16px}
 .card{margin-top:36px;padding:16px;border-radius:16px}
 .url{padding-left:14px}
 .url code{font-size:13px}

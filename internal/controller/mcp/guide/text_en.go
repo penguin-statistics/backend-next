@@ -3,6 +3,7 @@ package guide
 var en = &text{
 	Lang:            "en",
 	Name:            "English",
+	Abbr:            "EN",
 	ContentLanguage: "en",
 	Title:           "Penguin Statistics MCP Server",
 	Description: "Arknights drop rates for your AI assistant: a free, read-only MCP server without account or API key. " +

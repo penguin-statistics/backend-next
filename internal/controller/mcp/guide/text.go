@@ -13,10 +13,13 @@ type text struct {
 	// Lang is the value of ?lang for the text; ContentLanguage tells its language in Content-Language, <html lang>
 	// and hreflang
 	Lang, ContentLanguage string
-	// Name is the name of the language in itself, in the language switch
-	Name string
+	// Name is the name of the language in itself, in the language switch; Abbr is its abbreviation there on phones
+	Name, Abbr string
 	// Title is the heading of the page; Description sums it up for search results and link previews
 	Title, Description string
+	// TitleWords are the words of the name of the site in Title, for a language written without spaces (Japanese): the
+	// heading breaks between them only, not inside a word
+	TitleWords []string
 	// MarkdownLink names the link to the Markdown of the page
 	MarkdownLink string
 	// Copy and Copied label the copy buttons, before and after a click

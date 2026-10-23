@@ -1,13 +1,13 @@
 // Package guide is the setup guide of the MCP server, at the root of its host: how to add the server to Claude,
 // ChatGPT, Cherry Studio, Cursor, VS Code and other apps, what its tools do, its data, limits and privacy. It is in
-// English and in Simplified Chinese, as HTML for people and as Markdown for agents, with llms.txt (the English
-// Markdown, after a preface for agents) and robots.txt for the host.
+// English, Simplified Chinese, Japanese and Korean, as HTML for people and as Markdown for agents, with llms.txt (the
+// English Markdown, after a preface for agents) and robots.txt for the host.
 //
-// Everything is rendered once, at startup: the texts (text_en.go, text_zh.go, one table per language, which a
-// translation adds to) with the snippets and the one-click links (clients.go), all made of the URL of the server,
-// into the templates of page.gohtml and page.md.tmpl. The HTML has its style and script inline, and loads nothing but
-// its fonts, from its own host (fonts.go), and the icon of the site: its Content-Security-Policy allows the style and
-// the script by their hashes. How the page shows the texts is in display.go.
+// Everything is rendered once, at startup: the texts (text_en.go, text_zh.go, text_ja.go, text_ko.go, one table per
+// language, which a translation adds to) with the snippets and the one-click links (clients.go), all made of the URL
+// of the server, into the templates of page.gohtml and page.md.tmpl. The HTML has its style and script inline, and
+// loads nothing but its fonts, from its own host (fonts.go), and the icon of the site: its Content-Security-Policy
+// allows the style and the script by their hashes. How the page shows the texts is in display.go.
 package guide
 
 import (
@@ -45,7 +45,7 @@ const (
 const DefaultLang = "en"
 
 // texts are the texts of the guide, in the order of the language switch
-var texts = []*text{en, zh}
+var texts = []*text{en, zh, ja, ko}
 
 // licenseURL is the license of the data
 const licenseURL = "https://creativecommons.org/licenses/by-nc/4.0/"
@@ -233,7 +233,7 @@ type view struct {
 
 // langLink is a language in the language switch
 type langLink struct {
-	Name, Lang, ContentLanguage string
+	Name, Abbr, Lang, ContentLanguage string
 	// Path is the page in the language, URL its URL, Markdown that of its Markdown
 	Path, URL, Markdown string
 }
@@ -266,7 +266,7 @@ func newView(c Config, t *text) (*view, error) {
 		Plugins:      pluginsAvailable,
 	}
 	for _, l := range texts {
-		v.Langs = append(v.Langs, langLink{Name: l.Name, Lang: l.Lang, ContentLanguage: l.ContentLanguage,
+		v.Langs = append(v.Langs, langLink{Name: l.Name, Abbr: l.Abbr, Lang: l.Lang, ContentLanguage: l.ContentLanguage,
 			Path: "/?lang=" + l.Lang, URL: c.Guide + "?lang=" + l.Lang, Markdown: strings.TrimSuffix(c.Guide, "/") + MarkdownPath + "?lang=" + l.Lang})
 	}
 
@@ -331,7 +331,7 @@ func (v *view) expand(s string) string {
 
 // html renders the page as HTML.
 func (v *view) html() ([]byte, error) {
-	ts := typesetter{zh: v.T.Lang == "zh", expand: v.expand, terminal: v.T.Terminal}
+	ts := typesetter{lang: v.T.Lang, expand: v.expand, terminal: v.T.Terminal}
 	type name struct{ Name, Qualifier string }
 	type sentence struct{ First, Rest string }
 	t, err := htmltemplate.New("page.gohtml").Funcs(htmltemplate.FuncMap{
@@ -354,6 +354,20 @@ func (v *view) html() ([]byte, error) {
 				return [2]string{s[:i], s[i+1:]}
 			}
 			return [2]string{s, ""}
+		},
+		// the name of the site in the heading, which may break only between its words if the text has them
+		"h1name": func(name string) (htmltemplate.HTML, error) {
+			if v.T.TitleWords == nil {
+				return htmltemplate.HTML(htmltemplate.HTMLEscapeString(name)), nil //nolint:gosec // escaped
+			}
+			if strings.Join(v.T.TitleWords, "") != name {
+				return "", fmt.Errorf("the words of the title %q do not make its name %q", v.T.TitleWords, name)
+			}
+			words := make([]string, len(v.T.TitleWords))
+			for i, w := range v.T.TitleWords {
+				words[i] = htmltemplate.HTMLEscapeString(w)
+			}
+			return htmltemplate.HTML(strings.Join(words, "<wbr>")), nil //nolint:gosec // escaped
 		},
 		"name":     func(s string) name { n, q := splitName(s); return name{n, q} },
 		"sentence": func(s string) sentence { f, r := splitSentence(s); return sentence{f, r} },

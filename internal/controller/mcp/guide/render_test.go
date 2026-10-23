@@ -37,8 +37,8 @@ func render(t *testing.T, c Config) *Guide {
 	return g
 }
 
-// The page loads fast on a phone: the HTML, with its style and script, is under 100 KB, 23 KB compressed, and each of
-// its two fonts under 20 KB.
+// The page loads fast on a phone: the HTML, with its style and script, is under 23 KB compressed (and 110 KB as it is:
+// Japanese, with 3 bytes a character, is the largest), and each of its two fonts under 20 KB.
 func TestPageSize(t *testing.T) {
 	g := render(t, prod)
 	for lang, p := range g.Pages {
@@ -46,7 +46,7 @@ func TestPageSize(t *testing.T) {
 		w, _ := gzip.NewWriterLevel(&gz, gzip.BestCompression)
 		_, _ = w.Write(p.HTML)
 		_ = w.Close()
-		if n, z := len(p.HTML), gz.Len(); n >= 100000 || z >= 23000 {
+		if n, z := len(p.HTML), gz.Len(); n >= 110000 || z >= 23000 {
 			t.Errorf("%s: %d bytes of HTML, %d gzipped", lang, n, z)
 		}
 	}
@@ -397,10 +397,19 @@ func TestPageContents(t *testing.T) {
 			`<link rel="alternate" type="text/markdown" href="https://mcp.penguin-stats.io/index.md?lang=en">`,
 			`<link rel="service-desc" type="application/mcp-server-card+json" href="https://mcp.penguin-stats.io/mcp/server-card">`,
 			`<link rel="alternate" hreflang="zh-CN" href="https://mcp.penguin-stats.io/?lang=zh">`,
+			`<link rel="alternate" hreflang="ja" href="https://mcp.penguin-stats.io/?lang=ja">`,
+			`<link rel="alternate" hreflang="ko" href="https://mcp.penguin-stats.io/?lang=ko">`,
 			`<meta property="og:image" content="https://penguin-stats.io/favicon/android-chrome-512x512.png">`,
 			"Logs are kept for 15 days", "CC BY-NC 4.0", "1200 requests per minute"},
 		"zh": {`<html lang="zh-CN" data-copied="已复制" id="top">`, "<title>企鹅物流数据统计 MCP 服务器</title>",
 			`<h1 id="title"><span>企鹅物流数据统计</span> <span class="h1-b">MCP 服务器</span></h1>`, "保存 15 天", "每分钟 1200 次请求"},
+		// the name of the site breaks between its words only
+		"ja": {`<html lang="ja" data-copied="コピーしました" id="top">`, "<title>ペンギン急便データ統計処理部門 MCP サーバー</title>",
+			`<h1 id="title"><span>ペンギン急便<wbr>データ<wbr>統計<wbr>処理部門</span> <span class="h1-b">MCP サーバー</span></h1>`,
+			"15 日間", "1200 リクエスト/分", `<a href="/?lang=ja" hreflang="ja" lang="ja" aria-current="page"><span class="ln">日本語</span><span class="ln-s" aria-hidden="true">日</span></a>`},
+		"ko": {`<html lang="ko" data-copied="복사됨" id="top">`, "<title>펭귄 물류 데이터 분석 부서 MCP 서버</title>",
+			`<h1 id="title"><span>펭귄 물류 데이터 분석 부서</span> <span class="h1-b">MCP 서버</span></h1>`, "15일", "분당 1200회",
+			`<span class="h2-q">선택</span>`},
 	} {
 		html := string(g.Pages[lang].HTML)
 		for _, s := range want {
