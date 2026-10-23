@@ -154,7 +154,8 @@ func serverProperty(p *jsonschema.Schema) {
 	serverEnum(p)
 }
 
-// rankingServerProperty is the server argument of a tool that only ranks by it (search_stages): CN by default.
+// rankingServerProperty is the server argument of a tool that finds the same things on every server and only ranks
+// them and marks them open or not by it (search_stages): CN by default.
 func rankingServerProperty(p *jsonschema.Schema) {
 	p.Description = "Game server the user plays on: CN (China), US (global, English), JP (Japan) or KR (Korea). " +
 		"Default CN."

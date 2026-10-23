@@ -269,6 +269,7 @@ func TestGetItemDropRatesBadInput(t *testing.T) {
 		`{"server":"CN","item_id":"30012","top_n":101}`,
 		`{"server":"CN","item_id":"30012","sort_by":"best"}`,
 		`{"item_id":"30012","server":"TW"}`,
+		`{"item_id":"30012"}`, // the server is required
 		`{"server":"CN","item_id":"30012","include_closed":"yes"}`,
 		`{}`,
 	} {

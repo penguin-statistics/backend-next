@@ -24,7 +24,7 @@ var prod = Config{
 	Card:       "https://mcp.penguin-stats.io/mcp/server-card",
 	Site:       "https://penguin-stats.io",
 	Repository: "https://github.com/penguin-statistics/backend-next",
-	RateLimit:  120,
+	RateLimit:  1200,
 	RateWindow: time.Minute,
 }
 
@@ -398,9 +398,9 @@ func TestPageContents(t *testing.T) {
 			`<link rel="service-desc" type="application/mcp-server-card+json" href="https://mcp.penguin-stats.io/mcp/server-card">`,
 			`<link rel="alternate" hreflang="zh-CN" href="https://mcp.penguin-stats.io/?lang=zh">`,
 			`<meta property="og:image" content="https://penguin-stats.io/favicon/android-chrome-512x512.png">`,
-			"Logs are kept for 15 days", "CC BY-NC 4.0", "120 requests per minute"},
+			"Logs are kept for 15 days", "CC BY-NC 4.0", "1200 requests per minute"},
 		"zh": {`<html lang="zh-CN" data-copied="已复制" id="top">`, "<title>企鹅物流数据统计 MCP 服务器</title>",
-			`<h1 id="title"><span>企鹅物流数据统计</span> <span class="h1-b">MCP 服务器</span></h1>`, "保存 15 天", "每分钟 120 次请求"},
+			`<h1 id="title"><span>企鹅物流数据统计</span> <span class="h1-b">MCP 服务器</span></h1>`, "保存 15 天", "每分钟 1200 次请求"},
 	} {
 		html := string(g.Pages[lang].HTML)
 		for _, s := range want {

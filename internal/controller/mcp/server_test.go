@@ -133,6 +133,20 @@ func TestToolsList(t *testing.T) {
 		if _, ok := tool.InputSchema["properties"]; !ok || tool.InputSchema["type"] != "object" || tool.OutputSchema["type"] != "object" {
 			t.Errorf("%s: input schema %v, output schema %v", tool.Name, tool.InputSchema, tool.OutputSchema)
 		}
+		// the tools whose answer depends on the server require it, without a default, for the model to ask the user
+		// for it rather than answer for CN (see serverProperty); search_stages defaults it (rankingServerProperty)
+		required, _ := tool.InputSchema["required"].([]any)
+		server, _ := tool.InputSchema["properties"].(map[string]any)["server"].(map[string]any)
+		switch tool.Name {
+		case "get_item_drop_rates", "get_stage_drops", "list_events":
+			if !slices.Contains(required, any("server")) || server["default"] != nil {
+				t.Errorf("%s: server not required, or with a default: %v", tool.Name, tool.InputSchema)
+			}
+		case "search_stages":
+			if slices.Contains(required, any("server")) || server["default"] != "CN" {
+				t.Errorf("%s: server required, or not CN by default: %v", tool.Name, tool.InputSchema)
+			}
+		}
 	}
 	if res.TTLMs != 3600000 || res.CacheScope != "public" {
 		t.Errorf("ttlMs %d, cacheScope %q", res.TTLMs, res.CacheScope)

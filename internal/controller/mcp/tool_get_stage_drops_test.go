@@ -97,7 +97,7 @@ func TestGetStageDropsByCode(t *testing.T) {
 		// on CN only: the stage anyway
 		{"YW-4", "US", "act52side_04"},
 	} {
-		if out, _ := getStageDrops(t, app, `{"server":"CN","stage_id":`+strconv.Quote(tc.id)+`,"server":"`+tc.server+`"}`); out.Stage.StageID != tc.want {
+		if out, _ := getStageDrops(t, app, `{"stage_id":`+strconv.Quote(tc.id)+`,"server":"`+tc.server+`"}`); out.Stage.StageID != tc.want || out.Server != tc.server {
 			t.Errorf("%s on %s: stage %+v", tc.id, tc.server, out.Stage)
 		}
 	}
@@ -186,6 +186,7 @@ func TestGetStageDropsBadInput(t *testing.T) {
 	for _, args := range []string{
 		`{"server":"CN","stage_id":""}`,
 		`{"stage_id":"main_01-07","server":"TW"}`,
+		`{"stage_id":"main_01-07"}`, // the server is required
 		`{"server":"CN","stage_id":"main_01-07","lang":"fr"}`,
 		`{}`,
 	} {
