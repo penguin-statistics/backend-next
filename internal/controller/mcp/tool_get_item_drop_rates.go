@@ -84,12 +84,12 @@ func getItemDropRatesTool() *sdkmcp.Tool {
 		Title: "Item drop rates",
 		Description: "Where to farm an item: ranks every stage of a game server that drops it, with sanity per item, " +
 			"drop rate (items per run), runs (times) and quantity. Use it for any question about where to get an item, " +
-			"its best or most efficient stage, or which of several stages to run for it: one call covers every stage, " +
-			"so don't look stages up one by one with get_stage_drops. By default the stages open now that still drop " +
-			"it, lowest sanity per item first; stages of fewer than 100 runs (lowSample) rank after the others, " +
-			"gachas and the recruitment (no sanity cost) last. sort_by=drop_rate ranks by rate instead; " +
-			"include_closed=true adds past events and ended drops. item_id takes the item's name in any language; " +
-			"search_items first only when the name may mean several items.",
+			"its best or most efficient stage, or which of several stages to run for it: one call ranks every stage, " +
+			"so don't look stages up one by one with get_stage_drops (only a named stage left out of the top_n " +
+			"returned). By default the stages open now that still drop it, lowest sanity per item first; stages of " +
+			"fewer than 100 runs (lowSample) rank after the others, gachas and the recruitment (no sanity cost) last. " +
+			"sort_by=drop_rate ranks by rate instead; include_closed=true adds past events and ended drops. item_id " +
+			"takes the item's name in any language; search_items first only when the name may mean several items.",
 		InputSchema: inputSchema[getItemDropRatesIn](map[string]property{
 			"item_id": lengthProperty(1, queryMaxLength),
 			"server":  serverProperty,
