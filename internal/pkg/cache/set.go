@@ -2,6 +2,7 @@ package cache
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -15,6 +16,7 @@ func NewSet[T any](prefix string) *Set[T] {
 		c:           cache.New(cache.NoExpiration, time.Minute*10),
 		locks:       make(map[string]*keyLock),
 		calculating: make(map[string]bool),
+		requested:   make(map[string]bool),
 	}
 }
 
@@ -29,11 +31,26 @@ type Set[T any] struct {
 	// one, and is not published.
 	writeMu     sync.Mutex
 	calculating map[string]bool
+	// requested holds the keys MutexGetSet is calculating, for a request (not Refresh); guarded by writeMu
+	requested map[string]bool
 
 	prefix  string
 	metrics metrics
 
+	// c holds an *entry[T] per key
 	c *cache.Cache
+}
+
+// entry is a cached value, with whether it was read since it was cached (see Used).
+type entry[T any] struct {
+	value T
+	read  atomic.Bool
+}
+
+func newEntry[T any](value T, read bool) *entry[T] {
+	e := &entry[T]{value: value}
+	e.read.Store(read)
+	return e
 }
 
 func (c *Set[T]) key(key string) string {
@@ -57,9 +74,36 @@ func (c *Set[T]) get(key string, dest *T) error {
 		return ErrNotFound
 	}
 
-	// c holds only values of T: Set and MutexGetSet store nothing else
-	*dest = result.(T)
+	// c holds only entries of T: Set, MutexGetSet and Refresh store nothing else
+	e := result.(*entry[T])
+	if !e.read.Load() { // most reads find it read already: no write then
+		e.read.Store(true)
+	}
+	*dest = e.value
 	return nil
+}
+
+// Has reports whether key is cached, without counting a lookup or a read (see Used).
+func (c *Set[T]) Has(key string) bool {
+	_, ok := c.c.Get(c.key(key))
+	return ok
+}
+
+// Used reports whether the process serves key: whether MutexGetSet is calculating it for a request, or it is cached
+// and was read (Get, MutexGetSet) since it was cached, which a value MutexGetSet calculated was, by the request it
+// calculated it for. It counts no lookup and is no read. Set and Refresh cache unread values: a value only written
+// (e.g. by the worker's refreshes) and never read is not used. It tells e.g. what to refresh after the data changed
+// (cachesync): a key being calculated may be calculated from the data before.
+func (c *Set[T]) Used(key string) bool {
+	k := c.key(key)
+	c.writeMu.Lock()
+	requested := c.requested[k]
+	c.writeMu.Unlock()
+	if requested {
+		return true
+	}
+	result, ok := c.c.Get(k)
+	return ok && result.(*entry[T]).read.Load()
 }
 
 func (c *Set[T]) Set(key string, value T, expire time.Duration) {
@@ -71,7 +115,7 @@ func (c *Set[T]) Set(key string, value T, expire time.Duration) {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 	c.markWrittenLocked(key)
-	c.c.Set(key, value, expire)
+	c.c.Set(key, newEntry(value, false), expire)
 }
 
 func (c *Set[T]) markWrittenLocked(key string) {
@@ -149,15 +193,22 @@ func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, erro
 	// the key's lock makes this the only calculation of the key
 	c.writeMu.Lock()
 	c.calculating[c.key(key)] = false
+	c.requested[c.key(key)] = true
 	c.writeMu.Unlock()
 
+	var called, returned bool
+	defer func() { // also if valueFunc panics
+		c.writeMu.Lock()
+		defer c.writeMu.Unlock()
+		delete(c.requested, c.key(key))
+		if !called {
+			delete(c.calculating, c.key(key))
+		}
+	}()
 	start := time.Now()
 	value, err := valueFunc()
 	c.metrics.calculated(start)
 	if err != nil {
-		c.writeMu.Lock()
-		delete(c.calculating, c.key(key))
-		c.writeMu.Unlock()
 		log.Error().Err(err).Str("key", key).Msg("failed to get value from valueFunc() in MutexGetSet")
 		return err
 	}
@@ -165,8 +216,8 @@ func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, erro
 	// publish the value unless the key was written meanwhile (e.g. refreshed by the worker): then the value may have
 	// been calculated from older data, and the newer one is returned instead, if it is still there. Which value is
 	// returned is decided, and the newer one copied to dest, along with publishing: a later read could miss the newer
-	// value (deleted meanwhile) after publish was told it is the one returned.
-	var called, returned bool
+	// value (deleted meanwhile) after publish was told it is the one returned. The value cached is read: the request
+	// gets it.
 	cacheValue := func() bool {
 		c.writeMu.Lock()
 		defer c.writeMu.Unlock()
@@ -177,7 +228,7 @@ func (c *Set[T]) slowMutexGetSet(key string, dest *T, valueFunc func() (*T, erro
 		published := !c.calculating[c.key(key)]
 		delete(c.calculating, c.key(key))
 		if published {
-			c.c.Set(c.key(key), *value, expire)
+			c.c.Set(c.key(key), newEntry(*value, true), expire)
 		}
 		returned = published || c.get(key, dest) != nil
 		return returned
@@ -231,7 +282,7 @@ func (c *Set[T]) Refresh(key string, valueFunc func() (*T, error), expire time.D
 		cached = !c.calculating[k]
 		delete(c.calculating, k)
 		if cached {
-			c.c.Set(k, *value, expire)
+			c.c.Set(k, newEntry(*value, false), expire)
 		}
 		return cached
 	}

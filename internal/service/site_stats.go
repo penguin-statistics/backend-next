@@ -104,6 +104,18 @@ func (s *SiteStats) RefreshShimSiteStats(ctx context.Context, server string) (*m
 	return results, nil
 }
 
+// ShimSiteStatsUsed reports whether the site stats of server are used (see cache.Set.Used): whether this process
+// serves them, and should follow their refreshes (cachesync).
+func (s *SiteStats) ShimSiteStatsUsed(server string) bool {
+	return cache.ShimSiteStats.Used(server)
+}
+
+// DropShimSiteStats deletes the cached site stats of server, if they are cached: a refresh of them in another process
+// left them stale, and requests recalculate them.
+func (s *SiteStats) DropShimSiteStats(server string) {
+	deleteCached(cache.ShimSiteStats, server)
+}
+
 func (s *SiteStats) calcShimSiteStats(ctx context.Context, server string) (*modelv2.SiteStats, error) {
 	// the aggregations are independent; run them concurrently
 	var (

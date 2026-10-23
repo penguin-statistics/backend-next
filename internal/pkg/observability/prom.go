@@ -163,6 +163,31 @@ var (
 		Name: prometheus.BuildFQName(ServiceName, "worker", "refreshes_total"),
 		Help: "Background global matrix refreshes by outcome",
 	}, []string{"refresh", "server", "outcome"})
+	// CacheSyncBumps counts the advances of the Redis generations by which the calc worker tells every process
+	// that it refreshed the cached global results of a kind (globalDropMatrix, globalPatternMatrix, shimTrend or
+	// siteStats; see cachesync), by outcome: ok or error (the other processes then miss that refresh, unless Redis
+	// applied the advance and only its reply was lost).
+	CacheSyncBumps = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "cache_sync", "bumps_total"),
+		Help: "Advances of the cache sync generations after a calc worker refresh by kind and outcome",
+	}, []string{"kind", "outcome"})
+	// CacheSyncPolls counts the reads of the generations by outcome: ok or error.
+	CacheSyncPolls = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "cache_sync", "polls_total"),
+		Help: "Reads of the cache sync generations by outcome",
+	}, []string{"outcome"})
+	// CacheSyncRefreshDuration and CacheSyncRefreshes cover the refreshes a process runs after the generation of a
+	// kind changed, of the results of a server it serves: outcome is one of ok, error, panic and cancelled (as the
+	// process stops). The buckets are those of WorkerRefreshDuration.
+	CacheSyncRefreshDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    prometheus.BuildFQName(ServiceName, "cache_sync", "refresh_duration_seconds"),
+		Help:    "Duration of the refreshes following a calc worker refresh in seconds",
+		Buckets: prometheus.ExponentialBuckets(0.25, 2, 13),
+	}, []string{"kind", "server"})
+	CacheSyncRefreshes = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "cache_sync", "refreshes_total"),
+		Help: "Refreshes following a calc worker refresh by kind, server and outcome",
+	}, []string{"kind", "server", "outcome"})
 	// ColdstoreArchiveRuns covers the runs of the monthly archiving of the cold storage (#752): outcome is one of ok
 	// (also when there was nothing to archive), error, verification_failed, insufficient_space and
 	// lock_not_acquired. No partition is dropped by a run that did not end ok.

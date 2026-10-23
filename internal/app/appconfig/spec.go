@@ -138,6 +138,15 @@ type ConfigSpec struct {
 	// WorkerEnabled is a flag to indicate whether to enable the worker.
 	WorkerEnabled bool `split_words:"true"`
 
+	// CacheSyncInterval is how often a process checks whether the calc worker refreshed the cached global results
+	// (the global drop and pattern matrices, the trend and the site stats; see cachesync): the worker refreshes them
+	// in its own process only, and counts each refresh in Redis. A process that serves results of a server whose
+	// count changed (calculates them for a request, or read them since they were cached) refreshes them too, so that
+	// they are not frozen until they expire (24h) when the worker runs in another process; one that only caches them
+	// deletes them. 0 disables the checks: the process then refreshes nothing it did not calculate in its own worker.
+	// The worker counts its refreshes whatever this is.
+	CacheSyncInterval time.Duration `split_words:"true" default:"10s"`
+
 	// ReportWorkerEnabled runs the report worker (reportwkr), which consumes the report tasks of NATS and stores
 	// them in the database. It is separate from WorkerEnabled, which runs calcwkr. When false, the HTTP API still
 	// accepts reports and publishes them to the penguin-reports stream, a work queue without MaxAge, where they wait

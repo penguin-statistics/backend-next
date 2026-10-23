@@ -24,6 +24,7 @@ import (
 	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/pkg/observability"
 	"exusiai.dev/backend-next/internal/service"
+	"exusiai.dev/backend-next/internal/workers/cachesync"
 )
 
 // tracer traces every batch: calcwkr.batch > calcwkr.server > calcwkr.<microtask>, with the database queries of a
@@ -39,6 +40,7 @@ type WorkerDeps struct {
 	TrendService         *service.Trend
 	SiteStatsService     *service.SiteStats
 	RedSync              *redsync.Redsync
+	CacheSync            *cachesync.Syncer
 }
 
 type Worker struct {
@@ -67,8 +69,13 @@ type Worker struct {
 	// refreshGlobalMatrices tells whether a batch refreshes the cached global matrices (see globalMatrixRefresh)
 	refreshGlobalMatrices bool
 	// refreshMu runs the global matrix refreshes one at a time, as requests calculated them before, to not load the
-	// database with those of every server at once while the batch still calculates others
+	// database with those of every server at once while the batch still calculates others. It is that of cacheSync
+	// unless that is nil (see refreshLock).
 	refreshMu sync.Mutex
+
+	// cacheSync tells the other processes about every refresh of cached global results, so that they refresh those
+	// they serve too (see cachesync), and shares its refresh lock; nil tells nobody
+	cacheSync cacheSyncer
 
 	WorkerDeps
 }
@@ -100,6 +107,7 @@ func Start(conf *appconfig.Config, deps WorkerDeps) {
 			heartbeatURL: conf.WorkerHeartbeatURL,
 			// the worker of a process serving requests
 			refreshGlobalMatrices: true,
+			cacheSync:             deps.CacheSync,
 			syncMutex:             deps.RedSync.NewMutex("mutex:calcwkr", redsync.WithExpiry(30*time.Second), redsync.WithTries(2)),
 			WorkerDeps:            deps,
 		}
@@ -138,8 +146,9 @@ func (w *Worker) globalMatrixRefresh(batchCtx context.Context, name, server stri
 	}
 	logger := log.Ctx(batchCtx).With().Str("evt.name", "worker.calcwkr."+name).Str("server", server).Logger()
 	go func() {
-		w.refreshMu.Lock()
-		defer w.refreshMu.Unlock()
+		mu := w.refreshLock()
+		mu.Lock()
+		defer mu.Unlock()
 
 		ctx, cancel := context.WithTimeout(logger.WithContext(context.Background()), w.timeout)
 		defer cancel()
@@ -172,19 +181,54 @@ func (w *Worker) globalMatrixRefresh(batchCtx context.Context, name, server stri
 	}()
 }
 
+// cacheSyncer advances the generation of cached global results, and shares the lock of the refreshes of the
+// process (cachesync.Syncer).
+type cacheSyncer interface {
+	Bump(ctx context.Context, kind cachesync.Kind, server string)
+	RefreshLock() sync.Locker
+}
+
+// refreshLock returns the lock of the refreshes of cached global results: that of cacheSync, which its refreshes
+// following the worker of another process take too, so that the process runs one at a time, its own or not.
+func (w *Worker) refreshLock() sync.Locker {
+	if w.cacheSync != nil {
+		return w.cacheSync.RefreshLock()
+	}
+	return &w.refreshMu
+}
+
+// bumping returns refresh, which then tells the other processes about every refresh that succeeded.
+func (w *Worker) bumping(kind cachesync.Kind, refresh func(ctx context.Context, server string) error) func(ctx context.Context, server string) error {
+	return func(ctx context.Context, server string) error {
+		if err := refresh(ctx, server); err != nil {
+			return err
+		}
+		w.bump(ctx, kind, server)
+		return nil
+	}
+}
+
+// bump tells the other processes that this one refreshed the cached results of kind of server.
+func (w *Worker) bump(ctx context.Context, kind cachesync.Kind, server string) {
+	if w.cacheSync != nil {
+		w.cacheSync.Bump(ctx, kind, server)
+	}
+}
+
 // warmUpGlobalCaches fills the caches of the global matrices and trends of every server, empty after the process
 // started, with fill (fillGlobalCaches), from the matrix elements earlier batches saved: requests then do not each
 // wait for a calculation until the first batch has refreshed them. fill goes through the caches as requests do, so
 // it joins a calculation a request already runs and skips what requests already cached, instead of calculating it
 // once more. The first batch runs it before its jobs, holding the worker lock, so that it does not read the matrix
-// elements while another process's batch replaces them, and holding refreshMu, one server at a time. A server that
-// fails is left to the requests, as before.
+// elements while another process's batch replaces them, and holding the refresh lock, one server at a time. A server
+// that fails is left to the requests, as before.
 func (w *Worker) warmUpGlobalCaches(ctx context.Context, fill func(ctx context.Context, server string) error) {
 	if !w.refreshGlobalMatrices {
 		return
 	}
-	w.refreshMu.Lock()
-	defer w.refreshMu.Unlock()
+	mu := w.refreshLock()
+	mu.Lock()
+	defer mu.Unlock()
 	for _, server := range constant.Servers {
 		server := server
 		// microtask keeps the worker lock and logs the error
@@ -244,9 +288,9 @@ func (w *Worker) calcStats(ctx context.Context, server string) (err error) {
 	}); err != nil {
 		return err
 	}
-	w.globalMatrixRefresh(ctx, "globalDropMatrixRefresh", server, w.DropMatrixService.RefreshGlobalDropMatrixCaches)
+	w.globalMatrixRefresh(ctx, "globalDropMatrixRefresh", server, w.bumping(cachesync.KindGlobalDropMatrix, w.DropMatrixService.RefreshGlobalDropMatrixCaches))
 	// the trend is calculated from the drop matrix elements the job saved
-	w.globalMatrixRefresh(ctx, "shimTrendRefresh", server, w.TrendService.RefreshShimTrend)
+	w.globalMatrixRefresh(ctx, "shimTrendRefresh", server, w.bumping(cachesync.KindShimTrend, w.TrendService.RefreshShimTrend))
 	time.Sleep(w.sep)
 
 	// PatternMatrixService
@@ -255,13 +299,16 @@ func (w *Worker) calcStats(ctx context.Context, server string) (err error) {
 	}); err != nil {
 		return err
 	}
-	w.globalMatrixRefresh(ctx, "globalPatternMatrixRefresh", server, w.PatternMatrixService.RefreshGlobalPatternMatrixCaches)
+	w.globalMatrixRefresh(ctx, "globalPatternMatrixRefresh", server, w.bumping(cachesync.KindGlobalPatternMatrix, w.PatternMatrixService.RefreshGlobalPatternMatrixCaches))
 	time.Sleep(w.sep)
 
 	// SiteStatsService
 	if err = w.microtask(ctx, "siteStats", server, func(ctx context.Context) error {
-		_, err := w.SiteStatsService.RefreshShimSiteStats(ctx, server)
-		return err
+		if _, err := w.SiteStatsService.RefreshShimSiteStats(ctx, server); err != nil {
+			return err
+		}
+		w.bump(ctx, cachesync.KindSiteStats, server)
+		return nil
 	}); err != nil {
 		return err
 	}

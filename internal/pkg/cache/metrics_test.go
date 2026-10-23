@@ -182,3 +182,31 @@ func TestSingularMetrics(t *testing.T) {
 		t.Errorf("got %+v after the second lookup, want %+v", got, want)
 	}
 }
+
+func TestSetHasAndUsedCountNoLookup(t *testing.T) {
+	const name = "metricsTestSetHas"
+	c := NewSet[int](name)
+	counted := countsSince(t, name)
+	if c.Has("a") {
+		t.Error("Has reports a key never set")
+	}
+	c.Set("a", 1, time.Minute)
+	if !c.Has("a") {
+		t.Error("Has does not report a key set")
+	}
+	if c.Used("a") {
+		t.Error("Used reports a key never read")
+	}
+	_ = c.Delete("a")
+	if c.Has("a") {
+		t.Error("Has reports a deleted key")
+	}
+	c.Set("b", 1, time.Nanosecond)
+	time.Sleep(time.Millisecond)
+	if c.Has("b") {
+		t.Error("Has reports an expired key")
+	}
+	if got, want := counted(), (counts{sets: 2, deletes: 1}); got != want {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+}
