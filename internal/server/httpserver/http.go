@@ -81,6 +81,10 @@ func CreateServiceApp(conf *appconfig.Config) *fiber.App {
 	app.Use(middlewares.CORS(conf.CORSCredentialedOrigins))
 	// a 429 without its own Retry-After (fiber's limiter sets one) tells clients to wait a minute
 	app.Use(middlewares.RetryAfter(time.Minute))
+	// the API links its responses to its spec, docs, data license and catalog, and keeps them out of search indexes;
+	// not the stats pages, the sitemaps, /swagger or /mcp. Registered with the app, before any route, so that it also
+	// covers the routes on the app itself (GET /api) and the 404 of an unknown path under these prefixes.
+	app.Use([]string{"/PenguinStats", "/api"}, middlewares.APIDiscovery())
 	// requestid is used by report service to identify requests and generate taskId there afterwards
 	// the logger middleware now injects RequestID into the context
 	middlewares.Logger(app)
