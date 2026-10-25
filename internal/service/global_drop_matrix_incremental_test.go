@@ -232,6 +232,11 @@ func (f *fakeGlobalDropMatrixStore) DayFingerprints(ctx context.Context, _ bun.I
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	_, versions := f.read(ctx)
+	return fakeDayFingerprints(versions, bounds), nil
+}
+
+// fakeDayFingerprints returns for each of bounds the versions of the days before it.
+func fakeDayFingerprints(versions map[int]int64, bounds []int) map[int]string {
 	fingerprints := make(map[int]string, len(bounds))
 	for _, bound := range bounds {
 		days := make([]int, 0)
@@ -247,7 +252,7 @@ func (f *fakeGlobalDropMatrixStore) DayFingerprints(ctx context.Context, _ bun.I
 		}
 		fingerprints[bound] = b.String()
 	}
-	return fingerprints, nil
+	return fingerprints
 }
 
 // fakeTargets makes a target per stage 1..4 and item 10..12, plus one without elements, over [start, end).

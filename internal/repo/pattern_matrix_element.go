@@ -42,9 +42,10 @@ func (s *PatternMatrixElement) DB() bun.IDB {
 	return s.db
 }
 
-// RunInSnapshotTx runs fn in a read-only snapshot transaction of the database of s, see RunInSnapshotTx.
+// RunInSnapshotTx runs fn in a read-only snapshot transaction of the database of s, pattern_matrix_elements locked
+// against a TRUNCATE before the snapshot is taken, see RunInLockedSnapshotTx.
 func (s *PatternMatrixElement) RunInSnapshotTx(ctx context.Context, fn func(ctx context.Context, tx bun.Tx) error) error {
-	return RunInSnapshotTx(ctx, s.db, fn)
+	return RunInLockedSnapshotTx(ctx, s.db, []string{"pattern_matrix_elements"}, fn)
 }
 
 // globalPatternMatrixAggregateRow is a row of the global pattern matrix aggregations: the times of a stage, or the
