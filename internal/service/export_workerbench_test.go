@@ -29,7 +29,7 @@ func (s *DropMatrix) CalcGlobalDropMatricesForBench(ctx context.Context, server 
 }
 
 func (s *PatternMatrix) CalcGlobalPatternMatricesForBench(ctx context.Context, server string, sourceCategories []string) (map[string]*model.PatternMatrixQueryResult, error) {
-	return s.calcGlobalPatternMatrices(ctx, server, sourceCategories)
+	return s.calcGlobalPatternMatrices(ctx, server, sourceCategories, true)
 }
 
 // constantGlobalMatrixFingerprints stands in for the day versions on a database without them (a shared restore that
@@ -55,6 +55,14 @@ func (s *DropMatrix) SetGlobalMatrixIncrementalForBench(mode appconfig.GlobalMat
 	s.Config.GlobalMatrixBaseMaxAge = 100 * 365 * 24 * time.Hour
 	s.GlobalMatrixFingerprints = constantGlobalMatrixFingerprints{}
 	_ = cache.GlobalDropMatrixBase.Flush()
+}
+
+// SetGlobalMatrixIncrementalForBench is DropMatrix.SetGlobalMatrixIncrementalForBench for the pattern matrices.
+func (s *PatternMatrix) SetGlobalMatrixIncrementalForBench(mode appconfig.GlobalMatrixIncrementalMode) {
+	s.Config.GlobalMatrixIncremental = mode
+	s.Config.GlobalMatrixBaseMaxAge = 100 * 365 * 24 * time.Hour
+	s.GlobalMatrixFingerprints = constantGlobalMatrixFingerprints{}
+	_ = cache.GlobalPatternMatrixBase.Flush()
 }
 
 // CalcGlobalDropMatrixStageFirstForBench aggregates every day of the targets of the first n stages (by id) of server

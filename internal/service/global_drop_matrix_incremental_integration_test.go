@@ -22,13 +22,13 @@ import (
 	"exusiai.dev/backend-next/internal/util"
 )
 
-// flushCachesKeepingBases empties every cache but the bases of the incremental global drop matrices, as a refresh
-// finds them after the caches of the time ranges and drop infos expired.
+// flushCachesKeepingBases empties every cache but the bases of the incremental global matrices, as a refresh finds
+// them after the caches of the time ranges and drop infos expired.
 func flushCachesKeepingBases(t *testing.T) {
 	t.Helper()
 	cache.Initialize()
 	for name, flush := range cache.SetMap {
-		if name == "globalDropMatrixBase#server|sourceCategory" {
+		if name == "globalDropMatrixBase#server|sourceCategory" || name == "globalPatternMatrixBase#server|sourceCategory" {
 			continue
 		}
 		if err := flush(); err != nil {
@@ -97,7 +97,8 @@ func refreshedDropMatrices(t *testing.T, s *DropMatrix) map[string]string {
 	return results
 }
 
-func globalMatrixPathCounts() map[string]float64 {
+// globalMatrixPathCounts sums the calculations of the global matrices of kind of the test servers by path and reason.
+func globalMatrixPathCounts(kind string) map[string]float64 {
 	counts := make(map[string]float64)
 	for _, server := range testServers {
 		for _, sourceCategory := range allSourceCategories {
@@ -108,18 +109,18 @@ func globalMatrixPathCounts() map[string]float64 {
 				{globalMatrixPathRebuild, globalMatrixReasonChangedStages}, {globalMatrixPathRebuild, globalMatrixReasonTriggersMissing},
 				{globalMatrixPathFull, globalMatrixReasonTriggersMissing},
 			} {
-				counts[pr[0]+" "+pr[1]] += testutil.ToFloat64(observability.GlobalMatrixRefreshPaths.WithLabelValues(globalMatrixKindDrop, server, sourceCategory, pr[0], pr[1]))
+				counts[pr[0]+" "+pr[1]] += testutil.ToFloat64(observability.GlobalMatrixRefreshPaths.WithLabelValues(kind, server, sourceCategory, pr[0], pr[1]))
 			}
 		}
 	}
 	return counts
 }
 
-func globalMatrixVerifyMismatchCount() float64 {
+func globalMatrixVerifyMismatchCount(kind string) float64 {
 	var n float64
 	for _, server := range testServers {
 		for _, sourceCategory := range allSourceCategories {
-			n += testutil.ToFloat64(observability.GlobalMatrixVerifyMismatches.WithLabelValues(globalMatrixKindDrop, server, sourceCategory))
+			n += testutil.ToFloat64(observability.GlobalMatrixVerifyMismatches.WithLabelValues(kind, server, sourceCategory))
 		}
 	}
 	return n
@@ -139,8 +140,8 @@ func TestGlobalDropMatrixIncrementalMatchesOff(t *testing.T) {
 	off.SiteStatsService = &SiteStats{baseGenerations: &memorySiteStatsBaseGenerations{}}
 	on := incrementalDropMatrix(off, appconfig.GlobalMatrixIncrementalOn)
 	flushCaches(t)
-	pathsBefore := globalMatrixPathCounts()
-	mismatchesBefore := globalMatrixVerifyMismatchCount()
+	pathsBefore := globalMatrixPathCounts(globalMatrixKindDrop)
+	mismatchesBefore := globalMatrixVerifyMismatchCount(globalMatrixKindDrop)
 
 	compared := 0
 	compare := func(step string) {
@@ -329,7 +330,7 @@ func TestGlobalDropMatrixIncrementalMatchesOff(t *testing.T) {
 	}
 	requireCompared(t, compared, 100)
 
-	paths := globalMatrixPathCounts()
+	paths := globalMatrixPathCounts(globalMatrixKindDrop)
 	for _, pr := range []string{
 		"incremental none", "rebuild no_base", "rebuild fingerprint", "rebuild max_age", "full triggers_missing",
 	} {
@@ -337,7 +338,7 @@ func TestGlobalDropMatrixIncrementalMatchesOff(t *testing.T) {
 			t.Errorf("the calculations never took the %s path: the sequence does not exercise it (%v)", pr, paths)
 		}
 	}
-	if globalMatrixVerifyMismatchCount() != mismatchesBefore {
+	if globalMatrixVerifyMismatchCount(globalMatrixKindDrop) != mismatchesBefore {
 		t.Error("a verification counted a mismatch")
 	}
 	t.Logf("paths: %v", paths)
@@ -364,7 +365,7 @@ func TestGlobalDropMatrixIncrementalSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mismatches := globalMatrixVerifyMismatchCount()
+	mismatches := globalMatrixVerifyMismatchCount(globalMatrixKindDrop)
 	incremental := testutil.ToFloat64(observability.GlobalMatrixRefreshPaths.WithLabelValues(globalMatrixKindDrop, server, constant.SourceCategoryAll, globalMatrixPathIncremental, globalMatrixReasonNone))
 
 	// the calculation pauses once it read the triggers, the first statement of its snapshot
@@ -408,7 +409,7 @@ func TestGlobalDropMatrixIncrementalSnapshot(t *testing.T) {
 	if !changed {
 		t.Fatal("the batch did not change the matrices: the test does not exercise the snapshot")
 	}
-	if globalMatrixVerifyMismatchCount() != mismatches {
+	if globalMatrixVerifyMismatchCount(globalMatrixKindDrop) != mismatches {
 		t.Fatal("the verification in the snapshot of the calculation found a mismatch")
 	}
 	if n := testutil.ToFloat64(observability.GlobalMatrixRefreshPaths.WithLabelValues(globalMatrixKindDrop, server, constant.SourceCategoryAll, globalMatrixPathIncremental, globalMatrixReasonNone)); n != incremental+1 {
@@ -422,7 +423,7 @@ func TestGlobalDropMatrixIncrementalSnapshot(t *testing.T) {
 	for _, sourceCategory := range categories {
 		assertSameLines(t, sourceCategory+" after the batch", globalDropMatrixLines(after[sourceCategory]), globalDropMatrixLines(next[sourceCategory]))
 	}
-	if globalMatrixVerifyMismatchCount() != mismatches {
+	if globalMatrixVerifyMismatchCount(globalMatrixKindDrop) != mismatches {
 		t.Fatal("a verification found a mismatch")
 	}
 }
@@ -559,7 +560,7 @@ func testGlobalDropMatrixIncrementalTruncate(t *testing.T, mode appconfig.Global
 		}
 		return n
 	}
-	pathsBefore, rebuildsBefore, mismatches := paths(path, reason), paths(globalMatrixPathRebuild, globalMatrixReasonFingerprint), globalMatrixVerifyMismatchCount()
+	pathsBefore, rebuildsBefore, mismatches := paths(path, reason), paths(globalMatrixPathRebuild, globalMatrixReasonFingerprint), globalMatrixVerifyMismatchCount(globalMatrixKindDrop)
 
 	pause := &pauseAfterReading{table: "matrix_element_day_versions", read: make(chan struct{}), release: make(chan struct{})}
 	db.AddQueryHook(pause)
@@ -598,7 +599,7 @@ func testGlobalDropMatrixIncrementalTruncate(t *testing.T, mode appconfig.Global
 	for _, sourceCategory := range categories {
 		assertSameLines(t, sourceCategory+" during the TRUNCATE", globalDropMatrixLines(before[sourceCategory]), globalDropMatrixLines(got.results[sourceCategory]))
 	}
-	if globalMatrixVerifyMismatchCount() != mismatches {
+	if globalMatrixVerifyMismatchCount(globalMatrixKindDrop) != mismatches {
 		t.Fatal("a verification found a mismatch")
 	}
 	if n := paths(path, reason); n != pathsBefore+float64(len(categories)) {
@@ -620,7 +621,7 @@ func testGlobalDropMatrixIncrementalTruncate(t *testing.T, mode appconfig.Global
 	if n := paths(globalMatrixPathRebuild, globalMatrixReasonFingerprint); n != rebuildsBefore+float64(len(categories)) {
 		t.Fatalf("the calculation after the TRUNCATE rebuilt %v bases for their fingerprint, want %d", n-rebuildsBefore, len(categories))
 	}
-	if globalMatrixVerifyMismatchCount() != mismatches {
+	if globalMatrixVerifyMismatchCount(globalMatrixKindDrop) != mismatches {
 		t.Fatal("a verification found a mismatch")
 	}
 }
