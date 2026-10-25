@@ -126,10 +126,9 @@ func (s *DropMatrix) RunCalcDropMatrixJob(ctx context.Context, server string) er
 	if err != nil {
 		return err
 	}
-	s.DropMatrixElementService.DeleteByServerAndDayNum(ctx, server, dayNum)
-
-	if len(dropMatrixElements) != 0 {
-		s.DropMatrixElementService.BatchSaveElements(ctx, dropMatrixElements, server)
+	dropMatrixElements = elementsOfDay(dropMatrixElements, dayNum, dropMatrixElementDay)
+	if err := s.DropMatrixElementService.ReplaceDay(ctx, server, dayNum, dropMatrixElements); err != nil {
+		return err
 	}
 	describeCalcJob(ctx, dayNum, s.Config.MatrixWorkerSourceCategories, len(dropMatrixElements))
 
@@ -141,9 +140,9 @@ func (s *DropMatrix) RunCalcDropMatrixJob(ctx context.Context, server string) er
 		if err != nil {
 			return err
 		}
-		s.DropMatrixElementService.DeleteByServerAndDayNum(ctx, server, dayNum-1)
-		if len(dropMatrixElementsForYesterday) != 0 {
-			s.DropMatrixElementService.BatchSaveElements(ctx, dropMatrixElementsForYesterday, server)
+		dropMatrixElementsForYesterday = elementsOfDay(dropMatrixElementsForYesterday, dayNum-1, dropMatrixElementDay)
+		if err := s.DropMatrixElementService.ReplaceDay(ctx, server, dayNum-1, dropMatrixElementsForYesterday); err != nil {
+			return err
 		}
 		describePreviousDay(ctx, len(dropMatrixElementsForYesterday))
 	}
@@ -161,9 +160,9 @@ func (s *DropMatrix) UpdateDropMatrixByGivenDate(ctx context.Context, server str
 		return err
 	}
 	dayNum := util.GetDayNum(date, server)
-	s.DropMatrixElementService.DeleteByServerAndDayNum(ctx, server, dayNum)
-	if len(dropMatrixElements) != 0 {
-		s.DropMatrixElementService.BatchSaveElements(ctx, dropMatrixElements, server)
+	dropMatrixElements = elementsOfDay(dropMatrixElements, dayNum, dropMatrixElementDay)
+	if err := s.DropMatrixElementService.ReplaceDay(ctx, server, dayNum, dropMatrixElements); err != nil {
+		return err
 	}
 	// the day may be one of those the site stats keep aggregated in memory
 	return s.SiteStatsService.InvalidateSiteStatsBase(ctx, server)
