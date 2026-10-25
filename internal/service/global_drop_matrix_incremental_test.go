@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -40,7 +41,8 @@ type fakeDropMatrixCall struct {
 }
 
 // fakeGlobalDropMatrixStore aggregates elements in memory as the statements of the repo do, versions their days as
-// the triggers do, and records the aggregations it runs.
+// the triggers do, and records the aggregations it runs. RunInSnapshotTx reads the elements and versions as they are
+// when it starts, as a snapshot.
 type fakeGlobalDropMatrixStore struct {
 	mu          sync.Mutex
 	elements    []fakeDropElement
@@ -49,9 +51,28 @@ type fakeGlobalDropMatrixStore struct {
 	nextVersion int64
 	identity    string
 	missing     string
-	// gate, if set, blocks the partials over every day until it is closed, after closing started once
-	gate    chan struct{}
-	started chan struct{}
+	// gate, if set, blocks the partials over every day until it is closed, after closing started once; once gated
+	// blocks only the first of them
+	gate      chan struct{}
+	started   chan struct{}
+	once      bool
+	startOnce sync.Once
+}
+
+// fakeSnapshot is what a snapshot of the fake store reads.
+type fakeSnapshot struct {
+	elements []fakeDropElement
+	versions map[int]int64
+}
+
+type fakeSnapshotKey struct{}
+
+// read returns the elements and versions of the snapshot of ctx, or, without one, the current ones. f.mu is held.
+func (f *fakeGlobalDropMatrixStore) read(ctx context.Context) ([]fakeDropElement, map[int]int64) {
+	if snapshot, ok := ctx.Value(fakeSnapshotKey{}).(*fakeSnapshot); ok {
+		return snapshot.elements, snapshot.versions
+	}
+	return f.elements, f.versions
 }
 
 func (f *fakeGlobalDropMatrixStore) bump(dayNum int) {
@@ -74,14 +95,22 @@ func (f *fakeGlobalDropMatrixStore) replaceDay(dayNum int, elements []fakeDropEl
 }
 
 func (f *fakeGlobalDropMatrixStore) RunInSnapshotTx(ctx context.Context, fn func(ctx context.Context, tx bun.Tx) error) error {
-	return fn(ctx, bun.Tx{})
+	f.mu.Lock()
+	// replaceDay replaces f.elements, never modifies it
+	snapshot := &fakeSnapshot{elements: f.elements, versions: make(map[int]int64, len(f.versions))}
+	for dayNum, version := range f.versions {
+		snapshot.versions[dayNum] = version
+	}
+	f.mu.Unlock()
+	return fn(context.WithValue(ctx, fakeSnapshotKey{}, snapshot), bun.Tx{})
 }
 
 func (f *fakeGlobalDropMatrixStore) aggregate(
-	targets []*model.GlobalDropMatrixTarget, sourceCategories []string, scope *model.GlobalMatrixScope,
+	ctx context.Context, targets []*model.GlobalDropMatrixTarget, sourceCategories []string, scope *model.GlobalMatrixScope,
 ) (before, after map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	elements, _ := f.read(ctx)
 	before = make(map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate)
 	after = make(map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate)
 	type distinctTimes struct {
@@ -91,7 +120,7 @@ func (f *fakeGlobalDropMatrixStore) aggregate(
 	}
 	seen := make(map[distinctTimes]bool)
 	for _, target := range targets {
-		for _, el := range f.elements {
+		for _, el := range elements {
 			if el.stageId != target.StageID || el.itemId != target.ItemID || !containsString(sourceCategories, el.sourceCategory) ||
 				el.start < target.TimeRange.StartTime.Unix() || el.end > target.TimeRange.EndTime.Unix() {
 				continue
@@ -152,15 +181,15 @@ func (f *fakeGlobalDropMatrixStore) takeCalls() []fakeDropMatrixCall {
 }
 
 func (f *fakeGlobalDropMatrixStore) CalcGlobalDropMatrixAggregates(
-	_ context.Context, _ bun.IDB, _ string, targets []*model.GlobalDropMatrixTarget, sourceCategories []string,
+	ctx context.Context, _ bun.IDB, _ string, targets []*model.GlobalDropMatrixTarget, sourceCategories []string,
 ) (map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate, error) {
 	f.record(fakeDropMatrixCall{kind: "reference", targets: len(targets)})
-	_, all := f.aggregate(targets, sourceCategories, nil)
+	_, all := f.aggregate(ctx, targets, sourceCategories, nil)
 	return all, nil
 }
 
 func (f *fakeGlobalDropMatrixStore) CalcGlobalDropMatrixPartials(
-	_ context.Context, _ bun.IDB, _ string, targets []*model.GlobalDropMatrixTarget, sourceCategories []string, scope model.GlobalMatrixScope,
+	ctx context.Context, _ bun.IDB, _ string, targets []*model.GlobalDropMatrixTarget, sourceCategories []string, scope model.GlobalMatrixScope,
 ) (before, after map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate, err error) {
 	if len(targets) == 0 {
 		return map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate{}, map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate{}, nil
@@ -176,10 +205,20 @@ func (f *fakeGlobalDropMatrixStore) CalcGlobalDropMatrixPartials(
 	sort.Ints(call.stages)
 	f.record(call)
 	if f.gate != nil && !scope.FromDayNum.Valid && !scope.StageFirst {
-		close(f.started)
-		<-f.gate
+		first := false
+		f.startOnce.Do(func() {
+			first = true
+			close(f.started)
+		})
+		if first || !f.once {
+			<-f.gate
+		}
+		// as a statement of a context canceled meanwhile
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
 	}
-	before, after = f.aggregate(targets, sourceCategories, &scope)
+	before, after = f.aggregate(ctx, targets, sourceCategories, &scope)
 	return before, after, nil
 }
 
@@ -189,13 +228,14 @@ func (f *fakeGlobalDropMatrixStore) Triggers(context.Context, bun.IDB, string) (
 	return f.identity, f.missing, nil
 }
 
-func (f *fakeGlobalDropMatrixStore) DayFingerprints(_ context.Context, _ bun.IDB, _, _ string, bounds []int) (map[int]string, error) {
+func (f *fakeGlobalDropMatrixStore) DayFingerprints(ctx context.Context, _ bun.IDB, _, _ string, bounds []int) (map[int]string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	_, versions := f.read(ctx)
 	fingerprints := make(map[int]string, len(bounds))
 	for _, bound := range bounds {
 		days := make([]int, 0)
-		for dayNum := range f.versions {
+		for dayNum := range versions {
 			if dayNum < bound {
 				days = append(days, dayNum)
 			}
@@ -203,7 +243,7 @@ func (f *fakeGlobalDropMatrixStore) DayFingerprints(_ context.Context, _ bun.IDB
 		sort.Ints(days)
 		var b strings.Builder
 		for _, dayNum := range days {
-			fmt.Fprintf(&b, "%d:%d,", dayNum, f.versions[dayNum])
+			fmt.Fprintf(&b, "%d:%d,", dayNum, versions[dayNum])
 		}
 		fingerprints[bound] = b.String()
 	}
@@ -303,12 +343,12 @@ func TestGlobalDropMatrixIncrementalDecisions(t *testing.T) {
 			before[sourceCategory] = pathCount(sourceCategory, path, reason)
 		}
 		store.takeCalls()
-		got, err := s.aggregateGlobalDropMatricesIncrementally(ctx, server, targets, sourceCategories)
+		got, err := s.aggregateGlobalDropMatricesIncrementally(ctx, server, targets, sourceCategories, false)
 		if err != nil {
 			t.Fatalf("%s: %v", what, err)
 		}
 		calls := store.takeCalls()
-		_, want := store.aggregate(targets, sourceCategories, nil)
+		_, want := store.aggregate(context.Background(), targets, sourceCategories, nil)
 		for _, sourceCategory := range sourceCategories {
 			if mismatches := diffGlobalDropMatrixAggregates(targets, globalDropMatrixAggregatesOf(got, sourceCategory), globalDropMatrixAggregatesOf(want, sourceCategory)); len(mismatches) > 0 {
 				t.Fatalf("%s %s: the aggregates differ from the reference: %v", what, sourceCategory, mismatches)
@@ -545,8 +585,10 @@ func TestGlobalDropMatrixIncrementalDecisions(t *testing.T) {
 	}
 }
 
-// Two calculations needing the same rebuild (a request's and a refresh's) run it once.
-func TestGlobalDropMatrixIncrementalSingleRebuild(t *testing.T) {
+// newRebuildTestStore returns a store whose rebuilds wait for its gate, with days of elements until today, and a
+// DropMatrix calculating incrementally from it, without bases, and a batch, which rewrites today.
+func newRebuildTestStore(t *testing.T) (*fakeGlobalDropMatrixStore, *DropMatrix, []*model.GlobalDropMatrixTarget, func(seed int64)) {
+	t.Helper()
 	cache.Initialize()
 	if err := cache.GlobalDropMatrixBase.Flush(); err != nil {
 		t.Fatal(err)
@@ -558,7 +600,6 @@ func TestGlobalDropMatrixIncrementalSingleRebuild(t *testing.T) {
 	now := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
 	util.Now = func() time.Time { return now }
 	start, end := now.Add(-30*24*time.Hour), now.Add(30*24*time.Hour)
-	targets := fakeTargets(start, end)
 	store := &fakeGlobalDropMatrixStore{versions: make(map[int]int64), identity: "triggers", gate: make(chan struct{}), started: make(chan struct{})}
 	r := rand.New(rand.NewSource(3))
 	today := util.GetDayNum(&now, "CN")
@@ -569,30 +610,119 @@ func TestGlobalDropMatrixIncrementalSingleRebuild(t *testing.T) {
 		Config:                   &appconfig.Config{ConfigSpec: appconfig.ConfigSpec{GlobalMatrixIncremental: appconfig.GlobalMatrixIncrementalOn}},
 		GlobalMatrixFingerprints: store, globalDropMatrixStore: store,
 	}
-	sourceCategories := []string{constant.SourceCategoryAll}
-	results := make(chan map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate, 2)
-	calculate := func() {
-		got, err := s.aggregateGlobalDropMatricesIncrementally(context.Background(), "CN", targets, sourceCategories)
-		if err != nil {
-			t.Error(err)
-		}
-		results <- got
+	batch := func(seed int64) {
+		store.replaceDay(today, fakeDay(rand.New(rand.NewSource(seed)), today, start, end))
 	}
-	go calculate()
+	return store, s, fakeTargets(start, end), batch
+}
+
+type incrementalCalculated struct {
+	aggregates map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate
+	err        error
+}
+
+func calculateIncrementally(ctx context.Context, s *DropMatrix, targets []*model.GlobalDropMatrixTarget, refresh bool) <-chan incrementalCalculated {
+	done := make(chan incrementalCalculated, 1)
+	go func() {
+		aggregates, err := s.aggregateGlobalDropMatricesIncrementally(ctx, "CN", targets, []string{constant.SourceCategoryAll}, refresh)
+		done <- incrementalCalculated{aggregates, err}
+	}()
+	return done
+}
+
+func requireGlobalDropMatrixAggregates(t *testing.T, what string, targets []*model.GlobalDropMatrixTarget, got, want map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate) {
+	t.Helper()
+	if mismatches := diffGlobalDropMatrixAggregates(targets, globalDropMatrixAggregatesOf(got, constant.SourceCategoryAll), globalDropMatrixAggregatesOf(want, constant.SourceCategoryAll)); len(mismatches) > 0 {
+		t.Fatalf("%s differs from the reference: %v", what, mismatches)
+	}
+}
+
+// A request needing the rebuild a refresh is running waits for it and takes its results: the rebuild runs once.
+func TestGlobalDropMatrixIncrementalSingleRebuild(t *testing.T) {
+	store, s, targets, _ := newRebuildTestStore(t)
+	refreshed := calculateIncrementally(context.Background(), s, targets, true)
 	<-store.started
-	go calculate()
-	time.Sleep(200 * time.Millisecond) // the second calculation waits for the rebuild of the first
+	requested := calculateIncrementally(context.Background(), s, targets, false)
+	time.Sleep(200 * time.Millisecond) // the request waits for the rebuild of the refresh
 	close(store.gate)
-	_, want := store.aggregate(targets, sourceCategories, nil)
-	for i := 0; i < 2; i++ {
-		got := <-results
-		if mismatches := diffGlobalDropMatrixAggregates(targets, globalDropMatrixAggregatesOf(got, constant.SourceCategoryAll), globalDropMatrixAggregatesOf(want, constant.SourceCategoryAll)); len(mismatches) > 0 {
-			t.Fatalf("calculation %d differs from the reference: %v", i, mismatches)
+	_, want := store.aggregate(context.Background(), targets, []string{constant.SourceCategoryAll}, nil)
+	for what, done := range map[string]<-chan incrementalCalculated{"the refresh": refreshed, "the request": requested} {
+		got := <-done
+		if got.err != nil {
+			t.Fatal(got.err)
 		}
+		requireGlobalDropMatrixAggregates(t, what, targets, got.aggregates, want)
 	}
 	if calls := store.takeCalls(); len(calls) != 1 {
 		t.Fatalf("two calculations ran %d aggregations, want a single rebuild: %+v", len(calls), calls)
 	}
+}
+
+// A refresh after a batch while a request rebuilds from a snapshot of before it does not take the request's results:
+// they lack the batch the refresh publishes. It rebuilds from a snapshot of its own.
+func TestGlobalDropMatrixIncrementalRefreshAfterRequestRebuild(t *testing.T) {
+	store, s, targets, batch := newRebuildTestStore(t)
+	store.once = true
+	sourceCategories := []string{constant.SourceCategoryAll}
+	_, before := store.aggregate(context.Background(), targets, sourceCategories, nil)
+	requested := calculateIncrementally(context.Background(), s, targets, false)
+	<-store.started // the request read its snapshot
+
+	batch(4)
+	_, after := store.aggregate(context.Background(), targets, sourceCategories, nil)
+	if len(diffGlobalDropMatrixAggregates(targets, globalDropMatrixAggregatesOf(before, constant.SourceCategoryAll), globalDropMatrixAggregatesOf(after, constant.SourceCategoryAll))) == 0 {
+		t.Fatal("the batch did not change the aggregates: the test does not exercise the snapshot")
+	}
+	refreshed := calculateIncrementally(context.Background(), s, targets, true)
+	var got incrementalCalculated
+	select {
+	case got = <-refreshed:
+	case <-time.After(5 * time.Second):
+		t.Error("the refresh waits for the rebuild of the request")
+		close(store.gate)
+		got = <-refreshed
+	}
+	if got.err != nil {
+		t.Fatal(got.err)
+	}
+	requireGlobalDropMatrixAggregates(t, "the refresh", targets, got.aggregates, after)
+
+	select {
+	case <-store.gate:
+	default:
+		close(store.gate)
+	}
+	got = <-requested
+	if got.err != nil {
+		t.Fatal(got.err)
+	}
+	requireGlobalDropMatrixAggregates(t, "the request (its snapshot)", targets, got.aggregates, before)
+	if calls := store.takeCalls(); len(calls) != 2 {
+		t.Fatalf("the request and the refresh ran %d aggregations, want a rebuild each: %+v", len(calls), calls)
+	}
+}
+
+// A request waiting for a rebuild that failed because the context of its caller was canceled (a refresh past its
+// deadline) rebuilds instead of failing too.
+func TestGlobalDropMatrixIncrementalRebuildOfCanceledCaller(t *testing.T) {
+	store, s, targets, _ := newRebuildTestStore(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	refreshed := calculateIncrementally(ctx, s, targets, true)
+	<-store.started
+	requested := calculateIncrementally(context.Background(), s, targets, false)
+	time.Sleep(200 * time.Millisecond) // the request waits for the rebuild of the refresh
+	cancel()
+	close(store.gate)
+	if got := <-refreshed; !errors.Is(got.err, context.Canceled) {
+		t.Fatalf("the canceled refresh returned %v, want %v", got.err, context.Canceled)
+	}
+	got := <-requested
+	if got.err != nil {
+		t.Fatalf("the request failed with the refresh: %v", got.err)
+	}
+	_, want := store.aggregate(context.Background(), targets, []string{constant.SourceCategoryAll}, nil)
+	requireGlobalDropMatrixAggregates(t, "the request", targets, got.aggregates, want)
 }
 
 func describeFakeCall(call fakeDropMatrixCall) string {

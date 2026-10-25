@@ -357,10 +357,10 @@ func TestGlobalDropMatrixIncrementalSnapshot(t *testing.T) {
 	categories := allSourceCategories
 
 	// a base, then the matrices without bases before the batch
-	if _, err := on.calcGlobalDropMatrices(ctx, server, categories); err != nil {
+	if _, err := on.calcGlobalDropMatrices(ctx, server, categories, false); err != nil {
 		t.Fatal(err)
 	}
-	before, err := off.calcGlobalDropMatrices(ctx, server, categories)
+	before, err := off.calcGlobalDropMatrices(ctx, server, categories, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +376,7 @@ func TestGlobalDropMatrixIncrementalSnapshot(t *testing.T) {
 	}
 	done := make(chan calculated, 1)
 	go func() {
-		results, err := on.calcGlobalDropMatrices(context.WithValue(ctx, pauseAfterReadingKey{}, pause), server, categories)
+		results, err := on.calcGlobalDropMatrices(context.WithValue(ctx, pauseAfterReadingKey{}, pause), server, categories, false)
 		done <- calculated{results, err}
 	}()
 	select {
@@ -390,7 +390,7 @@ func TestGlobalDropMatrixIncrementalSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	flushCachesKeepingBases(t)
-	after, err := off.calcGlobalDropMatrices(ctx, server, categories)
+	after, err := off.calcGlobalDropMatrices(ctx, server, categories, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -415,7 +415,7 @@ func TestGlobalDropMatrixIncrementalSnapshot(t *testing.T) {
 		t.Fatalf("the calculation during the batch did not extend the base (%v incremental calculations, want %v)", n, incremental+1)
 	}
 
-	next, err := on.calcGlobalDropMatrices(ctx, server, categories)
+	next, err := on.calcGlobalDropMatrices(ctx, server, categories, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,13 +427,97 @@ func TestGlobalDropMatrixIncrementalSnapshot(t *testing.T) {
 	}
 }
 
+// A refresh after a batch while a request, without a base, rebuilds one from a snapshot of before the batch: the
+// refresh caches the matrices of after the batch instead of taking those of the request's rebuild, and the request
+// does not cache its own over them.
+func TestGlobalDropMatrixIncrementalRefreshDuringRequestRebuild(t *testing.T) {
+	db, off, _ := newGlobalMatrixTestData(t)
+	ctx := context.Background()
+	r := rand.New(rand.NewSource(2))
+	on := incrementalDropMatrix(off, appconfig.GlobalMatrixIncrementalOn)
+	flushCaches(t)
+	server := "CN"
+	key := server + constant.CacheSep + constant.SourceCategoryAll
+	before, err := off.calcGlobalDropMatrices(ctx, server, []string{constant.SourceCategoryAll}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// the request pauses once it read the triggers, the first statement of the snapshot of its rebuild
+	pause := &pauseAfterReading{table: "matrix_element_day_versions", read: make(chan struct{}), release: make(chan struct{})}
+	db.AddQueryHook(pause)
+	released := false
+	release := func() {
+		if !released {
+			released = true
+			close(pause.release)
+		}
+	}
+	defer release()
+	type requested struct {
+		result *model.DropMatrixQueryResult
+		err    error
+	}
+	requestDone := make(chan requested, 1)
+	go func() {
+		result, err := on.calcGlobalDropMatrix(context.WithValue(ctx, pauseAfterReadingKey{}, pause), server, constant.SourceCategoryAll)
+		requestDone <- requested{result, err}
+	}()
+	select {
+	case <-pause.read:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the request never read the triggers")
+	}
+	now := util.Now()
+	insertReports(t, r, db, server, time.UnixMilli(util.GetDayStartTime(&now, server)), now, 200)
+	if err := off.RunCalcDropMatrixJob(ctx, server); err != nil {
+		t.Fatal(err)
+	}
+	after, err := off.calcGlobalDropMatrices(ctx, server, []string{constant.SourceCategoryAll}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(globalDropMatrixLines(before[constant.SourceCategoryAll])) == fmt.Sprint(globalDropMatrixLines(after[constant.SourceCategoryAll])) {
+		t.Fatal("the batch did not change the matrix: the test does not exercise the snapshot")
+	}
+
+	refreshDone := make(chan error, 1)
+	go func() { refreshDone <- on.RefreshGlobalDropMatrixCaches(ctx, server) }()
+	select {
+	case err = <-refreshDone:
+	case <-time.After(10 * time.Second):
+		t.Error("the refresh waits for the rebuild of the request")
+		release()
+		err = <-refreshDone
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cached model.DropMatrixQueryResult
+	if err := cache.GlobalDropMatrix.Get(key, &cached); err != nil {
+		t.Fatal(err)
+	}
+	assertSameLines(t, "cached by the refresh", globalDropMatrixLines(after[constant.SourceCategoryAll]), globalDropMatrixLines(&cached))
+
+	release()
+	got := <-requestDone
+	if got.err != nil {
+		t.Fatal(got.err)
+	}
+	assertSameLines(t, "returned to the request", globalDropMatrixLines(after[constant.SourceCategoryAll]), globalDropMatrixLines(got.result))
+	if err := cache.GlobalDropMatrix.Get(key, &cached); err != nil {
+		t.Fatal(err)
+	}
+	assertSameLines(t, "cached after the request", globalDropMatrixLines(after[constant.SourceCategoryAll]), globalDropMatrixLines(&cached))
+}
+
 // Without the migration, or with the day versions not readable, the incremental mode aggregates every day.
 func TestGlobalDropMatrixIncrementalWithoutDayVersions(t *testing.T) {
 	db, off, _ := newGlobalMatrixTestData(t)
 	ctx := context.Background()
 	on := incrementalDropMatrix(off, appconfig.GlobalMatrixIncrementalVerify)
 	flushCaches(t)
-	want, err := off.calcGlobalDropMatrices(ctx, "CN", allSourceCategories)
+	want, err := off.calcGlobalDropMatrices(ctx, "CN", allSourceCategories, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,7 +527,7 @@ func TestGlobalDropMatrixIncrementalWithoutDayVersions(t *testing.T) {
 	check := func(what string) {
 		t.Helper()
 		before := full()
-		got, err := on.calcGlobalDropMatrices(ctx, "CN", allSourceCategories)
+		got, err := on.calcGlobalDropMatrices(ctx, "CN", allSourceCategories, false)
 		if err != nil {
 			t.Fatalf("%s: %v", what, err)
 		}

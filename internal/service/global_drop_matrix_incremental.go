@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -108,7 +109,8 @@ type globalMatrixIncremental struct {
 	jitter     float64
 	// calculations counts the calculations of each server (*atomic.Int64), for GlobalMatrixVerifyEvery
 	calculations sync.Map
-	// rebuilds runs a single rebuild of a server and source category at a time, for every caller
+	// rebuilds runs a rebuild of a server and source category once for the callers that need it at once (see
+	// rebuildGlobalDropMatrixBase)
 	rebuilds singleflight.Group
 }
 
@@ -178,8 +180,11 @@ func (s *DropMatrix) globalDropMatrixElements() globalDropMatrixStore {
 // A calculation that is verified (GlobalMatrixIncremental verify, every GlobalMatrixVerifyEvery) also runs
 // aggregateGlobalDropMatrices's statement in the same snapshot, and if the results differ, serves its results and
 // drops the base. verify always serves them.
+//
+// refresh is for a refresh, which caches its results as the newest: they must be of data at least as new as the call
+// (see rebuildGlobalDropMatrixBase).
 func (s *DropMatrix) aggregateGlobalDropMatricesIncrementally(
-	ctx context.Context, server string, targets []*model.GlobalDropMatrixTarget, sourceCategories []string,
+	ctx context.Context, server string, targets []*model.GlobalDropMatrixTarget, sourceCategories []string, refresh bool,
 ) (map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate, error) {
 	now := util.Now()
 	// the days before yesterday: the worker rewrites yesterday when the day changes, maybe after this calculation
@@ -216,7 +221,7 @@ func (s *DropMatrix) aggregateGlobalDropMatricesIncrementally(
 	}
 	for _, calc := range calcs {
 		if calc.path == "" {
-			if err := s.rebuildGlobalDropMatrixBase(ctx, server, targets, ranges, beforeDayNum, calc, verify); err != nil {
+			if err := s.rebuildGlobalDropMatrixBase(ctx, server, targets, ranges, beforeDayNum, calc, verify, refresh); err != nil {
 				return nil, err
 			}
 		}
@@ -367,11 +372,18 @@ type globalDropMatrixRebuild struct {
 }
 
 // rebuildGlobalDropMatrixBase aggregates every day of the targets for calc in a snapshot of its own, the days before
-// beforeDayNum apart as a new base. A rebuild of the same server and source category already running (a request's
-// and a refresh's) is waited for instead, and its results are taken if it had the same targets.
+// beforeDayNum apart as a new base. A rebuild of the same server and source category already running is waited for
+// instead, and its results are taken if it had the same targets, except by a refresh: the snapshot of a rebuild that
+// started before the refresh may be of before the batch the refresh publishes, and nothing would then keep the
+// refresh from caching it over newer matrices (cache.Set.Set does not check), so a refresh starts a rebuild of its
+// own, which the calculations that need one after it share. A request may take the results of any rebuild: requests
+// of a key run one after the other (cache.Set.MutexGetSet), so it shares only a refresh's, and if a refresh wrote the
+// key meanwhile, MutexGetSet does not cache the request's results over it. A caller that waited for a rebuild that
+// failed because the context of the caller running it was done (canceled, past its deadline) rebuilds itself,
+// unless its own context is done too.
 func (s *DropMatrix) rebuildGlobalDropMatrixBase(
 	ctx context.Context, server string, targets []*model.GlobalDropMatrixTarget, ranges map[model.GlobalMatrixStageItem]model.GlobalMatrixSecondRange,
-	beforeDayNum int, calc *globalDropMatrixCalc, verify bool,
+	beforeDayNum int, calc *globalDropMatrixCalc, verify, refresh bool,
 ) error {
 	rebuild := func() (interface{}, error) {
 		if err := s.rebuildGlobalDropMatrixBaseNow(ctx, server, targets, ranges, beforeDayNum, calc, verify); err != nil {
@@ -379,12 +391,24 @@ func (s *DropMatrix) rebuildGlobalDropMatrixBase(
 		}
 		return &globalDropMatrixRebuild{ranges: ranges, path: calc.path, newBase: calc.newBase, aggregates: calc.aggregates}, nil
 	}
-	v, err, _ := s.incremental.rebuilds.Do(globalDropMatrixBaseKey(server, calc.sourceCategory), rebuild)
-	if err != nil {
+	key := globalDropMatrixBaseKey(server, calc.sourceCategory)
+	if refresh {
+		// a rebuild running is left to its callers; the rebuilds that start from now on are after the refresh
+		s.incremental.rebuilds.Forget(key)
+	}
+	var executed bool
+	v, err, _ := s.incremental.rebuilds.Do(key, func() (interface{}, error) {
+		executed = true
+		return rebuild()
+	})
+	if executed { // this caller rebuilt
 		return err
 	}
-	if calc.path != "" { // this caller rebuilt
-		return nil
+	if err != nil {
+		if (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) && ctx.Err() == nil {
+			_, err = rebuild()
+		}
+		return err
 	}
 	result := v.(*globalDropMatrixRebuild)
 	if !sameGlobalMatrixTargetRanges(result.ranges, ranges) || result.newBase != nil && result.newBase.BeforeDayNum != beforeDayNum {

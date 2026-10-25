@@ -390,7 +390,7 @@ func (s *DropMatrix) RefreshGlobalDropMatrixCaches(ctx context.Context, server s
 			s.deleteGlobalDropMatrixCaches(server)
 		}
 	}()
-	globals, err := s.calcGlobalDropMatrices(ctx, server, s.Config.MatrixWorkerSourceCategories)
+	globals, err := s.calcGlobalDropMatrices(ctx, server, s.Config.MatrixWorkerSourceCategories, true)
 	if err != nil {
 		return err
 	}
@@ -489,7 +489,7 @@ func deleteCached(c interface {
 }
 
 func (s *DropMatrix) calcGlobalDropMatrixUncached(ctx context.Context, server string, sourceCategory string) (*model.DropMatrixQueryResult, error) {
-	results, err := s.calcGlobalDropMatrices(ctx, server, []string{sourceCategory})
+	results, err := s.calcGlobalDropMatrices(ctx, server, []string{sourceCategory}, false)
 	if err != nil {
 		return nil, err
 	}
@@ -497,15 +497,16 @@ func (s *DropMatrix) calcGlobalDropMatrixUncached(ctx context.Context, server st
 }
 
 // calcGlobalDropMatrices calculates the global drop matrices of server for every source category: each stage and
-// item over its latest max accumulable time range, from a single statement per source category.
-func (s *DropMatrix) calcGlobalDropMatrices(ctx context.Context, server string, sourceCategories []string) (map[string]*model.DropMatrixQueryResult, error) {
+// item over its latest max accumulable time range, from a single statement per source category. refresh is for
+// RefreshGlobalDropMatrixCaches (see aggregateGlobalDropMatricesIncrementally).
+func (s *DropMatrix) calcGlobalDropMatrices(ctx context.Context, server string, sourceCategories []string, refresh bool) (map[string]*model.DropMatrixQueryResult, error) {
 	targets, err := s.globalDropMatrixTargets(ctx, server)
 	if err != nil {
 		return nil, err
 	}
 	var aggregates map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate
 	if s.Config.GlobalMatrixIncremental.Incremental() {
-		aggregates, err = s.aggregateGlobalDropMatricesIncrementally(ctx, server, targets, sourceCategories)
+		aggregates, err = s.aggregateGlobalDropMatricesIncrementally(ctx, server, targets, sourceCategories, refresh)
 	} else {
 		aggregates, err = s.aggregateGlobalDropMatrices(ctx, s.DropMatrixElementService.DB(), server, targets, sourceCategories)
 	}

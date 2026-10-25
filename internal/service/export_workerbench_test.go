@@ -25,7 +25,7 @@ func (s *PatternMatrix) CalcGlobalPatternMatrixForBench(ctx context.Context, ser
 }
 
 func (s *DropMatrix) CalcGlobalDropMatricesForBench(ctx context.Context, server string, sourceCategories []string) (map[string]*model.DropMatrixQueryResult, error) {
-	return s.calcGlobalDropMatrices(ctx, server, sourceCategories)
+	return s.calcGlobalDropMatrices(ctx, server, sourceCategories, true)
 }
 
 func (s *PatternMatrix) CalcGlobalPatternMatricesForBench(ctx context.Context, server string, sourceCategories []string) (map[string]*model.PatternMatrixQueryResult, error) {
