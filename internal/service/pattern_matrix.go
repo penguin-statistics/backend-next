@@ -9,6 +9,7 @@ import (
 	"exusiai.dev/gommon/constant"
 	"github.com/pkg/errors"
 	"github.com/samber/lo"
+	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
@@ -307,6 +308,20 @@ func (s *PatternMatrix) calcGlobalPatternMatrix(ctx context.Context, server stri
 // calcGlobalPatternMatrices calculates the global pattern matrices of server for every source category: each stage
 // over its latest time range, from a single statement per source category.
 func (s *PatternMatrix) calcGlobalPatternMatrices(ctx context.Context, server string, sourceCategories []string) (map[string]*model.PatternMatrixQueryResult, error) {
+	targets, err := s.globalPatternMatrixTargets(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	aggregates, err := s.aggregateGlobalPatternMatrices(ctx, s.PatternMatrixElementService.DB(), server, targets, sourceCategories)
+	if err != nil {
+		return nil, err
+	}
+	return assembleGlobalPatternMatrices(server, targets, aggregates, sourceCategories)
+}
+
+// globalPatternMatrixTargets returns the targets of the global pattern matrices of server: each stage with its latest
+// time range.
+func (s *PatternMatrix) globalPatternMatrixTargets(ctx context.Context, server string) ([]*model.GlobalPatternMatrixTarget, error) {
 	latestTimeRanges, err := s.TimeRangeService.GetLatestTimeRangesByServer(ctx, server)
 	if err != nil {
 		return nil, err
@@ -316,16 +331,30 @@ func (s *PatternMatrix) calcGlobalPatternMatrices(ctx context.Context, server st
 		// as the elements had it: start and end only, at second precision
 		targets = append(targets, &model.GlobalPatternMatrixTarget{StageID: stageId, TimeRange: model.TimeRangeFromString(timeRange.String())})
 	}
+	return targets, nil
+}
+
+// aggregateGlobalPatternMatrices aggregates the elements of the targets in db for every source category.
+func (s *PatternMatrix) aggregateGlobalPatternMatrices(
+	ctx context.Context, db bun.IDB, server string, targets []*model.GlobalPatternMatrixTarget, sourceCategories []string,
+) (map[string]*model.GlobalPatternMatrixAggregates, error) {
 	// a statement per source category, as for the global drop matrices
 	aggregates := make(map[string]*model.GlobalPatternMatrixAggregates, len(sourceCategories))
 	for _, sourceCategory := range sourceCategories {
-		categoryAggregates, err := s.PatternMatrixElementService.CalcGlobalPatternMatrixAggregates(ctx, server, targets, []string{sourceCategory})
+		categoryAggregates, err := s.PatternMatrixElementService.CalcGlobalPatternMatrixAggregates(ctx, db, server, targets, []string{sourceCategory})
 		if err != nil {
 			return nil, err
 		}
 		aggregates[sourceCategory] = categoryAggregates[sourceCategory]
 	}
+	return aggregates, nil
+}
 
+// assembleGlobalPatternMatrices makes the global pattern matrices of server for the source categories from the
+// aggregates of the targets, in the order of targets.
+func assembleGlobalPatternMatrices(
+	server string, targets []*model.GlobalPatternMatrixTarget, aggregates map[string]*model.GlobalPatternMatrixAggregates, sourceCategories []string,
+) (map[string]*model.PatternMatrixQueryResult, error) {
 	results := make(map[string]*model.PatternMatrixQueryResult, len(sourceCategories))
 	for _, sourceCategory := range sourceCategories {
 		aggregate := aggregates[sourceCategory]
