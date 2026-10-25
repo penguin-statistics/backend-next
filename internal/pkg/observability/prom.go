@@ -163,6 +163,30 @@ var (
 		Name: prometheus.BuildFQName(ServiceName, "worker", "refreshes_total"),
 		Help: "Background global matrix refreshes by outcome",
 	}, []string{"refresh", "server", "outcome"})
+	// GlobalMatrixRefreshPaths counts the calculations of the global matrices of a kind (drop), server and source
+	// category with GlobalMatrixIncremental on or verify by path: incremental (a base extended by the days since and
+	// the changed targets), rebuild (a base aggregated from every day) or full (every day, without a base: the triggers
+	// of the day versions are missing or not firing always, or the versions cannot be read). reason is why it did not
+	// take the path before: none for incremental; no_base, fingerprint (a day of the base was written, or the triggers
+	// changed), day_back (the base is of a later day), max_age or changed_stages for rebuild; triggers_missing for full.
+	GlobalMatrixRefreshPaths = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "worker", "global_matrix_refresh_path_total"),
+		Help: "Calculations of the incremental global matrices by kind, server, source category, path and reason",
+	}, []string{"kind", "server", "source_category", "path", "reason"})
+	// GlobalMatrixChangedStages is the number of stages whose target time range changed since the base, of each
+	// incremental calculation of a source category (also those that rebuild for it).
+	GlobalMatrixChangedStages = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    prometheus.BuildFQName(ServiceName, "worker", "global_matrix_changed_stages"),
+		Help:    "Stages whose target time range changed since the base, per incremental global matrix calculation",
+		Buckets: []float64{0, 1, 2, 5, 10, 20, 50, 100, 200, 500},
+	}, []string{"kind", "server"})
+	// GlobalMatrixVerifyMismatches counts the verifications of the incremental global matrices (GlobalMatrixIncremental
+	// verify, or GlobalMatrixVerifyEvery) that found other results than the reference calculation in the same
+	// snapshot: the reference results are served, and the base is dropped. Must stay 0.
+	GlobalMatrixVerifyMismatches = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: prometheus.BuildFQName(ServiceName, "worker", "global_matrix_verify_mismatches_total"),
+		Help: "Verifications of the incremental global matrices that differed from the reference calculation",
+	}, []string{"kind", "server", "source_category"})
 	// CacheSyncBumps counts the advances of the Redis generations by which the calc worker tells every process
 	// that it refreshed the cached global results of a kind (globalDropMatrix, globalPatternMatrix, shimTrend or
 	// siteStats; see cachesync), by outcome: ok or error (the other processes then miss that refresh, unless Redis

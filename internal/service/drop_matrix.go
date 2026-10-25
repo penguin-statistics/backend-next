@@ -11,6 +11,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
 	"github.com/uptrace/bun"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
@@ -19,6 +23,9 @@ import (
 	modelv2 "exusiai.dev/backend-next/internal/model/v2"
 	"exusiai.dev/backend-next/internal/util"
 )
+
+// globalMatrixTracer traces the parts of the refreshes of the global matrices.
+var globalMatrixTracer = otel.Tracer("globalmatrix")
 
 type DropMatrix struct {
 	Config                   *appconfig.Config
@@ -29,6 +36,15 @@ type DropMatrix struct {
 	StageService             *Stage
 	ItemService              *Item
 	SiteStatsService         *SiteStats
+
+	// GlobalMatrixFingerprints checks the bases of the incremental global drop matrices (GlobalMatrixIncremental);
+	// nil reads the day versions of the elements.
+	GlobalMatrixFingerprints GlobalMatrixFingerprints
+
+	// globalDropMatrixStore reads the elements for the incremental global drop matrices instead of
+	// DropMatrixElementService, if set (tests)
+	globalDropMatrixStore globalDropMatrixStore
+	incremental           globalMatrixIncremental
 }
 
 func NewDropMatrix(
@@ -378,13 +394,33 @@ func (s *DropMatrix) RefreshGlobalDropMatrixCaches(ctx context.Context, server s
 	if err != nil {
 		return err
 	}
+	if err := s.cacheGlobalDropMatrices(ctx, server, globals); err != nil {
+		return err
+	}
+	refreshed = true
+	return nil
+}
+
+// cacheGlobalDropMatrices applies the shims to the global drop matrices of server a refresh calculated, and caches
+// them, raw and shim, in a span of its own: the part of a refresh that does not read the elements.
+func (s *DropMatrix) cacheGlobalDropMatrices(ctx context.Context, server string, globals map[string]*model.DropMatrixQueryResult) (err error) {
+	ctx, span := globalMatrixTracer.Start(ctx, "dropMatrix.cacheGlobalDropMatrices", trace.WithAttributes(attribute.String("server", server)))
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+		}
+		span.End()
+	}()
 	// the opening stages are the same for every source category: read them once
 	openingStageIds, err := s.getOpeningStageIds(ctx, server)
 	if err != nil {
 		return err
 	}
+	elements := 0
 	for _, sourceCategory := range s.Config.MatrixWorkerSourceCategories {
 		global := globals[sourceCategory]
+		elements += len(global.Matrix)
 		shims := make(map[bool]*modelv2.DropMatrixQueryResult, 2)
 		for _, showClosedZones := range []bool{true, false} {
 			if shims[showClosedZones], err = s.applyShimForDropMatrixQuery(ctx, showClosedZones, openingStageIds, "", "", global); err != nil {
@@ -399,7 +435,9 @@ func (s *DropMatrix) RefreshGlobalDropMatrixCaches(ctx context.Context, server s
 			})
 		}
 	}
-	refreshed = true
+	if span.IsRecording() {
+		span.SetAttributes(attribute.Int("matrix.elements", elements))
+	}
 	return nil
 }
 
@@ -465,7 +503,12 @@ func (s *DropMatrix) calcGlobalDropMatrices(ctx context.Context, server string, 
 	if err != nil {
 		return nil, err
 	}
-	aggregates, err := s.aggregateGlobalDropMatrices(ctx, s.DropMatrixElementService.DB(), server, targets, sourceCategories)
+	var aggregates map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate
+	if s.Config.GlobalMatrixIncremental.Incremental() {
+		aggregates, err = s.aggregateGlobalDropMatricesIncrementally(ctx, server, targets, sourceCategories)
+	} else {
+		aggregates, err = s.aggregateGlobalDropMatrices(ctx, s.DropMatrixElementService.DB(), server, targets, sourceCategories)
+	}
 	if err != nil {
 		return nil, err
 	}

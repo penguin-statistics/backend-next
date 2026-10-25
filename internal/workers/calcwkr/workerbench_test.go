@@ -48,7 +48,8 @@ var phases = []string{"dropMatrix", "patternMatrix", "siteStats"}
 
 // longLivedCaches are caches that outlive the worker's batch interval and are kept between the two batches.
 var longLivedCaches = map[string]bool{
-	"siteStatsBase#server": true, // 6 hrs
+	"siteStatsBase#server":                       true, // 6 hrs
+	"globalDropMatrixBase#server|sourceCategory": true, // rebuilt after GlobalMatrixBaseMaxAge
 }
 
 func TestWorkerBench(t *testing.T) {

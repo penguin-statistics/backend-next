@@ -23,3 +23,32 @@ func (m *WorkerHeartbeatURLMap) Decode(value string) error {
 	}
 	return nil
 }
+
+// GlobalMatrixIncrementalMode is the mode of ConfigSpec.GlobalMatrixIncremental: off, verify or on.
+type GlobalMatrixIncrementalMode string
+
+const (
+	GlobalMatrixIncrementalOff    GlobalMatrixIncrementalMode = "off"
+	GlobalMatrixIncrementalVerify GlobalMatrixIncrementalMode = "verify"
+	GlobalMatrixIncrementalOn     GlobalMatrixIncrementalMode = "on"
+)
+
+// Decode accepts off, verify and on in any case; empty is off.
+func (m *GlobalMatrixIncrementalMode) Decode(value string) error {
+	switch mode := GlobalMatrixIncrementalMode(strings.ToLower(strings.TrimSpace(value))); mode {
+	case "":
+		*m = GlobalMatrixIncrementalOff
+		return nil
+	case GlobalMatrixIncrementalOff, GlobalMatrixIncrementalVerify, GlobalMatrixIncrementalOn:
+		*m = mode
+		return nil
+	default:
+		return fmt.Errorf("invalid global matrix incremental mode %q: expect off, verify or on", value)
+	}
+}
+
+// Incremental reports whether the global matrices are calculated from bases (verify or on). The zero value, as in
+// configurations built in code, is off.
+func (m GlobalMatrixIncrementalMode) Incremental() bool {
+	return m == GlobalMatrixIncrementalVerify || m == GlobalMatrixIncrementalOn
+}

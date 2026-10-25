@@ -1,6 +1,10 @@
 package model
 
-import "gopkg.in/guregu/null.v3"
+import (
+	"time"
+
+	"gopkg.in/guregu/null.v3"
+)
 
 // SiteStatsAggregate is the per stage and item aggregation of drop matrix elements behind the site stats.
 // Aggregates of disjoint day ranges add up (see Add).
@@ -78,4 +82,44 @@ type GlobalMatrixScope struct {
 	// StageFirst reads the elements of the stages of the targets before joining them with the targets: faster for the
 	// targets of a few stages over every day, slower for those of every stage.
 	StageFirst bool
+}
+
+// Clone returns a copy of a that shares nothing with it.
+func (a *GlobalDropMatrixAggregate) Clone() *GlobalDropMatrixAggregate {
+	clone := &GlobalDropMatrixAggregate{Times: a.Times, Quantity: a.Quantity}
+	if a.QuantityBuckets != nil {
+		clone.QuantityBuckets = make(map[int]int, len(a.QuantityBuckets))
+		for quantity, count := range a.QuantityBuckets {
+			clone.QuantityBuckets[quantity] = count
+		}
+	}
+	return clone
+}
+
+// GlobalMatrixStageItem is a stage and item of a global drop matrix, in a source category known from the context.
+type GlobalMatrixStageItem struct {
+	StageID int
+	ItemID  int
+}
+
+// GlobalMatrixSecondRange is the time range of a target of a global matrix, as the aggregation compares it: in
+// whole seconds since the epoch.
+type GlobalMatrixSecondRange struct {
+	Start int64
+	End   int64
+}
+
+// GlobalDropMatrixBase is the aggregate of the drop matrix elements of the days before BeforeDayNum, of a server and
+// source category, for the targets in Targets: read in one snapshot, in which the fingerprint of those days (the
+// identity of the triggers that version them and their day versions) was Fingerprint. It is immutable once cached:
+// a refresh makes a new one, which may share the aggregates it did not change.
+type GlobalDropMatrixBase struct {
+	BeforeDayNum int
+	Fingerprint  string
+	// Targets holds every target the base was aggregated for, also those without an element, with its time range.
+	Targets map[GlobalMatrixStageItem]GlobalMatrixSecondRange
+	// Partials holds the aggregates of the targets that have elements in those days.
+	Partials map[GlobalMatrixStageItem]*GlobalDropMatrixAggregate
+	// BuiltAt is when the base was last aggregated from every day; extending it keeps it.
+	BuiltAt time.Time
 }

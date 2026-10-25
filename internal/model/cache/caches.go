@@ -23,6 +23,7 @@ var (
 
 	ShimGlobalDropMatrix *cache.Set[modelv2.DropMatrixQueryResult]
 	GlobalDropMatrix     *cache.Set[model.DropMatrixQueryResult]
+	GlobalDropMatrixBase *cache.Set[model.GlobalDropMatrixBase]
 
 	ShimTrend *cache.Set[modelv2.TrendQueryResult]
 
@@ -128,6 +129,11 @@ func initializeCaches() {
 
 	SetMap["shimGlobalDropMatrix#server|showClosedZones|sourceCategory"] = ShimGlobalDropMatrix.Flush
 	SetMap["globalDropMatrix#server|sourceCategory"] = GlobalDropMatrix.Flush
+
+	// the bases of the incremental global drop matrices (GlobalMatrixIncremental), of this process only: purging
+	// them makes the next calculations aggregate every day again
+	GlobalDropMatrixBase = cache.NewSet[model.GlobalDropMatrixBase]("globalDropMatrixBase#server|sourceCategory")
+	SetMap["globalDropMatrixBase#server|sourceCategory"] = GlobalDropMatrixBase.Flush
 
 	// trend
 	ShimTrend = cache.NewSet[modelv2.TrendQueryResult]("shimTrend#server")
