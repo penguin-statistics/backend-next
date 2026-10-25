@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/samber/lo"
+	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/model"
@@ -45,10 +46,25 @@ func (s *DropMatrixElement) IsExistByServerAndDayNum(ctx context.Context, server
 	return s.DropMatrixElementRepo.IsExistByServerAndDayNum(ctx, server, dayNum)
 }
 
+func (s *DropMatrixElement) DB() bun.IDB {
+	return s.DropMatrixElementRepo.DB()
+}
+
+func (s *DropMatrixElement) RunInSnapshotTx(ctx context.Context, fn func(ctx context.Context, tx bun.Tx) error) error {
+	return s.DropMatrixElementRepo.RunInSnapshotTx(ctx, fn)
+}
+
 func (s *DropMatrixElement) CalcGlobalDropMatrixAggregates(
-	ctx context.Context, server string, targets []*model.GlobalDropMatrixTarget, sourceCategories []string,
+	ctx context.Context, db bun.IDB, server string, targets []*model.GlobalDropMatrixTarget, sourceCategories []string,
 ) (map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate, error) {
-	return s.DropMatrixElementRepo.CalcGlobalDropMatrixAggregates(ctx, server, targets, sourceCategories)
+	return s.DropMatrixElementRepo.CalcGlobalDropMatrixAggregates(ctx, db, server, targets, sourceCategories)
+}
+
+func (s *DropMatrixElement) CalcGlobalDropMatrixPartials(
+	ctx context.Context, db bun.IDB, server string, targets []*model.GlobalDropMatrixTarget, sourceCategories []string,
+	scope model.GlobalMatrixScope,
+) (before, after map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate, err error) {
+	return s.DropMatrixElementRepo.CalcGlobalDropMatrixPartials(ctx, db, server, targets, sourceCategories, scope)
 }
 
 func (s *DropMatrixElement) CalcSiteStatsAggregates(
