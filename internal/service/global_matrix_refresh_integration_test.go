@@ -335,7 +335,7 @@ func TestGlobalMatrixRefreshPanic(t *testing.T) {
 
 	// a drop matrix element and a pattern of an item the items map does not have (e.g. during a metadata update), in
 	// the manual source category only: a refresh of CN caches the matrices of the all source category, then panics
-	globals, err := dropMatrix.calcGlobalDropMatrices(ctx, "CN", allSourceCategories)
+	globals, err := dropMatrix.calcGlobalDropMatrices(ctx, "CN", allSourceCategories, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +358,7 @@ func TestGlobalMatrixRefreshPanic(t *testing.T) {
 		FROM pattern_matrix_elements WHERE server = 'CN' AND source_category = ? AND stage_id = ? AND pattern_id = ?`,
 		constant.SourceCategoryManual, pattern.StageID, pattern.PatternID)
 	flushCaches(t)
-	globals, err = dropMatrix.calcGlobalDropMatrices(ctx, "CN", allSourceCategories)
+	globals, err = dropMatrix.calcGlobalDropMatrices(ctx, "CN", allSourceCategories, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +428,7 @@ func TestGlobalMatricesMatchLegacy(t *testing.T) {
 	ctx := context.Background()
 	compared := 0
 	for _, server := range testServers {
-		drops, err := dropMatrix.calcGlobalDropMatrices(ctx, server, allSourceCategories)
+		drops, err := dropMatrix.calcGlobalDropMatrices(ctx, server, allSourceCategories, false)
 		if err != nil {
 			t.Fatal(err)
 		}

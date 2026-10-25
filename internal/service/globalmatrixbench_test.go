@@ -6,7 +6,12 @@
 // that a faster calculation is checked to produce the same matrices. Read only.
 //
 // Env: WORKERBENCH_NOW (RFC3339, default 2026-10-19T14:00:00Z), GLOBALMATRIXBENCH_RUNS (default 3),
-// GLOBALMATRIXBENCH_EXPLAIN (a server: print the plans of its global matrix queries, for every source category at once).
+// GLOBALMATRIXBENCH_EXPLAIN (a server: print the plans of its global matrix queries, for every source category at once),
+// GLOBALMATRIXBENCH_INCREMENTAL (days, e.g. 1,30: for each k, time the global drop matrices without bases, then with
+// GlobalMatrixIncremental on, a rebuild of the bases k days before WORKERBENCH_NOW and their extension at it, and
+// require the same SHA-256 from all three; the fingerprints are constant, as the restore has no day versions),
+// GLOBALMATRIXBENCH_STAGE_FIRST (stage counts, e.g. 5,20,100: time the recomputation of the targets of that many
+// stages of CN over every day, as an incremental calculation recomputes changed targets).
 package service_test
 
 import (
@@ -27,6 +32,7 @@ import (
 	"go.uber.org/fx"
 
 	"exusiai.dev/backend-next/internal/app"
+	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/app/appcontext"
 	"exusiai.dev/backend-next/internal/service"
 	"exusiai.dev/backend-next/internal/util"
@@ -134,6 +140,29 @@ func TestGlobalMatrixBench(t *testing.T) {
 		return
 	}
 
+	if ks := os.Getenv("GLOBALMATRIXBENCH_INCREMENTAL"); ks != "" {
+		benchIncremental(t, ctx, dropMatrix, now, categories, ks)
+		return
+	}
+	if ns := os.Getenv("GLOBALMATRIXBENCH_STAGE_FIRST"); ns != "" {
+		dayNum := util.GetDayNum(&now, "CN") - 1
+		for _, n := range strings.Split(ns, ",") {
+			stages, err := strconv.Atoi(n)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, sourceCategory := range categories {
+				start := time.Now()
+				targets, err := dropMatrix.CalcGlobalDropMatrixStageFirstForBench(ctx, "CN", sourceCategory, stages, dayNum)
+				if err != nil {
+					t.Fatal(err)
+				}
+				fmt.Printf("BENCH stage_first server=CN source_category=%s stages=%d targets=%d ms=%d\n", sourceCategory, stages, targets, time.Since(start).Milliseconds())
+			}
+		}
+		return
+	}
+
 	// warm the caches the calculation reads (time ranges, drop infos), as a batch leaves them
 	reference := calculate()
 	sum := sha256.New()
@@ -161,4 +190,56 @@ func TestGlobalMatrixBench(t *testing.T) {
 		}
 		fmt.Printf("BENCH run=%d total_ms=%d queries=%d\n", run, time.Since(start).Milliseconds(), counter.n.Load()-queries)
 	}
+}
+
+// benchIncremental times the global drop matrices of every server and source category without bases, then for each
+// k of ks, with bases rebuilt k days before now and extended at now, and requires the same results of all.
+func benchIncremental(t *testing.T, ctx context.Context, dropMatrix *service.DropMatrix, now time.Time, categories []string, ks string) {
+	calculate := func(what string) string {
+		lines := make([]string, 0)
+		total := time.Now()
+		for _, server := range constant.Servers {
+			start := time.Now()
+			drops, err := dropMatrix.CalcGlobalDropMatricesForBench(ctx, server, categories)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, sourceCategory := range categories {
+				for _, el := range drops[sourceCategory].Matrix {
+					lines = append(lines, fmt.Sprintf("dm|%s|%s|%d|%d|%d|%d|%v|%d|%d", server, sourceCategory, el.StageID, el.ItemID,
+						el.Times, el.Quantity, el.StdDev, el.TimeRange.StartTime.UnixMilli(), el.TimeRange.EndTime.UnixMilli()))
+				}
+			}
+			fmt.Printf("BENCH incremental %s server=%s ms=%d\n", what, server, time.Since(start).Milliseconds())
+		}
+		sort.Strings(lines)
+		sum := sha256.New()
+		for _, line := range lines {
+			fmt.Fprintln(sum, line)
+		}
+		hash := hex.EncodeToString(sum.Sum(nil))
+		fmt.Printf("BENCH incremental %s total_ms=%d lines=%d hash=%s\n", what, time.Since(total).Milliseconds(), len(lines), hash)
+		return hash
+	}
+
+	dropMatrix.SetGlobalMatrixIncrementalForBench(appconfig.GlobalMatrixIncrementalOff)
+	calculate("warm-up") // the caches of the time ranges and drop infos, as a batch leaves them
+	full := calculate("full")
+	for _, k := range strings.Split(ks, ",") {
+		days, err := strconv.Atoi(k)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dropMatrix.SetGlobalMatrixIncrementalForBench(appconfig.GlobalMatrixIncrementalOn)
+		earlier := now.Add(-time.Duration(days) * 24 * time.Hour)
+		util.Now = func() time.Time { return earlier }
+		rebuild := calculate(fmt.Sprintf("rebuild k=%d", days))
+		util.Now = func() time.Time { return now }
+		incremental := calculate(fmt.Sprintf("extend k=%d", days))
+		again := calculate(fmt.Sprintf("extend again k=%d", days))
+		if rebuild != full || incremental != full || again != full {
+			t.Fatalf("k=%d: the hashes of the rebuild %s, the extension %s and the next %s differ from that without bases %s", days, rebuild, incremental, again, full)
+		}
+	}
+	dropMatrix.SetGlobalMatrixIncrementalForBench(appconfig.GlobalMatrixIncrementalOff)
 }
