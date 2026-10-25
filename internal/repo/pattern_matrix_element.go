@@ -20,17 +20,11 @@ func NewPatternMatrixElement(db *bun.DB) *PatternMatrixElement {
 	return &PatternMatrixElement{db: db, sel: selector.New[model.PatternMatrixElement](db)}
 }
 
-func (s *PatternMatrixElement) BatchSaveElements(ctx context.Context, elements []*model.PatternMatrixElement, server string) error {
-	_, err := s.db.NewInsert().Model(&elements).Exec(ctx)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *PatternMatrixElement) DeleteByServerAndDayNum(ctx context.Context, server string, dayNum int) error {
-	_, err := s.db.NewDelete().Model((*model.PatternMatrixElement)(nil)).Where("server = ?", server).Where("day_num = ?", dayNum).Exec(ctx)
-	return err
+// ReplaceDay replaces the elements of server on dayNum by elements, all of that day, atomically (see
+// replaceElementsOfDay).
+func (s *PatternMatrixElement) ReplaceDay(ctx context.Context, server string, dayNum int, elements []*model.PatternMatrixElement) error {
+	return replaceElementsOfDay(ctx, s.db, "pattern_matrix_elements", server, dayNum, elements,
+		func(el *model.PatternMatrixElement) (string, int) { return el.Server, el.DayNum })
 }
 
 func (s *PatternMatrixElement) IsExistByServerAndDayNum(ctx context.Context, server string, dayNum int) (bool, error) {
