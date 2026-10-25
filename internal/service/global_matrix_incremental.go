@@ -26,7 +26,8 @@ import (
 // the targets whose time range changed. A base is valid only while no element of its days changed: every write of
 // the elements gives the days it touched a new version (scripts/migrations/20261025_matrix_element_day_versions.sql),
 // in its own transaction, so a calculation reads the fingerprint of the versions of the base's days and the elements
-// since in one snapshot, and extends the base only if the fingerprint is the base's.
+// since in one snapshot, and extends the base only if the fingerprint is the base's. The snapshot is taken with the
+// elements locked: TRUNCATE is not MVCC-safe (see globalDropMatrixStore).
 
 // The paths and reasons of observability.GlobalMatrixRefreshPaths.
 const (

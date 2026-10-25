@@ -26,6 +26,8 @@ import (
 // globalPatternMatrixStore reads the pattern matrix elements for the incremental global pattern matrices
 // (PatternMatrixElement).
 type globalPatternMatrixStore interface {
+	// RunInSnapshotTx runs fn in a read-only snapshot transaction, the elements locked from before the snapshot is
+	// taken, as globalDropMatrixStore's does.
 	RunInSnapshotTx(ctx context.Context, fn func(ctx context.Context, tx bun.Tx) error) error
 	CalcGlobalPatternMatrixAggregates(
 		ctx context.Context, db bun.IDB, server string, targets []*model.GlobalPatternMatrixTarget, sourceCategories []string,

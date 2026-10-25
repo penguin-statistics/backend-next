@@ -474,6 +474,117 @@ func TestGlobalPatternMatrixIncrementalRefreshDuringRequestRebuild(t *testing.T)
 	}
 }
 
+// TestGlobalPatternMatrixIncrementalTruncate is TestGlobalDropMatrixIncrementalTruncate for the global pattern
+// matrices: a TRUNCATE of the elements once an incremental calculation read the triggers waits for it, the calculation
+// gets the matrices of before the TRUNCATE, and the next one rebuilds.
+func TestGlobalPatternMatrixIncrementalTruncate(t *testing.T) {
+	for _, mode := range []appconfig.GlobalMatrixIncrementalMode{appconfig.GlobalMatrixIncrementalOn, appconfig.GlobalMatrixIncrementalVerify} {
+		for _, extend := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s extend=%v", mode, extend), func(t *testing.T) {
+				testGlobalPatternMatrixIncrementalTruncate(t, mode, extend)
+			})
+		}
+	}
+}
+
+func testGlobalPatternMatrixIncrementalTruncate(t *testing.T, mode appconfig.GlobalMatrixIncrementalMode, extend bool) {
+	db, _, off := newGlobalMatrixTestData(t)
+	ctx := context.Background()
+	on := incrementalPatternMatrix(off, mode)
+	on.Config.GlobalMatrixVerifyEvery = 0
+	flushCaches(t)
+	server := "CN"
+	path, reason := globalMatrixPathRebuild, globalMatrixReasonNoBase
+	// each rebuild has a snapshot of its own, and only the first is paused: rebuild one source category
+	categories := []string{constant.SourceCategoryAll}
+	if extend {
+		if _, err := on.calcGlobalPatternMatrices(ctx, server, allSourceCategories, false); err != nil {
+			t.Fatal(err)
+		}
+		path, reason, categories = globalMatrixPathIncremental, globalMatrixReasonNone, allSourceCategories
+	}
+	before, err := off.calcGlobalPatternMatrices(ctx, server, categories, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sourceCategory := range categories {
+		if len(before[sourceCategory].PatternMatrix) == 0 {
+			t.Fatalf("%s: no element before the TRUNCATE: the test does not exercise it", sourceCategory)
+		}
+	}
+	paths := func(path, reason string) float64 {
+		var n float64
+		for _, sourceCategory := range categories {
+			n += testutil.ToFloat64(observability.GlobalMatrixRefreshPaths.WithLabelValues(globalMatrixKindPattern, server, sourceCategory, path, reason))
+		}
+		return n
+	}
+	pathsBefore, rebuildsBefore, mismatches := paths(path, reason), paths(globalMatrixPathRebuild, globalMatrixReasonFingerprint), globalMatrixVerifyMismatchCount(globalMatrixKindPattern)
+
+	pause := &pauseAfterReading{table: "matrix_element_day_versions", read: make(chan struct{}), release: make(chan struct{})}
+	db.AddQueryHook(pause)
+	released := false
+	release := func() {
+		if !released {
+			released = true
+			close(pause.release)
+		}
+	}
+	defer release()
+	type calculated struct {
+		results map[string]*model.PatternMatrixQueryResult
+		err     error
+	}
+	done := make(chan calculated, 1)
+	go func() {
+		results, err := on.calcGlobalPatternMatrices(context.WithValue(ctx, pauseAfterReadingKey{}, pause), server, categories, false)
+		done <- calculated{results, err}
+	}()
+	select {
+	case <-pause.read:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the calculation never read the triggers")
+	}
+	// the TRUNCATE waits for the lock the calculation took before its snapshot
+	truncated := truncateWhileCalculating(t, db, "pattern_matrix_elements")
+	release()
+	got := <-done
+	if got.err != nil {
+		t.Fatal(got.err)
+	}
+	if err := <-truncated; err != nil {
+		t.Fatal(err)
+	}
+	for _, sourceCategory := range categories {
+		assertSameLines(t, sourceCategory+" during the TRUNCATE", globalPatternMatrixLines(before[sourceCategory]), globalPatternMatrixLines(got.results[sourceCategory]))
+	}
+	if globalMatrixVerifyMismatchCount(globalMatrixKindPattern) != mismatches {
+		t.Fatal("a verification found a mismatch")
+	}
+	if n := paths(path, reason); n != pathsBefore+float64(len(categories)) {
+		t.Fatalf("the calculation during the TRUNCATE took the %s %s path %v times, want %d", path, reason, n-pathsBefore, len(categories))
+	}
+
+	// the next calculation finds the fingerprint changed
+	want, err := off.calcGlobalPatternMatrices(ctx, server, categories, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, err := on.calcGlobalPatternMatrices(ctx, server, categories, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sourceCategory := range categories {
+		assertSameLines(t, sourceCategory+" after the TRUNCATE", globalPatternMatrixLines(want[sourceCategory]), globalPatternMatrixLines(next[sourceCategory]))
+	}
+	if n := paths(globalMatrixPathRebuild, globalMatrixReasonFingerprint); n != rebuildsBefore+float64(len(categories)) {
+		t.Fatalf("the calculation after the TRUNCATE rebuilt %v bases for their fingerprint, want %d", n-rebuildsBefore, len(categories))
+	}
+	if globalMatrixVerifyMismatchCount(globalMatrixKindPattern) != mismatches {
+		t.Fatal("a verification found a mismatch")
+	}
+}
+
 // Without the migration, or with the day versions not readable, the incremental mode aggregates every day.
 func TestGlobalPatternMatrixIncrementalWithoutDayVersions(t *testing.T) {
 	db, _, off := newGlobalMatrixTestData(t)
