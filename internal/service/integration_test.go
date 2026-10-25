@@ -80,6 +80,18 @@ CREATE TABLE drop_matrix_elements (
 	end_time timestamp with time zone,
 	day_num integer NOT NULL
 );
+CREATE TABLE pattern_matrix_elements (
+	element_id bigserial PRIMARY KEY,
+	stage_id integer NOT NULL,
+	pattern_id bigint NOT NULL,
+	quantity integer NOT NULL,
+	times integer NOT NULL,
+	server server NOT NULL,
+	source_category character varying(32) DEFAULT 'all' NOT NULL,
+	start_time timestamp with time zone,
+	end_time timestamp with time zone,
+	day_num integer NOT NULL
+);
 CREATE TABLE stages (
 	stage_id serial PRIMARY KEY,
 	ark_stage_id character varying(255) NOT NULL,
@@ -131,6 +143,14 @@ func newTestDB(t *testing.T) *bun.DB {
 	)), pgdialect.New())
 	t.Cleanup(func() { db.Close() })
 	if _, err := db.ExecContext(ctx, testSchema); err != nil {
+		t.Fatal(err)
+	}
+	// the day versions of the matrix elements, as in production
+	migration, err := os.ReadFile("../../scripts/migrations/20261025_matrix_element_day_versions.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, string(migration)); err != nil {
 		t.Fatal(err)
 	}
 	return db

@@ -163,6 +163,19 @@ CREATE TABLE items (
     CONSTRAINT items_pkey PRIMARY KEY (item_id)
 );
 
+-- scripts/migrations/20261025_matrix_element_day_versions.sql: the day versions of drop_matrix_elements and
+-- pattern_matrix_elements, written by the triggers of indexes.sql. Rows are never deleted, and versions never reused:
+-- a (server, day) without a row has not been written since the triggers exist. server is text, as the element tables
+-- have an enum each. A TRUNCATE bumps ('*', -1), below every day of every server. migrate.sh copies no row of it.
+CREATE SEQUENCE matrix_element_day_version_seq;
+CREATE TABLE matrix_element_day_versions (
+    tbl text NOT NULL CHECK (tbl IN ('drop', 'pattern')),
+    server text NOT NULL,
+    day_num integer NOT NULL,
+    version bigint NOT NULL,
+    CONSTRAINT matrix_element_day_versions_pkey PRIMARY KEY (tbl, server, day_num)
+);
+
 CREATE TABLE notices (
     notice_id serial NOT NULL,
     existence jsonb,
