@@ -68,9 +68,10 @@ func (s *DropMatrixElement) DB() bun.IDB {
 	return s.db
 }
 
-// RunInSnapshotTx runs fn in a read-only snapshot transaction of the database of s, see RunInSnapshotTx.
+// RunInSnapshotTx runs fn in a read-only snapshot transaction of the database of s, drop_matrix_elements locked
+// against a TRUNCATE before the snapshot is taken, see RunInLockedSnapshotTx.
 func (s *DropMatrixElement) RunInSnapshotTx(ctx context.Context, fn func(ctx context.Context, tx bun.Tx) error) error {
-	return RunInSnapshotTx(ctx, s.db, fn)
+	return RunInLockedSnapshotTx(ctx, s.db, []string{"drop_matrix_elements"}, fn)
 }
 
 // globalDropMatrixAggregateRow is a row of the global drop matrix aggregations: a part (kind) of the aggregate of a

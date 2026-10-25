@@ -92,6 +92,9 @@ func (dayVersionFingerprints) DayFingerprints(ctx context.Context, db bun.IDB, t
 // globalDropMatrixStore reads the drop matrix elements for the incremental global drop matrices
 // (DropMatrixElement).
 type globalDropMatrixStore interface {
+	// RunInSnapshotTx runs fn in a read-only snapshot transaction, the elements locked from before the snapshot is
+	// taken: TRUNCATE is not MVCC-safe, and one committed after the fingerprint was read would empty the elements of
+	// the snapshot while the day version it bumps is not in it, so a base would pass the check with no element since.
 	RunInSnapshotTx(ctx context.Context, fn func(ctx context.Context, tx bun.Tx) error) error
 	CalcGlobalDropMatrixAggregates(
 		ctx context.Context, db bun.IDB, server string, targets []*model.GlobalDropMatrixTarget, sourceCategories []string,

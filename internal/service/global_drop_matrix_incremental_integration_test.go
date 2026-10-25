@@ -511,6 +511,151 @@ func TestGlobalDropMatrixIncrementalRefreshDuringRequestRebuild(t *testing.T) {
 	assertSameLines(t, "cached after the request", globalDropMatrixLines(after[constant.SourceCategoryAll]), globalDropMatrixLines(&cached))
 }
 
+// A TRUNCATE of the elements committing once an incremental calculation read the triggers, the first statement of
+// its snapshot, and before it read the elements. TRUNCATE is not MVCC-safe: if it committed, the snapshot would have
+// no element while the day version the TRUNCATE bumps is not in it, so the base would pass the check. The calculation
+// locks the elements before its snapshot: the TRUNCATE waits for it, the calculation gets the matrices of its
+// snapshot, of before the TRUNCATE, and the next one finds the fingerprint changed and rebuilds. Both when the
+// calculation extends the base (every source category in one snapshot) and when it rebuilds it, verified or not.
+func TestGlobalDropMatrixIncrementalTruncate(t *testing.T) {
+	for _, mode := range []appconfig.GlobalMatrixIncrementalMode{appconfig.GlobalMatrixIncrementalOn, appconfig.GlobalMatrixIncrementalVerify} {
+		for _, extend := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s extend=%v", mode, extend), func(t *testing.T) {
+				testGlobalDropMatrixIncrementalTruncate(t, mode, extend)
+			})
+		}
+	}
+}
+
+func testGlobalDropMatrixIncrementalTruncate(t *testing.T, mode appconfig.GlobalMatrixIncrementalMode, extend bool) {
+	db, off, _ := newGlobalMatrixTestData(t)
+	ctx := context.Background()
+	on := incrementalDropMatrix(off, mode)
+	on.Config.GlobalMatrixVerifyEvery = 0
+	flushCaches(t)
+	server := "CN"
+	path, reason := globalMatrixPathRebuild, globalMatrixReasonNoBase
+	// each rebuild has a snapshot of its own, and only the first is paused: rebuild one source category
+	categories := []string{constant.SourceCategoryAll}
+	if extend {
+		if _, err := on.calcGlobalDropMatrices(ctx, server, allSourceCategories, false); err != nil {
+			t.Fatal(err)
+		}
+		path, reason, categories = globalMatrixPathIncremental, globalMatrixReasonNone, allSourceCategories
+	}
+	before, err := off.calcGlobalDropMatrices(ctx, server, categories, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sourceCategory := range categories {
+		if len(before[sourceCategory].Matrix) == 0 {
+			t.Fatalf("%s: no element before the TRUNCATE: the test does not exercise it", sourceCategory)
+		}
+	}
+	paths := func(path, reason string) float64 {
+		var n float64
+		for _, sourceCategory := range categories {
+			n += testutil.ToFloat64(observability.GlobalMatrixRefreshPaths.WithLabelValues(globalMatrixKindDrop, server, sourceCategory, path, reason))
+		}
+		return n
+	}
+	pathsBefore, rebuildsBefore, mismatches := paths(path, reason), paths(globalMatrixPathRebuild, globalMatrixReasonFingerprint), globalMatrixVerifyMismatchCount()
+
+	pause := &pauseAfterReading{table: "matrix_element_day_versions", read: make(chan struct{}), release: make(chan struct{})}
+	db.AddQueryHook(pause)
+	released := false
+	release := func() {
+		if !released {
+			released = true
+			close(pause.release)
+		}
+	}
+	defer release()
+	type calculated struct {
+		results map[string]*model.DropMatrixQueryResult
+		err     error
+	}
+	done := make(chan calculated, 1)
+	go func() {
+		results, err := on.calcGlobalDropMatrices(context.WithValue(ctx, pauseAfterReadingKey{}, pause), server, categories, false)
+		done <- calculated{results, err}
+	}()
+	select {
+	case <-pause.read:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the calculation never read the triggers")
+	}
+	// the TRUNCATE waits for the lock the calculation took before its snapshot
+	truncated := truncateWhileCalculating(t, db, "drop_matrix_elements")
+	release()
+	got := <-done
+	if got.err != nil {
+		t.Fatal(got.err)
+	}
+	if err := <-truncated; err != nil {
+		t.Fatal(err)
+	}
+	for _, sourceCategory := range categories {
+		assertSameLines(t, sourceCategory+" during the TRUNCATE", globalDropMatrixLines(before[sourceCategory]), globalDropMatrixLines(got.results[sourceCategory]))
+	}
+	if globalMatrixVerifyMismatchCount() != mismatches {
+		t.Fatal("a verification found a mismatch")
+	}
+	if n := paths(path, reason); n != pathsBefore+float64(len(categories)) {
+		t.Fatalf("the calculation during the TRUNCATE took the %s %s path %v times, want %d", path, reason, n-pathsBefore, len(categories))
+	}
+
+	// the next calculation finds the fingerprint changed
+	want, err := off.calcGlobalDropMatrices(ctx, server, categories, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	next, err := on.calcGlobalDropMatrices(ctx, server, categories, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sourceCategory := range categories {
+		assertSameLines(t, sourceCategory+" after the TRUNCATE", globalDropMatrixLines(want[sourceCategory]), globalDropMatrixLines(next[sourceCategory]))
+	}
+	if n := paths(globalMatrixPathRebuild, globalMatrixReasonFingerprint); n != rebuildsBefore+float64(len(categories)) {
+		t.Fatalf("the calculation after the TRUNCATE rebuilt %v bases for their fingerprint, want %d", n-rebuildsBefore, len(categories))
+	}
+	if globalMatrixVerifyMismatchCount() != mismatches {
+		t.Fatal("a verification found a mismatch")
+	}
+}
+
+// truncateWhileCalculating truncates table on another connection while a calculation is paused in its snapshot, and
+// returns once the TRUNCATE waits for a lock, that of the calculation, or, failing the test, once it is done. The
+// channel returned receives the result of the TRUNCATE.
+func truncateWhileCalculating(t *testing.T, db *bun.DB, table string) chan error {
+	t.Helper()
+	ctx := context.Background()
+	truncated := make(chan error, 1)
+	go func() {
+		_, err := db.ExecContext(ctx, "TRUNCATE "+table)
+		truncated <- err
+	}()
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); {
+		select {
+		case err := <-truncated:
+			t.Errorf("the TRUNCATE of %s did not wait for the calculation (%v)", table, err)
+			truncated <- err
+			return truncated
+		case <-time.After(10 * time.Millisecond):
+		}
+		var waiting bool
+		if err := db.NewRaw("SELECT EXISTS (SELECT FROM pg_locks WHERE relation = ?::regclass AND NOT granted)", table).Scan(ctx, &waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting {
+			return truncated
+		}
+	}
+	t.Fatalf("the TRUNCATE of %s neither waited nor ran", table)
+	return nil
+}
+
 // Without the migration, or with the day versions not readable, the incremental mode aggregates every day.
 func TestGlobalDropMatrixIncrementalWithoutDayVersions(t *testing.T) {
 	db, off, _ := newGlobalMatrixTestData(t)
