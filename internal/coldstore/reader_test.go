@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -1205,5 +1206,162 @@ func TestReaderLocksOnlyFilesOfTheColdStorage(t *testing.T) {
 	sort.Slice(targets, func(i, k int) bool { return targetLess(targets[i], targets[k]) })
 	if want := []string{DimsTarget, MonthTarget("pre"), MonthTarget("2019-05"), MonthTarget("2019-10")}; !reflect.DeepEqual(targets, want) {
 		t.Errorf("lock order = %v, want %v", targets, want)
+	}
+}
+
+// makeReadOnly takes the write permission off dir and everything in it, as a read-only mount would, and gives it
+// back when the test ends so that the directory can be removed. Root ignores the permissions: the test is skipped.
+func makeReadOnly(t *testing.T, dir string) {
+	t.Helper()
+	if os.Geteuid() == 0 {
+		t.Skip("root writes to read-only directories")
+	}
+	chmodAll := func(dirMode, fileMode os.FileMode) error {
+		return filepath.WalkDir(dir, func(p string, e os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if e.IsDir() {
+				return os.Chmod(p, dirMode)
+			}
+			return os.Chmod(p, fileMode)
+		})
+	}
+	t.Cleanup(func() { _ = chmodAll(0o755, 0o644) })
+	if err := chmodAll(0o555, 0o444); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// queryEveryTarget reads a file of every month of the View and the dimensions.
+func queryEveryTarget(t *testing.T, r *Reader) {
+	t.Helper()
+	v := r.View()
+	var f QueryFiles
+	all := TimeRange{Start: time.Unix(0, 0).UTC(), End: v.HotBoundary()}
+	if n := queryInt(t, r, &f, "SELECT count(*) FROM "+f.ReadParquet(v.Files(KindDropReports, all))); n == 0 {
+		t.Error("no reports")
+	}
+	if n := queryInt(t, r, &f, "SELECT count(*) FROM "+f.ReadParquet([]string{v.DimFile(DropPatternElementsFile)})); n != 60 {
+		t.Errorf("drop pattern elements = %d", n)
+	}
+}
+
+// TestReaderReadsAReadOnlyStoreWithoutLocks is the restore drill of 2026-10-29: a cold storage restored from the
+// bucket has no LocksDir, and the app mounts it read-only. The reader opens it and serves it without the locks.
+func TestReaderReadsAReadOnlyStoreWithoutLocks(t *testing.T) {
+	d := newReaderTestData()
+	dir, _ := writeReaderStore(t, d, readerMonths...)
+	if err := os.RemoveAll(filepath.Join(dir, LocksDir)); err != nil {
+		t.Fatal(err)
+	}
+	makeReadOnly(t, dir)
+
+	r := openTestReader(t, dir)
+	queryEveryTarget(t, r)
+	res, err := r.CheckIntegrity(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Files != 3*len(Kinds)+1 || len(res.Bad) != 0 {
+		t.Fatalf("integrity = %+v", res)
+	}
+	if _, err := os.Stat(filepath.Join(dir, LocksDir)); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("lock directory: %v", err)
+	}
+
+	// LocksDir created by hand, still without the lock files
+	if err := os.Chmod(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, LocksDir), 0o555); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	queryEveryTarget(t, r)
+	if _, err := r.CheckIntegrity(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestReaderLocksReadOnlyLockFiles: on a read-only copy that has the lock files (written by the archiver), the
+// queries still take their shared locks, and wait for a publication that holds one.
+func TestReaderLocksReadOnlyLockFiles(t *testing.T) {
+	d := newReaderTestData()
+	dir, _ := writeReaderStore(t, d, readerMonths...)
+	targets := []string{DimsTarget}
+	for _, key := range readerMonths {
+		targets = append(targets, MonthTarget(key))
+	}
+	// the lock files, and a publication of June holding its lock
+	unlockAll, err := LockTargets(dir, targets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlockAll()
+	june := MonthTarget("2019-06")
+	unlock, err := lockTarget(dir, june)
+	if err != nil {
+		t.Fatal(err)
+	}
+	makeReadOnly(t, dir)
+	r := openTestReader(t, dir)
+
+	sharedWait := make(chan string, 1)
+	testHookSharedLockWait = func(target string) {
+		select {
+		case sharedWait <- target:
+		default:
+		}
+	}
+	t.Cleanup(func() { testHookSharedLockWait = nil })
+	v := r.View()
+	var f QueryFiles
+	query := "SELECT count(*) FROM " + f.ReadParquet(v.Files(KindDropReports, TimeRange{Start: time.Unix(0, 0).UTC(), End: v.HotBoundary()}))
+	done := make(chan error, 1)
+	go func() {
+		var n int64
+		done <- r.QueryRow(context.Background(), &f, query).Scan(&n)
+	}()
+	select {
+	case target := <-sharedWait:
+		if target != june {
+			t.Errorf("the query waits for %s", target)
+		}
+	case err := <-done:
+		unlock()
+		t.Fatalf("the query ran during the publication: %v", err)
+	case <-time.After(10 * time.Second):
+		unlock()
+		t.Fatal("the query neither waited nor ended")
+	}
+	unlock()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the query did not end once the publication released its lock")
+	}
+	queryEveryTarget(t, r)
+}
+
+func TestCannotCreate(t *testing.T) {
+	for _, c := range []struct {
+		err  error
+		want bool
+	}{
+		{&os.PathError{Op: "open", Path: "x", Err: syscall.EROFS}, true},
+		{&os.PathError{Op: "open", Path: "x", Err: syscall.EACCES}, true},
+		{&os.PathError{Op: "mkdir", Path: "x", Err: syscall.ENOENT}, true},
+		{&os.PathError{Op: "open", Path: "x", Err: syscall.ENOSPC}, false},
+		{&os.PathError{Op: "open", Path: "x", Err: syscall.EMFILE}, false},
+	} {
+		if got := cannotCreate(c.err); got != c.want {
+			t.Errorf("cannotCreate(%v) = %t", c.err, got)
+		}
 	}
 }
