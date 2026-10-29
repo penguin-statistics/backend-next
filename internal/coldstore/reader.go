@@ -32,6 +32,13 @@ import (
 // reads the files of a month as two generations, and a publication waits for the queries that read its month. A
 // month whose patch stopped partway (its journal is still there) may hold files of both generations: the queries
 // that read it fail until coldstore-recover completes or undoes the patch.
+//
+// The queries create the lock files they take where they can. A read-only copy without them (a directory restored
+// from the bucket, which has no LocksDir, mounted read-only into the app) is read without the locks it lacks (see
+// openLock). A publication creates its lock file before it changes anything, so only a query that started before
+// then goes unlocked, and the publications that change files a View names leave it time to end: the dimensions are
+// one file replaced by a rename, and a patch swaps a month's files in only once it has hashed and rewritten the
+// whole month and written its journal, which the queries check.
 
 // ReaderConfig configures a Reader.
 type ReaderConfig struct {
@@ -70,9 +77,10 @@ type Reader struct {
 	view     *View
 	loadedAt manifestStamp
 
-	stop chan struct{}
-	wg   sync.WaitGroup
-	once sync.Once
+	stop   chan struct{}
+	wg     sync.WaitGroup
+	once   sync.Once
+	noLock sync.Once
 }
 
 // manifestStamp identifies a version of the manifest file, to notice that it was replaced.
@@ -84,8 +92,9 @@ type manifestStamp struct {
 // OpenReader opens the local cold storage: it reads the manifest, checks that it covers every month from the first
 // one on without a gap (CheckCoverage) and that every file it lists is in the directory with its size
 // (CheckLocalFiles), and opens the DuckDB database. Any of these failing is an error: the caller (the app's
-// startup) must not run without the files. The directory's LocksDir must be writable: the queries create the lock
-// files they take. The background reload and integrity check start with Start.
+// startup) must not run without the files. It creates the directory's LocksDir if it can, so that the queries create
+// the lock files they take; a read-only directory is read without the locks whose files it lacks (see openLock).
+// The background reload and integrity check start with Start.
 func OpenReader(cfg ReaderConfig) (_ *Reader, err error) {
 	if cfg.Dir == "" {
 		return nil, errors.New("coldstore: no cold storage directory")
@@ -101,7 +110,14 @@ func OpenReader(cfg ReaderConfig) (_ *Reader, err error) {
 	}
 	r.view, r.loadedAt = view, stamp
 	if err := os.MkdirAll(filepath.Join(dir, LocksDir), 0o755); err != nil {
-		return nil, errors.Wrap(err, "coldstore: create lock directory")
+		if !cannotCreate(err) {
+			return nil, errors.Wrap(err, "coldstore: create lock directory")
+		}
+		log.Warn().
+			Str("evt.name", "coldstore.reader.no_lock_dir").
+			Str("dir", dir).
+			Err(err).
+			Msg("coldstore: cannot create the lock directory; the queries take only the locks whose files exist")
 	}
 
 	r.tempRoot = cfg.TempDir
@@ -312,9 +328,12 @@ func (r *Reader) lockFiles(ctx context.Context, files *QueryFiles) (_ func(), er
 		}
 	}()
 	for _, target := range targets {
-		f, err := os.OpenFile(filepath.Join(r.dir, LocksDir, target+".lock"), os.O_RDONLY|os.O_CREATE, 0o644)
+		f, err := r.openLock(target)
 		if err != nil {
-			return nil, errors.Wrap(err, "coldstore: open lock")
+			return nil, err
+		}
+		if f == nil {
+			continue
 		}
 		locks = append(locks, f)
 		if err := lockShared(ctx, f, target); err != nil {
@@ -334,6 +353,39 @@ func (r *Reader) lockFiles(ctx context.Context, files *QueryFiles) (_ func(), er
 		}
 	}
 	return release, nil
+}
+
+// openLock opens the lock file of a target for a shared lock (a read-only descriptor is enough for flock), creating
+// it if it is not there. When it is not there and cannot be created (a read-only copy of the cold storage, or one
+// without LocksDir), it returns nil and no error: the target is read without its lock, as lockTargetShared does,
+// which is logged once.
+func (r *Reader) openLock(target string) (*os.File, error) {
+	name := filepath.Join(r.dir, LocksDir, target+".lock")
+	f, err := os.OpenFile(name, os.O_RDONLY|os.O_CREATE, 0o644)
+	if err != nil && cannotCreate(err) {
+		// it may have been created since, by a publication
+		f, err = os.Open(name)
+		if errors.Is(err, os.ErrNotExist) {
+			r.noLock.Do(func() {
+				log.Warn().
+					Str("evt.name", "coldstore.reader.no_lock").
+					Str("dir", r.dir).
+					Str("target", target).
+					Msg("coldstore: a lock file is missing and cannot be created; reading without it")
+			})
+			return nil, nil
+		}
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "coldstore: open lock")
+	}
+	return f, nil
+}
+
+// cannotCreate tells whether err, from creating a file or directory, means that it cannot be created there: its
+// directory is missing, read-only or not writable by this process.
+func cannotCreate(err error) bool {
+	return errors.Is(err, os.ErrNotExist) || errors.Is(err, os.ErrPermission) || errors.Is(err, syscall.EROFS)
 }
 
 // testHookSharedLockWait, if set, is called when lockShared first finds its target locked, before it waits.
