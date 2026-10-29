@@ -105,7 +105,9 @@ func fmtTime(p *time.Time) string {
 }
 
 // monthStats computes MonthStats over a relation of reports (reportColumns) and one of their extras
-// (extrasColumns).
+// (extrasColumns). Each relation is aggregated in a subquery of its own, which reads it once, as a stream: a CTE
+// referenced twice is materialized, which held the extras of a whole month (148M rows of 2023-10, 11 GB spilled
+// under a 1.5 GB memory limit) and overflowed the temp directory.
 func (j *job) monthStats(ctx context.Context, reports, extras string, recruitStageID int) (MonthStats, error) {
 	var (
 		s                 MonthStats
@@ -115,15 +117,17 @@ func (j *job) monthStats(ctx context.Context, reports, extras string, recruitSta
 		reliable          = "stage_id <> " + recruit + " AND reliability = 0"
 		reportsH, extrasH string
 	)
-	err := j.queryRow(ctx, `WITH rep AS (`+reports+`), ext AS (`+extras+`)
-		SELECT count(*), count(*) FILTER (WHERE stage_id = `+recruit+`),
-			count(*) FILTER (WHERE `+reliable+`), coalesce(sum(times) FILTER (WHERE `+reliable+`), 0)::BIGINT,
-			coalesce(sum(times), 0)::BIGINT,
-			min(report_id), max(report_id), min(created_at), max(created_at),
-			coalesce(sum(hash(`+reportColumns+`)::HUGEINT), 0)::VARCHAR,
-			(SELECT count(*) FROM ext),
-			(SELECT coalesce(sum(hash(`+extrasColumns+`)::HUGEINT), 0)::VARCHAR FROM ext)
-		FROM rep`,
+	err := j.queryRow(ctx, `SELECT * FROM (
+			SELECT count(*), count(*) FILTER (WHERE stage_id = `+recruit+`),
+				count(*) FILTER (WHERE `+reliable+`), coalesce(sum(times) FILTER (WHERE `+reliable+`), 0)::BIGINT,
+				coalesce(sum(times), 0)::BIGINT,
+				min(report_id), max(report_id), min(created_at), max(created_at),
+				coalesce(sum(hash(`+reportColumns+`)::HUGEINT), 0)::VARCHAR
+			FROM (`+reports+`)
+		), (
+			SELECT count(*), coalesce(sum(hash(`+extrasColumns+`)::HUGEINT), 0)::VARCHAR
+			FROM (`+extras+`)
+		)`,
 		&s.Rows, &s.RecruitRows, &s.ReliableRows, &s.ReliableTimes, &s.SumTimes,
 		&minID, &maxID, &minTime, &maxTime, &reportsH, &s.ExtrasRows, &extrasH)
 	if err != nil {
