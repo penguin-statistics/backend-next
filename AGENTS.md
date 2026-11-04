@@ -99,4 +99,5 @@ go test -race -count=1 $(go list ./... | grep -v '/backend-next/test$')
   to verify it after a release.
 - If you change public API behaviour or data semantics, say so in the PR.
 - Releases are maintainers' work: a `vX.Y.Z` tag on `main` builds the image (`build-release.yml`), and ManifestBot
-  writes it into the manifests repository (`applications/backend/values-prod.yaml`), which Argo CD deploys.
+  sets `BACKEND_TAG` in the manifests repository (`hosts/penguin-box/.env`), which the box's updater deploys
+  (blue/green) within about a minute.

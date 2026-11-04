@@ -41,5 +41,5 @@ jobs:
           sentry-project: ${{ secrets.SENTRY_PROJECT }}
           use-ghrelease: true
           use-manifestbot: true
-          manifestbot-file-path: "applications/backend/values-prod.yaml"
+          manifestbot-env-key: "BACKEND_TAG"
           manifestbot-token: ${{ secrets.PAT_FOR_MANIFESTBOT }}
