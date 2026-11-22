@@ -22,6 +22,19 @@ import (
 // the reports); higher zstd levels and smaller row groups were measured to gain nothing.
 const parquetOptions = "FORMAT parquet, COMPRESSION zstd, PARQUET_VERSION V2, ROW_GROUP_SIZE 122880"
 
+// recruitJoinedTable is the job's table of the recruit reports joined with their extras, written in a statement of
+// its own before it is sorted into the recruit file. Recruit reports are most of a month (77% of 2026-08's 45M), and
+// DuckDB estimates the recruit filter at a few thousand rows, so it builds the join's hash table on them: a join
+// that spills GBs, which the sort over it, in the same pipeline, competed with for the memory limit. Together they
+// overran it (2026-08 failed with an Out of Memory Error at every try with a 1 GB limit); apart, each has the memory
+// limit to itself (2026-08 passes with 1 GB), and the file is the same, since report_id makes the sort key unique.
+const recruitJoinedTable = "recruit_joined"
+
+// extrasJoinedTable is, the same way, the job's table of the extras of the other reports, written before it is
+// sorted into the extras file: the semi join and the sort were one statement too, which held for 2026-08 only
+// because its other reports were 23% of the month.
+const extrasJoinedTable = "extras_joined"
+
 // manualSourcesList is the SQL list of the source_names of manually entered reports, the is_manual of the rollup
 // (as isManualSourceExpr in internal/repo).
 func manualSourcesList() string {
@@ -166,12 +179,19 @@ func (j *job) stageMonth(ctx context.Context, month Month, dir string, recruitSt
 		// personal queries
 		`COPY (SELECT * FROM r WHERE stage_id <> ` + recruit + ` ORDER BY server, account_id, created_at, report_id)
 			TO ` + quote(tmp[KindDropReports]) + ` (` + parquetOptions + `, ` + kv("server,account_id,created_at") + `})`,
-		`COPY (SELECT e.* FROM e SEMI JOIN r ON r.report_id = e.report_id AND r.stage_id <> ` + recruit + ` ORDER BY e.report_id)
+		// the join and the sort of the extras and of the recruit file run as statements of their own (see
+		// recruitJoinedTable)
+		`CREATE OR REPLACE TABLE ` + extrasJoinedTable + ` AS
+			SELECT e.* FROM e SEMI JOIN r ON r.report_id = e.report_id AND r.stage_id <> ` + recruit,
+		`COPY (SELECT * FROM ` + extrasJoinedTable + ` ORDER BY report_id)
 			TO ` + quote(tmp[KindExtras]) + ` (` + parquetOptions + `, ` + kv("report_id") + `})`,
+		`DROP TABLE ` + extrasJoinedTable,
 		// recruit reports carry their extras inline; their stage_id is in the metadata
-		`COPY (SELECT r.* EXCLUDE (stage_id), e.ip, e.metadata, e.md5 FROM r LEFT JOIN e USING (report_id)
-				WHERE r.stage_id = ` + recruit + ` ORDER BY r.created_at, r.report_id)
+		`CREATE OR REPLACE TABLE ` + recruitJoinedTable + ` AS SELECT r.* EXCLUDE (stage_id), e.ip, e.metadata, e.md5
+			FROM r LEFT JOIN e USING (report_id) WHERE r.stage_id = ` + recruit,
+		`COPY (SELECT * FROM ` + recruitJoinedTable + ` ORDER BY created_at, report_id)
 			TO ` + quote(tmp[KindRecruit]) + ` (` + parquetOptions + `, ` + kv("created_at") + `, stage_id: ` + quote(recruit) + `})`,
+		`DROP TABLE ` + recruitJoinedTable,
 		// hours are UTC hours (the job runs with TimeZone UTC): every server's day boundary is a whole hour
 		`COPY (SELECT server, stage_id, pattern_id,
 				COALESCE(source_name IN (` + manualSourcesList() + `), false) AS is_manual,
