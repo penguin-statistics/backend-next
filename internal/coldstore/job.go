@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -219,8 +220,8 @@ func redactDSN(msg string, dsns ...string) string {
 	return uriPassword.ReplaceAllString(msg, "${1}***@")
 }
 
-// uriPassword matches the userinfo password of a postgres:// URI.
-var uriPassword = regexp.MustCompile(`(?i)(postgres(?:ql)?://[^:@/\s]*:)[^@\s]*@`)
+// uriPassword matches the userinfo password of a postgres:// or unix:// URI.
+var uriPassword = regexp.MustCompile(`(?i)((?:postgres(?:ql)?|unix)://[^:@/\s]*:)[^@\s]*@`)
 
 // rawPassword returns the password of a URI's userinfo exactly as it is written in the URI.
 func rawPassword(dsn string) string {
@@ -247,12 +248,31 @@ func libpqDSN(dsn string) (string, error) {
 	if err != nil {
 		return "", errors.New("coldstore: invalid PostgreSQL DSN")
 	}
-	if u.Scheme != "postgres" && u.Scheme != "postgresql" {
+	in := u.Query()
+	out := url.Values{}
+	switch u.Scheme {
+	case "postgres", "postgresql":
+	case "unix":
+		// pgdriver's unix://user:password@database/path/to/.s.PGSQL.5432 (penguin-box): libpq takes the socket's
+		// directory as host and the number in its name as port
+		dir, name := path.Split(u.Path)
+		port, ok := strings.CutPrefix(name, ".s.PGSQL.")
+		if !path.IsAbs(u.Path) || !ok || port == "" || strings.Trim(port, "0123456789") != "" {
+			return "", errors.New("coldstore: the path of a unix PostgreSQL DSN must be a socket named .s.PGSQL.<port>")
+		}
+		// without them pgdriver and libpq fall back to different defaults (PGDATABASE or postgres, the user name)
+		if u.Host == "" || u.User.Username() == "" {
+			return "", errors.New("coldstore: a unix PostgreSQL DSN must name its user and database")
+		}
+		out.Set("host", path.Clean(dir))
+		out.Set("port", port)
+		u = &url.URL{Scheme: "postgres", User: u.User, Path: "/" + u.Host}
+		// pgdriver dials the socket of the path and ignores a host parameter
+		in.Del("host")
+	default:
 		return "", fmt.Errorf("coldstore: unsupported PostgreSQL DSN scheme %q", u.Scheme)
 	}
 
-	in := u.Query()
-	out := url.Values{}
 	var settings []string
 	keys := make([]string, 0, len(in))
 	for k := range in {

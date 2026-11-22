@@ -1195,7 +1195,12 @@ func TestArchiveDropIgnoresOtherDatabases(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		u.Path = "/" + name
+		// pgdriver's unix DSN names the database where a postgres:// one has its host
+		if u.Scheme == "unix" {
+			u.Host = name
+		} else {
+			u.Path = "/" + name
+		}
 		return u.String()
 	}
 	createDB := func(name, template string) {
