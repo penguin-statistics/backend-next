@@ -65,9 +65,10 @@ func TestWriteMonthWithinMemoryLimit(t *testing.T) {
 	}
 }
 
-// TestRecruitFileMatchesSingleStatement checks that the recruit file, joined and sorted in statements of their own,
-// is byte for byte the file of the single COPY that joined and sorted at once, and that the join's table is gone.
-func TestRecruitFileMatchesSingleStatement(t *testing.T) {
+// TestJoinedFilesMatchSingleStatement checks that the recruit and extras files, joined and sorted in statements of
+// their own, are byte for byte the files of the single COPYs that joined and sorted at once, and that the joins'
+// tables are gone.
+func TestJoinedFilesMatchSingleStatement(t *testing.T) {
 	ctx := context.Background()
 	m := mustMonth(t, "2026-08")
 	d := newTestData()
@@ -93,25 +94,42 @@ func TestRecruitFileMatchesSingleStatement(t *testing.T) {
 	if entry.RecruitRows < 100 {
 		t.Fatalf("recruit rows = %d", entry.RecruitRows)
 	}
-	var left int64
-	if err := j.queryRow(ctx, `SELECT count(*) FROM duckdb_tables() WHERE table_name = `+quote(recruitJoinedTable), &left); err != nil {
-		t.Fatal(err)
-	}
-	if left != 0 {
-		t.Errorf("table %s left in the job's database", recruitJoinedTable)
+	for _, table := range []string{recruitJoinedTable, extrasJoinedTable} {
+		var left int64
+		if err := j.queryRow(ctx, `SELECT count(*) FROM duckdb_tables() WHERE table_name = `+quote(table), &left); err != nil {
+			t.Fatal(err)
+		}
+		if left != 0 {
+			t.Errorf("table %s left in the job's database", table)
+		}
 	}
 
-	single := filepath.Join(t.TempDir(), "recruit.parquet")
-	if err := j.exec(ctx, `COPY (SELECT r.* EXCLUDE (stage_id), e.ip, e.metadata, e.md5 FROM r LEFT JOIN e USING (report_id)
-			WHERE r.stage_id = `+strconv.Itoa(testRecruitStageID)+` ORDER BY r.created_at, r.report_id)
-		TO `+quote(single)+` (`+parquetOptions+`, KV_METADATA {month: '2026-08', sort: 'created_at', stage_id: '42'})`); err != nil {
-		t.Fatal(err)
-	}
-	want, err := describeFile(single)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := entry.File(KindRecruit); got.SHA256 != want.SHA256 || got.Bytes != want.Bytes {
-		t.Errorf("recruit file %s (%d bytes), the single statement's %s (%d bytes)", got.SHA256, got.Bytes, want.SHA256, want.Bytes)
+	recruit := strconv.Itoa(testRecruitStageID)
+	for _, c := range []struct {
+		kind Kind
+		copy string
+	}{
+		{KindRecruit, `SELECT r.* EXCLUDE (stage_id), e.ip, e.metadata, e.md5 FROM r LEFT JOIN e USING (report_id)
+			WHERE r.stage_id = ` + recruit + ` ORDER BY r.created_at, r.report_id`,
+		},
+		{KindExtras, `SELECT e.* FROM e SEMI JOIN r ON r.report_id = e.report_id AND r.stage_id <> ` + recruit + `
+			ORDER BY e.report_id`,
+		},
+	} {
+		kv := "KV_METADATA {month: '2026-08', sort: 'created_at', stage_id: " + quote(recruit) + "}"
+		if c.kind == KindExtras {
+			kv = "KV_METADATA {month: '2026-08', sort: 'report_id'}"
+		}
+		single := filepath.Join(t.TempDir(), "single.parquet")
+		if err := j.exec(ctx, `COPY (`+c.copy+`) TO `+quote(single)+` (`+parquetOptions+`, `+kv+`)`); err != nil {
+			t.Fatal(err)
+		}
+		want, err := describeFile(single)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := entry.File(c.kind); got.SHA256 != want.SHA256 || got.Bytes != want.Bytes {
+			t.Errorf("%s file %s (%d bytes), the single statement's %s (%d bytes)", c.kind, got.SHA256, got.Bytes, want.SHA256, want.Bytes)
+		}
 	}
 }

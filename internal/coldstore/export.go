@@ -30,6 +30,11 @@ const parquetOptions = "FORMAT parquet, COMPRESSION zstd, PARQUET_VERSION V2, RO
 // limit to itself (2026-08 passes with 1 GB), and the file is the same, since report_id makes the sort key unique.
 const recruitJoinedTable = "recruit_joined"
 
+// extrasJoinedTable is, the same way, the job's table of the extras of the other reports, written before it is
+// sorted into the extras file: the semi join and the sort were one statement too, which held for 2026-08 only
+// because its other reports were 23% of the month.
+const extrasJoinedTable = "extras_joined"
+
 // manualSourcesList is the SQL list of the source_names of manually entered reports, the is_manual of the rollup
 // (as isManualSourceExpr in internal/repo).
 func manualSourcesList() string {
@@ -174,10 +179,14 @@ func (j *job) stageMonth(ctx context.Context, month Month, dir string, recruitSt
 		// personal queries
 		`COPY (SELECT * FROM r WHERE stage_id <> ` + recruit + ` ORDER BY server, account_id, created_at, report_id)
 			TO ` + quote(tmp[KindDropReports]) + ` (` + parquetOptions + `, ` + kv("server,account_id,created_at") + `})`,
-		`COPY (SELECT e.* FROM e SEMI JOIN r ON r.report_id = e.report_id AND r.stage_id <> ` + recruit + ` ORDER BY e.report_id)
+		// the join and the sort of the extras and of the recruit file run as statements of their own (see
+		// recruitJoinedTable)
+		`CREATE OR REPLACE TABLE ` + extrasJoinedTable + ` AS
+			SELECT e.* FROM e SEMI JOIN r ON r.report_id = e.report_id AND r.stage_id <> ` + recruit,
+		`COPY (SELECT * FROM ` + extrasJoinedTable + ` ORDER BY report_id)
 			TO ` + quote(tmp[KindExtras]) + ` (` + parquetOptions + `, ` + kv("report_id") + `})`,
-		// recruit reports carry their extras inline; their stage_id is in the metadata. The join and the sort run
-		// as statements of their own (see recruitJoinedTable).
+		`DROP TABLE ` + extrasJoinedTable,
+		// recruit reports carry their extras inline; their stage_id is in the metadata
 		`CREATE OR REPLACE TABLE ` + recruitJoinedTable + ` AS SELECT r.* EXCLUDE (stage_id), e.ip, e.metadata, e.md5
 			FROM r LEFT JOIN e USING (report_id) WHERE r.stage_id = ` + recruit,
 		`COPY (SELECT * FROM ` + recruitJoinedTable + ` ORDER BY created_at, report_id)
