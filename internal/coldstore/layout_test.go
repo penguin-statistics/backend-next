@@ -112,6 +112,9 @@ func TestLibpqDSN(t *testing.T) {
 		"postgres://u@h/db?search_path=it 1&application_name=x": "postgres://u@h/db?application_name=x&options=-c%20search_path%3Dit%5C%201",
 		"postgres://u@h/db?connect_timeout=1500ms&timeout=5s":   "postgres://u@h/db?connect_timeout=2",
 		"postgres://u@h/db?statement_timeout=0&search_path=a,b": "postgres://u@h/db?options=-c%20search_path%3Da%2Cb%20-c%20statement_timeout%3D0",
+		// pgdriver's unix socket DSN, as penguin-box writes it
+		"unix://u:p%40ss@db/var/run/postgresql/.s.PGSQL.5432?sslmode=disable&dial_timeout=10s&read_timeout=1200s&write_timeout=120s": "postgres://u:p%40ss@/db?connect_timeout=10&host=%2Fvar%2Frun%2Fpostgresql&port=5432&sslmode=disable",
+		"unix://u@db/tmp/.s.PGSQL.5434?host=/elsewhere&search_path=x":                                                                "postgres://u@/db?host=%2Ftmp&options=-c%20search_path%3Dx&port=5434",
 	}
 	for in, want := range cases {
 		got, err := libpqDSN(in)
@@ -119,7 +122,7 @@ func TestLibpqDSN(t *testing.T) {
 			t.Errorf("libpqDSN(%s) = %s, %v; want %s", in, got, err, want)
 		}
 	}
-	for _, bad := range []string{"unix:///tmp/.s.PGSQL.5432", "mysql://h/db", "postgres://h/db?dial_timeout=soon"} {
+	for _, bad := range []string{"mysql://h/db", "postgres://h/db?dial_timeout=soon", "unix://u@db/tmp/pg.sock", "unix://u@db/tmp/.s.PGSQL.", "unix://u@db/tmp/.s.PGSQL.54x", "unix://u@db", "unix:///tmp/.s.PGSQL.5432", "unix://u@/tmp/.s.PGSQL.5432", "unix://db/tmp/.s.PGSQL.5432"} {
 		if _, err := libpqDSN(bad); err == nil {
 			t.Errorf("libpqDSN(%s) succeeded", bad)
 		}
@@ -163,6 +166,14 @@ func TestRedactDSN(t *testing.T) {
 		if !strings.Contains(got, "postgres://runner:***@127.0.0.1:1/postgres") {
 			t.Errorf("password %q: %s", p, got)
 		}
+	}
+	unix := "unix://u:s3cr%2Ft@db/var/run/postgresql/.s.PGSQL.5432?sslmode=disable"
+	libpq, err := libpqDSN(unix)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := redactDSN("failed: "+libpq+" from unix://u:s3cr/t@db/var/run/postgresql/.s.PGSQL.5432", libpq, unix); strings.Contains(got, "s3cr") {
+		t.Errorf("redactDSN of a unix DSN = %s", got)
 	}
 	if got := redactDSN("no password here postgres://u@h/db", "postgres://u@h/db"); got != "no password here postgres://u@h/db" {
 		t.Errorf("redactDSN without a password = %s", got)
