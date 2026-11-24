@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
+	"github.com/uptrace/bun"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
@@ -460,6 +461,20 @@ func (s *DropMatrix) calcGlobalDropMatrixUncached(ctx context.Context, server st
 // calcGlobalDropMatrices calculates the global drop matrices of server for every source category: each stage and
 // item over its latest max accumulable time range, from a single statement per source category.
 func (s *DropMatrix) calcGlobalDropMatrices(ctx context.Context, server string, sourceCategories []string) (map[string]*model.DropMatrixQueryResult, error) {
+	targets, err := s.globalDropMatrixTargets(ctx, server)
+	if err != nil {
+		return nil, err
+	}
+	aggregates, err := s.aggregateGlobalDropMatrices(ctx, s.DropMatrixElementService.DB(), server, targets, sourceCategories)
+	if err != nil {
+		return nil, err
+	}
+	return assembleGlobalDropMatrices(targets, aggregates, sourceCategories), nil
+}
+
+// globalDropMatrixTargets returns the targets of the global drop matrices of server: each stage and item with its
+// latest max accumulable time range.
+func (s *DropMatrix) globalDropMatrixTargets(ctx context.Context, server string) ([]*model.GlobalDropMatrixTarget, error) {
 	maxAccumulableTimeRanges, err := s.TimeRangeService.GetAllMaxAccumulableTimeRangesByServer(ctx, server)
 	if err != nil {
 		return nil, err
@@ -474,11 +489,18 @@ func (s *DropMatrix) calcGlobalDropMatrices(ctx context.Context, server string, 
 			targets = append(targets, &model.GlobalDropMatrixTarget{StageID: stageId, ItemID: itemId, TimeRange: timeRange})
 		}
 	}
+	return targets, nil
+}
+
+// aggregateGlobalDropMatrices aggregates the elements of the targets in db for every source category.
+func (s *DropMatrix) aggregateGlobalDropMatrices(
+	ctx context.Context, db bun.IDB, server string, targets []*model.GlobalDropMatrixTarget, sourceCategories []string,
+) (map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate, error) {
 	// a statement per source category: those of all source categories at once aggregate three times the elements
 	// and spill to disk, which is slower than three statements
 	aggregates := make(map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate)
 	for _, sourceCategory := range sourceCategories {
-		categoryAggregates, err := s.DropMatrixElementService.CalcGlobalDropMatrixAggregates(ctx, server, targets, []string{sourceCategory})
+		categoryAggregates, err := s.DropMatrixElementService.CalcGlobalDropMatrixAggregates(ctx, db, server, targets, []string{sourceCategory})
 		if err != nil {
 			return nil, err
 		}
@@ -486,7 +508,14 @@ func (s *DropMatrix) calcGlobalDropMatrices(ctx context.Context, server string, 
 			aggregates[key] = aggregate
 		}
 	}
+	return aggregates, nil
+}
 
+// assembleGlobalDropMatrices makes the global drop matrices of the source categories from the aggregates of the
+// targets, in the order of targets.
+func assembleGlobalDropMatrices(
+	targets []*model.GlobalDropMatrixTarget, aggregates map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate, sourceCategories []string,
+) map[string]*model.DropMatrixQueryResult {
 	results := make(map[string]*model.DropMatrixQueryResult, len(sourceCategories))
 	for _, sourceCategory := range sourceCategories {
 		result := &model.DropMatrixQueryResult{
@@ -510,7 +539,7 @@ func (s *DropMatrix) calcGlobalDropMatrices(ctx context.Context, server string, 
 		}
 		results[sourceCategory] = result
 	}
-	return results, nil
+	return results
 }
 
 // =========== Personal Max Accumulable ===========

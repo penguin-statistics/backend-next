@@ -49,3 +49,33 @@ type GlobalDropMatrixAggregate struct {
 	Quantity        null.Int
 	QuantityBuckets map[int]int
 }
+
+// Add accumulates an aggregate of the same target and source category over a disjoint range of days: a part valid
+// in either is valid, with the sum of both, and the buckets add per key. The elements of a day are on one side only,
+// and so is every distinct (times, day_num), so the sum is the aggregate of both ranges of days. The buckets of a are updated in place.
+func (a *GlobalDropMatrixAggregate) Add(other *GlobalDropMatrixAggregate) {
+	if other.Times.Valid {
+		a.Times = null.IntFrom(a.Times.ValueOrZero() + other.Times.Int64)
+	}
+	if other.Quantity.Valid {
+		a.Quantity = null.IntFrom(a.Quantity.ValueOrZero() + other.Quantity.Int64)
+	}
+	if len(other.QuantityBuckets) > 0 && a.QuantityBuckets == nil {
+		a.QuantityBuckets = make(map[int]int, len(other.QuantityBuckets))
+	}
+	for quantity, count := range other.QuantityBuckets {
+		a.QuantityBuckets[quantity] += count
+	}
+}
+
+// GlobalMatrixScope selects the days of the elements a partial aggregation of the global matrices reads, and splits
+// them in two.
+type GlobalMatrixScope struct {
+	// SplitDayNum splits the elements: those with day_num < SplitDayNum are aggregated apart from the others.
+	SplitDayNum int
+	// FromDayNum, if valid, leaves out the elements with day_num < FromDayNum.
+	FromDayNum null.Int
+	// StageFirst reads the elements of the stages of the targets before joining them with the targets: faster for the
+	// targets of a few stages over every day, slower for those of every stage.
+	StageFirst bool
+}
