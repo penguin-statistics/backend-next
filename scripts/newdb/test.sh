@@ -30,6 +30,9 @@ for q in oldq newq; do
 done
 oldq -f "$here/testdata/old_schema.sql"
 oldq -f "$here/testdata/seed.sql" > /dev/null
+# the day versions of the matrix elements, written on the old database too, as for a later move: not copied
+oldq -f "$here/../migrations/20261025_matrix_element_day_versions.sql"
+oldq -c "UPDATE drop_matrix_elements SET times = times" -c "UPDATE pattern_matrix_elements SET times = times"
 oldq -c "ANALYZE"
 # read-only, as in the maintenance window (T1)
 oldq -c "ALTER DATABASE \"$(oldq -c 'SELECT current_database()')\" SET default_transaction_read_only = on"
@@ -103,6 +106,15 @@ check "report ids continue after the old database" "$(newq -c "SELECT nextval('d
 check "accounts continue" "$(newq -c "SELECT nextval('accounts_account_id_seq')")" "51"
 check "indexes of drop_reports" "$(newq -c "SELECT string_agg(indexname, ' ' ORDER BY indexname) FROM pg_indexes WHERE schemaname = current_schema() AND tablename = 'drop_reports'")" \
 	"drop_reports_account_id_created_at drop_reports_created_at drop_reports_pkey"
+check "day versions on the old database" "$(oldq -c "SELECT count(*) > 0 FROM matrix_element_day_versions")" "t"
+check "no day version copied or written by the load" "$(newq -c "SELECT count(*) FROM matrix_element_day_versions")" "0"
+check "triggers of the day versions, always enabled" "$(newq -c "SELECT tgrelid::regclass || ' ' || count(*) || ' ' || string_agg(DISTINCT tgenabled::text, '')
+	FROM pg_trigger WHERE tgname LIKE 'matrix\_element\_day\_versions\_%' GROUP BY tgrelid ORDER BY 1" | tr '\n' ',')" \
+	"drop_matrix_elements 4 A,pattern_matrix_elements 4 A,"
+newq -c "UPDATE drop_matrix_elements SET times = times WHERE element_id = (SELECT min(element_id) FROM drop_matrix_elements)"
+check "a write of an element bumps its day" "$(newq -c "SELECT count(*) FROM matrix_element_day_versions v
+	JOIN drop_matrix_elements e ON e.server::text = v.server AND e.day_num = v.day_num
+	WHERE v.tbl = 'drop' AND e.element_id = (SELECT min(element_id) FROM drop_matrix_elements)")" "1"
 check "foreign keys" "$(newq -c "SELECT count(*) FROM pg_constraint WHERE contype = 'f' AND conrelid = 'drop_reports'::regclass")" "3"
 
 # reports of now and of the next month can be written, not those of a month without partition

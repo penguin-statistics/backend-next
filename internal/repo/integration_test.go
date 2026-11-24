@@ -70,10 +70,23 @@ CREATE TABLE pattern_matrix_elements (
 );
 `
 
-// newTestDB connects to PENGUIN_TEST_POSTGRES_DSN with a fresh schema holding testSchema.
+// dayVersionsMigration is the migration adding the day versions of the matrix elements: the tables of testSchema
+// have them, as in production.
+const dayVersionsMigration = "../../scripts/migrations/20261025_matrix_element_day_versions.sql"
+
+// newTestDB connects to PENGUIN_TEST_POSTGRES_DSN with a fresh schema holding testSchema and its day versions.
 func newTestDB(t *testing.T) *bun.DB {
 	t.Helper()
-	return newTestDBWithSchema(t, testSchema)
+	return newTestDBWithSchema(t, testSchema+readFile(t, dayVersionsMigration))
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }
 
 // newTestDBWithSchema connects to PENGUIN_TEST_POSTGRES_DSN with a fresh schema in which ddl has been run.

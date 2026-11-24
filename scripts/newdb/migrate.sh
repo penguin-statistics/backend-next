@@ -8,13 +8,14 @@
 #
 #   schema  T2  checks that the cold store holds every month before HOT_FROM (COLDSTORE_MANIFEST), then schema.sql on
 #               the new database, and the partitions of the hot months and of the RUNWAY_MONTHS after them
-#   small   T2  every table but drop_reports and drop_report_extras: pg_dump -Fd --data-only, pg_restore
+#   small   T2  every table but drop_reports, drop_report_extras and matrix_element_day_versions: pg_dump -Fd
+#               --data-only, pg_restore
 #   hot     T3  the reports created since HOT_FROM: drop_reports (recruitment reports included, as today) and their
 #               drop_report_extras (with the created_at of the report)
-#   post    T4  indexes.sql (secondary indexes, foreign keys), ANALYZE, every sequence set to at least the old value
-#               and the highest id that uses it
+#   post    T4  indexes.sql (secondary indexes, foreign keys, the triggers writing matrix_element_day_versions),
+#               ANALYZE, every sequence set to at least the old value and the highest id that uses it
 #   verify  T5  per day of the hot months, row count and content hash of both report tables, old against new;
-#               row counts of the other tables
+#               row counts of the other tables but matrix_element_day_versions
 #
 # Environment:
 #   OLD_DSN, NEW_DSN  connection strings (libpq URI or key=value) of the old and the new database
@@ -250,8 +251,11 @@ step_small() {
 	newq -c "DO \$\$ BEGIN EXECUTE (SELECT 'TRUNCATE ' || string_agg(c.oid::regclass::text, ', ') FROM pg_class c
 		WHERE c.relkind = 'r' AND NOT c.relispartition AND c.relnamespace = current_schema()::text::regnamespace); END \$\$"
 	rm -rf "$WORKDIR/small"
+	# no day versions: those of the old database say nothing of the new one, which a reader tells apart by its
+	# triggers (created by post) and so aggregates in full first
 	pg_dump "$OLD_DSN" -Fd -j "$JOBS" --data-only --schema=public \
-		--exclude-table-data=public.drop_reports --exclude-table-data=public.drop_report_extras -f "$WORKDIR/small"
+		--exclude-table-data=public.drop_reports --exclude-table-data=public.drop_report_extras \
+		--exclude-table-data=public.matrix_element_day_versions -f "$WORKDIR/small"
 	pg_restore -d "$NEW_DSN" -j "$JOBS" --data-only --no-owner --no-privileges --exit-on-error "$WORKDIR/small"
 }
 
@@ -316,9 +320,11 @@ step_verify() {
 	mkdir -p "$WORKDIR/verify"
 	local failed=0 tables t old new
 	run_jobs _verify || failed=1
-	# read before the loop, whose words would otherwise hide the failure as no table at all
+	# read before the loop, whose words would otherwise hide the failure as no table at all; the day versions are not
+	# copied (see step_small)
 	if ! tables=$(newq -c "SELECT c.relname FROM pg_class c WHERE c.relkind = 'r' AND NOT c.relispartition
-			AND c.relnamespace = current_schema()::text::regnamespace AND c.relname NOT LIKE 'pg\_%' ORDER BY 1"); then
+			AND c.relnamespace = current_schema()::text::regnamespace AND c.relname NOT LIKE 'pg\_%'
+			AND c.relname <> 'matrix_element_day_versions' ORDER BY 1"); then
 		log "cannot list the tables of the new database"
 		failed=1
 	fi

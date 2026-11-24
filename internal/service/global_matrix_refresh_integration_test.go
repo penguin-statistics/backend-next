@@ -146,10 +146,6 @@ func newGlobalMatrixTestData(t *testing.T) (*bun.DB, *DropMatrix, *PatternMatrix
 	t.Helper()
 	db := newTestDB(t)
 	ctx := context.Background()
-	mustExec(t, db, `CREATE TABLE pattern_matrix_elements (
-		element_id bigserial PRIMARY KEY, stage_id integer NOT NULL, pattern_id bigint NOT NULL, quantity integer NOT NULL,
-		times integer NOT NULL, server server NOT NULL, source_category character varying(32) DEFAULT 'all' NOT NULL,
-		start_time timestamp with time zone, end_time timestamp with time zone, day_num integer NOT NULL)`)
 	seedMatrixData(t, rand.New(rand.NewSource(1)), db)
 	for stageId := 1; stageId <= 6; stageId++ {
 		mustExec(t, db, "INSERT INTO stages (stage_id, ark_stage_id, zone_id, stage_type) VALUES (?, ?, 1, 'MAIN')", stageId, "stage_"+strconv.Itoa(stageId))
