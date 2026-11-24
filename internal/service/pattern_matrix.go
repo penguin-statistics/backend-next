@@ -28,6 +28,15 @@ type PatternMatrix struct {
 	DropPatternElementService   *DropPatternElement
 	StageService                *Stage
 	ItemService                 *Item
+
+	// GlobalMatrixFingerprints checks the bases of the incremental global pattern matrices (GlobalMatrixIncremental);
+	// nil reads the day versions of the elements.
+	GlobalMatrixFingerprints GlobalMatrixFingerprints
+
+	// globalPatternMatrixStore reads the elements for the incremental global pattern matrices instead of
+	// PatternMatrixElementService, if set (tests)
+	globalPatternMatrixStore globalPatternMatrixStore
+	incremental              globalMatrixIncremental
 }
 
 func NewPatternMatrix(
@@ -163,7 +172,7 @@ func (s *PatternMatrix) RefreshGlobalPatternMatrixCaches(ctx context.Context, se
 			s.deleteGlobalPatternMatrixCaches(server)
 		}
 	}()
-	globals, err := s.calcGlobalPatternMatrices(ctx, server, s.Config.MatrixWorkerSourceCategories)
+	globals, err := s.calcGlobalPatternMatrices(ctx, server, s.Config.MatrixWorkerSourceCategories, true)
 	if err != nil {
 		return err
 	}
@@ -298,7 +307,7 @@ func (s *PatternMatrix) calcPatternMatrixByGivenDate(
 }
 
 func (s *PatternMatrix) calcGlobalPatternMatrix(ctx context.Context, server string, sourceCategory string) (*model.PatternMatrixQueryResult, error) {
-	results, err := s.calcGlobalPatternMatrices(ctx, server, []string{sourceCategory})
+	results, err := s.calcGlobalPatternMatrices(ctx, server, []string{sourceCategory}, false)
 	if err != nil {
 		return nil, err
 	}
@@ -306,13 +315,19 @@ func (s *PatternMatrix) calcGlobalPatternMatrix(ctx context.Context, server stri
 }
 
 // calcGlobalPatternMatrices calculates the global pattern matrices of server for every source category: each stage
-// over its latest time range, from a single statement per source category.
-func (s *PatternMatrix) calcGlobalPatternMatrices(ctx context.Context, server string, sourceCategories []string) (map[string]*model.PatternMatrixQueryResult, error) {
+// over its latest time range, from a single statement per source category. refresh is for
+// RefreshGlobalPatternMatrixCaches (see aggregateGlobalPatternMatricesIncrementally).
+func (s *PatternMatrix) calcGlobalPatternMatrices(ctx context.Context, server string, sourceCategories []string, refresh bool) (map[string]*model.PatternMatrixQueryResult, error) {
 	targets, err := s.globalPatternMatrixTargets(ctx, server)
 	if err != nil {
 		return nil, err
 	}
-	aggregates, err := s.aggregateGlobalPatternMatrices(ctx, s.PatternMatrixElementService.DB(), server, targets, sourceCategories)
+	var aggregates map[string]*model.GlobalPatternMatrixAggregates
+	if s.Config.GlobalMatrixIncremental.Incremental() {
+		aggregates, err = s.aggregateGlobalPatternMatricesIncrementally(ctx, server, targets, sourceCategories, refresh)
+	} else {
+		aggregates, err = s.aggregateGlobalPatternMatrices(ctx, s.PatternMatrixElementService.DB(), server, targets, sourceCategories)
+	}
 	if err != nil {
 		return nil, err
 	}

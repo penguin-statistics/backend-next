@@ -2,92 +2,25 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"math/rand"
 	"sort"
 	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 
 	"exusiai.dev/gommon/constant"
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
 	"github.com/uptrace/bun"
-	"golang.org/x/sync/singleflight"
 	"gopkg.in/guregu/null.v3"
 
 	"exusiai.dev/backend-next/internal/app/appconfig"
 	"exusiai.dev/backend-next/internal/model"
 	"exusiai.dev/backend-next/internal/model/cache"
 	"exusiai.dev/backend-next/internal/pkg/observability"
-	"exusiai.dev/backend-next/internal/repo"
 	"exusiai.dev/backend-next/internal/util"
 )
 
-// The incremental global drop matrices (GlobalMatrixIncremental, #860). The aggregate of a target over every day is
-// the aggregate of the days before any day Add that of the others (model.GlobalDropMatrixAggregate.Add), so the days
-// before yesterday are kept aggregated, per process, server and source category, in a base, and a calculation
-// aggregates only the days since the base, and every day of the targets whose time range changed. A base is valid
-// only while no element of its days changed: every write of the elements gives the days it touched a new version
-// (scripts/migrations/20261025_matrix_element_day_versions.sql), in its own transaction, so a calculation reads the
-// fingerprint of the versions of the base's days and the elements since in one snapshot, and extends the base only
-// if the fingerprint is the base's.
-
-// The paths and reasons of observability.GlobalMatrixRefreshPaths.
-const (
-	globalMatrixPathIncremental = "incremental"
-	globalMatrixPathRebuild     = "rebuild"
-	globalMatrixPathFull        = "full"
-
-	globalMatrixReasonNone            = "none"
-	globalMatrixReasonNoBase          = "no_base"
-	globalMatrixReasonFingerprint     = "fingerprint"
-	globalMatrixReasonDayBack         = "day_back"
-	globalMatrixReasonMaxAge          = "max_age"
-	globalMatrixReasonChangedStages   = "changed_stages"
-	globalMatrixReasonTriggersMissing = "triggers_missing"
-
-	globalMatrixKindDrop = "drop"
-
-	// maxLoggedMismatches bounds the keys a verification logs.
-	maxLoggedMismatches = 20
-)
-
-// GlobalMatrixFingerprints reads, in the snapshot of db, what the bases of the incremental global matrices are
-// checked against. The default reads the day versions of the elements; a benchmark on a database without them uses a
-// constant one.
-type GlobalMatrixFingerprints interface {
-	// Triggers returns what identifies the triggers that version the days of the elements of table, or why the day
-	// versions cannot be relied on (missing is not empty): a trigger is missing or not firing always, or the versions
-	// cannot be read.
-	Triggers(ctx context.Context, db bun.IDB, table string) (identity, missing string, err error)
-	// DayFingerprints returns, for each of bounds, the fingerprint of the day versions of the elements of server in
-	// tbl (drop or pattern) of the days before it.
-	DayFingerprints(ctx context.Context, db bun.IDB, tbl, server string, bounds []int) (map[int]string, error)
-}
-
-// dayVersionFingerprints reads the day versions the triggers keep.
-type dayVersionFingerprints struct{}
-
-func (dayVersionFingerprints) Triggers(ctx context.Context, db bun.IDB, table string) (identity, missing string, err error) {
-	enabled, identity, readable, err := repo.ReadMatrixElementDayVersionTriggers(ctx, db, table)
-	if err != nil {
-		return "", "", err
-	}
-	if enabled != repo.MatrixElementDayVersionTriggers {
-		return identity, fmt.Sprintf("%d of the %d triggers of the day versions of %s fire always", enabled, repo.MatrixElementDayVersionTriggers, table), nil
-	}
-	if !readable {
-		return identity, "the day versions cannot be read (matrix_element_day_versions is missing, or SELECT is not granted)", nil
-	}
-	return identity, "", nil
-}
-
-func (dayVersionFingerprints) DayFingerprints(ctx context.Context, db bun.IDB, tbl, server string, bounds []int) (map[int]string, error) {
-	return repo.ReadMatrixElementDayFingerprints(ctx, db, tbl, server, bounds)
-}
+// The incremental global drop matrices (GlobalMatrixIncremental, #860): see global_matrix_incremental.go. A base is
+// kept per server and source category, of the aggregates of every stage and item.
 
 // globalDropMatrixStore reads the drop matrix elements for the incremental global drop matrices
 // (DropMatrixElement).
@@ -103,38 +36,6 @@ type globalDropMatrixStore interface {
 		ctx context.Context, db bun.IDB, server string, targets []*model.GlobalDropMatrixTarget, sourceCategories []string,
 		scope model.GlobalMatrixScope,
 	) (before, after map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate, err error)
-}
-
-// globalMatrixIncremental is the state of the incremental global matrices of a process; the zero value is ready.
-type globalMatrixIncremental struct {
-	// jitter is the fraction of GlobalMatrixBaseMaxAge taken off it in this process, in [0, 0.1)
-	jitterOnce sync.Once
-	jitter     float64
-	// calculations counts the calculations of each server (*atomic.Int64), for GlobalMatrixVerifyEvery
-	calculations sync.Map
-	// rebuilds runs a rebuild of a server and source category once for the callers that need it at once (see
-	// rebuildGlobalDropMatrixBase)
-	rebuilds singleflight.Group
-}
-
-func (g *globalMatrixIncremental) maxAge(configured time.Duration) time.Duration {
-	if configured <= 0 {
-		configured = 24 * time.Hour
-	}
-	g.jitterOnce.Do(func() { g.jitter = rand.Float64() / 10 })
-	return configured - time.Duration(float64(configured)*g.jitter)
-}
-
-// verifies counts a calculation of server, and reports whether it is verified.
-func (g *globalMatrixIncremental) verifies(conf *appconfig.Config, server string) bool {
-	if conf.GlobalMatrixIncremental == appconfig.GlobalMatrixIncrementalVerify {
-		return true
-	}
-	if conf.GlobalMatrixVerifyEvery <= 0 {
-		return false
-	}
-	counter, _ := g.calculations.LoadOrStore(server, &atomic.Int64{})
-	return counter.(*atomic.Int64).Add(1)%int64(conf.GlobalMatrixVerifyEvery) == 0
 }
 
 // globalDropMatrixCalc is the calculation of the global drop matrix of a source category.
@@ -169,8 +70,8 @@ func (s *DropMatrix) globalDropMatrixElements() globalDropMatrixStore {
 }
 
 // aggregateGlobalDropMatricesIncrementally aggregates the elements of the targets of server over every day for
-// every source category, as aggregateGlobalDropMatrices does, from the cached bases (see the top of the file). For
-// each source category:
+// every source category, as aggregateGlobalDropMatrices does, from the cached bases (see
+// global_matrix_incremental.go). For each source category:
 //   - without a usable base (none, of a later day, older than GlobalMatrixBaseMaxAge), it rebuilds one: one statement
 //     over every day, the days before yesterday apart, in a snapshot of its own;
 //   - otherwise, in one snapshot for every source category, if the fingerprint of the base's days is still the
@@ -376,14 +277,9 @@ type globalDropMatrixRebuild struct {
 
 // rebuildGlobalDropMatrixBase aggregates every day of the targets for calc in a snapshot of its own, the days before
 // beforeDayNum apart as a new base. A rebuild of the same server and source category already running is waited for
-// instead, and its results are taken if it had the same targets, except by a refresh: the snapshot of a rebuild that
-// started before the refresh may be of before the batch the refresh publishes, and nothing would then keep the
-// refresh from caching it over newer matrices (cache.Set.Set does not check), so a refresh starts a rebuild of its
-// own, which the calculations that need one after it share. A request may take the results of any rebuild: requests
-// of a key run one after the other (cache.Set.MutexGetSet), so it shares only a refresh's, and if a refresh wrote the
-// key meanwhile, MutexGetSet does not cache the request's results over it. A caller that waited for a rebuild that
-// failed because the context of the caller running it was done (canceled, past its deadline) rebuilds itself,
-// unless its own context is done too.
+// instead, and its results are taken if it had the same targets, except by a refresh (see
+// globalMatrixIncremental.shareRebuild). The requests of a key run one after the other (cache.Set.MutexGetSet), so a
+// request shares only a refresh's rebuild.
 func (s *DropMatrix) rebuildGlobalDropMatrixBase(
 	ctx context.Context, server string, targets []*model.GlobalDropMatrixTarget, ranges map[model.GlobalMatrixStageItem]model.GlobalMatrixSecondRange,
 	beforeDayNum int, calc *globalDropMatrixCalc, verify, refresh bool,
@@ -394,31 +290,16 @@ func (s *DropMatrix) rebuildGlobalDropMatrixBase(
 		}
 		return &globalDropMatrixRebuild{ranges: ranges, path: calc.path, newBase: calc.newBase, aggregates: calc.aggregates}, nil
 	}
-	key := globalDropMatrixBaseKey(server, calc.sourceCategory)
-	if refresh {
-		// a rebuild running is left to its callers; the rebuilds that start from now on are after the refresh
-		s.incremental.rebuilds.Forget(key)
+	usable := func(shared interface{}) bool {
+		result := shared.(*globalDropMatrixRebuild)
+		return sameGlobalMatrixTargetRanges(result.ranges, ranges) && (result.newBase == nil || result.newBase.BeforeDayNum == beforeDayNum)
 	}
-	var executed bool
-	v, err, _ := s.incremental.rebuilds.Do(key, func() (interface{}, error) {
-		executed = true
-		return rebuild()
-	})
-	if executed { // this caller rebuilt
-		return err
-	}
-	if err != nil {
-		if (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) && ctx.Err() == nil {
-			_, err = rebuild()
-		}
-		return err
-	}
-	result := v.(*globalDropMatrixRebuild)
-	if !sameGlobalMatrixTargetRanges(result.ranges, ranges) || result.newBase != nil && result.newBase.BeforeDayNum != beforeDayNum {
-		_, err := rebuild()
+	shared, err := s.incremental.shareRebuild(ctx, globalDropMatrixBaseKey(server, calc.sourceCategory), refresh, rebuild, usable)
+	if err != nil || shared == nil {
 		return err
 	}
 	// the base is cached by the caller that rebuilt it
+	result := shared.(*globalDropMatrixRebuild)
 	calc.path, calc.aggregates = result.path, result.aggregates
 	return nil
 }
@@ -551,18 +432,6 @@ func globalMatrixTargetRanges(targets []*model.GlobalDropMatrixTarget) map[model
 	return ranges
 }
 
-func sameGlobalMatrixTargetRanges(a, b map[model.GlobalMatrixStageItem]model.GlobalMatrixSecondRange) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for key, r := range a {
-		if other, ok := b[key]; !ok || other != r {
-			return false
-		}
-	}
-	return true
-}
-
 // globalDropMatrixAggregatesOf returns the aggregates of sourceCategory in aggregates, by stage and item.
 func globalDropMatrixAggregatesOf(
 	aggregates map[model.GlobalDropMatrixKey]*model.GlobalDropMatrixAggregate, sourceCategory string,
@@ -636,13 +505,6 @@ func describeGlobalDropMatrixAggregate(aggregate *model.GlobalDropMatrixAggregat
 		fmt.Fprintf(&b, " %d:%d", quantity, aggregate.QuantityBuckets[quantity])
 	}
 	return b.String()
-}
-
-func formatNullInt(i null.Int) string {
-	if !i.Valid {
-		return "null"
-	}
-	return fmt.Sprint(i.Int64)
 }
 
 // globalDropMatrixResultLines describes the elements of a global drop matrix, one line each.

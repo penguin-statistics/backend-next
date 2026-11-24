@@ -1,5 +1,7 @@
 package model
 
+import "time"
+
 // GlobalPatternMatrixTarget is a stage of a global pattern matrix, with the time range its elements are aggregated
 // over (the elements within it).
 type GlobalPatternMatrixTarget struct {
@@ -37,4 +39,19 @@ func (a *GlobalPatternMatrixAggregates) Add(other *GlobalPatternMatrixAggregates
 			quantities[patternId] += quantity
 		}
 	}
+}
+
+// GlobalPatternMatrixBase is the aggregate of the pattern matrix elements of the days before BeforeDayNum, of a server
+// and source category, for the target stages in Targets: read in one snapshot, in which the fingerprint of those days
+// (the identity of the triggers that version them and their day versions) was Fingerprint. It is immutable once
+// cached: a refresh makes a new one, which may share the quantities of the stages it did not change.
+type GlobalPatternMatrixBase struct {
+	BeforeDayNum int
+	Fingerprint  string
+	// Targets holds every target stage the base was aggregated for, also those without an element, with its time range.
+	Targets map[int]GlobalMatrixSecondRange
+	// Partials holds the aggregates of the target stages in those days.
+	Partials GlobalPatternMatrixAggregates
+	// BuiltAt is when the base was last aggregated from every day; extending it keeps it.
+	BuiltAt time.Time
 }

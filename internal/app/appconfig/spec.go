@@ -165,15 +165,16 @@ type ConfigSpec struct {
 	// Available categories are: all, automated, manual.
 	MatrixWorkerSourceCategories []string `required:"true" split_words:"true" default:"all"`
 
-	// GlobalMatrixIncremental is how the global drop matrices are calculated (#860): off (the default) aggregates
-	// every day of the drop matrix elements each time, as before. on keeps, per process, server and source category,
-	// a base: the aggregate of the days before yesterday. A refresh then aggregates only yesterday and today (and the
-	// days the base is behind), and recomputes over every day only the stages whose target time range changed. The
-	// base is checked, in the snapshot the refresh reads, against the day versions the triggers of
-	// scripts/migrations/20261025_matrix_element_day_versions.sql keep: if any day of the base was written since, or
-	// the triggers changed, it is built again. Without the triggers (or read access to the versions), every
-	// calculation aggregates every day, as with off. verify calculates as on, then also as off in the same snapshot,
-	// compares the two (penguinbackend_worker_global_matrix_verify_mismatches_total) and serves the result of off.
+	// GlobalMatrixIncremental is how the global drop and pattern matrices are calculated (#860): off (the default)
+	// aggregates every day of the drop and pattern matrix elements each time, as before. on keeps, per process, kind
+	// (drop or pattern), server and source category, a base: the aggregate of the days before yesterday. A refresh
+	// then aggregates only yesterday and today (and the days the base is behind), and recomputes over every day only
+	// the stages whose target time range changed. The base is checked, in the snapshot the refresh reads, against the
+	// day versions the triggers of scripts/migrations/20261025_matrix_element_day_versions.sql keep: if any day of the
+	// base was written since, or the triggers changed, it is built again. Without the triggers (or read access to the
+	// versions), every calculation aggregates every day, as with off. verify calculates as on, then also as off in the
+	// same snapshot, compares the two (penguinbackend_worker_global_matrix_verify_mismatches_total) and serves the
+	// result of off.
 	GlobalMatrixIncremental GlobalMatrixIncrementalMode `split_words:"true" default:"off"`
 
 	// GlobalMatrixBaseMaxAge is how long a base of GlobalMatrixIncremental is extended before it is built again from
@@ -181,9 +182,9 @@ type ConfigSpec struct {
 	// bases again at once. Not positive: 24h.
 	GlobalMatrixBaseMaxAge time.Duration `split_words:"true" default:"24h"`
 
-	// GlobalMatrixVerifyEvery verifies every nth calculation of the global drop matrices of a server when
-	// GlobalMatrixIncremental is on, as verify does, but serving the incremental result unless they differ. 0 never
-	// verifies.
+	// GlobalMatrixVerifyEvery verifies every nth calculation of the global drop matrices of a server, and apart that of
+	// the pattern matrices, when GlobalMatrixIncremental is on, as verify does, but serving the incremental result
+	// unless they differ. 0 never verifies.
 	GlobalMatrixVerifyEvery int `split_words:"true" default:"0"`
 
 	// GlobalMatrixMaxChangedStages is how many stages with a changed target time range (an event added or edited) an

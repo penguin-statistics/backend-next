@@ -28,6 +28,7 @@ var (
 	ShimTrend *cache.Set[modelv2.TrendQueryResult]
 
 	ShimGlobalPatternMatrix *cache.Set[modelv2.PatternMatrixQueryResult]
+	GlobalPatternMatrixBase *cache.Set[model.GlobalPatternMatrixBase]
 
 	Formula *cache.Singular[json.RawMessage]
 
@@ -144,6 +145,10 @@ func initializeCaches() {
 	ShimGlobalPatternMatrix = cache.NewSet[modelv2.PatternMatrixQueryResult]("shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns")
 
 	SetMap["shimGlobalPatternMatrix#server|sourceCategory|showAllPatterns"] = ShimGlobalPatternMatrix.Flush
+
+	// the bases of the incremental global pattern matrices, as those of the drop matrices
+	GlobalPatternMatrixBase = cache.NewSet[model.GlobalPatternMatrixBase]("globalPatternMatrixBase#server|sourceCategory")
+	SetMap["globalPatternMatrixBase#server|sourceCategory"] = GlobalPatternMatrixBase.Flush
 
 	// formula
 	Formula = cache.NewSingular[json.RawMessage]("formula")

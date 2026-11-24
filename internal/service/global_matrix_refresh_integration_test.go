@@ -298,18 +298,18 @@ func TestGlobalMatrixRefresh(t *testing.T) {
 
 	// a worker or admin rewrite of a stage's pattern elements (delete, then insert) in progress: the single statement
 	// reads one state consistently, without the stage while it is deleted
-	before, err := patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories)
+	before, err := patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	mustExec(t, db, "CREATE TABLE rewritten AS SELECT * FROM pattern_matrix_elements WHERE server = 'CN' AND stage_id = 1")
 	mustExec(t, db, "DELETE FROM pattern_matrix_elements WHERE server = 'CN' AND stage_id = 1")
-	during, err := patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories)
+	during, err := patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	mustExec(t, db, "INSERT INTO pattern_matrix_elements SELECT * FROM rewritten")
-	after, err := patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories)
+	after, err := patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +347,7 @@ func TestGlobalMatrixRefreshPanic(t *testing.T) {
 		SELECT stage_id, 999, quantity, times, server, quantity_buckets, source_category, start_time, end_time, day_num
 		FROM drop_matrix_elements WHERE server = 'CN' AND source_category = ? AND stage_id = ? AND item_id = ?`,
 		constant.SourceCategoryManual, drop.StageID, drop.ItemID)
-	patterns, err := patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories)
+	patterns, err := patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +362,7 @@ func TestGlobalMatrixRefreshPanic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	patterns, err = patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories)
+	patterns, err = patternMatrix.calcGlobalPatternMatrices(ctx, "CN", allSourceCategories, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -432,7 +432,7 @@ func TestGlobalMatricesMatchLegacy(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		patterns, err := patternMatrix.calcGlobalPatternMatrices(ctx, server, allSourceCategories)
+		patterns, err := patternMatrix.calcGlobalPatternMatrices(ctx, server, allSourceCategories, false)
 		if err != nil {
 			t.Fatal(err)
 		}

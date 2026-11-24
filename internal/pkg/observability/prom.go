@@ -163,9 +163,9 @@ var (
 		Name: prometheus.BuildFQName(ServiceName, "worker", "refreshes_total"),
 		Help: "Background global matrix refreshes by outcome",
 	}, []string{"refresh", "server", "outcome"})
-	// GlobalMatrixRefreshPaths counts the calculations of the global matrices of a kind (drop), server and source
-	// category with GlobalMatrixIncremental on or verify by path: incremental (a base extended by the days since and
-	// the changed targets), rebuild (a base aggregated from every day) or full (every day, without a base: the triggers
+	// GlobalMatrixRefreshPaths counts the calculations of the global matrices of a kind (drop or pattern), server and
+	// source category with GlobalMatrixIncremental on or verify by path: incremental (a base extended by the days since
+	// and the changed targets), rebuild (a base aggregated from every day) or full (every day, without a base: the triggers
 	// of the day versions are missing or not firing always, or the versions cannot be read). reason is why it did not
 	// take the path before: none for incremental; no_base, fingerprint (a day of the base was written, or the triggers
 	// changed), day_back (the base is of a later day), max_age or changed_stages for rebuild; triggers_missing for full.
