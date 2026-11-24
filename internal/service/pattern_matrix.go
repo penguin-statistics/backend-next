@@ -125,10 +125,9 @@ func (s *PatternMatrix) RunCalcPatternMatrixJob(ctx context.Context, server stri
 	if err != nil {
 		return err
 	}
-	s.PatternMatrixElementService.DeleteByServerAndDayNum(ctx, server, dayNum)
-
-	if len(patternMatrixElements) != 0 {
-		s.PatternMatrixElementService.BatchSaveElements(ctx, patternMatrixElements, server)
+	patternMatrixElements = elementsOfDay(patternMatrixElements, dayNum, patternMatrixElementDay)
+	if err := s.PatternMatrixElementService.ReplaceDay(ctx, server, dayNum, patternMatrixElements); err != nil {
+		return err
 	}
 	describeCalcJob(ctx, dayNum, s.Config.MatrixWorkerSourceCategories, len(patternMatrixElements))
 
@@ -139,9 +138,9 @@ func (s *PatternMatrix) RunCalcPatternMatrixJob(ctx context.Context, server stri
 		if err != nil {
 			return err
 		}
-		s.PatternMatrixElementService.DeleteByServerAndDayNum(ctx, server, dayNum-1)
-		if len(patternMatrixElementsForYesterday) != 0 {
-			s.PatternMatrixElementService.BatchSaveElements(ctx, patternMatrixElementsForYesterday, server)
+		patternMatrixElementsForYesterday = elementsOfDay(patternMatrixElementsForYesterday, dayNum-1, patternMatrixElementDay)
+		if err := s.PatternMatrixElementService.ReplaceDay(ctx, server, dayNum-1, patternMatrixElementsForYesterday); err != nil {
+			return err
 		}
 		describePreviousDay(ctx, len(patternMatrixElementsForYesterday))
 	}
@@ -233,9 +232,9 @@ func (s *PatternMatrix) UpdatePatternMatrixByGivenDate(ctx context.Context, serv
 		return err
 	}
 	dayNum := util.GetDayNum(date, server)
-	s.PatternMatrixElementService.DeleteByServerAndDayNum(ctx, server, dayNum)
-	if len(patternMatrixElements) != 0 {
-		s.PatternMatrixElementService.BatchSaveElements(ctx, patternMatrixElements, server)
+	patternMatrixElements = elementsOfDay(patternMatrixElements, dayNum, patternMatrixElementDay)
+	if err := s.PatternMatrixElementService.ReplaceDay(ctx, server, dayNum, patternMatrixElements); err != nil {
+		return err
 	}
 	describeCalcJob(ctx, dayNum, s.Config.MatrixWorkerSourceCategories, len(patternMatrixElements))
 	return nil

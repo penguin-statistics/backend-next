@@ -17,12 +17,10 @@ func NewPatternMatrixElement(patternMatrixElementRepo *repo.PatternMatrixElement
 	}
 }
 
-func (s *PatternMatrixElement) BatchSaveElements(ctx context.Context, elements []*model.PatternMatrixElement, server string) error {
-	return s.PatternMatrixElementRepo.BatchSaveElements(ctx, elements, server)
-}
+func patternMatrixElementDay(el *model.PatternMatrixElement) int { return el.DayNum }
 
-func (s *PatternMatrixElement) DeleteByServerAndDayNum(ctx context.Context, server string, dayNum int) error {
-	return s.PatternMatrixElementRepo.DeleteByServerAndDayNum(ctx, server, dayNum)
+func (s *PatternMatrixElement) ReplaceDay(ctx context.Context, server string, dayNum int, elements []*model.PatternMatrixElement) error {
+	return s.PatternMatrixElementRepo.ReplaceDay(ctx, server, dayNum, elements)
 }
 
 func (s *PatternMatrixElement) IsExistByServerAndDayNum(ctx context.Context, server string, dayNum int) (bool, error) {

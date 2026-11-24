@@ -24,17 +24,11 @@ func NewDropMatrixElement(db *bun.DB) *DropMatrixElement {
 	return &DropMatrixElement{db: db, sel: selector.New[model.DropMatrixElement](db)}
 }
 
-func (s *DropMatrixElement) BatchSaveElements(ctx context.Context, elements []*model.DropMatrixElement, server string) error {
-	_, err := s.db.NewInsert().Model(&elements).Exec(ctx)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s *DropMatrixElement) DeleteByServerAndDayNum(ctx context.Context, server string, dayNum int) error {
-	_, err := s.db.NewDelete().Model((*model.DropMatrixElement)(nil)).Where("server = ?", server).Where("day_num = ?", dayNum).Exec(ctx)
-	return err
+// ReplaceDay replaces the elements of server on dayNum by elements, all of that day, atomically (see
+// replaceElementsOfDay).
+func (s *DropMatrixElement) ReplaceDay(ctx context.Context, server string, dayNum int, elements []*model.DropMatrixElement) error {
+	return replaceElementsOfDay(ctx, s.db, "drop_matrix_elements", server, dayNum, elements,
+		func(el *model.DropMatrixElement) (string, int) { return el.Server, el.DayNum })
 }
 
 /**
