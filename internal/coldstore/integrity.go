@@ -94,18 +94,21 @@ func (r *Reader) checkIntegrity(ctx context.Context) (IntegrityResult, error) {
 }
 
 // checkTarget hashes the files of a target (DimsTarget or a MonthTarget) as the manifest file lists them now, under
-// the target's shared lock, and adds what it found to res. It returns an error only when the check cannot go on: ctx
-// ended, or the lock or the manifest cannot be read.
+// the target's shared lock (none if it has no lock file and cannot get one, see openLock), and adds what it found
+// to res. It returns an error only when the check cannot go on: ctx ended, or the lock or the manifest cannot be
+// read.
 func (r *Reader) checkTarget(ctx context.Context, target string, res *IntegrityResult) error {
-	lock, err := os.OpenFile(filepath.Join(r.dir, LocksDir, target+".lock"), os.O_RDONLY|os.O_CREATE, 0o644)
+	lock, err := r.openLock(target)
 	if err != nil {
-		return errors.Wrap(err, "coldstore: open lock")
-	}
-	defer lock.Close()
-	if err := lockShared(ctx, lock, target); err != nil {
 		return err
 	}
-	defer func() { _ = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN) }()
+	if lock != nil {
+		defer lock.Close()
+		if err := lockShared(ctx, lock, target); err != nil {
+			return err
+		}
+		defer func() { _ = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN) }()
+	}
 
 	key, isMonth := strings.CutPrefix(target, MonthTarget(""))
 	if isMonth && PendingPatch(r.dir, key) {
